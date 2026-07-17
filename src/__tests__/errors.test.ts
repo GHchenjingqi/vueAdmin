@@ -1,179 +1,191 @@
 /**
  * errors.ts 单元测试
- * 覆盖：AppError 类、createAppError、getErrorMessage、isUserCancel
+ *
+ * 覆盖全局应用错误类与错误转换工具：
+ * - AppError 构造、isRetryable / isAuthError 派生属性
+ * - createAppError：网络错误、HTTP 状态码、业务消息映射
+ * - getErrorMessage：AppError / Error / string / 普通对象
+ * - isUserCancel / isNetworkError / isAuthError / isValidationError 判定
+ *
+ * 该文件是 src/utils/error.ts 的纯逻辑实现来源（error.ts 仅为重导出），
+ * 补充后可消除 error.ts 的覆盖率假阴性。
  */
 import { describe, it, expect } from 'vitest'
-import { AppError, createAppError, getErrorMessage, isUserCancel } from '../utils/errors'
+import {
+  AppError,
+  createAppError,
+  getErrorMessage,
+  isUserCancel,
+  isNetworkError,
+  isAuthError,
+  isValidationError,
+} from '../utils/errors'
 
 describe('errors.ts - AppError', () => {
-  it('创建基本 AppError', () => {
-    const err = new AppError('测试错误')
-    expect(err.message).toBe('测试错误')
-    expect(err.code).toBe('UNKNOWN')
-    expect(err.name).toBe('AppError')
+  it('默认 code 为 UNKNOWN', () => {
+    const e = new AppError('boom')
+    expect(e.message).toBe('boom')
+    expect(e.name).toBe('AppError')
+    expect(e.code).toBe('UNKNOWN')
+    expect(e.status).toBeUndefined()
   })
 
-  it('创建带 code 的 AppError', () => {
-    const err = new AppError('未授权', 'UNAUTHORIZED', 401)
-    expect(err.code).toBe('UNAUTHORIZED')
-    expect(err.status).toBe(401)
+  it('携带 code / status / details', () => {
+    const e = new AppError('没权限', 'FORBIDDEN', 403, { role: 'guest' })
+    expect(e.code).toBe('FORBIDDEN')
+    expect(e.status).toBe(403)
+    expect(e.details).toEqual({ role: 'guest' })
   })
 
-  it('创建带 details 的 AppError', () => {
-    const details = { field: 'username', reason: 'required' }
-    const err = new AppError('验证失败', 'VALIDATION_ERROR', 400, details)
-    expect(err.details).toEqual(details)
+  it('isRetryable 仅网络/超时/服务端错误为真', () => {
+    expect(new AppError('a', 'NETWORK_ERROR').isRetryable).toBe(true)
+    expect(new AppError('a', 'TIMEOUT').isRetryable).toBe(true)
+    expect(new AppError('a', 'SERVER_ERROR').isRetryable).toBe(true)
+    expect(new AppError('a', 'UNAUTHORIZED').isRetryable).toBe(false)
+    expect(new AppError('a', 'VALIDATION_ERROR').isRetryable).toBe(false)
   })
 
-  describe('isRetryable', () => {
-    it('NETWORK_ERROR 可重试', () => {
-      const err = new AppError('网络错误', 'NETWORK_ERROR')
-      expect(err.isRetryable).toBe(true)
-    })
-
-    it('TIMEOUT 可重试', () => {
-      const err = new AppError('超时', 'TIMEOUT')
-      expect(err.isRetryable).toBe(true)
-    })
-
-    it('SERVER_ERROR 可重试', () => {
-      const err = new AppError('服务器错误', 'SERVER_ERROR')
-      expect(err.isRetryable).toBe(true)
-    })
-
-    it('UNAUTHORIZED 不可重试', () => {
-      const err = new AppError('未授权', 'UNAUTHORIZED')
-      expect(err.isRetryable).toBe(false)
-    })
-
-    it('BUSINESS_ERROR 不可重试', () => {
-      const err = new AppError('业务错误', 'BUSINESS_ERROR')
-      expect(err.isRetryable).toBe(false)
-    })
-  })
-
-  describe('isAuthError', () => {
-    it('UNAUTHORIZED 是认证错误', () => {
-      const err = new AppError('未授权', 'UNAUTHORIZED')
-      expect(err.isAuthError).toBe(true)
-    })
-
-    it('其他错误不是认证错误', () => {
-      const err = new AppError('禁止访问', 'FORBIDDEN')
-      expect(err.isAuthError).toBe(false)
-    })
+  it('isAuthError 由 code 决定', () => {
+    expect(new AppError('a', 'UNAUTHORIZED').isAuthError).toBe(true)
+    expect(new AppError('a', 'FORBIDDEN').isAuthError).toBe(false)
   })
 })
 
 describe('errors.ts - createAppError', () => {
-  it('AppError 直接返回', () => {
-    const original = new AppError('原始错误', 'BUSINESS_ERROR')
-    const result = createAppError(original)
-    expect(result).toBe(original)
+  it('已是 AppError 则原样返回', () => {
+    const original = new AppError('hi', 'NOT_FOUND', 404)
+    expect(createAppError(original)).toBe(original)
   })
 
-  it('无响应的网络错误（ERR_NETWORK）', () => {
-    const axiosErr = { code: 'ERR_NETWORK', message: 'Network Error' }
-    const result = createAppError(axiosErr)
-    expect(result.code).toBe('NETWORK_ERROR')
-    expect(result.message).toBe('Network Error')
+  it('无 response 视为网络错误', () => {
+    const e = createAppError({ message: 'Network Error' })
+    expect(e).toBeInstanceOf(AppError)
+    expect(e.code).toBe('NETWORK_ERROR')
   })
 
-  it('超时错误（ECONNABORTED）', () => {
-    const axiosErr = { code: 'ECONNABORTED', message: 'timeout of 15000ms exceeded' }
-    const result = createAppError(axiosErr)
-    expect(result.code).toBe('TIMEOUT')
+  it('无 response 且有 axios code 映射', () => {
+    expect(createAppError({ code: 'ECONNABORTED', message: 'x' }).code).toBe('TIMEOUT')
+    expect(createAppError({ code: 'ECONNREFUSED', message: 'x' }).code).toBe('NETWORK_ERROR')
+    expect(createAppError({ code: 'ENOTFOUND', message: 'x' }).code).toBe('NETWORK_ERROR')
   })
 
-  it('401 错误', () => {
-    const axiosErr = {
-      response: { status: 401, data: { message: 'Token expired' } },
-    }
-    const result = createAppError(axiosErr)
-    expect(result.code).toBe('UNAUTHORIZED')
-    expect(result.status).toBe(401)
-    expect(result.message).toBe('Token expired')
+  it('HTTP 状态码映射到对应 ErrorCode', () => {
+    expect(createAppError({ response: { status: 400 } }).code).toBe('VALIDATION_ERROR')
+    expect(createAppError({ response: { status: 401 } }).code).toBe('UNAUTHORIZED')
+    expect(createAppError({ response: { status: 403 } }).code).toBe('FORBIDDEN')
+    expect(createAppError({ response: { status: 404 } }).code).toBe('NOT_FOUND')
+    expect(createAppError({ response: { status: 500 } }).code).toBe('SERVER_ERROR')
+    expect(createAppError({ response: { status: 502 } }).code).toBe('SERVER_ERROR')
   })
 
-  it('403 错误', () => {
-    const axiosErr = {
-      response: { status: 403, data: {} },
-    }
-    const result = createAppError(axiosErr)
-    expect(result.code).toBe('FORBIDDEN')
-    expect(result.message).toBe('您没有权限执行此操作')
+  it('未知状态码回退 UNKNOWN', () => {
+    expect(createAppError({ response: { status: 418 } }).code).toBe('UNKNOWN')
   })
 
-  it('404 错误', () => {
-    const axiosErr = {
-      response: { status: 404, data: {} },
-    }
-    const result = createAppError(axiosErr)
-    expect(result.code).toBe('NOT_FOUND')
-    expect(result.message).toBe('请求的资源不存在')
+  it('优先使用业务消息，否则使用 HTTP 文案', () => {
+    expect(createAppError({ response: { status: 500, data: { message: '数据库炸了' } } }).message).toBe('数据库炸了')
+    expect(createAppError({ response: { status: 403, data: {} } }).message).toBe('您没有权限执行此操作')
+    expect(createAppError({ response: { status: 404, data: {} } }).message).toBe('请求的资源不存在')
   })
 
-  it('500 错误', () => {
-    const axiosErr = {
-      response: { status: 500, data: { message: 'Internal Server Error' } },
-    }
-    const result = createAppError(axiosErr)
-    expect(result.code).toBe('SERVER_ERROR')
-    expect(result.message).toBe('Internal Server Error')
+  it('无消息时回退到默认提示', () => {
+    const e = createAppError({ response: { status: 418, data: {} } })
+    expect(e.message).toBe('请求失败')
   })
 
-  it('未知 HTTP 状态码', () => {
-    const axiosErr = {
-      response: { status: 418, data: {} },
-    }
-    const result = createAppError(axiosErr)
-    expect(result.code).toBe('UNKNOWN')
-  })
-
-  it('无 message 时使用默认提示', () => {
-    const axiosErr = {
-      response: { status: 401, data: {} },
-    }
-    const result = createAppError(axiosErr)
-    expect(result.message).toBe('登录已过期，请重新登录')
+  it('携带原始 response.data 作为 details', () => {
+    const data = { message: 'x', traceId: 'abc' }
+    expect(createAppError({ response: { status: 500, data } }).details).toBe(data)
   })
 })
 
 describe('errors.ts - getErrorMessage', () => {
   it('AppError 返回 message', () => {
-    const err = new AppError('应用错误')
-    expect(getErrorMessage(err)).toBe('应用错误')
+    expect(getErrorMessage(new AppError('自定义错误'))).toBe('自定义错误')
   })
 
   it('Error 返回 message', () => {
-    const err = new Error('标准错误')
-    expect(getErrorMessage(err)).toBe('标准错误')
+    expect(getErrorMessage(new Error('标准错误'))).toBe('标准错误')
   })
 
-  it('字符串直接返回', () => {
-    expect(getErrorMessage('字符串错误')).toBe('字符串错误')
+  it('string 直接返回', () => {
+    expect(getErrorMessage('纯文本')).toBe('纯文本')
   })
 
-  it('其他类型返回默认消息', () => {
+  it('带 message 的普通对象', () => {
+    expect(getErrorMessage({ message: '对象消息' })).toBe('对象消息')
+  })
+
+  it('无 message 的对象返回未知错误', () => {
+    expect(getErrorMessage({ foo: 1 })).toBe('未知错误')
+  })
+
+  it('null / undefined 返回未知错误', () => {
     expect(getErrorMessage(null)).toBe('未知错误')
     expect(getErrorMessage(undefined)).toBe('未知错误')
-    expect(getErrorMessage({})).toBe('未知错误')
   })
 })
 
 describe('errors.ts - isUserCancel', () => {
-  it('字符串 cancel 为用户取消', () => {
+  it('字符串 cancel', () => {
     expect(isUserCancel('cancel')).toBe(true)
   })
-
-  it('message 为 cancel 的 Error 为用户取消', () => {
-    const err = new Error('cancel')
-    expect(isUserCancel(err)).toBe(true)
+  it('Error message 为 cancel', () => {
+    expect(isUserCancel(new Error('cancel'))).toBe(true)
   })
-
-  it('其他错误不是用户取消', () => {
-    expect(isUserCancel(new Error('other'))).toBe(false)
+  it('其它错误为 false', () => {
+    expect(isUserCancel(new Error('x'))).toBe(false)
     expect(isUserCancel(null)).toBe(false)
-    expect(isUserCancel('other')).toBe(false)
+  })
+})
+
+describe('errors.ts - isNetworkError', () => {
+  it('命中关键字', () => {
+    expect(isNetworkError(new Error('network timeout'))).toBe(true)
+    expect(isNetworkError(new Error('ECONNREFUSED'))).toBe(true)
+    expect(isNetworkError('connection failed')).toBe(true)
+  })
+  it('非网络错误', () => {
+    expect(isNetworkError(new Error('bad request'))).toBe(false)
+    expect(isNetworkError(null)).toBe(false)
+  })
+})
+
+describe('errors.ts - isAuthError', () => {
+  it('AppError status 401/403', () => {
+    expect(isAuthError(new AppError('a', 'UNAUTHORIZED', 401))).toBe(true)
+    expect(isAuthError(new AppError('a', 'FORBIDDEN', 403))).toBe(true)
+    expect(isAuthError(new AppError('a', 'NOT_FOUND', 404))).toBe(false)
+  })
+  it('AppError code 判定', () => {
+    expect(isAuthError(new AppError('a', 'UNAUTHORIZED'))).toBe(true)
+    expect(isAuthError(new AppError('a', 'FORBIDDEN'))).toBe(true)
+  })
+  it('Axios 风格 plain Error', () => {
+    expect(isAuthError({ response: { status: 401 } } as unknown as Error)).toBe(true)
+    expect(isAuthError({ response: { status: 403 } } as unknown as Error)).toBe(true)
+  })
+  it('空值返回 false', () => {
+    expect(isAuthError(null)).toBe(false)
+  })
+})
+
+describe('errors.ts - isValidationError', () => {
+  it('status 400', () => {
+    expect(isValidationError(new AppError('a', 'VALIDATION_ERROR', 400))).toBe(true)
+  })
+  it('code VALIDATION_ERROR', () => {
+    expect(isValidationError(new AppError('a', 'VALIDATION_ERROR'))).toBe(true)
+  })
+  it('message 含 validation/bad request', () => {
+    expect(isValidationError(new Error('bad request body'))).toBe(true)
+    expect(isValidationError(new Error('validation failed'))).toBe(true)
+  })
+  it('Axios 风格 status 400', () => {
+    expect(isValidationError({ response: { status: 400 } } as unknown as Error)).toBe(true)
+  })
+  it('其它错误为 false', () => {
+    expect(isValidationError(new AppError('a', 'NOT_FOUND', 404))).toBe(false)
+    expect(isValidationError(null)).toBe(false)
   })
 })

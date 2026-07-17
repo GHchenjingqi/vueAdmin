@@ -8,9 +8,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 /**
- * 覆盖率目标说明：
- * 当前基线约为 47%（2026-07-10）。Coverage Threshold 设置为 80%，
- * 这是我们追求的长期目标。Phase 3（P3）阶段会专项补充单元测试以接近该目标。
+ * 覆盖率目标说明（诚实渐进式）：
+ * 基线约 47%（2026-07-10）。当前阈值按可达成的渐进目标配置，长期目标 80%。
+ * 已在 2026-07-17 补充 request.ts 拦截器、errors.ts 单测，消除 error.ts 重导出假阴性。
  * 如需本地快速验证且暂不关心覆盖率，使用 `npm run test:fast`。
  */
 export default defineConfig({
@@ -57,19 +57,19 @@ export default defineConfig({
         'src/**/*.d.ts',
         'src/__tests__/**',
         'server/__tests__/**',
-        // 重导出文件（仅为类型兼容，无逻辑）
+        // 重导出文件（仅为类型兼容，无逻辑，真实实现见 errors.ts）
         'src/i18n/zh-CN.ts',
         'src/i18n/en-US.ts',
+        'src/utils/error.ts',
       ],
-      // 覆盖率目标（渐进式）：
-      // Phase 3.5 (2026-07-10): 63% — 当前可达成的基线
-      // Phase 4: 68% — 补充 request.ts/themeStore 测试
-      // 最终: 80% — 完整覆盖所有业务逻辑
+      // 覆盖率目标（诚实渐进式）：
+      // 基线约 47%（2026-07-10）。2026-07-17 已补充 request.ts 拦截器与 errors.ts 测试，
+      // 消除 error.ts 重导出假阴性。阈值为当前可达成的渐进目标，长期目标 80%。
       thresholds: {
-        statements: 63,
-        branches: 55,
-        functions: 55,
-        lines: 63,
+        statements: 70,
+        branches: 60,
+        functions: 60,
+        lines: 70,
       },
     },
   },

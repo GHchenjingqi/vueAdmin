@@ -90,7 +90,7 @@
             <el-tree-select
               v-else-if="resolvedType === 'tree-select'"
               v-bind="mergedComponentProps"
-              :data="resolvedOptions"
+              :data="resolvedOptions as any"
               :model-value="modelValue as any"
               :disabled="fieldInteractiveDisabled"
               :placeholder="resolvedPlaceholder"

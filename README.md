@@ -234,10 +234,10 @@ const formSchema = [
 | [Element Plus](https://element-plus.org/) | ^2.7.0 | 桌面端 UI 组件库（unplugin 自动按需导入） |
 | [Element Plus Icons Vue](https://element-plus.org/en-US/component/icon.html) | ^2.3.1 | 图标库 |
 | [Axios](https://axios-http.com/) | ^1.7.0 | HTTP 请求库 |
-| [Zod](https://zod.dev/) | ^4.4.3 | Schema 校验（前后端共享校验规则） |
+| [Zod](https://zod.dev/) | ^3.25.76 | Schema 校验（前后端共享校验规则） |
 | [ECharts](https://echarts.apache.org/) | ^6.1.0 | 图表可视化 |
 | [md-editor-v3](https://imzbf.github.io/md-editor-v3/) | ^6.5.3 | Markdown 编辑器 |
-| [Vite](https://vitejs.dev/) | ^5.4.0 | 前端构建工具（开发服务器 + 打包） |
+| [Vite](https://vitejs.dev/) | ^6.3.0 | 前端构建工具（开发服务器 + 打包） |
 | [Vitest](https://vitest.dev/) | ^4.1.9 | 单元测试框架（覆盖率报告） |
 | [@sentry/vue](https://docs.sentry.io/platforms/javascript/guides/vue/) | ^9.0.0 | 前端错误监控 |
 | [pinia-plugin-persistedstate](https://prazdevs.github.io/pinia-plugin-persistedstate/) | ^4.7.1 | Pinia 状态持久化 |
@@ -258,7 +258,7 @@ const formSchema = [
 |------|------|------|
 | [Express](https://expressjs.com/) | ^4.19.0 | Node.js Web 框架 |
 | [TypeScript](https://www.typescriptlang.org/) | ^6.0.3 | 类型安全 |
-| [Zod](https://zod.dev/) | ^4.4.3 | Schema 校验（与前端共享校验规则） |
+| [Zod](https://zod.dev/) | ^3.25.76 | Schema 校验（与前端共享校验规则） |
 | [Sequelize](https://sequelize.org/) | ^6.37.0 | ORM 数据库映射层 |
 | [MySQL2](https://github.com/sidorares/node-mysql2) | ^3.9.0 | MySQL 数据库驱动 |
 | [Multer](https://github.com/expressjs/multer) | ^2.2.0 | 文件上传中间件 |
@@ -935,7 +935,7 @@ vue-admin/
 │       └── project_rules.md         # IDE 项目规则
 ├── package.json                     # 前端依赖 + 脚本
 ├── vite.config.ts                   # Vite 构建配置（unplugin、分包策略、Gzip 压缩）
-├── vitest.config.ts                 # Vitest 配置（jsdom 环境、覆盖率阈值 80%）
+├── vitest.config.ts                   # Vitest 配置（jsdom 环境、覆盖率阈值 70% 渐进式，长期目标 80%）
 ├── tsconfig.json                    # 前端 TypeScript 配置
 ├── eslint.config.mjs                # ESLint 9 Flat Config（Vue + TypeScript + Prettier）
 ├── .prettierrc                      # Prettier 配置
@@ -1450,7 +1450,7 @@ vue-admin/
 ### 三、工程化层面
 
 #### 3.1 自动化测试 ~~（已完成 ✅）~~
-- **前端单元测试**：Vitest + @vue/test-utils，267 个测试用例覆盖所有 Store、工具函数、Composables、指令和核心组件，覆盖率阈值已配置为 80%
+- **前端单元测试**：Vitest + @vue/test-utils，267 个测试用例覆盖所有 Store、工具函数、Composables、指令和核心组件，覆盖率阈值配置为渐进式（当前 70%，长期目标 80%）
 - **E2E 测试**：Playwright 已集成，覆盖登录流程、仪表盘、语言切换、路由权限、用户 CRUD 等 5 个核心场景，CI 中自动执行
 - **后端测试**：待补充 Jest + Supertest 接口测试（注意：`server/services/` 下已实现 `authService` / `userService` / `AIAssistant` 等较厚业务逻辑，建议优先补齐单测）
 
