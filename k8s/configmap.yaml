@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: vue-admin
+data:
+  NODE_ENV: "production"
+  DB_HOST: "mysql"
+  DB_PORT: "3306"
+  DB_NAME: "vue_admin"
+  DB_USER: "root"
+  SERVER_PORT: "3000"
+  LOG_LEVEL: "info"
+  CAPTCHA_ENABLED: "true"
+  UPLOAD_MAX_SIZE: "10"
+  UPLOAD_PATH: "/app/server/uploads"
+  REDIS_ENABLED: "true"
+  REDIS_URL: "redis://redis:6379"

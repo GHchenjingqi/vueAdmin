@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # -------------------- MySQL 数据库 --------------------
+  mysql:
+    image: mysql:8.0
+    container_name: vue-admin-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-vue_admin}
+      MYSQL_USER: ${DB_USER:-root}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-root}
+      TZ: Asia/Shanghai
+    ports:
+      - '${DB_PORT:-3306}:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app-network
+
+  # -------------------- Redis 缓存（多实例限流/缓存） --------------------
+  redis:
+    image: redis:7-alpine
+    container_name: vue-admin-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # -------------------- 后端服务 --------------------
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vue-admin-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-vue_admin}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      SERVER_PORT: ${SERVER_PORT:-3000}
+      JWT_SECRET: ${JWT_SECRET:-vue_admin_secret_key_2024}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CAPTCHA_ENABLED: ${CAPTCHA_ENABLED:-true}
+      UPLOAD_MAX_SIZE: ${UPLOAD_MAX_SIZE:-10}
+      UPLOAD_PATH: ./server/uploads
+      # Redis 配置
+      REDIS_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+    ports:
+      - '${SERVER_PORT:-3000}:3000'
+    volumes:
+      - uploads_data:/app/server/uploads
+      - logs_data:/app/server/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - app-network
+
+  # -------------------- Nginx 反向代理（可选） --------------------
+  nginx:
+    image: nginx:alpine
+    container_name: vue-admin-nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - server
+    networks:
+      - app-network
+    profiles:
+      - with-nginx
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local
+  logs_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

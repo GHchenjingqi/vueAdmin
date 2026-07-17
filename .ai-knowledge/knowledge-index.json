@@ -1,0 +1,105 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-07-08T00:00:00.000Z",
+  "totalFiles": 14,
+  "files": [
+    {
+      "path": "project-specs/01-代码规范.md",
+      "title": "01-代码规范",
+      "keywords": ["规范", "coding-standards", "code-style", "代码规范", "coding", "typescript", "express", "vue", "sequelize", "模型", "控制器", "服务", "路由", "类型", "导入", "导出", "函数", "文件", "命名", "提交", "git"],
+      "weight": 10,
+      "size": 5000
+    },
+    {
+      "path": "project-specs/02-API设计规范.md",
+      "title": "02-API设计规范",
+      "keywords": ["api", "rest", "接口", "规范", "restful", "http", "get", "post", "put", "delete", "patch", "响应", "认证", "jwt", "token", "验证码", "分页", "参数", "校验", "zod", "文档", "openapi", "swagger"],
+      "weight": 10,
+      "size": 4000
+    },
+    {
+      "path": "project-specs/03-数据库规范.md",
+      "title": "03-数据库规范",
+      "keywords": ["数据库", "mysql", "sequelize", "表", "字段", "命名", "规范", "id", "主键", "外键", "索引", "字符集", "utf8mb4", "迁移", "种子", "建模", "model"],
+      "weight": 10,
+      "size": 3000
+    },
+    {
+      "path": "project-specs/04-前端组件规范.md",
+      "title": "04-前端组件规范",
+      "keywords": ["前端", "vue", "component", "组件", "protable", "proform", "element-plus", "国际化", "i18n", "pinia", "状态管理", "路由", "权限", "样式", "模板", "对话框", "表单"],
+      "weight": 10,
+      "size": 4000
+    },
+    {
+      "path": "project-specs/05-目录结构规范.md",
+      "title": "05-目录结构规范",
+      "keywords": ["目录结构", "项目结构", "architecture", "架构", "分层", "前端", "后端", "server", "src", "api", "models", "services", "controllers", "middleware", "components", "views", "router", "stores"],
+      "weight": 10,
+      "size": 5000
+    },
+    {
+      "path": "code-templates/backend/controller-template.txt",
+      "title": "controller-template",
+      "keywords": ["模板", "template", "code-generation", "后端", "express", "controller", "控制器", "crud", "list", "create", "update", "delete", "getById"],
+      "weight": 8,
+      "size": 2000
+    },
+    {
+      "path": "code-templates/backend/model-template.txt",
+      "title": "model-template",
+      "keywords": ["模板", "template", "code-generation", "后端", "model", "模型", "sequelize", "datatypes", "mysql", "表", "字段"],
+      "weight": 8,
+      "size": 1500
+    },
+    {
+      "path": "code-templates/backend/service-template.txt",
+      "title": "service-template",
+      "keywords": ["模板", "template", "code-generation", "后端", "service", "服务", "业务逻辑", "crud", "查询", "分页"],
+      "weight": 8,
+      "size": 2000
+    },
+    {
+      "path": "code-templates/frontend/api-template.ts",
+      "title": "api-template",
+      "keywords": ["模板", "template", "code-generation", "前端", "api", "接口", "request", "axios", "泛型", "类型"],
+      "weight": 8,
+      "size": 1500
+    },
+    {
+      "path": "code-templates/frontend/page-template.vue",
+      "title": "page-template",
+      "keywords": ["模板", "template", "code-generation", "前端", "vue", "页面", "protable", "crud", "列表", "表单", "对话框"],
+      "weight": 8,
+      "size": 6000
+    },
+    {
+      "path": "reference-modules/user-management/controller.ts",
+      "title": "controller",
+      "keywords": ["示例", "reference", "example", "user", "用户管理", "crud", "controller", "控制器", "express", "后端"],
+      "weight": 9,
+      "size": 2000
+    },
+    {
+      "path": "reference-modules/user-management/model.ts",
+      "title": "model",
+      "keywords": ["示例", "reference", "example", "user", "用户管理", "model", "模型", "sequelize", "mysql", "后端"],
+      "weight": 9,
+      "size": 2000
+    },
+    {
+      "path": "reference-modules/user-management/routes.ts",
+      "title": "routes",
+      "keywords": ["示例", "reference", "example", "user", "用户管理", "routes", "路由", "openapi", "swagger", "jwt", "认证", "后端"],
+      "weight": 9,
+      "size": 3000
+    },
+    {
+      "path": "reference-modules/user-management/UserManage.vue",
+      "title": "UserManage",
+      "keywords": ["示例", "reference", "example", "user", "用户管理", "vue", "前端", "protable", "页面", "列表", "crud"],
+      "weight": 9,
+      "size": 3000
+    }
+  ]
+}

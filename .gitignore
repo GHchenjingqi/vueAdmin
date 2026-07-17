@@ -1,0 +1,25 @@
+node_modules/
+dist/
+server/public/
+server/node_modules/
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.*.local
+server/.env
+server/.env.*
+server/logs/*.log
+logs/*.log
+*.log
+coverage/
+.vite/
+# Playwright E2E
+e2e-report/
+e2e/.auth/
+playwright/
+test-results/
+
+# Build analysis artifacts
+bundle-report/

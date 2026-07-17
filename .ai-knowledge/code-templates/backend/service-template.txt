@@ -1,0 +1,94 @@
+/**
+ * {{ModuleName}} Service 层
+ *
+ * 职责：封装{{moduleTitle}}相关的所有业务逻辑
+ */
+
+import { Op } from 'sequelize'
+import { AppError } from '../middleware/errorHandler.js'
+import {{moduleNameCapital}} from '../models/{{moduleNameCapital}}.js'
+
+type {{moduleNameCapital}}QueryParams = {
+  keyword?: string
+  status?: number
+  startDate?: string
+  endDate?: string
+}
+
+/**
+ * 构建查询 WHERE 条件
+ */
+export function buildWhere(query: {{moduleNameCapital}}QueryParams) {
+  const { keyword, status, startDate, endDate } = query
+  const where: any = {}
+
+  if (keyword) {
+    where.name = { [Op.like]: `%${keyword}%` }
+  }
+  if (status !== undefined && status !== null) {
+    where.status = status
+  }
+  if (startDate || endDate) {
+    where.createdAt = {}
+    if (startDate) where.createdAt[Op.gte] = new Date(startDate)
+    if (endDate) where.createdAt[Op.lte] = new Date(`${endDate} 23:59:59`)
+  }
+
+  return where
+}
+
+/**
+ * 获取{{moduleTitle}}列表（分页搜索）
+ */
+export async function list{{moduleNamePluralCapital}}(query: {{moduleNameCapital}}QueryParams, page: number, pageSize: number) {
+  const where = buildWhere(query)
+  const { count, rows } = await {{moduleNameCapital}}.findAndCountAll({
+    where,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+    order: [['id', 'DESC']],
+  })
+  return {
+    list: rows,
+    total: count,
+    page,
+    pageSize,
+  }
+}
+
+/**
+ * 获取单个{{moduleTitle}}
+ */
+export async function get{{moduleNameCapital}}ById(id: number) {
+  const item = await {{moduleNameCapital}}.findByPk(id)
+  if (!item) {
+    throw new AppError('{{moduleTitle}}不存在', 404)
+  }
+  return item
+}
+
+/**
+ * 创建{{moduleTitle}}
+ */
+export async function create{{moduleNameCapital}}(data: any, _operator: any) {
+  // 业务校验
+  return {{moduleNameCapital}}.create(data)
+}
+
+/**
+ * 更新{{moduleTitle}}
+ */
+export async function update{{moduleNameCapital}}(id: number, data: any, _operator: any) {
+  const item = await get{{moduleNameCapital}}ById(id)
+  await item.update(data)
+  return item
+}
+
+/**
+ * 删除{{moduleTitle}}
+ */
+export async function delete{{moduleNameCapital}}(id: number, _operator: any) {
+  const item = await get{{moduleNameCapital}}ById(id)
+  await item.destroy()
+  return item
+}

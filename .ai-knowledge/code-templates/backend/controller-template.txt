@@ -1,0 +1,84 @@
+/**
+ * {{ModuleName}} Controller
+ *
+ * 职责：仅做 HTTP 请求/响应编排，业务逻辑委托给 {{moduleName}}Service
+ */
+import type { Request, Response, NextFunction } from 'express'
+import * as {{moduleName}}Service from '../services/{{moduleName}}Service.js'
+import { AppError } from '../middleware/errorHandler.js'
+import { logOperation } from '../utils/logger.js'
+
+/**
+ * 获取{{moduleTitle}}列表（分页搜索）
+ * GET /api/{{moduleNamePlural}}
+ */
+export const list = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { page = 1, pageSize = 10 } = req.query
+    const result = await {{moduleName}}Service.list{{moduleNamePluralCapital}}(
+      req.query as any,
+      Number(page),
+      Number(pageSize),
+    )
+    res.json({ code: 0, data: result })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * 获取单个{{moduleTitle}}
+ * GET /api/{{moduleNamePlural}}/:id
+ */
+export const getById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const item = await {{moduleName}}Service.get{{moduleNameCapital}}ById(Number(req.params.id))
+    res.json({ code: 0, data: item })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * 创建{{moduleTitle}}
+ * POST /api/{{moduleNamePlural}}
+ */
+export const create = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await {{moduleName}}Service.create{{moduleNameCapital}}(req.body, req.user!)
+    logOperation(req, '创建{{moduleTitle}}', `ID: ${result.id}`,
+      JSON.stringify({ id: result.id, ...req.body }))
+    res.status(201).json({ code: 0, data: result, message: '创建成功' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * 更新{{moduleTitle}}
+ * PUT /api/{{moduleNamePlural}}/:id
+ */
+export const update = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await {{moduleName}}Service.update{{moduleNameCapital}}(Number(req.params.id), req.body, req.user!)
+    logOperation(req, '更新{{moduleTitle}}', `ID: ${req.params.id}`,
+      JSON.stringify(req.body))
+    res.json({ code: 0, message: '更新成功' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * 删除{{moduleTitle}}
+ * DELETE /api/{{moduleNamePlural}}/:id
+ */
+export const remove = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await {{moduleName}}Service.delete{{moduleNameCapital}}(Number(req.params.id), req.user!)
+    logOperation(req, '删除{{moduleTitle}}', `ID: ${req.params.id}`)
+    res.json({ code: 0, message: '删除成功' })
+  } catch (err) {
+    next(err)
+  }
+}
