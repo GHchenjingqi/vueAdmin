@@ -414,6 +414,10 @@ export default async function bootstrap(app) {
     const { initScheduler } = await import('./utils/scheduler.js')
     await initScheduler()
 
+    // 初始化跨副本踢下线订阅（Redis pub/sub；不可用时自动降级单副本）
+    const { initKickSubscriber } = await import('./utils/onlineUsers.js')
+    await initKickSubscriber()
+
     // HTTPS 服务器监听（开发环境使用自签名证书）
     httpsServer.listen(config.server.port, '0.0.0.0', () => {
       const banner = [
@@ -467,7 +471,10 @@ export default async function bootstrap(app) {
 
       try {
         await closeServers
-        // 2. 关闭数据库连接
+        // 2. 关闭跨副本踢下线订阅
+        const { closeKickSubscriber } = await import('./utils/onlineUsers.js')
+        await closeKickSubscriber()
+        // 3. 关闭数据库连接
         const { sequelize } = await import('./config/database.js')
         if (sequelize) {
           await sequelize.close()
