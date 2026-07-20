@@ -10,6 +10,7 @@ import apiRoutes from './routes/index.js'
 import accessLog from './middleware/accessLog.js'
 import errorHandler from './middleware/errorHandler.js'
 import { slowQueryLogMiddleware } from './middleware/slowQueryLog.js'
+import originValidator from './middleware/originValidator.js'
 import bootstrap from './bootstrap.js'
 import { closeRedis } from './config/redis.js'
 
@@ -146,6 +147,9 @@ app.use(cookieParser())
 // 请求体大小限制：防止 DoS 攻击
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// Origin 校验（CSRF 纵深防御，GET/HEAD/OPTIONS 放行）
+app.use(originValidator)
 
 // 静态文件：上传目录（头像、图片等）
 const uploadsDir = resolve(__dirname, 'uploads')

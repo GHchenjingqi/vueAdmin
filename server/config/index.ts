@@ -18,6 +18,16 @@ const config = {
   server: {
     port: parseInt(process.env.SERVER_PORT, 10) || 3000,
   },
+  app: {
+    // Origin 白名单（CSRF 纵深防御），开发环境默认放宽到内网 Vite 端口
+    allowedOrigins: [
+      'http://localhost:5174',
+      'https://localhost:5174',
+      'http://127.0.0.1:5174',
+      'https://127.0.0.1:5174',
+      ...(process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean),
+    ],
+  },
   database: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT, 10) || 3306,

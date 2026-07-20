@@ -27,14 +27,14 @@ export const sse = async (req, res, next) => {
   try {
     let userId = req.user?.id
     if (!req.user) {
-      let token = req.query?.token || null
-      if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-        token = req.headers.authorization.split(' ')[1]
-      }
-      if (!token) {
+      const authHeader = req.headers.authorization
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ code: 401, message: '未提供认证令牌' })
       }
-      if (typeof token !== 'string') token = token[0]
+      const token = authHeader.split(' ')[1]
+      if (typeof token !== 'string' || !token) {
+        return res.status(401).json({ code: 401, message: '无效的认证令牌' })
+      }
 
       let decoded
       try {

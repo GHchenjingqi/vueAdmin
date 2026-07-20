@@ -125,3 +125,23 @@ export function applyDataScopeWhere(
   }
   return where
 }
+
+/**
+ * 判断目标用户是否落在当前用户的数据权限范围内。
+ * - scope=1（全部）或缺失：始终允许；
+ * - 否则：目标部门需在允许部门列表内。
+ */
+export function isTargetInScope(
+  targetDeptId: number | null | undefined,
+  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
+): boolean {
+  const scope = reqUser?.dataScope
+  if (scope === undefined || scope === 1) return true
+  const allowed = reqUser?.deptIds && reqUser.deptIds.length
+    ? reqUser.deptIds
+    : reqUser?.deptId
+      ? [reqUser.deptId]
+      : []
+  if (allowed.length === 0) return false
+  return targetDeptId != null && allowed.includes(targetDeptId)
+}
