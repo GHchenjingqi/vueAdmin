@@ -183,11 +183,14 @@ describe('userService.ts', () => {
       vi.mocked(User.findOne).mockResolvedValueOnce(null)
       vi.mocked(User.create).mockResolvedValueOnce(mockUser as any)
 
-      await createUser({
-        username: 'newuser',
-        password: 'Test123!',
-        nickname: '新用户',
-      })
+      await createUser(
+        {
+          username: 'newuser',
+          password: 'Test123!',
+          nickname: '新用户',
+        },
+        { id: 1, username: 'admin' },
+      )
 
       expect(User.create).toHaveBeenCalled()
     })
@@ -196,7 +199,10 @@ describe('userService.ts', () => {
       vi.mocked(User.findOne).mockResolvedValueOnce({ id: 1 } as any)
 
       await expect(
-        createUser({ username: 'existing', password: 'Test123!', nickname: 'test' }),
+        createUser(
+          { username: 'existing', password: 'Test123!', nickname: 'test' },
+          { id: 1, username: 'admin' },
+        ),
       ).rejects.toThrow('用户名已存在')
     })
   })
@@ -212,7 +218,7 @@ describe('userService.ts', () => {
 
       vi.mocked(User.findByPk).mockResolvedValueOnce(mockUser as any)
 
-      await updateUser(1, { nickname: '超级管理员' })
+      await updateUser(1, { nickname: '超级管理员' }, { id: 1, username: 'admin' })
 
       expect(mockUser.update).toHaveBeenCalled()
     })
@@ -220,7 +226,7 @@ describe('userService.ts', () => {
     it('用户不存在抛出错误', async () => {
       vi.mocked(User.findByPk).mockResolvedValueOnce(null)
 
-      await expect(updateUser(999, { nickname: 'test' })).rejects.toThrow('用户不存在')
+      await expect(updateUser(999, { nickname: 'test' }, { id: 1, username: 'admin' })).rejects.toThrow('用户不存在')
     })
   })
 

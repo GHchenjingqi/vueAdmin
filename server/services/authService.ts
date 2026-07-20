@@ -24,6 +24,7 @@ import { logLogin, logLoginFailure } from '../utils/logger.js'
 import { generate, verify } from '../utils/captcha.js'
 import { checkRateLimit, recordAttempt, clearAttempts } from '../middleware/rateLimiter.js'
 import { clearKickRecord, isUserKicked } from '../utils/onlineUsers.js'
+import { resolveDataScope } from '../utils/dataScope.js'
 import crypto from 'crypto'
 
 // ==================== 常量 ====================
@@ -135,6 +136,27 @@ interface TokenPayload {
   id: number
   username: string
   nickname: string
+  /** 当前用户所属部门 ID（用于数据权限） */
+  deptId: number
+  /** 解析后的有效数据范围：1=全部 2=本部门 3=本级及以下 */
+  dataScope: number
+}
+
+/**
+ * 构造 JWT 载荷：补全部门 ID 与数据范围。
+ * 多角色取最宽松范围；旧 token 缺省字段不会进入此路径（新签发均带齐）。
+ */
+async function buildTokenPayload(user: { id: number; username: string; nickname: string; deptId?: number | null }): Promise<TokenPayload> {
+  const userRoles = await UserRole.findAll({ where: { userId: user.id }, attributes: ['roleId'] })
+  const roleIds = [...new Set(userRoles.map((ur) => ur.roleId))]
+  const { dataScope, deptId } = await resolveDataScope(user.deptId ?? null, roleIds)
+  return {
+    id: user.id,
+    username: user.username,
+    nickname: user.nickname || '',
+    deptId,
+    dataScope,
+  }
 }
 
 function signAccessToken(payload: TokenPayload): string {
@@ -270,11 +292,7 @@ export async function login(
   await RefreshToken.destroy({ where: { userId: user.id } })
 
   // 生成 Access Token
-  const accessToken = signAccessToken({
-    id: user.id,
-    username: user.username,
-    nickname: user.nickname,
-  })
+  const accessToken = signAccessToken(await buildTokenPayload(user))
 
   // 生成 Refresh Token
   const rtExpires = rememberMe ? REFRESH_TOKEN_EXPIRES_REMEMBER : REFRESH_TOKEN_EXPIRES_SESSION
@@ -356,15 +374,11 @@ export async function refresh(token: string): Promise<RefreshResult> {
       })
       if (latestValid) {
         const user = await User.findByPk(record.userId, {
-          attributes: ['id', 'username', 'nickname', 'status', 'passwordResetRequired'],
+          attributes: ['id', 'username', 'nickname', 'deptId', 'status', 'passwordResetRequired'],
         })
         if (user && user.status === 1) {
           return {
-            accessToken: signAccessToken({
-              id: user.id,
-              username: user.username,
-              nickname: user.nickname,
-            }),
+            accessToken: signAccessToken(await buildTokenPayload(user)),
             passwordResetRequired: !!user.passwordResetRequired,
           }
         }
@@ -374,7 +388,7 @@ export async function refresh(token: string): Promise<RefreshResult> {
   }
 
   const user = await User.findByPk(record.userId, {
-    attributes: ['id', 'username', 'nickname', 'status', 'passwordResetRequired'],
+    attributes: ['id', 'username', 'nickname', 'deptId', 'status', 'passwordResetRequired'],
   })
 
   if (!user || user.status !== 1) {
@@ -393,11 +407,7 @@ export async function refresh(token: string): Promise<RefreshResult> {
   await record.update({ revoked: 1, revokedAt: new Date() })
 
   // 签发新 Token
-  const accessToken = signAccessToken({
-    id: user.id,
-    username: user.username,
-    nickname: user.nickname,
-  })
+  const accessToken = signAccessToken(await buildTokenPayload(user))
 
   const rtExpires = record.rememberMe ? REFRESH_TOKEN_EXPIRES_REMEMBER : REFRESH_TOKEN_EXPIRES_SESSION
   const newRefreshToken = RefreshToken.generateToken()

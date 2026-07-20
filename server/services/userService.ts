@@ -11,6 +11,7 @@ import { AppError } from '../middleware/errorHandler.js'
 import { logOperation } from '../utils/logger.js'
 import { exportExcel } from '../utils/exportExcel.js'
 import { normalizeIds, prepareChangeLog } from '../utils/helpers.js'
+import { applyDataScopeWhere } from '../utils/dataScope.js'
 import User from '../models/User.js'
 import Department from '../models/Department.js'
 import Role from '../models/Role.js'
@@ -36,6 +37,26 @@ type UserQueryParams = {
 }
 
 /**
+ * 判断目标用户是否落在当前用户的数据权限范围内。
+ * - scope=1（全部）或缺失：始终允许；
+ * - 否则：目标部门需在允许部门列表内（含本级）。
+ */
+export function isTargetInScope(
+  targetDeptId: number | null | undefined,
+  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
+): boolean {
+  const scope = reqUser?.dataScope
+  if (scope === undefined || scope === 1) return true
+  const allowed = reqUser?.deptIds && reqUser.deptIds.length
+    ? reqUser.deptIds
+    : reqUser?.deptId
+      ? [reqUser.deptId]
+      : []
+  if (allowed.length === 0) return false
+  return targetDeptId != null && allowed.includes(targetDeptId)
+}
+
+/**
  * 构建用户查询 WHERE 条件
  */
 export function buildUserWhere(query: UserQueryParams) {
@@ -58,9 +79,16 @@ export function buildUserWhere(query: UserQueryParams) {
 
 /**
  * 获取用户列表（分页搜索）
+ * @param reqUser 当前登录用户（用于数据权限过滤，可选）
  */
-export async function listUsers(query: UserQueryParams, page: number, pageSize: number) {
+export async function listUsers(
+  query: UserQueryParams,
+  page: number,
+  pageSize: number,
+  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
+) {
   const where = buildUserWhere(query)
+  applyDataScopeWhere(where, reqUser || {}, query.deptId)
   const offset = (page - 1) * pageSize
 
   const { rows, count } = await User.findAndCountAll({
@@ -77,13 +105,20 @@ export async function listUsers(query: UserQueryParams, page: number, pageSize: 
 
 /**
  * 获取单个用户详情
+ * @param reqUser 当前登录用户（用于数据权限校验，可选）
  */
-export async function getUserById(userId: number) {
+export async function getUserById(
+  userId: number,
+  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
+) {
   const user = await User.findByPk(userId, {
     attributes: USER_PROFILE_ATTRS,
     include: USER_INCLUDES,
   })
   if (!user) throw new AppError(404, '用户不存在')
+  if (!isTargetInScope((user as any).deptId, reqUser)) {
+    throw new AppError(403, '无权访问该用户数据')
+  }
   return user
 }
 
@@ -145,10 +180,13 @@ export async function updateUser(
     deptId?: number
     roleIds?: number[] | number
   },
-  reqUser: { id: number; username: string },
+  reqUser: { id: number; username: string; dataScope?: number; deptId?: number; deptIds?: number[] },
 ) {
   const user = await User.findByPk(userId)
   if (!user) throw new AppError(404, '用户不存在')
+  if (!isTargetInScope((user as any).deptId, reqUser)) {
+    throw new AppError(403, '无权操作该用户数据')
+  }
 
   const { username, nickname, email, phone, avatar, status, deptId } = data
   const roleIds = normalizeIds(data.roleIds)
@@ -213,9 +251,15 @@ export async function changePassword(
 /**
  * 删除单个用户
  */
-export async function deleteUser(userId: number) {
+export async function deleteUser(
+  userId: number,
+  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
+) {
   const user = await User.findByPk(userId)
   if (!user) throw new AppError(404, '用户不存在')
+  if (!isTargetInScope((user as any).deptId, reqUser)) {
+    throw new AppError(403, '无权删除该用户')
+  }
 
   const username = user.username
   await UserRole.destroy({ where: { userId } })
@@ -227,10 +271,17 @@ export async function deleteUser(userId: number) {
 /**
  * 批量删除用户
  */
-export async function batchDeleteUsers(ids: number[]) {
+export async function batchDeleteUsers(
+  ids: number[],
+  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
+) {
   const users = await User.findAll({ where: { id: { [Op.in]: ids } } })
   if (users.length === 0) {
     throw new AppError(404, '用户不存在')
+  }
+  const outOfScope = users.filter((u) => !isTargetInScope((u as any).deptId, reqUser))
+  if (outOfScope.length > 0) {
+    throw new AppError(403, '无权删除部分用户')
   }
 
   await UserRole.destroy({ where: { userId: { [Op.in]: ids } } })
@@ -242,8 +293,13 @@ export async function batchDeleteUsers(ids: number[]) {
 /**
  * 导出用户列表 Excel
  */
-export async function exportUsers() {
+export async function exportUsers(
+  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
+) {
+  const where: any = {}
+  applyDataScopeWhere(where, reqUser || {})
   const users = await User.findAll({
+    where,
     attributes: ['id', 'username', 'nickname', 'email', 'phone', 'status', 'createdAt'],
     include: [{ model: Department, as: 'dept', attributes: ['name'] }],
     order: [['id', 'DESC']],

@@ -23,6 +23,7 @@ export const list = async (req: Request, res: Response, next: NextFunction) => {
       req.query as any,
       Number(page),
       Number(pageSize),
+      req.user,
     )
     res.json({ code: 0, data: result })
   } catch (err) {
@@ -36,7 +37,7 @@ export const list = async (req: Request, res: Response, next: NextFunction) => {
  */
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await userService.getUserById(Number(req.params.id))
+    const user = await userService.getUserById(Number(req.params.id), req.user)
     res.json({ code: 0, data: user })
   } catch (err) {
     next(err)
@@ -94,7 +95,7 @@ export const changePassword = async (req: Request, res: Response, next: NextFunc
  */
 export const remove = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id, username } = await userService.deleteUser(Number(req.params.id))
+    const { id, username } = await userService.deleteUser(Number(req.params.id), req.user)
     logOperation(req, '删除用户', `ID: ${id} 用户名 ${username}`, JSON.stringify({ id, username }))
     res.json({ code: 0, message: '删除成功' })
   } catch (err) {
@@ -112,7 +113,7 @@ export const batchRemove = async (req: Request, res: Response, next: NextFunctio
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       throw new AppError(400, '请选择要删除的用户')
     }
-    const result = await userService.batchDeleteUsers(ids)
+    const result = await userService.batchDeleteUsers(ids, req.user)
     logOperation(req, '批量删除用户', `删除 ${result.count} 条`, JSON.stringify({ ids }))
     res.json({ code: 0, data: { count: result.count }, message: `成功删除 ${result.count} 条` })
   } catch (err) {
@@ -126,7 +127,7 @@ export const batchRemove = async (req: Request, res: Response, next: NextFunctio
  */
 export const exportUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { buffer, filename } = await userService.exportUsers()
+    const { buffer, filename } = await userService.exportUsers(req.user)
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     res.setHeader('Content-Disposition', `attachment; filename=${encodeURIComponent(filename)}`)
     res.send(buffer)
