@@ -88,6 +88,11 @@ const restoreSession = async (): Promise<void> => {
 }
 
 onMounted(async () => {
+  // 同步 localeStore 的语言到 i18n/index.ts
+  // i18n/index.ts 在模块导入时就初始化了，需要确保与持久化的 localeStore 一致
+  const { setLocale } = await import('@/i18n')
+  setLocale(appStore.locale as 'zh-CN' | 'en-US')
+
   const SESSION_TIMEOUT = 15000
   const timeoutPromise = new Promise<void>((resolve) => {
     setTimeout(() => {

@@ -922,6 +922,7 @@
   "sidebar": {
     "navigation": "Side Navigation",
     "collapsed": "Collapsed Side Navigation",
+    "aiProviders": "AI Providers",
     "dashboard": "Dashboard",
     "system": "System",
     "settings": "Settings",

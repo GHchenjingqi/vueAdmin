@@ -832,9 +832,9 @@ body,
 
   /* 去掉 light 效果，统一使用主色调 */
   &.el-tag--primary {
-    --el-tag-bg-color: var(--el-color-primary);
-    --el-tag-text-color: #ffffff;
-    --el-tag-border-color: var(--el-color-primary);
+    --el-tag-bg-color: var(--el-color-primary) !important;
+    --el-tag-text-color: #ffffff !important;
+    --el-tag-border-color: var(--el-color-primary) !important;
   }
 
   &.el-tag--light {

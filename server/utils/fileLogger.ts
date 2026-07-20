@@ -114,7 +114,7 @@ function writeLog(level: string, category: string, message: string) {
     const line = `[${timestamp}] [${level}] ${message}\n`
     _fs.appendFileSync(logFile, line, 'utf-8')
   } catch (err) {
-    console.error('鍐欏叆鏃ュ織鏂囦欢澶辫触:', (err as Error).message)
+    console.error('写入日志文件失败:', (err as Error).message)
   }
 }
 
@@ -168,10 +168,10 @@ export function cleanOldLogs() {
       const stats = _statSync(filePath)
       if (now - stats.mtimeMs > maxAge) {
         _unlinkSync(filePath)
-        console.log(`  娓呯悊杩囨湡鏃ュ織: ${file}`)
+        console.log(`  清理过期日志: ${file}`)
       }
     }
   } catch (err) {
-    console.error('娓呯悊鏃ф棩蹇楀け璐?', (err as Error).message)
+    console.error('清理日志文件失败:', (err as Error).message)
   }
 }

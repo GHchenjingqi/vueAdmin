@@ -9,6 +9,10 @@
  * 加载策略：
  *   - zh-CN（默认语言）：静态同步导入，首屏已加载
  *   - en-US：首次切换语言时异步加载（约 30KB），后续直接读缓存
+ *
+ * 持久化：
+ *   - 语言偏好由 localeStore（pinia-plugin-persistedstate）负责写入 localStorage
+ *   - 本模块不再写入 localStorage，避免与 pinia 的 `locale` 键互相覆盖
  */
 import { ref, computed } from 'vue'
 import zhCN from './zh-CN.json'
@@ -33,8 +37,35 @@ const localeLoaders: Record<LocaleKey, () => Promise<{ default: MessageSchema }>
 /** 正在加载中的 promise（防止并发重复加载） */
 const loadingPromises: Partial<Record<LocaleKey, Promise<MessageSchema>>> = {}
 
+/** 语言包版本号：异步加载完成后递增，驱动依赖 t() 的组件重新渲染 */
+const messagesVersion = ref(0)
+
+function isLocaleKey(value: unknown): value is LocaleKey {
+  return value === 'zh-CN' || value === 'en-US'
+}
+
+/**
+ * 读取初始语言
+ * 兼容：
+ * 1. pinia 持久化格式：`{"locale":"en-US"}`
+ * 2. 历史明文格式：`en-US`
+ */
+function readInitialLocale(): LocaleKey {
+  if (typeof localStorage === 'undefined') return 'zh-CN'
+  try {
+    const raw = localStorage.getItem('locale')
+    if (!raw) return 'zh-CN'
+    if (isLocaleKey(raw)) return raw
+    const parsed = JSON.parse(raw) as { locale?: unknown } | null
+    if (parsed && isLocaleKey(parsed.locale)) return parsed.locale
+  } catch {
+    // 忽略非法缓存
+  }
+  return 'zh-CN'
+}
+
 // 当前语言
-const currentLocale = ref<LocaleKey>((typeof localStorage !== 'undefined' ? (localStorage.getItem('locale') as LocaleKey | null) : null) || 'zh-CN')
+const currentLocale = ref<LocaleKey>(readInitialLocale())
 
 /**
  * 异步加载语言包到缓存（仅 en-US 需要，zh-CN 已在构建时同步加载）
@@ -51,11 +82,16 @@ async function loadMessages(locale: LocaleKey): Promise<MessageSchema> {
   const promise = (async () => {
     const messages = await localeLoaders[locale]()
     messageCache[locale] = messages.default
+    messagesVersion.value += 1
     return messages.default
   })()
 
   loadingPromises[locale] = promise
-  return promise
+  try {
+    return await promise
+  } finally {
+    delete loadingPromises[locale]
+  }
 }
 
 /**
@@ -63,21 +99,18 @@ async function loadMessages(locale: LocaleKey): Promise<MessageSchema> {
  *
  * zh-CN：同步完成（已预加载）
  * en-US：首次切换时异步加载；后续切换直接读缓存（同步）
+ *
+ * 注意：持久化由 localeStore 负责，这里只更新运行时状态与 DOM lang。
  */
 export function setLocale(locale: LocaleKey): void {
-  if (!['zh-CN', 'en-US'].includes(locale)) return
+  if (!isLocaleKey(locale)) return
 
   currentLocale.value = locale
-  try {
-    localStorage.setItem('locale', locale)
-  } catch {
-    // 忽略存储失败
-  }
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('lang', locale)
   }
 
-  // 预加载非默认语言（静默，不阻塞 UI）
+  // 预加载非默认语言（静默，不阻塞 UI；加载完成后 messagesVersion 触发重渲染）
   if (locale === 'en-US' && messageCache['en-US'] === null) {
     loadMessages(locale).catch(() => {
       // 静默失败，保持 zh-CN 兜底
@@ -89,10 +122,15 @@ export function setLocale(locale: LocaleKey): void {
  * 等待指定语言包加载完成（测试用工具函数）
  *
  * 在测试环境中，动态 import() 可能需要等待 microtask 队列清空。
- * 此函数轮询等待缓存就绪，最长等待 500ms 后超时。
+ * 此函数轮询等待缓存就绪，最长等待后超时。
  */
 export async function waitForLocale(locale: LocaleKey): Promise<void> {
   if (messageCache[locale] !== null) return
+
+  // 主动触发加载，避免仅轮询永远等不到
+  void loadMessages(locale).catch(() => {
+    // wait loop 会在超时后抛错
+  })
 
   const start = Date.now()
   const TIMEOUT = 2000 // jsdom 环境下动态 import 可能较慢，适当放宽
@@ -100,7 +138,6 @@ export async function waitForLocale(locale: LocaleKey): Promise<void> {
     if (Date.now() - start > TIMEOUT) {
       throw new Error(`waitForLocale('${locale}'): 超时（${TIMEOUT}ms）`)
     }
-    // 等待一个 microtask
     await new Promise((resolve) => setTimeout(resolve, 20))
   }
 }
@@ -139,9 +176,13 @@ function interpolate(template: string, params?: Record<string, string | number>)
  *   3. 最后返回 key 本身或 fallback 参数
  *
  * 注意：en-US 首次切换时可能尚未加载完成，此时 t() 会读到中文兜底值。
- *       加载完成后 UI 会通过 Vue 的响应式自动更新（locale change 触发 re-render）。
+ *       加载完成后通过 messagesVersion 触发依赖 t() 的组件重新渲染。
  */
 export function translate(key: string, params?: Record<string, string | number>, fallback?: string): string {
+  // 建立响应式依赖：语言切换 + 语言包异步加载完成
+  void currentLocale.value
+  void messagesVersion.value
+
   const msg = messageCache[currentLocale.value]
   const value = getByPath(msg, key)
   if (value !== undefined) {
@@ -168,6 +209,7 @@ export function translate(key: string, params?: Record<string, string | number>,
  */
 export function useI18n() {
   const localeLabels = computed<Record<string, string>>(() => {
+    void messagesVersion.value
     const msg = messageCache[currentLocale.value]
     const labels = msg && (msg as Record<string, unknown>).locale
     if (labels && typeof labels === 'object') {
