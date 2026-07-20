@@ -113,53 +113,6 @@ async function setupFrontend(app, isProduction, express, httpsServer) {
   }
 }
 
-/**
- * 字典迁移：旧 dicts -> dict_types + dict_data
- */
-async function migrateDicts() {
-  try {
-    const [tables] = await sequelize.query("SHOW TABLES LIKE 'dicts'")
-    if (tables.length === 0) return
-
-    const [oldData] = await sequelize.query('SELECT * FROM dicts') as any
-    if (oldData.length > 0) {
-      const typeMap: Record<string, any> = {}
-      for (const row of oldData) {
-        if (!typeMap[row.type]) {
-          typeMap[row.type] = { name: row.type, type: row.type }
-        }
-      }
-      for (const t of Object.values(typeMap)) {
-        await DictType.findOrCreate({
-          where: { type: t.type },
-          defaults: { name: t.name, status: 1 },
-        })
-      }
-      for (const row of oldData) {
-        await DictData.findOrCreate({
-          where: { dictType: row.type, value: row.value },
-          defaults: {
-            dictType: row.type,
-            label: row.label,
-            value: row.value,
-            sort: row.sort || 0,
-            status: row.status ?? 1,
-            remark: row.description || '',
-          },
-        })
-      }
-      logInfo(`已迁移 ${oldData.length} 条旧字典数据`)
-    }
-    await sequelize.query('DROP TABLE IF EXISTS dicts')
-    logInfo('旧表 dicts 已清理')
-  } catch (err) {
-    logInfo('字典表迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 种子数据：默认管理员、菜单、系统设置
- */
 async function seedData() {
   const userCount = await User.count()
   if (userCount === 0) {
@@ -382,257 +335,6 @@ async function seedData() {
     }
   }
 }
-
-/**
- * 迁移：users 表增加 deptId 列
- */
-async function migrateUsersDeptId() {
-  try {
-    const [cols] = await sequelize.query("SHOW COLUMNS FROM users LIKE 'deptId'")
-    if (cols.length === 0) {
-      await sequelize.query('ALTER TABLE users ADD COLUMN deptId INT UNSIGNED NULL COMMENT "部门 ID" AFTER status')
-      logInfo('users 表已添加 deptId 列')
-    }
-  } catch (err) {
-    logInfo('deptId 迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 迁移：users 表增加 nickname 列
- */
-async function migrateUsersNickname() {
-  try {
-    const [cols] = await sequelize.query("SHOW COLUMNS FROM users LIKE 'nickname'")
-    if (cols.length === 0) {
-      await sequelize.query('ALTER TABLE users ADD COLUMN nickname VARCHAR(50) NULL COMMENT "昵称（显示用）" AFTER username')
-      logInfo('users 表已添加 nickname 列')
-    }
-  } catch (err) {
-    logInfo('nickname 迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 迁移：users 表增加 bio 列
- */
-async function migrateUsersBio() {
-  try {
-    const [cols] = await sequelize.query("SHOW COLUMNS FROM users LIKE 'bio'")
-    if (cols.length === 0) {
-      await sequelize.query('ALTER TABLE users ADD COLUMN bio VARCHAR(500) NULL DEFAULT "\u8fd9\u4e2a\u4eba\u5f88\u61d2" COMMENT "\u4e2a\u4eba\u4ecb\u7ecd" AFTER deptId')
-      logInfo('users 表已添加 bio 列')
-    }
-  } catch (err) {
-    logInfo('bio 迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 迁移：users 表增加安全相关字段（passwordResetRequired, loginAttempts, lockedUntil）
- */
-async function migrateUsersSecurity() {
-  try {
-    const [pwdCols] = await sequelize.query("SHOW COLUMNS FROM users LIKE 'passwordResetRequired'")
-    if (pwdCols.length === 0) {
-      await sequelize.query('ALTER TABLE users ADD COLUMN passwordResetRequired TINYINT NOT NULL DEFAULT 0 COMMENT "是否需要修改密码? 1=需要 0=不需要" AFTER password')
-      logInfo('users 表已添加 passwordResetRequired 列')
-    }
-    const [attemptCols] = await sequelize.query("SHOW COLUMNS FROM users LIKE 'loginAttempts'")
-    if (attemptCols.length === 0) {
-      await sequelize.query('ALTER TABLE users ADD COLUMN loginAttempts INT NOT NULL DEFAULT 0 COMMENT "连续登录失败次数" AFTER passwordResetRequired')
-      logInfo('users 表已添加 loginAttempts 列')
-    }
-    const [lockCols] = await sequelize.query("SHOW COLUMNS FROM users LIKE 'lockedUntil'")
-    if (lockCols.length === 0) {
-      await sequelize.query('ALTER TABLE users ADD COLUMN lockedUntil DATETIME NULL COMMENT "账号锁定截止时间" AFTER loginAttempts')
-      logInfo('users 表已添加 lockedUntil 列')
-    }
-  } catch (err) {
-    logInfo('users 安全字段迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 清理过期 refresh_tokens
- */
-async function cleanupExpiredRefreshTokens() {
-  try {
-    const [result] = await sequelize.query("DELETE FROM refresh_tokens WHERE expiresAt < NOW()") as any
-    const deleted = result.affectedRows || 0
-    if (deleted > 0) {
-      logInfo(`已清理${deleted} 条过期的 refresh_token`)
-    }
-  } catch (err) {
-    logInfo('refresh_token 清理（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 迁移：refresh_tokens 表增加 revokedAt 列
- */
-async function migrateRefreshTokensRevokedAt() {
-  try {
-    const [cols] = await sequelize.query("SHOW COLUMNS FROM refresh_tokens LIKE 'revokedAt'")
-    if (cols.length === 0) {
-      await sequelize.query('ALTER TABLE refresh_tokens ADD COLUMN revokedAt DATETIME NULL COMMENT "撤销时间（多标签宽限期判定）" AFTER rememberMe')
-      logInfo('refresh_tokens 表已添加 revokedAt 列')
-    }
-  } catch (err) {
-    logInfo('revokedAt 迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 迁移：refresh_tokens 表增加 purpose 列（区分 auth / password_reset）
- */
-async function migrateRefreshTokensPurpose() {
-  try {
-    const [cols] = await sequelize.query("SHOW COLUMNS FROM refresh_tokens LIKE 'purpose'")
-    if (cols.length === 0) {
-      await sequelize.query('ALTER TABLE refresh_tokens ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT "auth" COMMENT "令牌用途: auth=登录认证, password_reset=密码重置" AFTER revokedAt')
-      logInfo('refresh_tokens 表已添加 purpose 列')
-    }
-  } catch (err) {
-    logInfo('purpose 迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 迁移：创建 ai_providers 表
- */
-async function migrateAiProviders() {
-  try {
-    const [tables] = await sequelize.query("SHOW TABLES LIKE 'ai_providers'")
-    if (tables.length === 0) {
-      await sequelize.query(`
-        CREATE TABLE ai_providers (
-          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-          name VARCHAR(100) NOT NULL UNIQUE COMMENT '提供商名称',
-          apiBaseUrl VARCHAR(255) NOT NULL COMMENT 'API 基础地址',
-          apiKey VARCHAR(500) NOT NULL COMMENT 'API Key',
-          models VARCHAR(500) NOT NULL DEFAULT 'deepseek-chat' COMMENT '可用模型列表，逗号分隔',
-          defaultModel VARCHAR(100) NOT NULL DEFAULT 'deepseek-chat' COMMENT '默认模型',
-          enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用: 1=启用, 0=禁用',
-          sort INT NOT NULL DEFAULT 0 COMMENT '排序号',
-          description VARCHAR(255) DEFAULT NULL COMMENT '备注说明',
-          createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 提供商配置'
-      `)
-      logInfo('ai_providers 表已创建')
-
-      // 如果环境变量中有 DEEPSEEK_API_KEY，自动创建默认提供商
-      if (process.env.DEEPSEEK_API_KEY) {
-        await AiProvider.create({
-          name: 'DeepSeek',
-          apiBaseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
-          apiKey: process.env.DEEPSEEK_API_KEY,
-          models: 'deepseek-chat,deepseek-coder',
-          defaultModel: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-          enabled: 1,
-          sort: 0,
-          description: '系统自动创建（基于 DEEPSEEK_API_KEY 环境变量）',
-        })
-        logInfo('已自动创建默认 AI 提供商: DeepSeek')
-      }
-    }
-    } catch (err) {
-    logInfo('ai_providers 迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 菜单类型统一为 M/C/F，并新增按钮级权限字段 permission：
- * - 旧数据 type='D'(目录) 迁移为 'C'
- * - ENUM 扩展为 ('M','C','F')
- * - 新增 permission 列
- */
-async function migrateMenusTypeAndPermission() {
-  try {
-    const [tables] = await sequelize.query("SHOW TABLES LIKE 'menus'")
-    if (tables.length === 0) return
-
-    const [typeCols] = await sequelize.query("SHOW COLUMNS FROM menus LIKE 'type'")
-    const typeCol = (typeCols as any[])[0]
-    const needsEnumChange = typeCol && !/C/.test(typeCol.Type) && !/F/.test(typeCol.Type)
-
-    if (needsEnumChange) {
-      // MySQL 不允许直接将 ENUM('D','M') 改为 ENUM('M','C','F')（已有 D 数据不匹配新枚举会报
-      // "Data truncated"）。先扩展为包含 D 的超集，改写数据后再收缩为目标枚举。
-      await sequelize.query(
-        "ALTER TABLE menus MODIFY COLUMN type ENUM('D','M','C','F') NOT NULL DEFAULT 'M' COMMENT '类型: M=菜单, C=目录, F=按钮'"
-      )
-      logInfo('menus.type 已临时扩展为 ENUM(D,M,C,F)')
-    }
-
-    const [updateResult] = await sequelize.query("UPDATE menus SET type='C' WHERE type='D'") as any
-    if (updateResult && updateResult.affectedRows > 0) {
-      logInfo(`已迁移 ${updateResult.affectedRows} 条目录菜单 type: D -> C`)
-    }
-
-    if (needsEnumChange) {
-      await sequelize.query(
-        "ALTER TABLE menus MODIFY COLUMN type ENUM('M','C','F') NOT NULL DEFAULT 'M' COMMENT '类型: M=菜单, C=目录, F=按钮'"
-      )
-      logInfo('menus.type 已收缩为 ENUM(M,C,F)')
-    }
-
-    const [permCols] = await sequelize.query("SHOW COLUMNS FROM menus LIKE 'permission'")
-    if ((permCols as any[]).length === 0) {
-      await sequelize.query(
-        "ALTER TABLE menus ADD COLUMN permission VARCHAR(100) NULL COMMENT '权限标识(按钮级)，如 system:user:add' AFTER type"
-      )
-      logInfo('menus.permission 列已添加')
-    }
-  } catch (err) {
-    logInfo('menus 类型迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 角色菜单关联表添加 id 自增主键列。
- * 旧版表结构为复合主键 (roleId, menuId)，无自增 id 列，
- * 但 RoleMenu 模型声明了 id 字段，导致 bulkCreate 生成的 INSERT 包含 id 列报错。
- */
-async function migrateRoleMenusId() {
-  try {
-    const [cols] = await sequelize.query("SHOW COLUMNS FROM role_menus LIKE 'id'")
-    if ((cols as any[]).length === 0) {
-      await sequelize.query(
-        "ALTER TABLE role_menus ADD COLUMN id INT UNSIGNED AUTO_INCREMENT FIRST, DROP PRIMARY KEY, ADD PRIMARY KEY (id), ADD UNIQUE KEY role_menus_roleId_menuId_unique (roleId, menuId)"
-      )
-      logInfo('role_menus 表已添加 id 自增主键列')
-    }
-  } catch (err) {
-    logInfo('role_menus 迁移（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 密码迁移：旧明文密码 -> bcrypt 哈希
- */
-async function migratePasswords() {
-  try {
-    const bcrypt = await import('bcryptjs')
-    const [users] = await sequelize.query(
-      "SELECT id, password FROM users WHERE password NOT LIKE '$2a$%' AND password NOT LIKE '$2b$%'"
-    ) as any
-    if (users.length > 0) {
-      const saltRounds = 10
-      for (const u of users) {
-        const hashed = await bcrypt.hash(u.password, saltRounds)
-        await sequelize.query('UPDATE users SET password = ? WHERE id = ?', {
-          replacements: [hashed, u.id],
-        })
-      }
-      logInfo(`已迁移${users.length} 个用户的密码为 bcrypt 哈希`)
-    }
-  } catch (err) {
-    logInfo('密码迁移（可忽略）: ' + err.message)
-  }
-}
-
 /**
  * 启动服务：数据库同步、数据迁移、种子数据、前端托管、HTTP 监听
  * @param {import('express').Express} app - Express 应用实例
@@ -673,16 +375,9 @@ export default async function bootstrap(app) {
 
     cleanOldLogs()
 
-    // 兼容旧版：对已有数据库执行增量迁移（如果旧迁移记录不存在）
-    // 这些函数内部有 SHOW COLUMNS 检查，不会重复执行
-    await migrateDicts()
-    await migrateUsersDeptId()
-    await migrateUsersNickname()
-    await migrateUsersBio()
-    await migrateUsersSecurity()
-    await migrateRefreshTokensRevokedAt()
-    await migrateRefreshTokensPurpose()
-    await cleanupExpiredRefreshTokens()
+    // 兼容旧版数据库的增量迁移已收敛为一次性 Umzug 迁移
+    // （server/migrations/20260717_000001_legacy-compat.ts），由上方 migrator.up() 统一执行，
+    // 受 SequelizeMeta 保护，不会每次启动重复执行。
 
     // 种子数据（仅在用户表为空时写入）
     const userCount = await User.count()
@@ -690,14 +385,10 @@ export default async function bootstrap(app) {
       await seeder.up()
       logInfo('种子数据写入完成')
     } else {
-      // 兼容旧版：执行原有种子数据逻辑（增量补充）
+      // 兼容旧版：执行原有种子数据逻辑（增量补充菜单/设置等）
       await seedData()
     }
 
-    await migratePasswords()
-    await migrateAiProviders()
-    await migrateMenusTypeAndPermission()
-    await migrateRoleMenusId()
     await loadSiteInfo()
 
     // 自签名证书（开发环境），解决 Chrome HTTPS-First 模式报错

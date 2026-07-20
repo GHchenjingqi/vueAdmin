@@ -18,6 +18,11 @@ const __dirname = dirname(__filename)
 
 const app = express()
 
+// 信任反向代理（Nginx / K8s Ingress），否则 req.ip 恒为代理 IP，
+// 导致基于 IP 的限流、在线用户 IP 记录、强制下线判定全部失真。
+// 1 表示信任前一跳代理（生产环境建议按实际跳数或代理 IP 段配置）。
+app.set('trust proxy', 1)
+
 // ---------- 安全中间件（P0 级别，必须启用）----------
 // 自定义 CSP：允许开发模式下 Vite HMR WebSocket 连接
 // 注意：禁用 HSTS（strictTransportSecurity），因为开发环境通常不使用 HTTPS，
