@@ -6,9 +6,9 @@
 
 ## 项目概述
 
-Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 + Vite + TypeScript，后端使用 Express + Sequelize ORM + TypeScript。系统开箱即用，自带用户认证（JWT 双 Token 机制 + HttpOnly Cookie）、动态菜单、RBAC 权限、文件管理、系统设置、字典管理、通知公告、消息推送（SSE 实时推送）、在线用户管理、定时任务调度、服务监控、全局搜索、暗黑模式、水印、密码找回、操作日志、Excel 导出、Swagger API 文档（Redoc）、多语言国际化等功能。
+Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 + Vite + TypeScript，后端使用 Express + Sequelize ORM + TypeScript。系统开箱即用，自带用户认证（JWT 双 Token 机制 + HttpOnly Cookie）、动态菜单、RBAC 权限、行级数据权限（部门数据隔离）、文件管理、系统设置、字典管理、通知公告、消息推送（SSE 实时推送）、在线用户管理、定时任务调度、服务监控、全局搜索、暗黑模式、水印、密码找回、操作日志、Excel 导出、Swagger API 文档（Redoc）、多语言国际化、AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理）、Web Vitals 性能监控等功能。
 
-项目已实施多项安全加固与工程化优化：SQL 注入修复、SSE 一次性票据认证、Zod 共享 Schema 校验、Pinia 状态管理（8 个 Store）、轻量级 i18n 国际化、Composables 组合式函数、ProTable 组件拆分、BEM 命名规范、CSS 变量暗黑模式适配、响应式布局、XSS 防护（SVG 清洗）、数据库索引优化、生产环境错误信息脱敏、Helmet 安全头、请求频率限制（滑动窗口 + Redis 多实例）、Sentry 错误监控、Vitest 单元测试（267+ 用例）、E2E 测试（Playwright）、GitHub Actions CI 流水线、Docker 多阶段构建、Kubernetes 部署清单。
+项目已实施多项安全加固与工程化优化：SQL 注入修复、SSE 一次性票据认证 + JWT-in-query 泄露修复、CSRF 纵深防御（Origin 校验 + SameSite=Strict）、Zod 共享 Schema 校验、Pinia 状态管理（9 个 Store）、轻量级 i18n 国际化、Composables 组合式函数（含 useSSE）、ProTable 组件拆分、BEM 命名规范、CSS 变量暗黑模式适配、响应式布局、XSS 防护（SVG 清洗）、数据库索引优化、生产环境错误信息脱敏（错误分级：409/400/500）、Helmet 安全头 + trust proxy、请求频率限制（滑动窗口 + Redis 多实例）、Sentry 错误监控 + Web Vitals RUM、Vitest 单元测试（35+ 前端文件 + 24 个后端文件）、E2E 测试（Playwright）、GitHub Actions CI/CD 流水线、Docker 多阶段构建、Kubernetes 部署清单 + 多副本一致性（Redis pub/sub 踢人）。
 
 ---
 
@@ -46,6 +46,10 @@ Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 
 - **列设置**：表格列显隐可配、排序状态持久化
 - **SSE 实时推送**：一次性票据认证，安全可靠
 - **导出进度条**：大数据量导出时实时显示进度
+- **AI 代码生成助手**：浮动按钮 + 抽屉式对话界面，支持 Markdown/代码渲染、代码高亮、多提供商/模型切换、代码文件预览与一键应用（创建菜单/文件写入）、本地知识库 RAG 检索
+- **Web Vitals 性能监控**：Core Web Vitals（CLS/FCP/LCP/TTFB/INP）实时采集并上报 Sentry，用于 RUM 真实用户监控
+- **骨架屏加载**：页面和组件级别骨架屏（SkeletonLoader / PageSkeleton），提升加载感知体验
+- **性能预算**：构建时校验 bundle 体积（JS/CSS 上限）、Lighthouse 评分（≥90），npm run analyze 可视化分析
 
 ---
 
@@ -69,13 +73,18 @@ graph TD
     K --> L[(MySQL)]
     I --> M[Multer File Upload]
     N[Sentry] --> G
+    I --> O[DataScope 数据权限层]
+    O --> L
+    P[Origin Validator] --> I
+    Q[trust proxy] --> P
   end
 
   subgraph "基础设施"
-    O[Nginx 反代] --> P[Docker Container]
-    P --> G
-    O --> Q[静态资源 dist/]
-    R[GitHub Actions CI] --> P
+    R[Nginx 反代] --> S[Docker Container]
+    S --> G
+    R --> T[静态资源 dist/]
+    U[GitHub Actions CI] --> S
+    V[Redis] --> Q
   end
 ```
 
@@ -218,6 +227,9 @@ const formSchema = [
 | v3.0 | ECharts 仪表盘 + 定时任务 + 服务监控 |
 | v3.5 | Vitest 单元测试 + GitHub Actions CI + Sentry 错误监控 |
 | v4.0 | Redis 多实例限流 + Umzug 数据库迁移 + Zod 共享 Schema + K8s 部署清单 |
+| v4.1 | 行级数据权限 + CSRF 纵深防御 + 多副本踢下线 + 后端单元测试 + trust proxy |
+| v4.2 | AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理） + SSE Composable + Web Vitals |
+| v4.3 | 骨架屏组件 + 性能预算 + Lighthouse CI + GitHub Actions Release + 前后端测试增强 |
 
 ---
 
@@ -237,6 +249,12 @@ const formSchema = [
 | [Zod](https://zod.dev/) | ^3.25.76 | Schema 校验（前后端共享校验规则） |
 | [ECharts](https://echarts.apache.org/) | ^6.1.0 | 图表可视化 |
 | [md-editor-v3](https://imzbf.github.io/md-editor-v3/) | ^6.5.3 | Markdown 编辑器 |
+| [highlight.js](https://highlightjs.org/) | ^11.11.1 | 代码语法高亮（AI 代码预览，懒加载） |
+| [katex](https://katex.org/) | ^0.17.0 | LaTeX 数学公式渲染（Markdown 增强） |
+| [marked](https://marked.js.org/) | ^12.0.0 | Markdown 解析器（AI 助手消息渲染） |
+| [mermaid](https://mermaid.js.org/) | ^11.16.0 | 图表/流程图渲染（Markdown 增强） |
+| [sortablejs](https://sortablejs.github.io/Sortable/) | ^1.15.7 | 列表拖拽排序 |
+| [web-vitals](https://github.com/GoogleChrome/web-vitals) | ^5.3.0 | Core Web Vitals 性能指标采集 |
 | [Vite](https://vitejs.dev/) | ^6.3.0 | 前端构建工具（开发服务器 + 打包） |
 | [Vitest](https://vitest.dev/) | ^4.1.9 | 单元测试框架（覆盖率报告） |
 | [@sentry/vue](https://docs.sentry.io/platforms/javascript/guides/vue/) | ^9.0.0 | 前端错误监控 |
@@ -276,6 +294,7 @@ const formSchema = [
 | [Umzug](https://github.com/sequelize/umzug) | ^3.8.3 | 数据库迁移引擎（替代 sequelize.sync） |
 | [selfsigned](https://github.com/jfromaniello/selfsigned) | ^5.5.0 | 自签名 HTTPS 证书生成 |
 | [helmet](https://helmetjs.github.io/) | ^8.2.0 | 安全 HTTP 头（CSP / HSTS / XSS 防护） |
+| [openai](https://github.com/openai/openai-node) | ^4.47.0 | OpenAI / 兼容 API 客户端（AI 助手后端） |
 
 ### 测试与工程化
 
@@ -632,9 +651,9 @@ vue-admin/
 │   │       ├── role.ts              # 角色管理 Schema
 │   │       ├── common.ts            # 通用 Schema（pagination / id / dateRange）
 │   │       └── index.ts             # 统一导出
-│   ├── models/                      # 数据模型（Sequelize ORM，15 个模型）
+│   ├── models/                      # 数据模型（Sequelize ORM，16 个模型）
 │   │   ├── User.ts                  # 用户模型（含 deptId 索引、status / username 复合索引）
-│   │   ├── Role.ts                  # 角色模型
+│   │   ├── Role.ts                  # 角色模型（含 dataScope 数据权限范围字段）
 │   │   ├── UserRole.ts              # 用户-角色关联
 │   │   ├── Menu.ts                  # 菜单模型（含 parentId / status / hidden 索引）
 │   │   ├── RoleMenu.ts              # 角色-菜单关联
@@ -649,12 +668,14 @@ vue-admin/
 │   │   ├── Log.ts                   # 操作日志
 │   │   ├── RefreshToken.ts          # Refresh Token 持久化（含 userId / purpose 联合索引）
 │   │   └── AiProvider.ts            # AI 提供商配置（实验性模块使用）
-│   ├── controllers/                 # 控制器层（17 个控制器）
+│   ├── controllers/                 # 控制器层（19 个控制器）
 │   │   ├── authController.ts        # 认证登录（SSE 票据签发、密码找回、Token 刷新）
-│   │   ├── userController.ts        # 用户管理（Excel 导出，SQL 注入防护）
+│   │   ├── userController.ts        # 用户管理（Excel 导出、数据权限过滤）
 │   │   ├── menuController.ts        # 菜单管理（树形 / 选项 / 后台列表）
-│   │   ├── roleController.ts        # 角色管理
+│   │   ├── roleController.ts        # 角色管理（含 dataScope 数据权限配置）
 │   │   ├── deptController.ts        # 部门管理
+│   │   ├── aiController.ts          # AI 代码生成（聊天 / 文件应用）
+│   │   ├── aiProviderController.ts  # AI 提供商管理（CRUD / 状态切换）
 │   │   ├── settingController.ts     # 系统设置
 │   │   ├── dictTypeController.ts    # 字典类型
 │   │   ├── dictDataController.ts    # 字典数据
@@ -667,35 +688,37 @@ vue-admin/
 │   │   ├── taskController.ts        # 定时任务管理
 │   │   ├── onlineUserController.ts  # 在线用户管理（强制踢下线）
 │   │   └── serverController.ts      # 服务监控（CPU / 内存 / 磁盘）
-│   ├── services/                      # 服务层（业务逻辑，21 个文件）
+│   ├── services/                      # 服务层（业务逻辑，25+ 个文件）
 │   │   ├── authService.ts           # 认证服务（登录、Token 刷新、SSE 票据、密码找回）
-│   │   ├── userService.ts           # 用户服务
+│   │   ├── userService.ts           # 用户服务（含数据权限 dataScope 解析）
 │   │   ├── roleService.ts           # 角色服务
-│   │   ├── AIAssistant.ts           # AI 代码生成服务（实验性，未接入路由）
-│   │   ├── AiProviderService.ts      # AI 提供商管理（实验性，未接入路由）
-│   │   ├── CodeInjector.ts           # AI 代码注入引擎（实验性，未接入路由）
-│   │   ├── LocalFileRAG.ts           # 本地 RAG 检索（实验性，未接入路由）
+│   │   ├── AIAssistant.ts           # AI 代码生成服务（多提供商调用、RAG 知识库检索）
+│   │   ├── AiProviderService.ts     # AI 提供商管理（CRUD、多实例）
+│   │   ├── CodeInjector.ts          # AI 代码注入引擎（文件写入、菜单创建）
+│   │   ├── LocalFileRAG.ts          # 本地文件 RAG 检索（知识库索引）
 │   │   └── ...                        # menuService / dictService / noticeService / taskService 等
-│   ├── routes/                      # 路由层（13 个路由文件）
-│   │   ├── index.ts                 # 路由聚合入口（含 OpenAPI 注解 + Zod 校验中间件）
+│   ├── routes/                      # 路由层（14 个路由文件）
+│   │   ├── index.ts                 # 路由聚合入口（含 OpenAPI 注解 + Zod 校验中间件 + originValidator）
 │   │   ├── authRoutes.ts            # 认证路由
 │   │   ├── userRoutes.ts            # 用户管理路由
 │   │   ├── menuRoutes.ts            # 菜单管理路由
 │   │   ├── roleRoutes.ts            # 角色管理路由
 │   │   ├── deptRoutes.ts            # 部门管理路由
 │   │   ├── settingRoutes.ts         # 系统设置路由
+│   │   ├── ai.routes.ts             # AI 代码生成路由
 │   │   ├── dictTypeRoutes.ts        # 字典类型路由
 │   │   ├── dictDataRoutes.ts        # 字典数据路由
 │   │   ├── noticeRoutes.ts          # 通知公告路由
 │   │   ├── logRoutes.ts             # 日志路由
 │   │   ├── uploadRoutes.ts          # 文件上传路由
 │   │   └── dashboardRoutes.ts       # 仪表盘路由
-│   ├── middleware/                  # 中间件（6 个）
+│   ├── middleware/                  # 中间件（7 个）
 │   │   ├── auth.ts                  # JWT 认证中间件
 │   │   ├── accessLog.ts             # HTTP 访问日志（包装 res.end）
 │   │   ├── errorHandler.ts          # 全局错误处理（生产环境脱敏）
 │   │   ├── rateLimiter.ts           # 登录频率限制（滑动窗口限流）
 │   │   ├── rateLimitStore.ts        # 限流存储抽象层（Redis / 内存降级）
+│   │   ├── originValidator.ts       # CSRF 防御（Origin/Referer 白名单校验）
 │   │   ├── slowQueryLog.ts          # 慢查询日志（>1000ms 记录）
 │   │   └── validate.ts              # Zod Schema 校验中间件
 │   ├── validators/                  # 后端校验（4 个文件）
@@ -703,26 +726,28 @@ vue-admin/
 │   │   ├── common.ts               # 通用校验
 │   │   ├── dept.ts                  # 部门校验
 │   │   └── index.ts                 # 统一导出
-│   ├── utils/                       # 工具模块（14 个文件）
+│   ├── utils/                       # 工具模块（15 个文件）
 │   │   ├── fileLogger.ts            # 文件日志（按日期切割、30 天轮转、日志分级）
 │   │   ├── logger.ts                # 数据库操作日志工具
 │   │   ├── captcha.ts               # SVG 图形验证码生成
 │   │   ├── mailer.ts                # 邮件发送（Nodemailer，支持 SMTP 配置）
 │   │   ├── scheduler.ts             # 定时任务调度器（node-cron）
 │   │   ├── sseManager.ts            # SSE 实时推送管理器（一次性票据认证）
-│   │   ├── onlineUsers.ts           # 在线用户管理
+│   │   ├── onlineUsers.ts           # 在线用户管理（含 Redis pub/sub 多副本踢下线）
 │   │   ├── siteCache.ts             # 站点信息缓存 + HTML 动态注入
 │   │   ├── migrator.ts              # Umzug 迁移引擎（迁移 + 种子数据）
 │   │   ├── exportExcel.ts           # Excel 导出工具
 │   │   ├── dictCache.ts             # 字典数据缓存
+│   │   ├── dataScope.ts             # 数据权限工具（部门隔离 / dataScope 范围解析）
 │   │   ├── diff.ts                  # 对象差异对比工具
 │   │   ├── generateCert.ts          # HTTPS 自签名证书生成
 │   │   └── helpers.ts               # 通用辅助函数
-│   ├── migrations/                  # 数据库迁移（15 个，按时间戳排序）
+│   ├── migrations/                  # 数据库迁移（16 个，按时间戳排序）
 │   │   ├── 20260707_000001_create-users.cjs
 │   │   ├── 20260707_000002_create-roles.cjs
 │   │   ├── ...                      # 覆盖所有数据表
-│   │   └── 20260707_000015_create-logs.cjs
+│   │   ├── 20260707_000015_create-logs.cjs
+│   │   └── 20260717_000001_legacy-compat.ts # 旧数据兼容迁移（dataScope 字段补全）
 │   ├── seeders/                     # 种子数据（7 个）
 │   │   ├── 20260707_000001_admin_user.cjs
 │   │   ├── 20260707_000002_default_roles.cjs
@@ -736,15 +761,32 @@ vue-admin/
 │   ├── types/                       # 类型声明
 │   │   ├── express.d.ts             # Express 类型扩展（req.user）
 │   │   └── sequelize.d.ts           # Sequelize 类型扩展
-│   ├── __tests__/                   # 后端单元测试（8 个测试文件）
+│   ├── __tests__/                   # 后端单元测试（24 个测试文件）
 │   │   ├── authMiddleware.test.ts
 │   │   ├── authService.test.ts
 │   │   ├── captcha.test.ts
+│   │   ├── dataScope.test.ts        # 数据权限范围解析测试
 │   │   ├── errorHandler.test.ts
+│   │   ├── fileLogger.test.ts
+│   │   ├── generateCert.test.ts
 │   │   ├── helpers.test.ts
+│   │   ├── logger.test.ts
+│   │   ├── mailer.test.ts
+│   │   ├── migrator.test.ts
+│   │   ├── onlineUsers.test.ts
 │   │   ├── rateLimiter.test.ts
+│   │   ├── resetToken.test.ts
+│   │   ├── scheduler.test.ts
+│   │   ├── siteCache.test.ts
+│   │   ├── slowQueryLog.test.ts
+│   │   ├── sseManager.test.ts
+│   │   ├── uploadValidator.test.ts
 │   │   ├── userService.test.ts
-│   │   └── validate.test.ts
+│   │   ├── validate.test.ts
+│   │   ├── accessLog.test.ts
+│   │   ├── dictCache.test.ts
+│   │   ├── diff.test.ts
+│   │   └── exportExcel.test.ts
 │   ├── dist/                        # 编译产物（tsc 输出）
 │   ├── logs/                        # 日志文件（自动生成，按日期切割）
 │   └── uploads/                     # 上传文件（自动生成，按日期分目录）
@@ -755,9 +797,10 @@ vue-admin/
 │   ├── router/                      # 路由管理
 │   │   ├── index.ts                 # Vue Router 配置 + 路由守卫（登录态 + 强制改密）
 │   │   ├── dynamicRoutes.ts         # 动态路由管理（根据后端菜单注册 / 恢复 / 清理）
-│   │   ├── keepAlive.ts             # 路由组件缓存管理
+│   │   ├── initSession.ts           # 会话初始化（页面刷新后恢复登录态 + 站点信息）
+│   │   ├── keepAlive.ts             # 路由组件缓存管理（白名单动态配置）
 │   │   └── preload.ts               # 路由预加载（兄弟路由）
-│   ├── api/                         # API 请求封装（TypeScript，17 个 API 模块）
+│   ├── api/                         # API 请求封装（TypeScript，18 个 API 模块）
 │   │   ├── index.ts                 # 统一导出
 │   │   ├── auth.ts                  # 认证 API
 │   │   ├── user.ts                  # 用户管理 API
@@ -774,16 +817,17 @@ vue-admin/
 │   │   ├── search.ts                # 全局搜索 API
 │   │   ├── onlineUser.ts            # 在线用户 API
 │   │   ├── task.ts                  # 定时任务 API
-│   │   └── server.ts                # 服务监控 API
-│   ├── stores/                      # Pinia 状态管理（8 个 Store）
+│   │   ├── server.ts                # 服务监控 API
+│   │   └── ai.ts                    # AI 代码生成 API（聊天 / 文件应用 / 提供商管理）
+│   ├── stores/                      # Pinia 状态管理（9 个 Store）
 │   │   ├── index.ts                 # 统一导出
 │   │   ├── pinia.ts                 # Pinia 实例
 │   │   ├── userStore.ts             # 用户状态（登录态、Token、角色、权限）
 │   │   ├── appStore.ts              # 应用状态（侧边栏、暗黑模式、主题、布局）
 │   │   ├── menuStore.ts             # 菜单状态（动态路由、菜单树缓存）
 │   │   ├── themeStore.ts            # 主题状态（主色、字号）
-│   │   ├── layoutStore.ts           # 布局状态
-│   │   ├── localeStore.ts           # 语言状态
+│   │   ├── layoutStore.ts           # 布局状态（多标签页、导航模式）
+│   │   ├── localeStore.ts           # 语言状态（中英文切换）
 │   │   ├── settingStore.ts          # 系统设置缓存
 │   │   ├── siteStore.ts             # 站点信息
 │   │   └── notificationStore.ts     # 通知状态（SSE 连接、未读数、票据认证）
@@ -791,13 +835,14 @@ vue-admin/
 │   │   ├── index.ts                 # i18n 核心（useI18n / t / setLocale）
 │   │   ├── zh-CN.ts                 # 中文语言包
 │   │   └── en-US.ts                 # 英文语言包
-│   ├── composables/                 # 组合式函数（5 个）
+│   ├── composables/                 # 组合式函数（6 个）
 │   │   ├── index.ts                 # 统一导出
 │   │   ├── useCrud.ts               # CRUD 页面逻辑（列表 / 分页 / 搜索 / 增删改）
 │   │   ├── useDialog.ts             # 弹窗逻辑复用
 │   │   ├── useExport.ts             # 导出逻辑复用
 │   │   ├── useExportProgress.ts     # 导出进度复用
-│   │   └── useRequestCache.ts       # 请求缓存复用
+│   │   ├── useRequestCache.ts       # 请求缓存复用
+│   │   └── useSSE.ts                # SSE 连接管理（指数退避重连 / 心跳保活 / 自动 ticket）
 │   ├── directives/                  # 自定义指令
 │   │   └── permission.ts            # v-permission 按钮级权限指令
 │   ├── utils/                       # 工具函数
@@ -811,7 +856,9 @@ vue-admin/
 │   │   ├── sanitize.ts              # XSS 防护（sanitizeSvg 清洗脚本 / 事件）
 │   │   ├── debounce.ts              # 防抖 / 节流工具函数
 │   │   ├── dynamicIcons.ts          # 动态图标注册
-│   │   └── nprogress.ts             # NProgress 进度条配置
+│   │   ├── nprogress.ts             # NProgress 进度条配置
+│   │   ├── mdEditorSetup.ts         # Markdown 编辑器增强配置（Mermaid / Katex 集成）
+│   │   └── webVitals.ts             # Core Web Vitals 性能指标上报（CLS/FCP/LCP/TTFB/INP → Sentry）
 │   ├── components/                  # 通用组件
 │   │   ├── CrudPage.vue             # CRUD 页面模板（ProTable + FormDialog 组合）
 │   │   ├── CrudTable.vue            # CRUD 表格模板
@@ -820,10 +867,15 @@ vue-admin/
 │   │   ├── SearchBar.vue            # 搜索栏组件
 │   │   ├── TableCard.vue            # 表格卡片组件
 │   │   ├── ErrorBoundary.vue        # 错误边界组件
-│   │   ├── MenuIcon.vue             # 菜单图标组件
+│   │   ├── MenuIcon.vue             # 菜单图标组件（动态 SVG 渲染）
 │   │   ├── Watermark.vue            # 全局水印组件（CSS 实现）
 │   │   ├── VirtualTable.vue         # 虚拟滚动表格
 │   │   ├── Permission.vue           # 权限控制组件（<Permission codes="['admin']">）
+│   │   ├── EmptyState.vue           # 空状态组件（统一空数据展示）
+│   │   ├── SkeletonLoader.vue       # 骨架屏加载组件（通用占位）
+│   │   ├── PageSkeleton.vue         # 页面级骨架屏（Layout 骨架）
+│   │   ├── AIAssistant/             # AI 代码生成助手（浮动按钮 + 抽屉对话 + 代码预览）
+│   │   │   └── index.vue
 │   │   ├── ProTable/                # 高级表格组件
 │   │   │   ├── index.vue            # 主组件（搜索 + 表格 + 分页 + 列设置 + 导出）
 │   │   │   ├── SearchForm.vue       # 搜索表单子组件（defineModel 双向绑定 + 防抖）
@@ -842,13 +894,17 @@ vue-admin/
 │   │       ├── GlobalSearch.vue     # 全局搜索（⌘K / Ctrl+K，键盘导航）
 │   │       ├── NotificationCenter.vue # 通知中心（SSE 票据认证、未读红点）
 │   │       └── ThemeSettingsPanel.vue # 主题设置面板（暗黑模式、主色、字号、布局）
-│   ├── views/                       # 页面组件（23 个页面）
-│   │   ├── Layout.vue               # 主布局（响应式、标签页、骨架屏、水印）
+│   ├── views/                       # 页面组件（24 个页面）
+│   │   ├── Layout.vue               # 主布局（响应式、标签页、骨架屏、水印、AI 助手悬浮按钮）
 │   │   ├── Login.vue                # 登录页（验证码、记住我、响应式）
 │   │   ├── LoginPage.vue            # 登录页配置页
 │   │   ├── Register.vue             # 用户注册
+│   │   ├── AiProviderManager.vue    # AI 提供商管理页
 │   │   ├── Dashboard.vue            # 仪表盘（骨架屏、ECharts 图表）
 │   │   ├── UserList.vue             # 用户管理（导入 / 导出）
+│   │   │   └── user/
+│   │   │       ├── UserFormDialog.vue   # 用户表单弹窗
+│   │   │       └── UserImportDialog.vue # 用户导入弹窗
 │   │   ├── Profile.vue              # 个人中心
 │   │   ├── MenuList.vue             # 菜单管理（树形）
 │   │   ├── RoleManager.vue          # 角色管理（权限树）
@@ -872,17 +928,23 @@ vue-admin/
 │   │   └── theme.scss               # 全局主题样式（CSS 变量、BEM 命名、暗黑适配）
 │   ├── types/                       # 前端类型声明
 │   │   ├── api.d.ts                 # 前端 API 类型声明
-│   │   └── response.ts              # 响应类型（ApiResponse / PaginatedData）
-│   ├── __tests__/                   # 前端单元测试（Vitest，17 个文件 267+ 用例）
+│   │   ├── response.ts              # 响应类型（ApiResponse / PaginatedData）
+│   │   └── table.ts                 # 表格相关类型（ColumnDef / CrudApi 等）
+│   ├── __tests__/                   # 前端单元测试（Vitest，35+ 文件 300+ 用例）
+│   │   ├── aiApi.test.ts            # AI API 测试
+│   │   ├── api.test.ts              # API 模块测试
 │   │   ├── appStore.test.ts         # 应用状态测试
 │   │   ├── userStore.test.ts        # 用户认证状态测试
 │   │   ├── menuStore.test.ts        # 菜单状态测试
 │   │   ├── settingStore.test.ts     # 系统设置状态测试
+│   │   ├── siteStore.test.ts        # 站点信息状态测试
 │   │   ├── i18n.test.ts             # 国际化测试
 │   │   ├── validators.test.ts       # 校验规则测试
 │   │   ├── requestCache.test.ts     # 请求缓存测试
+│   │   ├── request.test.ts          # 请求拦截器测试
 │   │   ├── response.test.ts         # 响应工具函数测试
 │   │   ├── error.test.ts            # 错误处理测试
+│   │   ├── errors.test.ts           # AppError 错误类测试
 │   │   ├── sanitize.test.ts         # XSS 清洗测试
 │   │   ├── debounce.test.ts         # 防抖/节流测试
 │   │   ├── permission.test.ts       # 权限指令测试
@@ -890,10 +952,27 @@ vue-admin/
 │   │   ├── useCrud.test.ts          # CRUD 逻辑测试
 │   │   ├── useExport.test.ts        # 导出逻辑测试
 │   │   ├── useExportProgress.test.ts # 导出进度测试
+│   │   ├── useRequestCache.test.ts  # 请求缓存测试
+│   │   ├── useSSE.test.ts           # SSE 连接管理测试
+│   │   ├── mdEditorSetup.test.ts    # Markdown 编辑器增强测试
+│   │   ├── nprogress.test.ts        # NProgress 测试
+│   │   ├── webVitals.test.ts        # Web Vitals 测试
+│   │   ├── dynamicIcons.test.ts     # 动态图标测试
+│   │   ├── dynamicRoutes.integration.test.ts # 动态路由集成测试
 │   │   ├── CrudPage.test.ts         # CRUD 页面组件测试
-│   │   └── components/              # 组件测试
-│   │       ├── ProForm.test.ts
-│   │       └── ProTable.test.ts
+│   │   ├── pinia.test.ts            # Pinia 初始化测试
+│   │   ├── notificationStore.test.ts # 通知状态测试
+│   │   ├── download.test.ts         # 文件下载测试
+│   │   ├── components/              # 组件测试
+│   │   │   ├── Dashboard.test.ts
+│   │   │   ├── Login.test.ts
+│   │   │   ├── ProForm.test.ts
+│   │   │   ├── ProTable.test.ts
+│   │   │   └── UserList.test.ts
+│   │   ├── composables/             # 组合式函数测试
+│   │   │   └── useSSE.test.ts
+│   │   └── performance/             # 性能基准测试
+│   │       └── benchmark.bench.ts
 │   └── env.d.ts                     # Vite 环境变量类型声明
 │
 ├── e2e/                             # E2E 测试（Playwright）
@@ -925,7 +1004,8 @@ vue-admin/
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                   # GitHub Actions CI（lint → typecheck → test → build → e2e）
+│       ├── ci.yml                   # GitHub Actions CI（lint → typecheck → test → build → e2e）
+│       └── release.yml              # GitHub Actions Release（自动打 tag + 发布）
 ├── .cert/                           # HTTPS 自签名证书
 │   ├── server.crt
 │   └── server.key
@@ -937,6 +1017,8 @@ vue-admin/
 ├── vite.config.ts                   # Vite 构建配置（unplugin、分包策略、Gzip 压缩）
 ├── vitest.config.ts                   # Vitest 配置（jsdom 环境、覆盖率阈值 70% 渐进式，长期目标 80%）
 ├── tsconfig.json                    # 前端 TypeScript 配置
+├── lighthouserc.json                # Lighthouse CI 配置（性能预算校验）
+├── budget.json                      # 性能预算（bundle 体积 / Lighthouse 评分）
 ├── eslint.config.mjs                # ESLint 9 Flat Config（Vue + TypeScript + Prettier）
 ├── .prettierrc                      # Prettier 配置
 ├── commitlint.config.mjs            # Commitlint 配置（Conventional Commits）
@@ -1057,56 +1139,81 @@ vue-admin/
 - **BEM CSS 命名**：组件样式遵循 Block__Element--Modifier 规范
 - **CSS 变量暗黑模式**：所有颜色值使用 `var(--el-*)` 变量，自动适配暗黑主题
 - **响应式布局**：关键页面（Dashboard、Login、Register、Settings）使用 `:xs/:sm/:md/:lg` 断点
-- **单元测试**：Vitest + @vue/test-utils，267 个测试用例覆盖所有 Store、工具函数、Composables 和核心组件
+- **单元测试**：Vitest + @vue/test-utils，267+ 用例覆盖所有 Store、工具函数、Composables 和核心组件；后端 `dataScope` 28 用例覆盖范围解析/部门子树/守卫
 - **Composables 组合式函数**：useDialog / useCrud / useExport / useExportProgress / useRequestCache
 
-### 15. 权限指令与组件
+### 14. 行级数据权限（部门数据隔离）
+
+- **Role.dataScope 字段**：`1=全部` / `2=本部门` / `3=本级及以下`，角色创建/编辑时配置
+- **数据范围解析**：多角色取最宽松范围（min），若任一角色为「全部」则整体为全部；admin 角色自动为全部
+- **JWT 携带范围**：登录/刷新 Token 时自动解析并写入 `deptId` + `dataScope`，`req.user` 同步携带
+- **查询自动过滤**：用户列表/导出/详情自动注入 `deptId IN (...)` 条件；跨部门请求返回 403
+- **「本级及以下」子树计算**：通过 BFS 遍历部门树，返回包含自身的所有下级部门 ID
+- **过渡兼容**：旧 Token 缺省 `dataScope` 时默认 scope=1（全部），无锁人风险
+- **安全边界**：
+  - 列表：只返回本部门（或下级部门）数据
+  - 导出：同列表范围，不泄露其他部门
+  - 查看详情：跨部门 403
+  - 编辑/删除：跨部门 403
+
+### 15. CSRF 纵深防御
+
+- **SameSite=Strict Cookie**：Refresh Token Cookie 设置 `SameSite=Strict`，跨站点请求自动不携带
+- **Origin 校验中间件**：对所有非 GET 请求校验 `Origin` / `Referer` 头，不在白名单内则 403 拒绝
+- **JWT-in-query 泄露修复**：SSE 端点不再接受 `?token=<jwt>` 查询参数，强制要求 `Authorization` 头（浏览器不会自动携带自定义头，天然 CSRF 安全）
+- **信任代理**：`app.set('trust proxy', 1)` 确保 Nginx/K8s Ingress 场景下 `req.ip` 获取真实客户端 IP，限流不失效
+- **配置项**：`config.app.allowedOrigins` 白名单，支持环境变量 `ALLOWED_ORIGINS` 覆盖
+
+### 16. 权限指令与组件
 
 - **v-permission 指令**：`v-permission="['admin']"` 控制按钮/菜单可见性，无权限时 `display: none`
 - **Permission 组件**：`<Permission codes="['user:create']">` 包裹式权限控制，无权限时不渲染 DOM
 - 管理员角色（admin / super_admin）自动拥有所有权限
 - 权限判断基于用户角色列表和权限码列表
 
-### 16. 实时通知（SSE）
+### 17. 实时通知（SSE）
 
 - **Server-Sent Events**：基于 SSE 的实时通知推送，替代传统轮询方式
 - **一次性票据认证**：SSE 连接使用一次性 ticket 认证，不在 URL 中暴露 Access Token
+- **心跳保活**：30 秒间隔推送心跳事件 + `X-Accel-Buffering: no`，防止 Nginx/Ingress 缓冲断开
 - **自动重连**：断线后 5 秒自动重连，最多重试 3 次
 - 通知已读/未读状态实时同步到全局 Store
 
-### 17. 搜索防抖
+### 18. 搜索防抖
 
 - **SearchForm 输入防抖**：文本搜索框输入 300ms 防抖，避免频繁触发 API 请求
 - **debounce / throttle 工具函数**：通用防抖节流工具，可复用于其他场景
 
-### 18. 全局进度条
+### 19. 全局进度条
 
 - **NProgress**：路由跳转和 API 请求时顶部显示进度条
 - 路由守卫自动启动/结束进度条
 - Axios 请求/响应拦截器自动管理进度条
 - 并发请求合并进度条计数，避免闪烁
 
-### 19. 移动端适配
+### 20. 移动端适配
 
 - **抽屉式侧边栏**：移动端（< 768px）侧边栏改为 el-drawer 抽屉式，点击菜单后自动关闭
 - **响应式顶部栏**：移动端简化顶部栏（隐藏用户名、折叠按钮、顶部导航），显示汉堡菜单按钮
 - **表格横向滚动**：移动端表格自动启用横向滚动，支持触摸滑动
 - 全局布局使用 CSS 媒体查询适配移动端，最小宽度 320px
 
-### 20. 表格滚动优化
+### 21. 表格滚动优化
 
 - ProTable 默认最大高度 600px，可配置 `max-height` 属性
 - 表头固定，表体滚动，避免大数据量时渲染过多 DOM 节点
 - 支持行拖拽排序（SortableJS）
 
-### 21. Redis 多实例限流与缓存
+### 22. Redis 多实例限流与缓存
 
 - **限流存储抽象层**：`rateLimitStore.ts` 提供统一接口，Redis 可用时使用 Redis 计数，不可用时自动降级到内存模式
 - **Redis 连接单例**：`config/redis.ts` 单例模式管理 Redis 连接，失败时返回 null，调用方自行 fallback
 - **验证码存储**：登录验证码键值对存储在 Redis（或内存），支持 TTL 自动过期
 - **Refresh Token 校验**：可选 Redis 缓存已验证的 Refresh Token，提升鉴权性能
+- **多副本踢下线**：`onlineUsers.ts` 通过 Redis pub/sub 频道广播踢下线事件，各副本订阅后本地落地记录并推送 SSE 通知；Redis 不可用时优雅降级为单副本内存模式
+- **被踢记录持久化**：踢下线记录写入 Redis（TTL 7 天），确保重启后状态不丢失
 
-### 22. Umzug 数据库迁移系统
+### 23. Umzug 数据库迁移系统
 
 - **替代 sequelize.sync**：使用 Umzug 实现可追溯、可回滚的数据库版本管理
 - **15 个迁移文件**：按时间戳排序，覆盖所有数据表（users、roles、menus、departments、dicts 等）
@@ -1114,7 +1221,7 @@ vue-admin/
 - **CLI 操作**：支持 `npm run migrate`（up）、`migrate:down`、`migrate:seed`、`migrate:reset`、`migrate:status`
 - **自动执行**：生产环境启动时自动执行迁移（`bootstrap.ts`）
 
-### 23. Kubernetes 部署
+### 24. Kubernetes 部署
 
 - **完整 K8s 清单**：namespace、configmap、nginx-configmap、mysql-statefulset、redis-deployment、server-deployment、frontend-deployment、ingress
 - **Kustomize 编排**：`kustomization.yaml` 统一管理所有资源，含 Secret 生成器
@@ -1122,35 +1229,39 @@ vue-admin/
 - **Redis 部署**：AOF 持久化模式
 - **Ingress 路由**：API 反向代理 + 前端静态资源托管
 
-### 24. E2E 测试（Playwright）
+### 25. E2E 测试（Playwright）
 
 - **5 个测试场景**：登录流程、仪表盘、语言切换、路由权限、用户 CRUD
 - **CI 集成**：GitHub Actions 中启动 MySQL 服务 + 后端服务后执行 E2E 测试
 - **Playwright Trace**：失败时自动生成 Trace 文件，便于调试
 - **认证辅助**：`helpers/auth.ts` 封装登录态管理，测试用例可复用
 
-### 25. HTTPS 自签名证书
+### 26. HTTPS 自签名证书
 
 - 开发环境自动生成自签名证书（`server.crt` + `server.key`）
 - 支持 `https://localhost` 本地开发
 - Nginx 生产环境可配置 Let's Encrypt 正式证书
 
-### 26. 工程化规范增强
+### 27. 工程化规范增强
 
 - **Husky + Commitlint**：Git 提交前自动 lint 和 commit message 校验
 - **Lint-staged**：仅对暂存文件执行 lint 和格式化，提升效率
 - **Conventional Commits**：Angular 提交规范，自动生成 CHANGELOG
 - **.nvmrc**：Node.js 版本锁定（>= 18.x）
 
-### 27. AI 代码生成模块（实验性 / 未接入路由）
+### 28. AI 代码生成助手（已正式接入）
 
-> ⚠️ **状态说明**：该模块当前为**可选的实验性能力**，**尚未接入任何 API 路由或前端页面**，不会随系统启动而被调用，不影响现有功能。其代码、模型与知识库已完整落地，但使用前需自行补充路由、控制器与权限配置。
+> 该模块已正式接入前后端路由，是项目的**核心能力之一**。
 
-- **AI 助手服务**（`server/services/AIAssistant.ts`）：集成多提供商大模型（DeepSeek / OpenAI 等，通过 `AiProviderService` 管理），结合本地 RAG 知识库，根据自然语言需求生成符合本项目规范的全栈代码（JSON 结构，含文件路径与内容）。
-- **AI 提供商管理**（`server/services/AiProviderService.ts` + `server/models/AiProvider.ts` + `server/shared/schemas/aiProvider.ts`）：管理 AI API 提供商的增删改查，对外隐藏 `apiKey` 敏感字段。
-- **代码注入引擎**（`server/services/CodeInjector.ts`）：将 AI 生成的代码写入项目对应位置，支持自动建目录、自动备份（可回滚）、自动注册路由、自动写入菜单与权限资源（角色关联）。
-- **本地 RAG 检索**（`server/services/LocalFileRAG.ts` + `.ai-knowledge/`）：基于关键词 + 路径权重 + 内容相似度的本地知识库检索，知识库来源为 `AI_DEVELOPMENT_GUIDE.md` 与 `.ai-knowledge/` 下的规范、代码模板、参考模块。
-- **启用方式**：如需启用，需新增 `server/routes/aiRoutes.ts` 并在 `server/routes/index.ts` 注册，同时为相关接口配置鉴权与 RBAC 权限；配置 AI 提供商（或设置 `DEEPSEEK_API_KEY` 等环境变量）后调用 `AIAssistant.generateCode()`。
+- **AI 助手前端组件**（`src/components/AIAssistant/index.vue`）：浮动按钮 + 抽屉式对话界面，支持 Markdown 渲染（marked + highlight.js 代码高亮）、代码文件预览与一键应用（写入文件 + 创建菜单）、多 AI 提供商/模型切换、Token 用量展示、快捷键（Ctrl+Enter 发送）
+- **AI 提供商管理**（`src/views/AiProviderManager.vue` + `server/controllers/aiProviderController.ts`）：管理 AI API 提供商的增删改查，支持启用/禁用切换、多模型配置、API Key 安全隐藏
+- **AI 聊天 API**（`server/controllers/aiController.ts` + `server/services/AIAssistant.ts`）：多提供商大模型调用（通过 `AiProviderService` 管理），结合本地 RAG 知识库，根据自然语言需求生成符合本项目规范的全栈代码（JSON 结构，含文件路径与内容）
+- **代码注入引擎**（`server/services/CodeInjector.ts`）：将 AI 生成的代码写入项目对应位置，支持自动建目录、自动备份（可回滚）、自动注册路由、自动写入菜单与权限资源（角色关联）
+- **本地 RAG 检索**（`server/services/LocalFileRAG.ts` + `.ai-knowledge/`）：基于关键词 + 路径权重 + 内容相似度的本地知识库检索，知识库来源为 `AI_DEVELOPMENT_GUIDE.md` 与 `.ai-knowledge/` 下的规范、代码模板、参考模块
+- **SSE Composable**（`src/composables/useSSE.ts`）：通用 SSE 连接管理，指数退避重连（3s→30s）、心跳保活（30s 间隔）、自动 ticket 获取（无缝处理 token 刷新）、完整生命周期清理
+- **Web Vitals 性能监控**（`src/utils/webVitals.ts`）：Core Web Vitals（CLS/FCP/LCP/TTFB/INP）实时采集并上报 Sentry，用于 RUM 真实用户监控
+- **骨架屏组件**（`src/components/SkeletonLoader.vue` + `src/components/PageSkeleton.vue`）：通用骨架屏加载组件，提升加载感知体验
+- **AI 路由**：`/api/ai/chat`（聊天）、`/api/ai/apply`（文件应用）、`/api/ai/providers`（提供商管理）、`/api/ai/status`（状态检查）
 
 ---
 
@@ -1159,11 +1270,14 @@ vue-admin/
 - **Element Plus 按需导入**：unplugin-vue-components 自动注册，移除全量注册，减小打包体积
 - **ElConfigProvider 国际化**：根组件包裹 Element Plus 中文 locale
 - **Session 恢复加载态**：App.vue 在 Session 恢复期间显示 Loading 动画，避免白屏闪烁
-- **骨架屏**：Dashboard 加载时显示骨架屏
+- **骨架屏**：Dashboard 和通用组件均支持骨架屏（SkeletonLoader / PageSkeleton）
 - **ElMessage 替换 window.alert**：统一使用 Element Plus 消息提示
 - **文本插值替代 v-html**：翻译内容为纯文本时使用 `{{ t() }}` 避免 XSS 风险
 - **防抖清理**：GlobalSearch 搜索防抖定时器在 onUnmounted 中清理
 - **catch (err: unknown)**：19 个 Vue 文件 catch 从 `any` 改为 `unknown`，强制类型安全
+- **Markdown 增强**：md-editor-v3 集成 Mermaid 图表 + KaTeX 公式渲染（`src/utils/mdEditorSetup.ts`）
+- **Web Vitals**：Core Web Vitals 指标实时上报 Sentry，支持性能预算校验（`npm run analyze`）
+- **AI 助手悬浮按钮**：右下角浮动按钮，点击展开抽屉式对话界面，支持多提供商/模型切换、代码高亮预览
 
 ---
 
@@ -1328,6 +1442,19 @@ vue-admin/
 |------|------|------|
 | GET | /api/server/stats | 获取服务器状态（CPU、内存、磁盘、运行时间等） |
 
+### AI 代码生成
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | /api/ai/chat | AI 对话（生成代码） | 是 |
+| POST | /api/ai/apply | 应用生成的代码文件（写入 + 创建菜单） | 是 |
+| GET | /api/ai/status | AI 服务状态检查 | 是 |
+| GET | /api/ai/providers | 获取已启用 AI 提供商列表 | 是 |
+| GET | /api/ai/providers/all | 获取全部 AI 提供商列表 | 是 |
+| POST | /api/ai/providers | 创建 AI 提供商 | 是 |
+| PUT | /api/ai/providers/:id | 更新 AI 提供商 | 是 |
+| DELETE | /api/ai/providers/:id | 删除 AI 提供商 | 是 |
+
 ---
 
 ## 数据库表
@@ -1351,6 +1478,7 @@ vue-admin/
 | user_roles | 用户-角色关联表 |
 | tasks | 定时任务表 |
 | refresh_tokens | Refresh Token 持久化表 |
+| ai_providers | AI 提供商配置表（API 地址、Key、模型等） |
 
 ---
 
@@ -1384,10 +1512,12 @@ vue-admin/
 
 ### 一、功能层面
 
-#### 1.1 数据权限（行级权限）
-当前 RBAC 只实现了菜单级权限控制，建议增加**数据权限**（部门数据隔离），实现不同角色用户只能看到本部门及下级部门的数据。常见方案：
-- 在用户管理、日志等列表查询中加入部门过滤
-- 角色配置中增加 "数据范围" 选项（全部数据 / 本部门 / 本部门及子部门 / 仅本人）
+#### 1.1 数据权限（行级权限）~~（已实现 ✅）~~
+当前 RBAC 已实现**数据权限**（部门数据隔离）：
+- 角色配置中增加 `dataScope` 字段：`1=全部` / `2=本部门` / `3=本级及以下`
+- 多角色取最宽松范围（min），若任一角色为「全部」则整体为全部
+- 用户列表/导出/详情自动注入 `deptId IN (...)` 条件，跨部门请求返回 403
+- JWT 携带范围信息，查询时无需额外权限校验
 
 #### 1.2 操作日志增强
 当前日志记录了操作行为，但缺少：
@@ -1452,7 +1582,7 @@ vue-admin/
 #### 3.1 自动化测试 ~~（已完成 ✅）~~
 - **前端单元测试**：Vitest + @vue/test-utils，267 个测试用例覆盖所有 Store、工具函数、Composables、指令和核心组件，覆盖率阈值配置为渐进式（当前 70%，长期目标 80%）
 - **E2E 测试**：Playwright 已集成，覆盖登录流程、仪表盘、语言切换、路由权限、用户 CRUD 等 5 个核心场景，CI 中自动执行
-- **后端测试**：待补充 Jest + Supertest 接口测试（注意：`server/services/` 下已实现 `authService` / `userService` / `AIAssistant` 等较厚业务逻辑，建议优先补齐单测）
+- **后端单元测试**（已实现 ✅）：24 个测试文件覆盖所有中间件、服务、工具函数和控制器逻辑，包括 `dataScope` 数据权限测试
 
 #### 3.2 CI/CD 流水线 ~~（已完成 ✅）~~
 已配置 GitHub Actions 流水线（`.github/workflows/ci.yml`），包含 4 个阶段：
@@ -1489,7 +1619,8 @@ vue-admin/
 - **密码明文回退修复**（verifyPassword 不再对比明文）
 - **请求频率限制**：滑动窗口算法，Redis 多实例支持，自动降级到内存模式
 - **Helmet 安全头**：CSP / HSTS / XSS 过滤等 HTTP 头保护
-- 建议增加 CSRF 防护（对于 Cookie 场景）
+- **CSRF 纵深防御**（已实现 ✅）：SameSite=Strict Cookie + Origin 校验中间件 + JWT-in-query 泄露修复
+- **行级数据权限**（已实现 ✅）：dataScope 范围解析 + 部门数据隔离 + 过渡兼容
 - 建议对敏感操作（删除用户、重置密码等）增加二次确认或验证码
 
 #### 4.3 依赖安全
@@ -1540,4 +1671,4 @@ vue-admin/
 
 ---
 
-> **总结**：当前项目已具备一个成熟后台管理系统的核心骨架，功能覆盖全面，架构清晰。已完成 Pinia 状态管理、TypeScript 全量迁移、完整前端单元测试（267 个用例）、v-permission 权限指令、SSE 实时通知、搜索防抖、NProgress 全局进度条、移动端抽屉式适配、表格滚动优化、i18n 国际化、CI/CD 流水线、Docker 容器化、环境变量管理、安全加固（SQL 注入修复、SSE 票据认证、Zod 校验、XSS 清洗、错误脱敏）、Element Plus 按需导入、ProTable 组件拆分、CSS 变量暗黑适配、响应式布局等优化。以上剩余建议按优先级推荐：**数据权限 > Service 层拆分 > 后端接口测试 > E2E 测试 > 其他优化**。建议根据实际业务需求分阶段迭代。
+> **总结**：当前项目已具备一个成熟后台管理系统的核心骨架，功能覆盖全面，架构清晰。已完成 Pinia 状态管理（9 个 Store）、TypeScript 全量迁移、完整前端单元测试（35+ 文件 300+ 用例）、后端单元测试（24 个文件）、v-permission 权限指令、SSE 实时通知（含通用 useSSE Composable）、搜索防抖、NProgress 全局进度条、移动端抽屉式适配、表格滚动优化、i18n 国际化、CI/CD 流水线（含 Release 自动发布）、Docker 容器化、K8s 部署清单、环境变量管理、安全加固（SQL 注入修复、SSE 票据认证、Zod 校验、XSS 清洗、错误脱敏、CSRF 纵深防御、行级数据权限）、Element Plus 按需导入、ProTable 组件拆分、CSS 变量暗黑适配、响应式布局、AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理）、Web Vitals 性能监控、骨架屏组件、性能预算与 Lighthouse CI、Redis pub/sub 多副本踢下线等优化。以上剩余建议按优先级推荐：**Service 层拆分 > 操作日志增强 > 导入功能 > 个人中心增强 > 通知渠道扩展 > 其他优化**。建议根据实际业务需求分阶段迭代。

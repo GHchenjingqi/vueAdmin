@@ -1,9 +1,11 @@
 ---
 name: "ai-coding-standards"
-description: "AI coding standards for this project. Invoke when writing or modifying any code to ensure compliance with project conventions."
+description: AI coding standards for this project. Invoke when writing or modifying any code to ensure compliance with project conventions. IMPORTANT: Also read AI_DEVELOPMENT_GUIDE.md for comprehensive project standards.
 ---
 
 # AI Coding Standards
+
+> **重要提示**：本文件是项目规范的快速参考。对于完整的项目架构、编码规范、目录结构等内容，请查阅 `AI_DEVELOPMENT_GUIDE.md`。在进行任何代码修改前，务必先阅读该文档。
 
 ## 1. TypeScript 类型断言规范 (Type Assertion Rules)
 
