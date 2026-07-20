@@ -1,7 +1,9 @@
 ﻿/**
- * 鏂囦欢鏃ュ織鍐欏叆妯″潡
+ * 文件日志写入模块
  *
- * fs 渚濊禆閫氳繃妯″潡绾у彉閲忔敞鍏ワ紝娴嬭瘯鏃跺彲閫氳繃 setFsClient() 鏇挎崲銆? * 鐢熶骇鐜浣跨敤鍘熺敓 fs锛岀敓浜т唬鐮佹棤闇€浠讳綍鏀瑰姩銆? */
+ * fs 依赖通过模块级变量注入，测试时可通过 setFsClient() 替换。
+ * 生产环境使用原生 fs，生产代码无需任何改动。
+ */
 import * as _fsReal from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -12,10 +14,10 @@ const __dirname = dirname(__filename)
 // 日志目录
 const LOG_DIR = resolve(__dirname, '../logs')
 
-// 鏃ュ織淇濈暀澶╂暟
+// 日志保留天数
 const RETENTION_DAYS = 30
 
-// ===== 鍙敞鍏ョ殑 fs 瀹㈡埛绔紙娴嬭瘯鏃舵浛鎹級 =====
+// ===== 可注入的 fs 客户端（测试时替换） =====
 let _fs: typeof _fsReal = _fsReal
 let _statSync = _fs.statSync
 let _unlinkSync = _fs.unlinkSync
@@ -23,37 +25,39 @@ let _unlinkSync = _fs.unlinkSync
 // 防抖状态（对象引用避免 TDZ 问题）
 const _cleanState = { cleanedToday: false }
 /**
- * 鏇挎崲 fs 瀹炵幇锛堟祴璇曠敤锛? *
- * 浣跨敤鏂瑰紡锛? * ```ts
+ * 替换 fs 实现（测试用）
+ *
+ * 使用方式：
+ * ```ts
  * import { setFsClient } from './fileLogger'
  * setFsClient({ appendFileSync: mockFn, ... })
  * ```
  */
 export function setFsClient(fsClient: Partial<typeof _fs>) {
   _fs = Object.assign({}, _fsReal, fsClient)
-  // 鍚屾鍑芥暟鍗曠嫭缁存姢寮曠敤
+  // 同步函数单独维护引用
   if ('statSync' in fsClient) _statSync = fsClient.statSync!
   if ('unlinkSync' in fsClient) _unlinkSync = fsClient.unlinkSync!
 }
 
-/** 鎭㈠鍘熺敓 fs锛堟祴璇?cleanup锛?*/
+/** 恢复原生 fs（测试 cleanup）*/
 export function resetFsClient() {
   _fs = _fsReal
   _statSync = _fs.statSync
   _unlinkSync = _fs.unlinkSync
 }
 
-/** 閲嶇疆姣忔棩娓呯悊鏍囧織锛堟祴璇曠敤锛?*/
+/** 重置每日清理标志（测试用）*/
 export function resetCleanedToday() {
   _cleanState.cleanedToday = false
 }
 
-/** 璇诲彇姣忔棩娓呯悊鐘舵€侊紙娴嬭瘯鐢級 */
+/** 读取每日清理状态（测试用） */
 export function getCleanedTodayState(): boolean {
   return _cleanState.cleanedToday
 }
 
-/** 瀵煎嚭 fs 璋冪敤杩借釜锛堟祴璇曠敤锛?*/
+/** 导出 fs 调用追踪（测试用）*/
 export interface FsCalls {
   appendFileSync: Array<[path: string, content: string, encoding: string]>
   readdirSync: Array<[path: string]>
@@ -62,7 +66,9 @@ export interface FsCalls {
 }
 
 /**
- * 鑾峰彇 fs 璋冪敤杩借釜锛堟祴璇曠敤锛? * 蹇呴』鍦ㄨ皟鐢?setFsClient(trackingFsClient(calls)) 涔嬪悗璋冪敤姝ゅ嚱鏁般€? */
+ * 获取 fs 调用追踪（测试用）
+ * 必须在调用 setFsClient(trackingFsClient(calls)) 之后调用此函数。
+ */
 export function trackingFsClient(calls: FsCalls) {
   return {
     appendFileSync: (path: string, content: string, encoding: string) => {
@@ -84,16 +90,16 @@ export function trackingFsClient(calls: FsCalls) {
   }
 }
 
-// ===== 鏃ュ織閫昏緫 =====
+// ===== 日志逻辑 =====
 
-/** 纭繚鏃ュ織鐩綍瀛樺湪 */
+/** 确保日志目录存在 */
 function ensureLogDir() {
   if (!_fs.existsSync(LOG_DIR)) {
     _fs.mkdirSync(LOG_DIR, { recursive: true })
   }
 }
 
-/** 鑾峰彇褰撳ぉ鏃ユ湡瀛楃涓?*/
+/** 获取当天日期字符串 */
 function getDateStr() {
   const d = new Date()
   const y = d.getFullYear()
@@ -104,7 +110,7 @@ function getDateStr() {
 
 const LEVELS = { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' }
 
-/** 鏍稿績鍐欏叆鍑芥暟 */
+/** 核心写入函数 */
 function writeLog(level: string, category: string, message: string) {
   try {
     ensureLogDir()
@@ -126,7 +132,7 @@ export function logAccess(
   ip: string,
   userAgent: string | undefined,
 ) {
-  const msg = `${method} ${url} 鈫?${statusCode} (${durationMs}ms) | IP: ${ip} | UA: ${(userAgent || '-').substring(0, 120)}`
+  const msg = `${method} ${url} -> ${statusCode} (${durationMs}ms) | IP: ${ip} | UA: ${(userAgent || '-').substring(0, 120)}`
   writeLog(LEVELS.INFO, 'access', msg)
 }
 

@@ -317,8 +317,9 @@ const formSchema = [
 
 ## 环境要求
 
-- **Node.js** >= 18.x
-- **MySQL** >= 5.7
+- **Node.js** >= 20.x（见 `.nvmrc`）
+- **MySQL** >= 8.0
+- **Redis** >= 7（可选，多实例限流）
 - **npm** >= 9.x
 
 ---
@@ -355,7 +356,7 @@ DB_USER=root
 DB_PASSWORD=root
 
 # 服务配置
-SERVER_PORT=3000
+SERVER_PORT=5173
 
 # JWT 密钥（生产环境请修改为随机字符串）
 JWT_SECRET=your_secret_key_here
@@ -394,7 +395,7 @@ npm run dev
 
 - 前端由 Vite 开发服务器热更新
 - 后端由 Express 直接运行
-- 访问地址：http://localhost:3000
+- 访问地址：https://localhost:5173（自签名证书，首次需在浏览器信任）
 
 > 开发模式下，Vite 中间件内嵌在 Express 中，前端代码由 Vite 提供实时编译和 HMR（热模块替换）。
 
@@ -406,7 +407,7 @@ npm run dev
 npm run build
 ```
 
-构建产物输出到 `server/public/` 目录。
+前端构建产物输出到根目录 `dist/`；后端 TypeScript 编译产物输出到 `server/dist/`。
 
 打包后启动生产模式：
 
@@ -1247,7 +1248,7 @@ vue-admin/
 - **Husky + Commitlint**：Git 提交前自动 lint 和 commit message 校验
 - **Lint-staged**：仅对暂存文件执行 lint 和格式化，提升效率
 - **Conventional Commits**：Angular 提交规范，自动生成 CHANGELOG
-- **.nvmrc**：Node.js 版本锁定（>= 18.x）
+- **.nvmrc**：Node.js 版本锁定（20）
 
 ### 28. AI 代码生成助手（已正式接入）
 
@@ -1600,7 +1601,7 @@ vue-admin/
 - **Commitlint**：Angular Conventional Commits 规范，拦截不合规的 commit message
 - **BEM CSS 命名规范** 和 **CSS 变量暗黑模式适配**
 - **catch (err: unknown)** 类型安全规范
-- **.nvmrc**：Node.js 版本锁定（>= 18.x）
+- **.nvmrc**：Node.js 版本锁定（20）
 
 ### 四、安全层面
 

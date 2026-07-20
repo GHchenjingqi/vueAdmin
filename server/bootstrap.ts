@@ -423,7 +423,6 @@ export default async function bootstrap(app) {
       const banner = [
         '='.repeat(50),
         `  🚀 Vue Admin 服务启动成功`,
-        `  🌐 访问地址:  https://192.168.12.251:${config.server.port}`,
         `  🌐 本地地址:  https://localhost:${config.server.port}`,
         `  📡 API 接口:  https://localhost:${config.server.port}/api`,
         `  📖 API 文档:  https://localhost:${config.server.port}/api/docs`,

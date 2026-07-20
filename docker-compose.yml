@@ -58,8 +58,10 @@ services:
       DB_NAME: ${DB_NAME:-vue_admin}
       DB_USER: ${DB_USER:-root}
       DB_PASSWORD: ${DB_PASSWORD:-root}
-      SERVER_PORT: ${SERVER_PORT:-3000}
-      JWT_SECRET: ${JWT_SECRET:-vue_admin_secret_key_2024}
+      SERVER_PORT: 3000
+      # 容器内固定 3000；宿主机映射见 ports（SERVER_HOST_PORT）
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost:3000,http://localhost:3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CAPTCHA_ENABLED: ${CAPTCHA_ENABLED:-true}
       UPLOAD_MAX_SIZE: ${UPLOAD_MAX_SIZE:-10}
@@ -68,7 +70,7 @@ services:
       REDIS_ENABLED: 'true'
       REDIS_URL: redis://redis:6379
     ports:
-      - '${SERVER_PORT:-3000}:3000'
+      - '${SERVER_HOST_PORT:-3000}:3000'
     volumes:
       - uploads_data:/app/server/uploads
       - logs_data:/app/server/logs

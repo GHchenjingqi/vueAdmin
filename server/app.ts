@@ -13,6 +13,7 @@ import { slowQueryLogMiddleware } from './middleware/slowQueryLog.js'
 import originValidator from './middleware/originValidator.js'
 import bootstrap from './bootstrap.js'
 import { closeRedis } from './config/redis.js'
+import config from './config/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -55,29 +56,20 @@ app.use((_req, res, next) => {
   next()
 })
 
-// CORS 跨域白名单
-// 生产环境严格限制，开发环境放宽到局域网 IP
-const allowedOrigins = [
-  'http://localhost:5174',
-  'http://127.0.0.1:5174',
-  'http://192.168.12.251:5174',
-  'https://localhost:5174',
-  'https://127.0.0.1:5174',
-  'https://192.168.12.251:5174',
-]
+// CORS 跨域白名单（来自 config.app.allowedOrigins / ALLOWED_ORIGINS，禁止硬编码内网 IP）
+const allowedOrigins = config.app.allowedOrigins
 app.use(
   cors({
     origin: (origin, callback) => {
       // 允许无 origin 的请求（服务端、Postman 等）
       if (!origin) return callback(null, true)
-      // 生产环境只允许白名单
-      if (process.env.NODE_ENV === 'production') {
-        return callback(null, allowedOrigins.includes(origin))
-      }
-      // 开发环境允许所有局域网 IP（形如 http://192.168.x.x:5173）
       if (allowedOrigins.includes(origin)) return callback(null, true)
-      const ipOrigin = /^https?:\/\/(\d{1,3}\.){3}\d{1,3}:\d+$/.test(origin)
-      return callback(null, ipOrigin)
+      // 开发环境允许局域网 IP（形如 http://192.168.x.x:5173），生产仅白名单
+      if (process.env.NODE_ENV !== 'production') {
+        const ipOrigin = /^https?:\/\/(\d{1,3}\.){3}\d{1,3}:\d+$/.test(origin)
+        return callback(null, ipOrigin)
+      }
+      return callback(null, false)
     },
     credentials: true,
   }),
