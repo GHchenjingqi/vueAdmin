@@ -811,7 +811,12 @@ describe('模块名称', () => {
 ### 14.2 常用命令
 
 ```bash
-npm run dev          # 启动开发服务器
+npm run install:all  # 安装根目录 + server 依赖
+npm run dev          # 启动开发服务器（自动建库/迁移/种子）
+npm run migrate      # 手动执行数据库迁移
+npm run migrate:seed # 写入种子（空库 admin 等）
+npm run migrate:status
+npm run migrate:reset # 危险：清空后重建
 npm run build        # 生产构建
 npm run typecheck    # TypeScript 类型检查（必须通过）
 npm run lint         # ESLint 代码检查
@@ -855,6 +860,13 @@ npm test             # 运行测试
 | `src/stores/layoutStore.ts` | 布局状态（多标签页、导航模式） |
 | `src/stores/localeStore.ts` | 语言状态（中英文切换） |
 | `src/stores/siteStore.ts` | 站点信息状态 |
+| `server/.env` | 后端环境变量（DB_* / SERVER_PORT / JWT_SECRET） |
+| `server/bootstrap.ts` | 启动：ensure DB → migrate → seed → listen |
+| `server/utils/ensureDatabase.ts` | 自动建库（query + CREATE DATABASE IF NOT EXISTS） |
+| `server/utils/migrator.ts` | Umzug 迁移/种子（Windows 路径 `/` 归一化） |
+| `server/scripts/migrate.ts` | 迁移 CLI 入口 |
+| `server/seeders/20260707_000001_admin_user.ts` | 默认管理员种子（运行时 bcrypt） |
+| `.agents/skills/vue-admin-env-setup/SKILL.md` | 本地环境搭建 skill |
 
 ---
 
@@ -1068,27 +1080,58 @@ const ALLOWED_ORIGINS = [
 - 非 GET 请求均经过 Origin 校验，不在白名单内则返回 403
 - 配置 `config.app.allowedOrigins` 或使用 `ALLOWED_ORIGINS` 环境变量
 - 生产环境 `trust proxy` 已配置，确保 `req.ip` 获取真实客户端 IP
-| `src/composables/useSSE.ts` | SSE 连接管理（指数退避重连 / 心跳 / 自动 ticket） |
-| `src/utils/webVitals.ts` | Core Web Vitals 性能指标上报 |
-| `src/utils/mdEditorSetup.ts` | Markdown 编辑器增强配置（Mermaid + KaTeX） |
-| `src/components/AIAssistant/index.vue` | AI 代码生成助手（浮动按钮 + 抽屉对话） |
-| `src/components/SkeletonLoader.vue` | 通用骨架屏组件 |
-| `src/components/PageSkeleton.vue` | 页面级骨架屏组件 |
-| `src/router/initSession.ts` | 会话初始化（刷新后恢复登录态） |
-| `src/router/keepAlive.ts` | 路由组件缓存管理 |
-| `src/stores/themeStore.ts` | 主题状态（主色、字号） |
-| `src/stores/layoutStore.ts` | 布局状态（多标签页、导航模式） |
-| `src/stores/localeStore.ts` | 语言状态（中英文切换） |
-| `src/stores/siteStore.ts` | 站点信息状态 |
-| `src/composables/useSSE.ts` | SSE 连接管理（指数退避重连 / 心跳 / 自动 ticket） |
-| `src/utils/webVitals.ts` | Core Web Vitals 性能指标上报 |
-| `src/utils/mdEditorSetup.ts` | Markdown 编辑器增强配置（Mermaid + KaTeX） |
-| `src/components/AIAssistant/index.vue` | AI 代码生成助手（浮动按钮 + 抽屉对话） |
-| `src/components/SkeletonLoader.vue` | 通用骨架屏组件 |
-| `src/components/PageSkeleton.vue` | 页面级骨架屏组件 |
-| `src/router/initSession.ts` | 会话初始化（刷新后恢复登录态） |
-| `src/router/keepAlive.ts` | 路由组件缓存管理 |
-| `src/stores/themeStore.ts` | 主题状态（主色、字号） |
-| `src/stores/layoutStore.ts` | 布局状态（多标签页、导航模式） |
-| `src/stores/localeStore.ts` | 语言状态（中英文切换） |
-| `src/stores/siteStore.ts` | 站点信息状态 |
+
+---
+
+## 二十、本地环境搭建（MySQL / 迁移）
+
+重新 clone 或换机器后，按下面顺序做；细节与决策树见项目 skill。
+
+### 20.1 启动链路
+
+```
+server/.env
+  → ensureDatabaseExists()      # query + CREATE DATABASE IF NOT EXISTS
+  → sequelize.authenticate()
+  → Umzug migrator.up()         # server/migrations/*.ts
+  → seeder.up() if users = 0    # server/seeders/*.ts
+  → HTTPS listen SERVER_PORT
+```
+
+### 20.2 最短路径
+
+```bash
+npm run install:all
+# 配置 server/.env（DB_* 与本机 MySQL 一致）
+npm run dev
+```
+
+失败时：
+
+```bash
+# 手动建库（utf8mb4）后
+npm run migrate:status
+npm run migrate
+npm run migrate:seed
+npm run dev
+```
+
+默认账号：`admin` / `123456`。API 前缀：`/api/v1`。健康检查：`/health`。
+
+### 20.3 Windows 关键修复（已入库代码）
+
+| 问题 | 修复位置 |
+|------|----------|
+| 根目录找不到 `tsx` | 根 `package.json`：`npm --prefix server run migrate*` |
+| migrate 成功无表 | `server/utils/migrator.ts`：glob `.replace(/\\/g, '/')` |
+| 自动建库失败 | `server/utils/ensureDatabase.ts`：使用 `query` |
+| admin 密码无效 | seeder 运行时 `bcrypt.hash` |
+
+### 20.4 AI 排障原则
+
+1. 先查 MySQL 服务 / `server/.env`，再查迁移状态，**不要先重写 ORM**
+2. 验证尽量用隔离库名与端口，避免覆盖现有开发库
+3. 文档与示例不写真实密码
+4. 改完用 `migrate:status`、`/health`、`/api/v1/auth/captcha` 验证
+5. 完整 skill：`.agents/skills/vue-admin-env-setup/SKILL.md`
+6. 静态自检：`node .agents/skills/vue-admin-env-setup/scripts/check-env.mjs`

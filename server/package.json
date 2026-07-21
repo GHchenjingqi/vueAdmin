@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "migrate": "tsx scripts/migrate.ts up",
+    "migrate:down": "tsx scripts/migrate.ts down",
+    "migrate:seed": "tsx scripts/migrate.ts seed",
+    "migrate:reset": "tsx scripts/migrate.ts reset",
+    "migrate:status": "tsx scripts/migrate.ts status",
     "start": "node dist/app.js",
     "dev": "tsx app.ts",
     "build": "tsc",

@@ -335,46 +335,61 @@ cd vue-admin
 
 ### 2. 配置环境变量
 
-前端和根目录均需要环境变量配置：
+**前端 / 根目录**（可选，开发默认已够用）：
 
-**前端环境变量**（根目录）：
 ```bash
-# 复制环境变量模板
-cp .env.example .env.development
-# 根据实际环境修改 .env.development 中的配置
+# Windows PowerShell
+Copy-Item .env.example .env.development
+# macOS / Linux
+# cp .env.example .env.development
 ```
 
-**后端环境变量**（server/ 目录）：
-编辑 `server/.env`，根据实际环境修改：
+**后端（必须）** — 复制模板并改成你的本机 MySQL 账号：
+
+```bash
+# Windows PowerShell
+Copy-Item server/.env.example server/.env
+# macOS / Linux
+# cp server/.env.example server/.env
+```
+
+`server/.env` 关键项：
 
 ```ini
-# 数据库配置
+# 数据库配置（与本机 MySQL 一致）
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_NAME=vue_admin       # 数据库名称，需提前创建
+DB_NAME=vue_admin
 DB_USER=root
-DB_PASSWORD=root
+DB_PASSWORD=你的MySQL密码
 
-# 服务配置
+# 服务端口（开发默认 5173）
 SERVER_PORT=5173
 
-# JWT 密钥（生产环境请修改为随机字符串）
-JWT_SECRET=your_secret_key_here
-
-# 邮件配置（密码找回功能，可选）
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=noreply@example.com
-SMTP_PASS=your_smtp_password
+# JWT 密钥（生产必须改强随机串）
+JWT_SECRET=vue_admin_secret_key_2024
 ```
 
-### 3. 创建数据库
+> 说明：`bootstrap` 会在启动时自动 `CREATE DATABASE IF NOT EXISTS`（需账号有 CREATE 权限）。  
+> 若自动建库失败，请先手动建库（见下方「MySQL 环境配置」）。
 
-登录 MySQL 并创建数据库：
+### 3. 准备 MySQL
+
+1. 安装并启动 **MySQL 8.0+**，确认端口 `3306` 可连。  
+2. 确认 `server/.env` 中 `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD` 能登录。  
+3. **推荐**：直接启动应用，由后端自动建库 + 迁移 + 种子。  
+4. **手动建库**（自动失败时）：
 
 ```sql
-CREATE DATABASE IF NOT EXISTS vue_admin DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS vue_admin
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+Windows 若未把 `mysql` 加 PATH，可用：
+
+```powershell
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -p -e "CREATE DATABASE IF NOT EXISTS vue_admin DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 ```
 
 ### 4. 一键安装所有依赖
@@ -383,9 +398,149 @@ CREATE DATABASE IF NOT EXISTS vue_admin DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_
 npm run install:all
 ```
 
-该命令会自动安装 **后端（server/）** 和 **前端（根目录）** 的所有依赖。
+该命令会安装 **根目录前端** 与 **server/ 后端** 依赖。
 
----
+### 5. 初始化表结构与种子数据（两种方式）
+
+**方式 A（推荐）**：直接开发启动，`bootstrap.ts` 自动执行迁移；用户表为空时写入种子。
+
+```bash
+npm run dev
+```
+
+**方式 B**：先手动迁移 / 导入，再启动。
+
+```bash
+npm run migrate          # 执行 server/migrations 建表
+npm run migrate:seed     # 写入 admin 等初始数据
+npm run migrate:status   # 查看迁移状态
+npm run dev
+```
+
+默认管理员：`admin` / `123456`
+
+### 6. 常见失败与处理
+
+| 现象 | 原因 | 处理 |
+|------|------|------|
+| 自动创建数据库失败 | MySQL 未启动 / 密码错 / 无 CREATE 权限 | 检查服务与 `.env`，或手动建库 |
+| 迁移失败 Unknown database | 库不存在且自动建库未跑通 | 先手动建库，再 `npm run migrate` |
+| 表不存在 / 缺列 | 迁移未执行完 | `npm run migrate:status` 后 `npm run migrate` |
+| migrate 成功但只有 `SequelizeMeta`、无业务表（Windows） | Umzug 反斜杠绝对路径 glob 匹配 0 文件 | 确认 `server/utils/migrator.ts` 对 glob 做 `.replace(/\\/g, '/')`，清错记后重跑 `migrate` |
+| 根目录 `npm run migrate*` 找不到 `tsx` | Windows 下 `cd server && tsx` 未走 server 的 bin | 根脚本须为 `npm --prefix server run migrate*`（当前仓库已修好） |
+| 登录 admin 失败 | 种子未写入或旧错误哈希 | 空库执行 `npm run migrate:seed`；确认 seeder 使用运行时 `bcrypt.hash`，或 `npm run migrate:reset`（会清空数据） |
+| `tsx`/`esbuild` 报 `The service was stopped` | Windows 上 esbuild service 异常 | 杀残留 esbuild；或 `cd server && npx tsc -p tsconfig.json` 后 `node dist/app.js` 兜底 |
+| Docker MySQL 起不来 | `MYSQL_USER=root` 非法，或缺少 `server/init.sql` | compose 默认业务用户 `vue_admin`；确认 `server/init.sql` 存在 |
+| 改 init.sql 不生效 | 数据卷已初始化过 | `docker compose down -v` 后重建（会丢容器数据） |
+
+更完整的步骤见下方 **「MySQL 环境配置」**。可重复执行的助手 skill：
+
+- 项目内：[`.agents/skills/vue-admin-env-setup/SKILL.md`](.agents/skills/vue-admin-env-setup/SKILL.md)
+- 自检：`node .agents/skills/vue-admin-env-setup/scripts/check-env.mjs`
+
+
+## MySQL 环境配置
+
+本地开发默认连 **本机 MySQL**（非 Docker）。完整链路：
+
+```
+server/.env 配置
+    → ensureDatabaseExists() 自动建库（utf8mb4）
+    → sequelize.authenticate()
+    → Umzug migrator.up() 建表（server/migrations/）
+    → 用户表为空时 seeder.up() 写种子（server/seeders/）
+    → 服务监听 https://localhost:5173
+```
+
+### 环境变量优先级
+
+后端读取 `server/.env`（见 `server/config/index.ts`）：
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| DB_HOST | localhost | MySQL 主机 |
+| DB_PORT | 3306 | 端口 |
+| DB_NAME | vue_admin | 库名（可自动创建） |
+| DB_USER | root | 账号（需有建库权限更省心） |
+| DB_PASSWORD | 123456 | 密码，**务必改成与本机一致** |
+
+### 推荐流程（重新拉代码后）
+
+```bash
+# 1) 依赖
+npm run install:all
+
+# 2) 后端 env（若没有）
+# Windows: Copy-Item server/.env.example server/.env
+# 然后编辑 DB_PASSWORD 等
+
+# 3) 确认 MySQL 服务运行（Windows 服务名可能是 MySQL80）
+# Get-Service *mysql*
+
+# 4) 启动（自动建库 + 迁移 + 种子）
+npm run dev
+```
+
+### 仅修复数据库（不重启前端也能用）
+
+```bash
+npm run migrate:status
+npm run migrate
+npm run migrate:seed
+```
+
+危险操作（回滚全部迁移再重建 + 种子，**清空业务数据**）：
+
+```bash
+npm run migrate:reset
+```
+
+### Windows 实测要点（重新拉代码必看）
+
+| 检查项 | 期望 |
+|--------|------|
+| 根 `package.json` migrate 脚本 | `npm --prefix server run migrate*` |
+| `server/package.json` migrate 脚本 | `tsx scripts/migrate.ts ...` |
+| `server/utils/migrator.ts` | migrations/seeders 的 glob 路径 `.replace(/\\/g, '/')` |
+| `server/utils/ensureDatabase.ts` | 用 `query` 执行 `CREATE DATABASE IF NOT EXISTS` |
+| admin seeder | 运行时 `bcrypt.hash('123456')`，不是写死假哈希 |
+| 隔离验证 | 换 `DB_NAME` / `DB_PORT` / `SERVER_PORT`，避免覆盖现有开发库 |
+
+验证通过标志：
+
+1. `npm run migrate:status` 显示 executed > 0  
+2. `SHOW TABLES` 含 `users`（不只 meta 表）  
+3. `https://localhost:<SERVER_PORT>/health` 返回 ok  
+4. `https://localhost:<SERVER_PORT>/api/v1/auth/captcha` 返回 200  
+5. 默认账号 `admin` / `123456` 可登录  
+
+### 项目 skill 与自检
+
+```bash
+# 静态检查关键文件、脚本与 env 是否齐全（不连库）
+node .agents/skills/vue-admin-env-setup/scripts/check-env.mjs
+```
+
+完整步骤与决策树：`.agents/skills/vue-admin-env-setup/SKILL.md`  
+排障细节：`.agents/skills/vue-admin-env-setup/references/mysql-troubleshoot.md`
+
+### Docker 中的 MySQL
+
+```bash
+# 仅基础设施
+docker compose up -d mysql redis
+
+# 全栈
+# 先准备根目录 .env（含 JWT_SECRET、DB_*）
+docker compose up -d
+```
+
+注意：
+
+1. 官方镜像 **禁止** `MYSQL_USER=root`；compose 默认业务用户 `vue_admin`。  
+2. `server/init.sql` 只在 **数据卷首次创建** 时执行。  
+3. 容器内 `DB_HOST=mysql`，本机开发仍是 `127.0.0.1`。  
+4. 表结构仍由应用迁移创建，不要只靠 init.sql 建业务表。
 
 ## 开发模式运行
 
@@ -589,6 +744,8 @@ sudo systemctl reload nginx
 ### 方案三：Docker 容器化部署（推荐）
 
 项目已提供多阶段构建 Dockerfile 和 docker-compose.yml，一键启动 MySQL + Node 服务。
+
+> Docker MySQL 注意：`MYSQL_USER` 禁止为 `root`（compose 默认 `vue_admin`）；`server/init.sql` 仅首次初始化数据卷时执行；业务表由 Umzug 迁移创建。
 
 ```bash
 # 1. 复制环境变量模板
