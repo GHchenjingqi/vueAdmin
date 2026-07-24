@@ -400,13 +400,25 @@ npm run install:all
 
 该命令会安装 **根目录前端** 与 **server/ 后端** 依赖。
 
-### 5. 初始化表结构与种子数据（两种方式）
+### 5. 编译后端 TypeScript
+
+```bash
+cd server && npx tsc -p tsconfig.json
+```
+
+> ⚠️ **Windows 注意**：本项目的 `tsx` 依赖 `esbuild`，在部分 Windows 环境下会报 `The service was stopped` 错误。  
+> 因此 `npm run dev` 和 `npm run migrate*` 已改为先 `tsc` 编译再 `node dist/...` 运行，不依赖 `tsx`。  
+> 首次启动或修改后端代码后需先编译（`npm run build` 或 `tsc`），编译产物在 `server/dist/`。
+
+### 6. 初始化表结构与种子数据（两种方式）
 
 **方式 A（推荐）**：直接开发启动，`bootstrap.ts` 自动执行迁移；用户表为空时写入种子。
 
 ```bash
 npm run dev
 ```
+
+内部执行流程：`tsc` → `node dist/app.js` → 自动建库 → Umzug 迁移建表 → 种子数据。
 
 **方式 B**：先手动迁移 / 导入，再启动。
 
@@ -426,10 +438,11 @@ npm run dev
 | 自动创建数据库失败 | MySQL 未启动 / 密码错 / 无 CREATE 权限 | 检查服务与 `.env`，或手动建库 |
 | 迁移失败 Unknown database | 库不存在且自动建库未跑通 | 先手动建库，再 `npm run migrate` |
 | 表不存在 / 缺列 | 迁移未执行完 | `npm run migrate:status` 后 `npm run migrate` |
-| migrate 成功但只有 `SequelizeMeta`、无业务表（Windows） | Umzug 反斜杠绝对路径 glob 匹配 0 文件 | 确认 `server/utils/migrator.ts` 对 glob 做 `.replace(/\\/g, '/')`，清错记后重跑 `migrate` |
+| migrate 成功但只有 `SequelizeMeta`、无业务表（Windows） | Umzug `glob` 类型错误：传了 `[string, string]` 而非 `string` | 确认 `server/utils/migrator.ts` 的 glob 为 `'../migrations/*.{ts,js}'`（单字符串），清错记后重跑 `migrate` |
 | 根目录 `npm run migrate*` 找不到 `tsx` | Windows 下 `cd server && tsx` 未走 server 的 bin | 根脚本须为 `npm --prefix server run migrate*`（当前仓库已修好） |
 | 登录 admin 失败 | 种子未写入或旧错误哈希 | 空库执行 `npm run migrate:seed`；确认 seeder 使用运行时 `bcrypt.hash`，或 `npm run migrate:reset`（会清空数据） |
-| `tsx`/`esbuild` 报 `The service was stopped` | Windows 上 esbuild service 异常 | 杀残留 esbuild；或 `cd server && npx tsc -p tsconfig.json` 后 `node dist/app.js` 兜底 |
+| `tsx`/`esbuild` 报 `The service was stopped` | Windows 上 esbuild service 异常 | 方案一：`cd server && npx tsc -p tsconfig.json` 后 `node dist/app.js`；方案二：`npm run dev` 已内置 `tsc && node dist/app.js`；方案三：杀残留 esbuild 进程后重试 `tsx` |
+| `npm install` 报 esbuild 安装失败 | esbuild postinstall 脚本在 Windows 上不稳定 | 使用 `npm install --ignore-scripts` 跳过 postinstall；`dotenv` 等关键包缺失时单独安装 |
 | Docker MySQL 起不来 | `MYSQL_USER=root` 非法，或缺少 `server/init.sql` | compose 默认业务用户 `vue_admin`；确认 `server/init.sql` 存在 |
 | 改 init.sql 不生效 | 数据卷已初始化过 | `docker compose down -v` 后重建（会丢容器数据） |
 
@@ -500,10 +513,11 @@ npm run migrate:reset
 | 检查项 | 期望 |
 |--------|------|
 | 根 `package.json` migrate 脚本 | `npm --prefix server run migrate*` |
-| `server/package.json` migrate 脚本 | `tsx scripts/migrate.ts ...` |
-| `server/utils/migrator.ts` | migrations/seeders 的 glob 路径 `.replace(/\\/g, '/')` |
+| `server/package.json` 脚本 | `dev`, `migrate*` 使用 `tsc && node dist/...`（而非 `tsx`，因 esbuild Windows 不稳定） |
+| `server/utils/migrator.ts` | migrations/seeders 的 glob 为 `'../migrations/*.{ts,js}'`（单字符串，非 `[string, string]`） |
 | `server/utils/ensureDatabase.ts` | 用 `query` 执行 `CREATE DATABASE IF NOT EXISTS` |
 | admin seeder | 运行时 `bcrypt.hash('123456')`，不是写死假哈希 |
+| `dotenv` 包 | 确保 `server/node_modules/dotenv/package.json` 存在（缺失时 `npm install dotenv --ignore-scripts`） |
 | 隔离验证 | 换 `DB_NAME` / `DB_PORT` / `SERVER_PORT`，避免覆盖现有开发库 |
 
 验证通过标志：

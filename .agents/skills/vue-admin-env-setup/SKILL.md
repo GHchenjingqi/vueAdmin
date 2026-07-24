@@ -34,11 +34,13 @@ description: Bootstrap and repair the vue-admin local/dev environment for this r
 
 | 症状 | 根因 | 修复 |
 |------|------|------|
-| `npm run migrate*` 报找不到 `tsx` | 根目录 `cd server && tsx` 未走 server 的 `node_modules/.bin` | 根脚本改为 `npm --prefix server run migrate*`，在 `server/package.json` 定义 `tsx scripts/migrate.ts ...` |
-| migrate 显示成功但只有 `SequelizeMeta`，无业务表 | Umzug 在 Windows 上对**反斜杠绝对路径 glob** 匹配失败，pending=0 | `server/utils/migrator.ts` 对 glob 做 `.replace(/\\/g, '/')` |
+| `npm run migrate*` 报找不到 `tsx` | 根目录 `cd server && tsx` 未走 server 的 `node_modules/.bin` | 根脚本改为 `npm --prefix server run migrate*`，在 `server/package.json` 定义 `tsc && node dist/scripts/migrate.ts ...`（不用 `tsx`） |
+| migrate 显示成功但只有 `SequelizeMeta`，无业务表 | Umzug `glob` 类型错误：传了 `[string, string]` 而非 `string`，导致 pending=0 | `server/utils/migrator.ts` 的 glob 改为 `'../migrations/*.{ts,js}'`（单字符串，`{ts,js}` 通配符） |
 | 自动建库“失败可忽略”，随后 Unknown database | 旧逻辑 `execute(CREATE DATABASE)` + 建库后未强制重连 | 使用 `ensureDatabaseExists()`（`query` + 启动/CLI 统一调用） |
 | 能进系统但 admin 密码不对 | seeder 里假 bcrypt 字符串 | `server/seeders/20260707_000001_admin_user.ts` 运行时 `bcrypt.hash('123456')` |
-| 本机 `tsx`/`esbuild` 报 `The service was stopped` | 部分 Windows 环境 esbuild service 异常 | 兜底：`cd server && npx tsc -p tsconfig.json` 后 `node dist/app.js`；或排查杀软/残留 esbuild 进程 |
+| 本机 `tsx`/`esbuild` 报 `The service was stopped` | 部分 Windows 环境 esbuild service 异常 | **方案一**（推荐）：`server/package.json` 的 `dev`/`migrate*` 脚本改为 `tsc && node dist/...`，不依赖 `tsx`；**方案二**：`cd server && npx tsc -p tsconfig.json` 后 `node dist/app.js`；**方案三**：杀残留 esbuild 进程后重试 `tsx` |
+| `npm install` 报 esbuild 安装失败 | esbuild postinstall 脚本在 Windows 上不稳定 | 使用 `npm install --ignore-scripts` 跳过 postinstall；缺失的包（如 `dotenv`）用 `npm install <包名> --ignore-scripts` 单独安装 |
+| `dotenv` 包缺失 package.json 导致模块找不到 | npm 部分安装失败 | 检查 `server/node_modules/dotenv/package.json` 是否存在，缺失则 `npm install dotenv --ignore-scripts` |
 
 ## 标准启动流程
 
@@ -101,6 +103,9 @@ Get-Service *mysql*
 npm run dev
 ```
 
+> ⚠️ **Windows 注意**：`npm run dev` 实际执行 `cd server && tsc && node dist/app.js`，不依赖 `tsx`。  
+> 首次启动或修改后端代码后需先编译，编译产物在 `server/dist/`。
+
 期望日志包含：
 
 - 数据库 `...` 已就绪
@@ -130,21 +135,24 @@ npm run dev
 
 1. **连不上 MySQL** → 服务/端口/密码/`DB_HOST`；不要先改业务代码
 2. **Unknown database** → 走 ensure（重跑 dev 或 migrate CLI）；仍失败则手动 `CREATE DATABASE`
-3. **表不存在 / 迁移中断** → `migrate:status` 看 pending；若 pending=0 但无业务表，先查 Umzug Windows glob 修复
+3. **表不存在 / 迁移中断** → `migrate:status` 看 pending；若 pending=0 但无业务表，先查 Umzug glob 类型（`server/utils/migrator.ts` 的 glob 须为 `'*.{ts,js}'` 单字符串）
 4. **能进系统但 admin 登录失败** → 种子未写或假哈希；空库 `migrate:seed`；可接受清库时 `migrate:reset`
 5. **Docker MySQL 起不来** → 检查 `MYSQL_USER!=root`、`server/init.sql` 存在；数据卷脏了用 `docker compose down -v`（丢容器数据）
-6. **tsx The service was stopped** → 杀残留 esbuild；或 `tsc` 编译后 `node dist/app.js` 兜底启动
+6. **tsx The service was stopped** → 改 `server/package.json` 脚本为 `tsc && node dist/...`（推荐）；或 `tsc` 编译后 `node dist/app.js` 兜底；或杀残留 esbuild 进程
+7. **npm install 因 esbuild 失败** → 用 `npm install --ignore-scripts` 跳过 postinstall
 
 ## 助手执行约定
 
 使用本 skill 时：
 
-1. 先读 `server/.env`、`server/bootstrap.ts`、`server/utils/ensureDatabase.ts`、`server/utils/migrator.ts`、最近 `server/logs/app-*.log`
+1. 先读 `server/.env`、`server/bootstrap.ts`、`server/utils/ensureDatabase.ts`、`server/utils/migrator.ts`、`server/package.json`、最近 `server/logs/app-*.log`
 2. 用终端验证 MySQL 服务与端口，而不是只猜
 3. 优先修复配置与迁移，不重写 ORM
-4. 改完后用 `npm run migrate:status` 或一次 `npm run dev` 验证
-5. 不要提交真实密码；文档示例用占位符
-6. 验证时尽量隔离库名/端口，避免覆盖现有开发库
+4. 若 `tsx`/`esbuild` 报 `The service was stopped`，优先用 `tsc && node dist/...` 替代 `tsx` 运行
+5. 若 `npm install` 因 esbuild 失败，用 `npm install --ignore-scripts` 跳过 postinstall
+6. 改完后用 `npm run migrate:status` 或一次 `npm run dev` 验证
+7. 不要提交真实密码；文档示例用占位符
+8. 验证时尽量隔离库名/端口，避免覆盖现有开发库
 
 ## 可选 Docker 基础设施
 
@@ -170,8 +178,9 @@ DB_PASSWORD=<与 compose DB_PASSWORD 一致>
 
 - [ ] `server/.env` 存在且密码正确
 - [ ] MySQL 服务 Running / 可 ping
-- [ ] `server/utils/migrator.ts` glob 已做 Windows 斜杠归一化
+- [ ] `server/utils/migrator.ts` glob 为 `'*.{ts,js}'` 单字符串（非 `[string, string]`）
 - [ ] 根 `package.json` migrate 脚本走 `npm --prefix server run ...`
+- [ ] `server/package.json` 的 dev/migrate 脚本使用 `tsc && node dist/...`（而非 `tsx`，因 esbuild Windows 不稳定）
 - [ ] `npm run migrate:status` executed>0，或 dev 日志迁移完成
 - [ ] `SHOW TABLES` 含 `users`（不只 `SequelizeMeta`）
 - [ ] admin 密码哈希可用（`bcrypt.compare('123456', hash)`）

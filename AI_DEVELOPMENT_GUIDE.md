@@ -812,17 +812,19 @@ describe('模块名称', () => {
 
 ```bash
 npm run install:all  # 安装根目录 + server 依赖
-npm run dev          # 启动开发服务器（自动建库/迁移/种子）
-npm run migrate      # 手动执行数据库迁移
+npm run dev          # 启动开发服务器（tsc 编译 → node dist/app.js → 自动建库/迁移/种子）
+npm run migrate      # 手动执行数据库迁移（tsc 编译 → node dist/scripts/migrate.js up）
 npm run migrate:seed # 写入种子（空库 admin 等）
 npm run migrate:status
 npm run migrate:reset # 危险：清空后重建
-npm run build        # 生产构建
+npm run build        # 生产构建（前端 vite + 后端 tsc）
 npm run typecheck    # TypeScript 类型检查（必须通过）
 npm run lint         # ESLint 代码检查
 npm run format       # Prettier 格式化
 npm test             # 运行测试
 ```
+
+> ⚠️ Windows 注意：`tsx`/`esbuild` 不稳定时，所有 server 脚本均使用 `tsc && node dist/...` 方式运行。
 
 ### 14.3 避免的操作
 
@@ -1106,6 +1108,10 @@ npm run install:all
 npm run dev
 ```
 
+> ⚠️ **Windows 注意**：`tsx` 依赖 `esbuild`，在部分 Windows 环境会报 `The service was stopped`。  
+> 因此 `npm run dev` 实际执行 `tsc && node dist/app.js`，不依赖 `tsx`。  
+> 首次启动或修改后端代码后需先编译（`tsc`），编译产物在 `server/dist/`。
+
 失败时：
 
 ```bash
@@ -1123,15 +1129,20 @@ npm run dev
 | 问题 | 修复位置 |
 |------|----------|
 | 根目录找不到 `tsx` | 根 `package.json`：`npm --prefix server run migrate*` |
-| migrate 成功无表 | `server/utils/migrator.ts`：glob `.replace(/\\/g, '/')` |
+| `server/package.json` 脚本（dev/migrate）使用 `tsx` 报 `The service was stopped` | `server/package.json`：改为 `tsc && node dist/...`，不依赖 `tsx` |
+| Umzug glob 类型错误导致 pending=0 无表创建 | `server/utils/migrator.ts`：glob 改为 `'../migrations/*.{ts,js}'`（单字符串） |
 | 自动建库失败 | `server/utils/ensureDatabase.ts`：使用 `query` |
 | admin 密码无效 | seeder 运行时 `bcrypt.hash` |
+| `dotenv` 包残缺（缺 package.json） | 用 `npm install dotenv --ignore-scripts` 重装 |
 
 ### 20.4 AI 排障原则
 
 1. 先查 MySQL 服务 / `server/.env`，再查迁移状态，**不要先重写 ORM**
-2. 验证尽量用隔离库名与端口，避免覆盖现有开发库
-3. 文档与示例不写真实密码
-4. 改完用 `migrate:status`、`/health`、`/api/v1/auth/captcha` 验证
-5. 完整 skill：`.agents/skills/vue-admin-env-setup/SKILL.md`
-6. 静态自检：`node .agents/skills/vue-admin-env-setup/scripts/check-env.mjs`
+2. 若 `tsx`/`esbuild` 报 `The service was stopped`，改用 `tsc && node dist/...` 运行
+3. 若 `npm install` 因 esbuild postinstall 失败，用 `npm install --ignore-scripts`
+4. 若 `dotenv` 等包残缺，用 `npm install <包名> --ignore-scripts` 单独重装
+5. 验证尽量用隔离库名与端口，避免覆盖现有开发库
+6. 文档与示例不写真实密码
+7. 改完用 `migrate:status`、`/health`、`/api/v1/auth/captcha` 验证
+8. 完整 skill：`.agents/skills/vue-admin-env-setup/SKILL.md`
+9. 静态自检：`node .agents/skills/vue-admin-env-setup/scripts/check-env.mjs`

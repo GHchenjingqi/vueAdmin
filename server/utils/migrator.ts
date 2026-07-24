@@ -23,10 +23,7 @@ const __dirname = dirname(__filename)
 export const migrator = new Umzug({
   migrations: {
     // dist 下为 .js，tsx 源码运行为 .ts
-    glob: [
-      resolve(__dirname, '../migrations/*.js').replace(/\\/g, '/'),
-      resolve(__dirname, '../migrations/*.ts').replace(/\\/g, '/'),
-    ],
+glob: resolve(__dirname, '../migrations/*.{ts,js}').replace(/\\/g, '/'),
     resolve: ({ name, path, context }) => {
       const fileUrl = pathToFileURL(path!).href
       return {
@@ -61,10 +58,7 @@ export const migrator = new Umzug({
 export const seeder = new Umzug({
   migrations: {
     // dist 下为 .js，tsx 源码运行为 .ts
-    glob: [
-      resolve(__dirname, '../seeders/*.js').replace(/\\/g, '/'),
-      resolve(__dirname, '../seeders/*.ts').replace(/\\/g, '/'),
-    ],
+glob: resolve(__dirname, '../seeders/*.{ts,js}').replace(/\\/g, '/'),
     resolve: ({ name, path, context }) => {
       const fileUrl = pathToFileURL(path!).href
       return {
