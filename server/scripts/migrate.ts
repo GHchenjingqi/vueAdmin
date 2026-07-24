@@ -9,10 +9,14 @@
  *   tsx scripts/migrate.ts status    # 查看迁移状态
  */
 import { migrator, seeder } from '../utils/migrator.js'
+import { ensureDatabaseExists } from '../utils/ensureDatabase.js'
+import sequelize from '../config/database.js'
 
 const command = process.argv[2]
 
 async function main() {
+  await ensureDatabaseExists()
+  await sequelize.authenticate()
   switch (command) {
     case 'up':
       await migrator.up()

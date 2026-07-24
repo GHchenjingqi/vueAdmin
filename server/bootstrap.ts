@@ -20,6 +20,7 @@ import config from './config/index.js'
 import { logInfo, cleanOldLogs } from './utils/fileLogger.js'
 import { loadSiteInfo, injectSiteInfo } from './utils/siteCache.js'
 import { migrator, seeder } from './utils/migrator.js'
+import { ensureDatabaseExists } from './utils/ensureDatabase.js'
 import { resolve, join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
@@ -33,36 +34,6 @@ const projectRoot = existsSync(resolve(__dirname, '../index.html'))
   ? resolve(__dirname, '..')
   : resolve(__dirname, '../..')
 
-/**
- * 自动创建数据库（如果不存在）
- * 使用 mysql2 裸连接（不指定数据库名），避免 "Unknown database" 错误
- */
-async function createDatabaseIfNotExists() {
-  try {
-    const mysql2 = await import('mysql2/promise')
-    const db = config.database
-    const conn = await mysql2.createConnection({
-      host: db.host,
-      port: db.port,
-      user: db.user,
-      password: db.password,
-    })
-    await conn.execute(
-      `CREATE DATABASE IF NOT EXISTS \`${db.name}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-    )
-    await conn.end()
-    logInfo(`数据库 ${db.name} 已自动创建`)
-  } catch (err) {
-    logInfo('数据库自动创建（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 前端静态资源配置
- * - 生产环境（NODE_ENV=production）：使用预构建 dist 目录
- * - 开发环境（NODE_ENV!=production）：优先使用 Vite 中间件（HMR 热更新），
- *   这样后端 `npm run dev` 也能实时反映前端源码改动，无需每次手动 `vite build`。
- */
 async function setupFrontend(app, isProduction, express, httpsServer) {
   const distDir = resolve(projectRoot, 'dist')
 
@@ -352,16 +323,10 @@ export default async function bootstrap(app) {
     Menu.belongsToMany(Role, { through: RoleMenu, foreignKey: 'menuId', as: 'roles' })
     Message.belongsTo(User, { foreignKey: 'fromUserId', as: 'fromUser' })
 
-    // 先测试连接，数据库不存在则自动创建
-    try {
-      await sequelize.authenticate()
-    } catch (connErr) {
-      if (connErr.message.includes('Unknown database')) {
-        await createDatabaseIfNotExists()
-      } else {
-        throw connErr
-      }
-    }
+        // 先确保数据库存在，再认证连接（CREATE 后必须重新 authenticate）
+    await ensureDatabaseExists()
+    await sequelize.authenticate()
+    logInfo(`数据库连接成功: ${config.database.host}:${config.database.port}/${config.database.name}`)
 
     // 执行数据库迁移（替代 sequelize.sync()）
     const pending = await migrator.pending()
@@ -423,7 +388,6 @@ export default async function bootstrap(app) {
       const banner = [
         '='.repeat(50),
         `  🚀 Vue Admin 服务启动成功`,
-        `  🌐 访问地址:  https://192.168.12.251:${config.server.port}`,
         `  🌐 本地地址:  https://localhost:${config.server.port}`,
         `  📡 API 接口:  https://localhost:${config.server.port}/api`,
         `  📖 API 文档:  https://localhost:${config.server.port}/api/docs`,

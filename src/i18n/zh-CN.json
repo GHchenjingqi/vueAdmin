@@ -922,6 +922,7 @@
   "sidebar": {
     "navigation": "侧边导航",
     "collapsed": "折叠侧边导航",
+    "aiProviders": "AI 提供商",
     "dashboard": "仪表盘",
     "system": "系统管理",
     "settings": "基础设置",

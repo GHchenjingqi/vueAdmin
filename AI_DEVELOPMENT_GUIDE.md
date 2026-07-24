@@ -8,8 +8,8 @@
 
 - **项目名称**：vue-admin（后台管理系统）
 - **版本**：1.0.0
-- **技术栈**：Vue 3 + TypeScript + Element Plus + Pinia + Vue Router 4 + Axios + ECharts
-- **构建工具**：Vite 5
+- **技术栈**：Vue 3 + TypeScript + Element Plus + Pinia + Vue Router 4 + Axios + ECharts + AI 代码生成助手
+- **构建工具**：Vite 6
 - **包管理**：npm
 - **Node 版本**：参见 `.nvmrc`
 
@@ -31,6 +31,9 @@
 | 类型检查 | vue-tsc | ^3.3.5 | `npm run typecheck` |
 | CSS 预处理器 | Sass | ^1.101.0 | scss |
 | 代码提交 | husky + lint-staged | - | pre-commit 自动 lint |
+| AI 提供商 | openai | ^4.47.0 | OpenAI/兼容 API 客户端（后端） |
+| Markdown 增强 | marked + katex + mermaid + highlight.js | ^12.0.0 / ^0.17.0 / ^11.16.0 / ^11.11.1 | AI 助手 Markdown 渲染 |
+| 性能监控 | web-vitals + @sentry/vue | ^5.3.0 / ^10.63.0 | Core Web Vitals + Sentry RUM |
 
 ---
 
@@ -57,7 +60,8 @@ d:\codes\web/
 │   │   ├── setting.ts      # 系统设置
 │   │   ├── onlineUser.ts   # 在线用户
 │   │   ├── upload.ts       # 文件上传
-│   │   └── search.ts       # 全局搜索
+│   │   ├── search.ts       # 全局搜索
+│   │   └── ai.ts           # AI 代码生成（聊天 / 文件应用 / 提供商管理）
 │   ├── assets/             # 静态资源（主题样式等）
 │   ├── components/         # 通用组件
 │   │   ├── ProForm/        # 专业表单组件（ProFormItem + index.vue）
@@ -72,13 +76,20 @@ d:\codes\web/
 │   │   ├── SearchBar.vue   # 搜索栏
 │   │   ├── ErrorBoundary.vue # 错误边界
 │   │   ├── Permission.vue  # 权限组件
-│   │   └── Watermark.vue   # 水印组件
+│   │   ├── Watermark.vue   # 水印组件
+│   │   ├── EmptyState.vue  # 空状态组件
+│   │   ├── SkeletonLoader.vue # 通用骨架屏组件
+│   │   ├── PageSkeleton.vue  # 页面级骨架屏组件
+│   │   ├── MenuIcon.vue    # 菜单图标组件（动态 SVG）
+│   │   └── AIAssistant/    # AI 代码生成助手（浮动按钮 + 抽屉对话 + 代码预览）
+│   │       └── index.vue
 │   ├── composables/        # 组合式函数
 │   │   ├── useCrud.ts      # 通用 CRUD 逻辑封装
 │   │   ├── useDialog.ts    # 对话框逻辑
 │   │   ├── useExport.ts    # 导出逻辑
 │   │   ├── useExportProgress.ts # 导出进度
-│   │   └── useRequestCache.ts # 请求缓存
+│   │   ├── useRequestCache.ts # 请求缓存
+│   │   └── useSSE.ts       # SSE 连接管理（指数退避重连 / 心跳 / 自动 ticket）
 │   ├── directives/         # 自定义指令
 │   │   └── permission.ts   # v-permission 权限指令
 │   ├── i18n/               # 国际化
@@ -88,6 +99,8 @@ d:\codes\web/
 │   ├── router/             # 路由配置
 │   │   ├── index.ts        # 路由实例 + 守卫
 │   │   ├── dynamicRoutes.ts# 动态路由生成（根据后端菜单配置）
+│   │   ├── initSession.ts  # 会话初始化（刷新后恢复登录态 + 站点信息）
+│   │   ├── keepAlive.ts    # 路由组件缓存管理（白名单动态配置）
 │   │   └── preload.ts      # 路由预加载策略
 │   ├── stores/             # Pinia 状态管理
 │   │   ├── index.ts        # 统一导出入口
@@ -95,7 +108,11 @@ d:\codes\web/
 │   │   ├── appStore.ts     # 应用全局状态（侧边栏、主题等）
 │   │   ├── userStore.ts    # 用户认证状态
 │   │   ├── menuStore.ts    # 菜单状态
+│   │   ├── themeStore.ts   # 主题状态（主色、字号）
+│   │   ├── layoutStore.ts  # 布局状态（多标签页、导航模式）
+│   │   ├── localeStore.ts  # 语言状态（中英文切换）
 │   │   ├── settingStore.ts # 系统设置状态
+│   │   ├── siteStore.ts    # 站点信息状态
 │   │   └── notificationStore.ts # 通知状态
 │   ├── types/              # 类型定义
 │   │   ├── api.ts          # 业务模型类型（从 server/shared/schemas 自动同步）
@@ -110,14 +127,21 @@ d:\codes\web/
 │   │   ├── download.ts     # 文件下载
 │   │   ├── nprogress.ts    # 进度条封装
 │   │   ├── sanitize.ts     # 输入清理
-│   │   └── validators.ts   # 表单校验规则
+│   │   ├── validators.ts   # 表单校验规则
+│   │   ├── dynamicIcons.ts # 动态图标注册
+│   │   ├── mdEditorSetup.ts# Markdown 编辑器增强配置（Mermaid + KaTeX）
+│   │   └── webVitals.ts    # Core Web Vitals 性能指标上报（Sentry）
 │   ├── views/              # 页面视图
 │   │   ├── user/           # 用户管理子组件
-│   │   ├── Layout.vue      # 主布局
-│   │   ├── Dashboard.vue   # 仪表盘
+│   │   │   ├── UserFormDialog.vue   # 用户表单弹窗
+│   │   │   └── UserImportDialog.vue # 用户导入弹窗
+│   │   ├── Layout.vue      # 主布局（含 AI 助手悬浮按钮）
+│   │   ├── Dashboard.vue   # 仪表盘（骨架屏）
 │   │   ├── Login.vue       # 登录
+│   │   ├── LoginPage.vue   # 登录页配置页
 │   │   ├── Register.vue    # 注册
 │   │   ├── Profile.vue     # 个人中心
+│   │   ├── AiProviderManager.vue # AI 提供商管理页
 │   │   ├── ...             # 其他业务页面
 │   ├── App.vue             # 根组件
 │   ├── env.d.ts            # 环境类型声明
@@ -787,7 +811,12 @@ describe('模块名称', () => {
 ### 14.2 常用命令
 
 ```bash
-npm run dev          # 启动开发服务器
+npm run install:all  # 安装根目录 + server 依赖
+npm run dev          # 启动开发服务器（自动建库/迁移/种子）
+npm run migrate      # 手动执行数据库迁移
+npm run migrate:seed # 写入种子（空库 admin 等）
+npm run migrate:status
+npm run migrate:reset # 危险：清空后重建
 npm run build        # 生产构建
 npm run typecheck    # TypeScript 类型检查（必须通过）
 npm run lint         # ESLint 代码检查
@@ -819,3 +848,290 @@ npm test             # 运行测试
 | `src/types/api.ts` | 业务模型类型 |
 | `src/types/response.ts` | API 响应类型 |
 | `src/composables/useCrud.ts` | 通用 CRUD 组合式函数 |
+| `src/composables/useSSE.ts` | SSE 连接管理（指数退避重连 / 心跳 / 自动 ticket） |
+| `src/utils/webVitals.ts` | Core Web Vitals 性能指标上报 |
+| `src/utils/mdEditorSetup.ts` | Markdown 编辑器增强配置（Mermaid + KaTeX） |
+| `src/components/AIAssistant/index.vue` | AI 代码生成助手（浮动按钮 + 抽屉对话） |
+| `src/components/SkeletonLoader.vue` | 通用骨架屏组件 |
+| `src/components/PageSkeleton.vue` | 页面级骨架屏组件 |
+| `src/router/initSession.ts` | 会话初始化（刷新后恢复登录态） |
+| `src/router/keepAlive.ts` | 路由组件缓存管理 |
+| `src/stores/themeStore.ts` | 主题状态（主色、字号） |
+| `src/stores/layoutStore.ts` | 布局状态（多标签页、导航模式） |
+| `src/stores/localeStore.ts` | 语言状态（中英文切换） |
+| `src/stores/siteStore.ts` | 站点信息状态 |
+| `server/.env` | 后端环境变量（DB_* / SERVER_PORT / JWT_SECRET） |
+| `server/bootstrap.ts` | 启动：ensure DB → migrate → seed → listen |
+| `server/utils/ensureDatabase.ts` | 自动建库（query + CREATE DATABASE IF NOT EXISTS） |
+| `server/utils/migrator.ts` | Umzug 迁移/种子（Windows 路径 `/` 归一化） |
+| `server/scripts/migrate.ts` | 迁移 CLI 入口 |
+| `server/seeders/20260707_000001_admin_user.ts` | 默认管理员种子（运行时 bcrypt） |
+| `.agents/skills/vue-admin-env-setup/SKILL.md` | 本地环境搭建 skill |
+
+---
+
+## 十五、SSE 连接管理（useSSE Composable）
+
+### 15.1 概述
+
+`src/composables/useSSE.ts` 提供了通用的 SSE（Server-Sent Events）连接管理 Composable，核心特性：
+
+- **指数退避重连**：初始 3s，最大 30s，1.5 倍递增
+- **心跳保活**：30s 间隔检测连接存活状态
+- **自动 ticket 获取**：SSE 连接使用一次性 ticket，自动处理 token 刷新
+- **完整生命周期清理**：组件卸载时自动断开
+
+### 15.2 使用方式
+
+```typescript
+import { useSSE } from '@/composables/useSSE'
+
+// 在组件中使用
+const sse = useSSE({
+  url: '/notices/sse',              // SSE 端点（不含 /api/v1 前缀）
+  heartbeatInterval: 30_000,        // 心跳间隔（ms），默认 30s
+  reconnect: {
+    initialDelay: 3_000,            // 初始重连延迟
+    maxDelay: 30_000,               // 最大重连延迟
+    multiplier: 1.5,                // 指数退避倍数
+  },
+  maxRetries: -1,                   // 最大重连次数，-1 = 无限
+})
+
+// 订阅事件
+sse.on('notice-published', () => {
+  fetchUnreadCount()
+})
+
+sse.on('kicked', () => {
+  performLogout()
+})
+
+sse.on('error', () => {
+  console.warn('SSE 连接错误')
+})
+
+// 建立连接
+sse.connect()
+
+// 断开连接（主动）
+sse.disconnect()
+
+// 查看连接状态
+if (sse.connected.value) {
+  console.log('SSE 已连接')
+}
+```
+
+### 15.3 可用事件
+
+| 事件 | 说明 |
+|------|------|
+| `connected` | 连接建立 |
+| `notice-published` | 新通知发布 |
+| `notice-removed` | 通知被删除 |
+| `kicked` | 被踢下线 |
+| `error` | 连接错误 |
+| `disconnected` | 已断开 |
+| `*` | 所有事件（通配符） |
+
+### 15.4 生命周期
+
+- 组件挂载时调用 `sse.connect()` 建立连接
+- 组件卸载时 `sse.disconnect()` 自动清理（内部已调用 `onUnmounted`）
+- 手动调用 `disconnect()` 后不再自动重连
+
+---
+
+## 十六、AI 代码生成助手
+
+### 16.1 概述
+
+AI 助手是项目的**正式功能模块**，已接入前后端路由。前端组件位于 `src/components/AIAssistant/index.vue`。
+
+### 16.2 前端组件结构
+
+- **浮动触发按钮**：右下角圆形按钮，点击展开抽屉
+- **抽屉式对话界面**：右侧抽屉，540px 宽，支持关闭
+- **消息列表**：用户/AI 气泡式对话，支持 Markdown + 代码高亮
+- **代码文件预览**：支持文件列表展开、代码复制、单文件/批量应用
+- **AI 提供商管理**：内嵌弹窗，支持增删改查、启用/禁用切换
+- **模型/提供商切换**：下拉菜单，支持多提供商多模型
+- **Token 用量展示**：每条 AI 回复下方显示 Token 统计
+
+### 16.3 AI API 调用
+
+```typescript
+import { aiApi } from '@/api/ai'
+
+// 发送聊天消息
+const res = await aiApi.chat({
+  message: '帮我创建一个用户管理页面',
+  providerId: 1,    // AI 提供商 ID
+  model: 'claude-3', // 模型名称
+})
+
+// 应用生成的代码文件
+const res = await aiApi.apply(files)
+
+// 获取 AI 服务状态
+const status = await aiApi.getStatus()
+
+// 获取已启用提供商列表
+const providers = await aiApi.getEnabledProviders()
+```
+
+### 16.4 Markdown 增强
+
+- `src/utils/mdEditorSetup.ts`：md-editor-v3 增强配置，集成 Mermaid 图表 + KaTeX 公式渲染
+- AI 助手中的 Markdown 渲染使用 `marked`（GFM 模式）+ `highlight.js`（懒加载）
+
+---
+
+## 十七、Web Vitals 性能监控
+
+### 17.1 概述
+
+`src/utils/webVitals.ts` 收集 Core Web Vitals 并上报到 Sentry，用于 RUM 真实用户监控。
+
+### 17.2 监控指标
+
+| 指标 | 说明 |
+|------|------|
+| CLS | Cumulative Layout Shift（累积布局偏移） |
+| FCP | First Contentful Paint（首次内容绘制） |
+| LCP | Largest Contentful Paint（最大内容绘制） |
+| TTFB | Time to First Byte（首字节时间） |
+| INP | Interaction to Next Paint（交互到下一次绘制） |
+
+### 17.3 上报方式
+
+```typescript
+import { reportWebVitals } from '@/utils/webVitals'
+
+// 在 main.ts 中调用
+reportWebVitals()
+```
+
+所有指标通过 `Sentry.metrics.distribution()` 上报，附带 `rating` 标签。
+
+---
+
+## 十八、行级数据权限（dataScope）
+
+### 18.1 概述
+
+后端通过 `dataScope` 实现部门级数据隔离。角色配置 `dataScope` 字段：
+
+- `1` = 全部数据
+- `2` = 仅本部门
+- `3` = 本级及以下部门
+
+### 18.2 核心逻辑（server/utils/dataScope.ts）
+
+```typescript
+import { resolveDataScope, applyDataScopeWhere, isTargetInScope } from '@/server/utils/dataScope'
+
+// 解析当前用户的数据范围
+const scope = await resolveDataScope(userDeptId, roleIds)
+// scope = { dataScope: 2, deptId: 3, deptIds: [3, 5, 6] }
+
+// 将数据范围约束应用到查询 WHERE 条件
+applyDataScopeWhere(where, reqUser, queryDeptId)
+
+// 判断目标用户是否在数据范围内
+if (isTargetInScope(targetDeptId, reqUser)) {
+  // 允许访问
+}
+```
+
+### 18.3 AI 注意事项
+
+- 后端 `req.user` 已自动携带 `dataScope`、`deptId`、`deptIds` 字段
+- 多角色取最宽松范围（min），任一角色为 `1` 则整体为全部
+- 旧 Token 缺省 `dataScope` 时默认 scope=1（过渡兼容，无锁人风险）
+
+---
+
+## 十九、CSRF 纵深防御
+
+### 19.1 三层防护
+
+| 层 | 机制 | 说明 |
+|----|------|------|
+| 1 | `SameSite=Strict` Cookie | 跨站点请求自动不携带 Cookie |
+| 2 | `originValidator` 中间件 | 非 GET 请求校验 Origin/Referer 白名单 |
+| 3 | JWT-in-query 禁用 | SSE 端点不接受 `?token=` 查询参数 |
+
+### 19.2 originValidator 配置
+
+```typescript
+// server/middleware/originValidator.ts
+// 允许 Origin 白名单（支持环境变量 ALLOWED_ORIGINS 覆盖）
+const ALLOWED_ORIGINS = [
+  'http://localhost:5174',
+  'https://localhost:5174',
+  // ...
+]
+```
+
+### 19.3 AI 注意事项
+
+- 非 GET 请求均经过 Origin 校验，不在白名单内则返回 403
+- 配置 `config.app.allowedOrigins` 或使用 `ALLOWED_ORIGINS` 环境变量
+- 生产环境 `trust proxy` 已配置，确保 `req.ip` 获取真实客户端 IP
+
+---
+
+## 二十、本地环境搭建（MySQL / 迁移）
+
+重新 clone 或换机器后，按下面顺序做；细节与决策树见项目 skill。
+
+### 20.1 启动链路
+
+```
+server/.env
+  → ensureDatabaseExists()      # query + CREATE DATABASE IF NOT EXISTS
+  → sequelize.authenticate()
+  → Umzug migrator.up()         # server/migrations/*.ts
+  → seeder.up() if users = 0    # server/seeders/*.ts
+  → HTTPS listen SERVER_PORT
+```
+
+### 20.2 最短路径
+
+```bash
+npm run install:all
+# 配置 server/.env（DB_* 与本机 MySQL 一致）
+npm run dev
+```
+
+失败时：
+
+```bash
+# 手动建库（utf8mb4）后
+npm run migrate:status
+npm run migrate
+npm run migrate:seed
+npm run dev
+```
+
+默认账号：`admin` / `123456`。API 前缀：`/api/v1`。健康检查：`/health`。
+
+### 20.3 Windows 关键修复（已入库代码）
+
+| 问题 | 修复位置 |
+|------|----------|
+| 根目录找不到 `tsx` | 根 `package.json`：`npm --prefix server run migrate*` |
+| migrate 成功无表 | `server/utils/migrator.ts`：glob `.replace(/\\/g, '/')` |
+| 自动建库失败 | `server/utils/ensureDatabase.ts`：使用 `query` |
+| admin 密码无效 | seeder 运行时 `bcrypt.hash` |
+
+### 20.4 AI 排障原则
+
+1. 先查 MySQL 服务 / `server/.env`，再查迁移状态，**不要先重写 ORM**
+2. 验证尽量用隔离库名与端口，避免覆盖现有开发库
+3. 文档与示例不写真实密码
+4. 改完用 `migrate:status`、`/health`、`/api/v1/auth/captcha` 验证
+5. 完整 skill：`.agents/skills/vue-admin-env-setup/SKILL.md`
+6. 静态自检：`node .agents/skills/vue-admin-env-setup/scripts/check-env.mjs`

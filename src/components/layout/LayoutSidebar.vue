@@ -64,13 +64,9 @@ function menuKey(item: MenuItem): string {
   if (!item.path) return ''
   const segments = item.path.split('/').filter(Boolean)
   if (segments.length === 0) return ''
-  const key = segments
-    .map((seg, i) => {
-      if (i === 0) return seg
-      // 驼峰转换：online-users → onlineUsers
-      return seg.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
-    })
-    .join('.')
+  // 所有路径段都做 kebab → camel，避免 /ai-providers 映射成 sidebar.ai-providers
+  // 例：/ai-providers → sidebar.aiProviders，/online-users → sidebar.onlineUsers
+  const key = segments.map((seg) => seg.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())).join('.')
   return `sidebar.${key}`
 }
 

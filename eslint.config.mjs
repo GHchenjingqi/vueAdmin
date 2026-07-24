@@ -36,6 +36,7 @@ export default tseslint.config(
       'node_modules/**',
       'e2e-report/**',
       '.ai-knowledge/**',
+      '.kilo/**',
       '**/*.d.ts',
       'auto-imports.d.ts',
       'components.d.ts',

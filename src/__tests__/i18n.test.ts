@@ -87,11 +87,20 @@ describe('i18n', () => {
       expect(translate('common.confirm')).toBe('确定')
     })
 
-    it('persists language to localStorage', () => {
+    it('does not overwrite pinia locale persistence key', () => {
       const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
       setLocale('en-US')
-      expect(setItemSpy).toHaveBeenCalledWith('locale', 'en-US')
+      // 语言持久化由 localeStore 负责，i18n 不再写入 localStorage，避免覆盖 pinia 的 JSON 结构
+      expect(setItemSpy).not.toHaveBeenCalledWith('locale', 'en-US')
       setItemSpy.mockRestore()
+    })
+
+    it('reads pinia-persisted locale on init', async () => {
+      localStorage.setItem('locale', JSON.stringify({ locale: 'en-US' }))
+      vi.resetModules()
+      const mod = await import('@/i18n/index')
+      expect(mod.useI18n().locale.value).toBe('en-US')
+      mod.setLocale('zh-CN')
     })
 
     it('sets document.documentElement lang attribute', () => {

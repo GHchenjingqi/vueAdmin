@@ -15,7 +15,7 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button type="primary" :icon="EditPen" v-permission="['sys:msg:send']" @click="handleCreate">
+        <el-button v-permission="['sys:msg:send']" type="primary" :icon="EditPen" @click="handleCreate">
           {{ t('message.sendMessage') }}
         </el-button>
         <el-button :icon="Select" @click="handleReadAll">

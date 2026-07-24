@@ -10,7 +10,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import config from '../config/index.js'
 
-// 允许的 Origin（默认：同源 + 常见内网 Vite 端口）
+// 允许的 Origin（来自 config.app.allowedOrigins / ALLOWED_ORIGINS）
 const ALLOWED_ORIGINS = new Set<string>([
   ...new Set((config.app.allowedOrigins || ['http://localhost:5174', 'https://localhost:5174', 'http://127.0.0.1:5174', 'https://127.0.0.1:5174']).filter(Boolean)),
 ])

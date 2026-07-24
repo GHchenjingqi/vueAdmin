@@ -63,15 +63,21 @@ vi.mock('axios', () => {
       config: cfg,
     })
   instance.interceptors = {
-    request: { use: (f: any, r: any) => { handlers.request = { fulfilled: f, rejected: r } } },
-    response: { use: (f: any, r: any) => { handlers.response = { fulfilled: f, rejected: r } } },
+    request: {
+      use: (f: any, r: any) => {
+        handlers.request = { fulfilled: f, rejected: r }
+      },
+    },
+    response: {
+      use: (f: any, r: any) => {
+        handlers.response = { fulfilled: f, rejected: r }
+      },
+    },
   }
   instance.defaults = {}
   const axiosDefault: any = {
     create: vi.fn(() => instance),
-    post: vi.fn(() =>
-      Promise.resolve({ data: { code: 0, data: { accessToken: 'new-token' }, message: 'ok' } }),
-    ),
+    post: vi.fn(() => Promise.resolve({ data: { code: 0, data: { accessToken: 'new-token' }, message: 'ok' } })),
   }
   axiosDefault.__handlers = handlers
   axiosDefault.__instance = instance
@@ -235,9 +241,7 @@ describe('request.ts - 响应拦截器（成功分支）', () => {
 
   it('blob 响应类型包裹为 code 0 结构', async () => {
     const blob = new Blob(['x'])
-    const res: any = await handlers.response.fulfilled(
-      baseResponse({ config: { method: 'get', url: '/d', responseType: 'blob' }, data: blob }),
-    )
+    const res: any = await handlers.response.fulfilled(baseResponse({ config: { method: 'get', url: '/d', responseType: 'blob' }, data: blob }))
     expect(res.data.code).toBe(0)
     expect(res.data.data).toBe(blob)
     expect(setCache).not.toHaveBeenCalled()
@@ -249,9 +253,7 @@ describe('request.ts - 响应拦截器（成功分支）', () => {
   })
 
   it('业务错误（code != 0）抛出 AppError', async () => {
-    await expect(
-      handlers.response.fulfilled(baseResponse({ data: { code: 400, data: null, message: '参数错误' } })),
-    ).rejects.toThrow('参数错误')
+    await expect(handlers.response.fulfilled(baseResponse({ data: { code: 400, data: null, message: '参数错误' } }))).rejects.toThrow('参数错误')
   })
 })
 
@@ -285,9 +287,7 @@ describe('request.ts - 响应拦截器（失败分支）', () => {
   it('401 但为登录/刷新接口时不触发刷新，直接拒绝', async () => {
     let caught: any
     try {
-      await handlers.response.rejected(
-        axiosErr({ response: { status: 401, data: { message: '' } }, config: { url: '/auth/login', headers: {} } }),
-      )
+      await handlers.response.rejected(axiosErr({ response: { status: 401, data: { message: '' } }, config: { url: '/auth/login', headers: {} } }))
     } catch (e) {
       caught = e
     }
@@ -296,9 +296,7 @@ describe('request.ts - 响应拦截器（失败分支）', () => {
   })
 
   it('401 普通接口触发刷新并自动重试', async () => {
-    const result: any = await handlers.response.rejected(
-      axiosErr({ response: { status: 401, data: { message: '' } } }),
-    )
+    const result: any = await handlers.response.rejected(axiosErr({ response: { status: 401, data: { message: '' } } }))
     expect((axios as any).post).toHaveBeenCalledWith('/api/v1/auth/token', {}, { withCredentials: true })
     // 重试由 mock 实例返回 raw 响应
     expect(result.data.data).toBe('retry-ok')
@@ -323,9 +321,7 @@ describe('request.ts - 响应拦截器（失败分支）', () => {
   it('被强制下线（kicked）跳登录页', async () => {
     let caught: any
     try {
-      await handlers.response.rejected(
-        axiosErr({ response: { status: 401, data: { kicked: true, message: '已被踢' } } }),
-      )
+      await handlers.response.rejected(axiosErr({ response: { status: 401, data: { kicked: true, message: '已被踢' } } }))
     } catch (e) {
       caught = e
     }

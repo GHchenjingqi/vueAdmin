@@ -170,7 +170,7 @@ const emit = defineEmits<{
   (e: 'unreadChange', count: number): void
 }>()
 
-const { t, locale, localeLabels, setLocale } = useI18n()
+const { t, locale, localeLabels } = useI18n()
 const appStore = useAppStore()
 const route = useRoute()
 
@@ -205,12 +205,8 @@ function menuKey(item: MenuItem): string {
   if (!item.path) return ''
   const segments = item.path.split('/').filter(Boolean)
   if (segments.length === 0) return ''
-  const key = segments
-    .map((seg, i) => {
-      if (i === 0) return seg
-      return seg.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
-    })
-    .join('.')
+  // 所有路径段都做 kebab → camel，避免 /ai-providers 映射成 sidebar.ai-providers
+  const key = segments.map((seg) => seg.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())).join('.')
   return `sidebar.${key}`
 }
 
@@ -224,7 +220,6 @@ function handleUnreadChange(val: number): void {
 }
 
 function handleLocaleChange(localeKey: string): void {
-  setLocale(localeKey as 'zh-CN' | 'en-US')
   appStore.setLocale(localeKey as 'zh-CN' | 'en-US')
 }
 
