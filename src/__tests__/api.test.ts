@@ -360,6 +360,12 @@ describe('noticeApi', () => {
     noticeApi.getUnreadCount()
     expect(mockGet).toHaveBeenCalledWith('/notices/unread/count')
   })
+
+  it('listUser() calls GET /notices with view=user', async () => {
+    const { noticeApi } = await import('@/api/notice')
+    noticeApi.listUser()
+    expect(mockGet).toHaveBeenCalledWith('/notices', { params: { view: 'user' } })
+  })
 })
 
 describe('messageApi', () => {
@@ -375,10 +381,10 @@ describe('messageApi', () => {
     expect(mockGet).toHaveBeenCalledWith('/messages/1')
   })
 
-  it('send() calls POST /messages', async () => {
+  it('getUnreadCount() calls GET /messages with scope', async () => {
     const { messageApi } = await import('@/api/message')
-    messageApi.send({ title: 'Hello', content: 'World', receiverId: 1 })
-    expect(mockPost).toHaveBeenCalledWith('/messages', { title: 'Hello', content: 'World', receiverId: 1 })
+    messageApi.getUnreadCount()
+    expect(mockGet).toHaveBeenCalledWith('/messages', { params: { scope: 'unread-count' } })
   })
 
   it('markRead() calls PATCH /messages/:id', async () => {
@@ -387,10 +393,10 @@ describe('messageApi', () => {
     expect(mockPatch).toHaveBeenCalledWith('/messages/1', { isRead: true })
   })
 
-  it('markAllRead() calls PATCH /messages', async () => {
+  it('markAllRead() calls PATCH /messages with readAll', async () => {
     const { messageApi } = await import('@/api/message')
     messageApi.markAllRead()
-    expect(mockPatch).toHaveBeenCalledWith('/messages')
+    expect(mockPatch).toHaveBeenCalledWith('/messages', { readAll: true })
   })
 
   it('delete() calls DELETE /messages/:id', async () => {

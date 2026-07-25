@@ -89,7 +89,8 @@
     "showSearch": "Show Search",
     "year": "Year",
     "month": "Month",
-    "day": "Day"
+    "day": "Day",
+    "backToPrevious": "Go Back"
   },
   "layout": {
     "lightMode": "Light Mode",
@@ -567,7 +568,7 @@
     "exportFileName": "System Log"
   },
   "notice": {
-    "pageTitle": "Notices & Announcements",
+    "pageTitle": "Announcement Management",
     "addNotice": "Add Notice",
     "editNotice": "Edit Notice",
     "notice": "Notice",
@@ -596,7 +597,7 @@
     "all": "All"
   },
   "message": {
-    "title": "Messages",
+    "title": "Message Center",
     "sendMessage": "Send Message",
     "readAll": "Mark All Read",
     "view": "View",
@@ -734,7 +735,7 @@
     "sat": "Sat"
   },
   "notification": {
-    "title": "Notifications",
+    "title": "Message Center",
     "readAll": "Mark All Read",
     "noNotices": "No notifications",
     "viewMore": "View More",
@@ -751,7 +752,10 @@
     "fetchFailed": "Failed to fetch notification details",
     "markAllReadSuccess": "All marked as read",
     "operationFailed": "Operation failed",
-    "forceOfflineMessage": "Your account has been forcefully taken offline by an administrator. Please log in again"
+    "forceOfflineMessage": "Your account has been forcefully taken offline by an administrator. Please log in again",
+    "message": "Messages",
+    "noMessages": "No messages",
+    "noUnreadMessages": "No unread messages"
   },
   "search": {
     "placeholder": "Search menus, pages, users, content...",
@@ -932,12 +936,16 @@
     "menus": "Menus",
     "dict": "Dictionary",
     "files": "Files",
-    "notices": "Notices",
+    "notices": "Announcements",
     "logs": "Logs",
-    "messages": "Messages",
+    "messages": "Message Center",
     "tasks": "Scheduled Tasks",
     "monitor": "Monitor",
     "onlineUsers": "Online Users",
     "serverMonitor": "Server Monitor"
+  },
+  "errorPage": {
+    "notFoundTitle": "Sorry, the page you visited does not exist",
+    "notFoundDesc": "The page may have been deleted, moved, or is temporarily unavailable"
   }
 }

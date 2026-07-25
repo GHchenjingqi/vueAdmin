@@ -107,7 +107,12 @@ export async function markMessageRead(id: number, isRead: boolean) {
 export async function markAllMessagesRead(userId: number) {
   await Message.update(
     { isRead: true, readAt: new Date() },
-    { where: { toUserId: userId, isRead: false } },
+    {
+      where: {
+        [Op.or]: [{ toUserId: userId }, { toUserId: null }],
+        isRead: false,
+      },
+    },
   )
 }
 

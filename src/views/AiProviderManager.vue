@@ -58,7 +58,7 @@
       :title="isEdit ? t('aiProvider.editTitle') : t('aiProvider.addTitle')"
       :loading="submitLoading"
       :schema="formSchema"
-      :labelWidth="95"
+      :label-width="95"
       destroy-on-close
       @confirm="handleSubmit"
     />

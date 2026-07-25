@@ -22,6 +22,12 @@ vi.mock('../models/User.js', () => ({
   },
 }))
 
+vi.mock('../models/Department.js', () => ({
+  default: {
+    findAll: vi.fn(),
+  },
+}))
+
 vi.mock('../models/RefreshToken.js', () => ({
   default: {
     findOne: vi.fn(),

@@ -20,8 +20,8 @@ export async function getUnreadCount(userId: number) {
     distinct: true,
     col: 'noticeId',
   })
-  const unread = totalPublished - readCount
-  return { total: Math.max(0, unread) }
+  const unread = Math.max(0, totalPublished - readCount)
+  return { total: unread, count: unread }
 }
 
 /**
@@ -143,6 +143,7 @@ export async function createNotice(data: {
       title: notice.title,
       type: notice.type,
       time: notice.publishTime,
+      content: notice.content,
     })
   }
 
@@ -206,6 +207,7 @@ export async function updateNotice(
       title: updateData.title || notice.title,
       type: updateData.type || notice.type,
       time: updateData.publishTime,
+      content: (updateData.content as string | undefined) || notice.content,
     })
   }
   if (wasUnpublished) {

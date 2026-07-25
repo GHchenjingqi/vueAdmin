@@ -17,10 +17,19 @@ export interface Message {
   id: number
   title: string
   content?: string
-  senderId?: number
-  senderName?: string
-  receiverId?: number
+  fromUserId?: number | null
+  toUserId?: number | null
+  fromUser?: {
+    id: number
+    username: string
+    nickname?: string
+  } | null
+  /** 后端字段 */
+  isRead?: boolean
+  /** 兼容旧前端字段 */
   read?: boolean
+  readAt?: string | null
+  createdAt?: string
   sendTime?: string
   type?: string
 }

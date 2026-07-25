@@ -1,4 +1,5 @@
 ﻿#!/usr/bin/env node
+/* global process */
 /**
  * 快速检查 vue-admin 本地环境关键文件与 env（不连接数据库）。
  * 用法: 在仓库根执行
@@ -49,7 +50,7 @@ try {
 const migratorPath = path.join(cwd, 'server/utils/migrator.ts')
 if (fs.existsSync(migratorPath)) {
   const src = fs.readFileSync(migratorPath, 'utf8')
-  const fixed = src.includes(".replace(/\\\\/g, '/')") || src.includes('.replace(/\\/g, \'/\')') || /replace\(\/\\\\\/g,\s*['\"]\/['\"]\)/.test(src) || src.includes("replace(/\\\\/g, '/')")
+  const _fixed = src.includes(".replace(/\\\\/g, '/')") || src.includes('.replace(/\\/g, \'/\')') || /replace\(\/\\\\\/g,\s*['"]\/['"]\)/.test(src) || src.includes("replace(/\\\\/g, '/')")
   // simpler detection
   const hasSlashFix = src.includes('replace(/\\') && src.includes("g, '/')")
   console.log(`[${hasSlashFix ? 'OK' : 'WARN'}] migrator Windows path slash normalization`)

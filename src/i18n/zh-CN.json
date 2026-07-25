@@ -89,7 +89,8 @@
     "showSearch": "显示搜索",
     "year": "年",
     "month": "月",
-    "day": "日"
+    "day": "日",
+    "backToPrevious": "返回上一页"
   },
   "layout": {
     "lightMode": "亮色模式",
@@ -567,7 +568,7 @@
     "exportFileName": "系统日志"
   },
   "notice": {
-    "pageTitle": "通知公告",
+    "pageTitle": "公告管理",
     "addNotice": "新增通知",
     "editNotice": "编辑通知",
     "notice": "通知",
@@ -596,7 +597,7 @@
     "all": "全部"
   },
   "message": {
-    "title": "消息通知",
+    "title": "消息中心",
     "sendMessage": "发送消息",
     "readAll": "全部已读",
     "view": "查看",
@@ -734,7 +735,7 @@
     "sat": "周六"
   },
   "notification": {
-    "title": "消息通知",
+    "title": "消息中心",
     "readAll": "全部已读",
     "noNotices": "暂无通知",
     "viewMore": "查看更多",
@@ -751,7 +752,10 @@
     "fetchFailed": "获取通知详情失败",
     "markAllReadSuccess": "已全部标记为已读",
     "operationFailed": "操作失败",
-    "forceOfflineMessage": "您的账号已被管理员强制下线，请重新登录"
+    "forceOfflineMessage": "您的账号已被管理员强制下线，请重新登录",
+    "message": "消息",
+    "noMessages": "暂无消息",
+    "noUnreadMessages": "暂无未读消息"
   },
   "search": {
     "placeholder": "搜索菜单、页面、用户、内容...",
@@ -932,12 +936,16 @@
     "menus": "菜单管理",
     "dict": "字典管理",
     "files": "文件管理",
-    "notices": "通知管理",
+    "notices": "公告管理",
     "logs": "系统日志",
-    "messages": "消息通知",
+    "messages": "消息中心",
     "tasks": "定时任务",
     "monitor": "系统监控",
     "onlineUsers": "在线用户",
     "serverMonitor": "服务监控"
+  },
+  "errorPage": {
+    "notFoundTitle": "抱歉，您访问的页面不存在",
+    "notFoundDesc": "您访问的页面可能已被删除、移动或暂时不可用"
   }
 }

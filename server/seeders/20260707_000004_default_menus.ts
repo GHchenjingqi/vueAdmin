@@ -120,7 +120,7 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
     },
     {
       parentId: 1,
-      name: '通知管理',
+      name: '公告管理',
       path: '/notices',
       component: 'views/NoticeManager.vue',
       icon: 'Bell',
@@ -132,13 +132,13 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
       updatedAt: new Date(),
     },
     {
-      parentId: 1,
+      parentId: 14,
       name: '系统日志',
       path: '/logs',
       component: 'views/SystemLog.vue',
       icon: 'Document',
       type: 'M',
-      sort: 10,
+      sort: 2,
       status: 1,
       hidden: 0,
       createdAt: new Date(),
@@ -146,7 +146,7 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
     },
     {
       parentId: 1,
-      name: '消息通知',
+      name: '消息中心',
       path: '/messages',
       component: 'views/MessageList.vue',
       icon: 'ChatLineSquare',

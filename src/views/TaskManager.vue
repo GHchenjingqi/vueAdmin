@@ -171,8 +171,8 @@ const filteredTasks = computed(() => {
   })
 })
 
-function onQuery(): void {
-  // computed 会自动过滤，无需额外逻辑
+function onQuery(params: { searchParams?: Record<string, unknown> }): void {
+  if (params.searchParams) Object.assign(searchParams, params.searchParams)
 }
 
 const form = reactive({

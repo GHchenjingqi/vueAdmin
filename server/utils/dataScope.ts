@@ -43,7 +43,7 @@ export async function resolveDataScope(
 
   const roles = await (Role as any).findAll({ where: { id: { [Op.in]: roleIds } }, attributes: ['dataScope'] })
   const scopes = roles.map((r) => (r as unknown as { dataScope: number }).dataScope ?? 1)
-  const dataScope = Math.min(...scopes, 1)
+  const dataScope = scopes.length > 0 ? Math.min(...scopes) : 1
 
   if (dataScope === 1) {
     return { dataScope: 1, deptId, deptIds: [] }

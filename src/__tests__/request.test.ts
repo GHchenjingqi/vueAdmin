@@ -252,8 +252,8 @@ describe('request.ts - 响应拦截器（成功分支）', () => {
     expect(invalidateByUrl).toHaveBeenCalledWith('/users')
   })
 
-  it('业务错误（code != 0）抛出 AppError', async () => {
-    await expect(handlers.response.fulfilled(baseResponse({ data: { code: 400, data: null, message: '参数错误' } }))).rejects.toThrow('参数错误')
+  it('业务错误（code != 0）抛出 AppError', () => {
+    expect(() => handlers.response.fulfilled(baseResponse({ data: { code: 400, data: null, message: '参数错误' } }))).toThrow('参数错误')
   })
 })
 

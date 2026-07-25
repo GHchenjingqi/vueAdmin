@@ -66,8 +66,7 @@ describe('migrator', () => {
     const glob = migrator.options.migrations.glob as string | string[]
     const globText = Array.isArray(glob) ? glob.join(',') : String(glob)
     expect(globText).toContain('migrations')
-    // 同时支持 dist(.js) 与源码(.ts)
-    expect(globText.includes('.ts') || globText.includes('.js')).toBe(true)
+    expect(globText).toMatch(/\{ts,js\}|\.ts|\.js/)
   })
 
   it('should have context set to sequelize query interface', () => {
@@ -117,7 +116,7 @@ describe('seeder', () => {
     const glob = seeder.options.migrations.glob as string | string[]
     const globText = Array.isArray(glob) ? glob.join(',') : String(glob)
     expect(globText).toContain('seeders')
-    expect(globText.includes('.ts') || globText.includes('.js')).toBe(true)
+    expect(globText).toMatch(/\{ts,js\}|\.ts|\.js/)
   })
 
   it('should have SeederMeta storage', () => {

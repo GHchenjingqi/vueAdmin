@@ -812,8 +812,8 @@ describe('模块名称', () => {
 
 ```bash
 npm run install:all  # 安装根目录 + server 依赖
-npm run dev          # 启动开发服务器（tsc 编译 → node dist/app.js → 自动建库/迁移/种子）
-npm run migrate      # 手动执行数据库迁移（tsc 编译 → node dist/scripts/migrate.js up）
+npm run dev          # 启动开发服务器（tsx app.ts → 自动建库/迁移/种子 + Vite HMR）
+npm run migrate      # 手动执行数据库迁移（tsx scripts/migrate.ts up）
 npm run migrate:seed # 写入种子（空库 admin 等）
 npm run migrate:status
 npm run migrate:reset # 危险：清空后重建
@@ -824,7 +824,7 @@ npm run format       # Prettier 格式化
 npm test             # 运行测试
 ```
 
-> ⚠️ Windows 注意：`tsx`/`esbuild` 不稳定时，所有 server 脚本均使用 `tsc && node dist/...` 方式运行。
+> ⚠️ Windows 注意：若 `tsx`/`esbuild` 报错，兜底使用 `cd server && npx tsc -p tsconfig.json` 后 `node dist/app.js`。
 
 ### 14.3 避免的操作
 
@@ -1108,9 +1108,16 @@ npm run install:all
 npm run dev
 ```
 
-> ⚠️ **Windows 注意**：`tsx` 依赖 `esbuild`，在部分 Windows 环境会报 `The service was stopped`。  
-> 因此 `npm run dev` 实际执行 `tsc && node dist/app.js`，不依赖 `tsx`。  
-> 首次启动或修改后端代码后需先编译（`tsc`），编译产物在 `server/dist/`。
+> ⚠️ **Windows 注意**：若 `tsx`/`esbuild` 报 `The service was stopped`，说明 esbuild 二进制文件缺失或版本不匹配。
+> 修复方法（确保版本与 `tsx` 的 esbuild 一致，当前 0.28.1）：
+> ```powershell
+> cd server
+> npm install @esbuild/win32-x64@0.28.1 --ignore-scripts
+> Copy-Item node_modules\@esbuild\win32-x64\esbuild.exe node_modules\tsx\node_modules\esbuild\bin\esbuild.exe -Force
+> ```
+> 验证：`cd server && npx tsx -e "console.log('tsx OK')"` 应输出 `tsx OK`。
+> 
+> 兜底方案（无 Vite HMR，前端显示静态页面）：`cd server && npx tsc -p tsconfig.json` 后 `node dist/app.js`
 
 失败时：
 
@@ -1129,7 +1136,7 @@ npm run dev
 | 问题 | 修复位置 |
 |------|----------|
 | 根目录找不到 `tsx` | 根 `package.json`：`npm --prefix server run migrate*` |
-| `server/package.json` 脚本（dev/migrate）使用 `tsx` 报 `The service was stopped` | `server/package.json`：改为 `tsc && node dist/...`，不依赖 `tsx` |
+| `tsx`/`esbuild` 报 `The service was stopped`（esbuild 二进制缺失/版本不匹配） | `npm install @esbuild/win32-x64@0.28.1 --ignore-scripts` 安装后 `Copy-Item node_modules\@esbuild\win32-x64\esbuild.exe node_modules\tsx\node_modules\esbuild\bin\esbuild.exe -Force` |
 | Umzug glob 类型错误导致 pending=0 无表创建 | `server/utils/migrator.ts`：glob 改为 `'../migrations/*.{ts,js}'`（单字符串） |
 | 自动建库失败 | `server/utils/ensureDatabase.ts`：使用 `query` |
 | admin 密码无效 | seeder 运行时 `bcrypt.hash` |
@@ -1138,8 +1145,8 @@ npm run dev
 ### 20.4 AI 排障原则
 
 1. 先查 MySQL 服务 / `server/.env`，再查迁移状态，**不要先重写 ORM**
-2. 若 `tsx`/`esbuild` 报 `The service was stopped`，改用 `tsc && node dist/...` 运行
-3. 若 `npm install` 因 esbuild postinstall 失败，用 `npm install --ignore-scripts`
+2. 若 `tsx`/`esbuild` 报 `The service was stopped`，先检查 esbuild 版本匹配并复制二进制，而不是改用 `tsc` 编译
+3. 若 `npm install` 因 esbuild postinstall 失败，用 `npm install --ignore-scripts`，再手动复制 esbuild 二进制
 4. 若 `dotenv` 等包残缺，用 `npm install <包名> --ignore-scripts` 单独重装
 5. 验证尽量用隔离库名与端口，避免覆盖现有开发库
 6. 文档与示例不写真实密码
