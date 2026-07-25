@@ -17,6 +17,7 @@ export const savedPath: string = window.location.pathname
 const routes = [
   {
     path: '/',
+    redirect: '/dashboard',
     name: 'Layout',
     component: Layout,
     meta: { requiresAuth: true },

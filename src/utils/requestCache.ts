@@ -126,7 +126,7 @@ export function invalidateByUrl(url: string): void {
         if (toDelete.has(cacheKey)) continue
         // 从缓存 key 中提取 URL 部分，精确匹配前缀
         const keyUrl = cacheKey.split(':')[1] || ''
-        if (keyUrl.startsWith(url)) {
+        if (url.startsWith(keyUrl)) {
           toDelete.add(cacheKey)
         }
       }
@@ -144,7 +144,7 @@ export function invalidateByUrl(url: string): void {
       if (storageKey?.startsWith(`cache:`)) {
         const cacheKey = storageKey.slice(6)
         const keyUrl = cacheKey.split(':')[1] || ''
-        if (keyUrl.startsWith(url)) {
+        if (url.startsWith(keyUrl)) {
           localStorage.removeItem(storageKey)
         }
       }

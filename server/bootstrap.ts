@@ -100,7 +100,7 @@ async function seedData() {
 
   const menuCount = await Menu.count()
   if (menuCount === 0) {
-    const system = await Menu.create({ parentId: 0, name: '系统管理', path: '/system', icon: 'Setting', type: 'C', sort: 1 })
+    const system = await Menu.create({ parentId: 0, name: '系统管理', path: '/system', icon: 'Setting', type: 'C', sort: 100 })
     const dashboard = await Menu.create({ parentId: 0, name: '仪表盘', path: '/dashboard', component: 'views/Dashboard.vue', icon: 'Odometer', type: 'M', sort: 0 })
     await Menu.create({ parentId: system.id, name: '基础设置', path: '/settings', component: 'views/Settings.vue', icon: 'Setting', type: 'M', sort: 0 })
     await Menu.create({ parentId: system.id, name: '用户管理', path: '/users', component: 'views/UserList.vue', icon: 'User', type: 'M', sort: 1 })
@@ -109,16 +109,19 @@ async function seedData() {
     await Menu.create({ parentId: system.id, name: '菜单管理', path: '/menus', component: 'views/MenuList.vue', icon: 'Grid', type: 'M', sort: 4 })
     await Menu.create({ parentId: system.id, name: '字典管理', path: '/dict', component: 'views/DictManager.vue', icon: 'Collection', type: 'M', sort: 5 })
     await Menu.create({ parentId: system.id, name: '文件管理', path: '/files', component: 'views/FileManager.vue', icon: 'FolderOpened', type: 'M', sort: 6 })
-    await Menu.create({ parentId: system.id, name: '通知管理', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', type: 'M', sort: 7 })
     await Menu.create({ parentId: system.id, name: '系统日志', path: '/logs', component: 'views/SystemLog.vue', icon: 'Document', type: 'M', sort: 10 })
-    await Menu.create({ parentId: system.id, name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', type: 'M', sort: 11 })
-    await Menu.create({ parentId: system.id, name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', type: 'M', sort: 12 })
+    await Menu.create({ parentId: system.id, name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', type: 'M', sort: 7 })
     await Menu.create({ parentId: system.id, name: 'AI 提供商', path: '/ai-providers', component: 'views/AiProviderManager.vue', icon: 'Aim', type: 'M', sort: 13 })
 
     // 系统监控目录（与系统管理同级）
-    const monitor = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'C', sort: 2 })
+    const monitor = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'C', sort: 110 })
     await Menu.create({ parentId: monitor.id, name: '在线用户', path: '/online-users', component: 'views/OnlineUsers.vue', icon: 'Connection', type: 'M', sort: 0 })
     await Menu.create({ parentId: monitor.id, name: '服务监控', path: '/server-monitor', component: 'views/ServerMonitor.vue', icon: 'DataBoard', type: 'M', sort: 1 })
+
+    // 消息管理目录（与系统管理同级）
+    const message = await Menu.create({ parentId: 0, name: '消息管理', path: '/message', icon: 'ChatLineSquare', type: 'C', sort: 70 })
+    await Menu.create({ parentId: message.id, name: '消息发布', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', type: 'M', sort: 0 })
+    await Menu.create({ parentId: message.id, name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', type: 'M', sort: 1 })
 
     logInfo('默认菜单已创建')
 
@@ -169,6 +172,15 @@ async function seedData() {
         await UserRole.create({ userId: adminUser.id, roleId: adminRole.id })
       }
 
+      // 普通用户仅拥有消息管理相关菜单权限
+      const messageMenus = await Menu.findAll({
+        where: { name: ['消息管理', '消息发布', '消息通知'] },
+        attributes: ['id'],
+      })
+      if (messageMenus.length > 0) {
+        await RoleMenu.bulkCreate(messageMenus.map(m => ({ roleId: userRole.id, menuId: m.id })))
+      }
+
       logInfo('默认角色数据已创建')
     }
 
@@ -198,7 +210,6 @@ async function seedData() {
     const supplements = [
       { name: '文件管理', path: '/files', component: 'views/FileManager.vue', icon: 'FolderOpened', sort: 4 },
       { name: '基础设置', path: '/settings', component: 'views/Settings.vue', icon: 'Setting', sort: 5 },
-      { name: '通知管理', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', sort: 6 },
       { name: '部门管理', path: '/depts', component: 'views/DeptManager.vue', icon: 'Share', sort: 7 },
       { name: '角色管理', path: '/roles', component: 'views/RoleManager.vue', icon: 'Avatar', sort: 8 },
     ]
@@ -212,7 +223,6 @@ async function seedData() {
 
     // 增量：补充新菜单
     const newMenus = [
-      { name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', sort: 11 },
       { name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', sort: 12 },
     ]
     for (const m of newMenus) {
@@ -233,7 +243,7 @@ async function seedData() {
     // 增量：系统监控目录 + 将在线用户移到系统监控下
     let monitorMenu = await Menu.findOne({ where: { name: '系统监控' } })
     if (!monitorMenu) {
-      monitorMenu = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'D', sort: 2 })
+      monitorMenu = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'D', sort: 110 })
       logInfo('已补充菜单: 系统监控')
     }
     // 查找已有的在线用户菜单并移到系统监控下
@@ -248,6 +258,43 @@ async function seedData() {
     if (!serverMonitorMenu) {
       await Menu.create({ parentId: monitorMenu.id, name: '服务监控', path: '/server-monitor', component: 'views/ServerMonitor.vue', icon: 'DataBoard', type: 'M', sort: 1 })
       logInfo('已补充菜单: 服务监控')
+    }
+
+    // 增量：消息管理目录 + 将消息发布/消息通知移入
+    let messageMenu = await Menu.findOne({ where: { name: '消息管理' } })
+    if (!messageMenu) {
+      messageMenu = await Menu.create({ parentId: 0, name: '消息管理', path: '/message', icon: 'ChatLineSquare', type: 'C', sort: 70 })
+      logInfo('已补充菜单: 消息管理')
+    }
+    // 将消息发布移到消息管理下
+    const publishMenu = await Menu.findOne({ where: { name: '消息发布' } })
+    if (publishMenu && publishMenu.parentId !== messageMenu.id) {
+      publishMenu.parentId = messageMenu.id
+      await publishMenu.save()
+      logInfo('已移动: 消息发布 → 消息管理')
+    }
+    // 将消息通知移到消息管理下
+    const msgMenu = await Menu.findOne({ where: { name: '消息通知' } })
+    if (msgMenu && msgMenu.parentId !== messageMenu.id) {
+      msgMenu.parentId = messageMenu.id
+      await msgMenu.save()
+      logInfo('已移动: 消息通知 → 消息管理')
+    }
+
+    // 增量：确保普通用户角色拥有消息管理菜单权限
+    const userRole = await Role.findOne({ where: { code: 'user' } })
+    if (userRole) {
+      const messageMenuNames = ['消息管理', '消息发布', '消息通知']
+      for (const name of messageMenuNames) {
+        const menu = await Menu.findOne({ where: { name } })
+        if (menu) {
+          const existing = await RoleMenu.findOne({ where: { roleId: userRole.id, menuId: menu.id } })
+          if (!existing) {
+            await RoleMenu.create({ roleId: userRole.id, menuId: menu.id })
+            logInfo(`已授权: 普通用户 → ${name}`)
+          }
+        }
+      }
     }
 
     // 增量：字典管理

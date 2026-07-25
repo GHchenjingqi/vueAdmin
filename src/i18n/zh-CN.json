@@ -953,6 +953,7 @@
     "files": "文件管理",
     "notices": "公告管理",
     "logs": "系统日志",
+    "message": "消息管理",
     "messages": "消息中心",
     "tasks": "定时任务",
     "monitor": "系统监控",

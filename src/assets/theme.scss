@@ -758,7 +758,12 @@ body,
 .el-menu {
   border-right: 1px solid var(--sidebar-border);
   background-color: var(--sidebar-bg);
-
+  .el-sub-menu .el-menu-item {
+    margin-top: 4px;
+    margin-bottom: 4px;
+    height: 40px !important;
+    line-height: 40px !important;
+  }
   &:not(.el-menu--horizontal) {
     .el-menu-item:hover,
     .el-sub-menu__title:hover {
