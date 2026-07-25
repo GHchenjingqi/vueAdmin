@@ -448,7 +448,22 @@
     "resetToCurrent": "已重置为当前保存值",
     "fromLibrary": "从文件库选择",
     "open": "开启",
-    "close": "关闭"
+    "close": "关闭",
+    "emailConfig": "邮箱配置",
+    "enableEmail": "启用邮箱",
+    "emailEnableTip": "开启后，用户可通过邮箱找回密码",
+    "smtpHost": "SMTP 服务器",
+    "smtpPort": "SMTP 端口",
+    "smtpSecure": "加密方式",
+    "smtpUser": "邮箱账号",
+    "smtpPass": "邮箱授权码",
+    "senderName": "发件人名称",
+    "inputSmtpHost": "请输入 SMTP 服务器地址，如 smtp.qq.com",
+    "inputSmtpUser": "请输入邮箱账号",
+    "inputSmtpPass": "请输入邮箱密码或授权码",
+    "inputSenderName": "请输入发件人名称",
+    "ssl": "SSL",
+    "tls": "TLS"
   },
   "filePicker": {
     "selectFromLibrary": "从文件库选择",

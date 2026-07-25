@@ -448,7 +448,22 @@
     "resetToCurrent": "Reset to current saved values",
     "fromLibrary": "From Library",
     "open": "Open",
-    "close": "Close"
+    "close": "Close",
+    "emailConfig": "Email Config",
+    "enableEmail": "Enable Email",
+    "emailEnableTip": "When enabled, users can reset password via email",
+    "smtpHost": "SMTP Host",
+    "smtpPort": "SMTP Port",
+    "smtpSecure": "Encryption",
+    "smtpUser": "Email Account",
+    "smtpPass": "Email Password",
+    "senderName": "Sender Name",
+    "inputSmtpHost": "Enter SMTP host, e.g. smtp.qq.com",
+    "inputSmtpUser": "Enter email account",
+    "inputSmtpPass": "Enter email password or authorization code",
+    "inputSenderName": "Enter sender name",
+    "ssl": "SSL",
+    "tls": "TLS"
   },
   "filePicker": {
     "selectFromLibrary": "Select from Library",

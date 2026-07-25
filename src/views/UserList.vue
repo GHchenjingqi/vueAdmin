@@ -361,8 +361,8 @@ async function fetchRoleOptions(): Promise<void> {
     const rows = Array.isArray(res.data) ? res.data : (res.data as { rows?: { name: string; id: number }[] } | undefined)?.rows || []
     const options = rows.map((r: { name: string; id: number }) => ({ label: r.name, value: r.id }))
     userFormDialogRef.value?.setRoleOptions(options)
-  } catch {
-    // 角色选项加载失败不影响主流程
+  } catch (err) {
+    console.error('获取角色选项失败:', err)
   }
 }
 

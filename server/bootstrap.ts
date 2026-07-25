@@ -132,6 +132,13 @@ async function seedData() {
       { optionKey: 'captcha_enabled', optionValue: '1', autoload: 1, description: '登录时是否开启验证码: 1=开启 0=关闭' },
       { optionKey: 'watermark_enabled', optionValue: '0', autoload: 1, description: '是否开启全局水印: 1=开启 0=关闭' },
       { optionKey: 'watermark_text', optionValue: 'Vue Admin', autoload: 1, description: '水印文字内容' },
+      { optionKey: 'smtp_enabled', optionValue: '0', autoload: 0, description: '是否启用 SMTP 邮件发送: 1=开启 0=关闭' },
+      { optionKey: 'smtp_host', optionValue: '', autoload: 0, description: 'SMTP 服务器地址' },
+      { optionKey: 'smtp_port', optionValue: '465', autoload: 0, description: 'SMTP 服务器端口' },
+      { optionKey: 'smtp_secure', optionValue: '1', autoload: 0, description: 'SMTP 是否启用 SSL: 1=开启 0=关闭' },
+      { optionKey: 'smtp_user', optionValue: '', autoload: 0, description: 'SMTP 邮箱账号' },
+      { optionKey: 'smtp_pass', optionValue: '', autoload: 0, description: 'SMTP 邮箱密码/授权码' },
+      { optionKey: 'smtp_sender_name', optionValue: 'Vue Admin', autoload: 0, description: '发件人名称' },
     ]
     await Setting.bulkCreate(defaultSettings)
     logInfo('默认系统设置已创建')
@@ -283,6 +290,22 @@ async function seedData() {
       captchaSetting.optionValue = '1'
       await captchaSetting.save()
       logInfo('已更新: captcha_enabled → 1（验证码默认开启）')
+    }
+
+    // 增量：邮箱配置（兼容已有系统）
+    const smtpEnabled = await Setting.findOne({ where: { optionKey: 'smtp_enabled' } })
+    if (!smtpEnabled) {
+      const emailSettings = [
+        { optionKey: 'smtp_enabled', optionValue: '0', autoload: 0, description: '是否启用 SMTP 邮件发送: 1=开启 0=关闭' },
+        { optionKey: 'smtp_host', optionValue: '', autoload: 0, description: 'SMTP 服务器地址' },
+        { optionKey: 'smtp_port', optionValue: '465', autoload: 0, description: 'SMTP 服务器端口' },
+        { optionKey: 'smtp_secure', optionValue: '1', autoload: 0, description: 'SMTP 是否启用 SSL: 1=开启 0=关闭' },
+        { optionKey: 'smtp_user', optionValue: '', autoload: 0, description: 'SMTP 邮箱账号' },
+        { optionKey: 'smtp_pass', optionValue: '', autoload: 0, description: 'SMTP 邮箱密码/授权码' },
+        { optionKey: 'smtp_sender_name', optionValue: 'Vue Admin', autoload: 0, description: '发件人名称' },
+      ]
+      await Setting.bulkCreate(emailSettings)
+      logInfo('默认邮箱配置已补充')
     }
 
     // 增量：默认定时任务
