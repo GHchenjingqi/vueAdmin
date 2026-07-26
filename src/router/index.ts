@@ -78,6 +78,8 @@ router.beforeEach((to, _from, next) => {
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     next({ path: '/login' })
+  } else if (to.name === 'NotFound' && !isLoggedIn) {
+    next({ path: '/login' })
   } else if (to.path === '/login' && isLoggedIn) {
     const currentPath: string = to.path
     if (passwordResetRequired && currentPath !== '/force-password-change') {

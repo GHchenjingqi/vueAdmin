@@ -265,7 +265,8 @@ async function handleResetPassword(row: Record<string, unknown>): Promise<void> 
       type: 'warning',
     })
     const res = await userApi.changePassword(rowId, { reset: true, password: '' })
-    ElMessage.success(res.message || t('user.pwdResetSuccess'))
+    const pwd = (res.data as unknown as { password?: string } | undefined)?.password || '123456'
+    ElMessage.success(t('user.pwdResetTo', { password: pwd }))
   } catch (err: unknown) {
     if (err !== 'cancel') {
       ElMessage.error(t('user.resetPwdFailed') + ': ' + getErrorMessage(err))
