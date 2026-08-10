@@ -1,9 +1,5 @@
 <template>
-  <el-input
-    v-bind="$attrs"
-    :model-value="modelValue"
-    @update:model-value="updateValue"
-  />
+  <el-input v-bind="$attrs" :model-value="modelValue" @update:model-value="updateValue" />
 </template>
 
 <script setup lang="ts">

@@ -13,60 +13,32 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openCreateDialog"
-        >
+        <el-button type="primary" :icon="Plus" @click="openCreateDialog">
           {{ t('role.addRole') }}
         </el-button>
       </template>
 
       <template #column-dataScope="{ row }">
-        <el-tag
-          :type="dataScopeType(row.dataScope)"
-          size="small"
-        >
+        <el-tag :type="dataScopeType(row.dataScope)" size="small">
           {{ dataScopeLabel(row.dataScope) }}
         </el-tag>
       </template>
 
       <template #column-status="{ row }">
-        <el-tag
-          :type="row.status === 1 ? 'success' : 'info'"
-          size="small"
-        >
+        <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
           {{ row.status === 1 ? t('role.enabled') : t('role.disabled') }}
         </el-tag>
       </template>
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openEditDialog(row)"
-          >
+          <el-button type="primary" link size="small" :icon="Edit" @click="openEditDialog(row)">
             {{ t('common.edit') }}
           </el-button>
-          <el-button
-            type="warning"
-            link
-            size="small"
-            :icon="Key"
-            @click="openMenuDialog(row)"
-          >
+          <el-button type="warning" link size="small" :icon="Key" @click="openMenuDialog(row)">
             {{ t('role.assignPermission') }}
           </el-button>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDelete(row)"
-          >
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">
             {{ t('common.delete') }}
           </el-button>
         </div>
@@ -83,13 +55,7 @@
       @confirm="handleSubmit"
     />
 
-    <el-dialog
-      v-model="menuDialogVisible"
-      :title="t('role.assignMenuPermission')"
-      width="420px"
-      :close-on-click-modal="false"
-      destroy-on-close
-    >
+    <el-dialog v-model="menuDialogVisible" :title="t('role.assignMenuPermission')" width="420px" :close-on-click-modal="false" destroy-on-close>
       <el-tree
         ref="menuTreeRef"
         :data="menuTree"
@@ -103,20 +69,10 @@
         <template #default="{ data }">
           <span class="menu-tree-node">
             <span>{{ data.name }}</span>
-            <el-tag
-              v-if="data.type === 'F'"
-              type="success"
-              size="small"
-              effect="plain"
-            >
+            <el-tag v-if="data.type === 'F'" type="success" size="small" effect="plain">
               {{ t('menu.button') }}
             </el-tag>
-            <el-tag
-              v-else-if="data.type === 'C'"
-              type="warning"
-              size="small"
-              effect="plain"
-            >
+            <el-tag v-else-if="data.type === 'C'" type="warning" size="small" effect="plain">
               {{ t('menu.catalog') }}
             </el-tag>
           </span>
@@ -127,11 +83,7 @@
         <el-button @click="menuDialogVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button
-          type="primary"
-          :loading="menuSubmitLoading"
-          @click="handleMenuSubmit"
-        >
+        <el-button type="primary" :loading="menuSubmitLoading" @click="handleMenuSubmit">
           {{ t('common.confirm') }}
         </el-button>
       </template>

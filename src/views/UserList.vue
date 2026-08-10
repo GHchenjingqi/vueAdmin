@@ -16,51 +16,28 @@
       @selection-change="handleSelectionChange"
     >
       <template #header-buttons>
-        <el-button
-          type="danger"
-          :icon="Delete"
-          :disabled="selectedIds.length === 0"
-          @click="handleBatchDelete"
-        >
+        <el-button type="danger" :icon="Delete" :disabled="selectedIds.length === 0" @click="handleBatchDelete">
           {{ t('common.batchDelete') }}
           <template v-if="selectedIds.length">
             {{ ` (${selectedIds.length})` }}
           </template>
         </el-button>
-        <el-button
-          v-permission="['system:user:add']"
-          type="primary"
-          :icon="Plus"
-          @click="handleOpenCreate"
-        >
+        <el-button v-permission="['system:user:add']" type="primary" :icon="Plus" @click="handleOpenCreate">
           {{ t('user.addUser') }}
         </el-button>
-        <el-button
-          :icon="Download"
-          @click="handleExport"
-        >
+        <el-button :icon="Download" @click="handleExport">
           {{ t('common.export') }}
         </el-button>
-        <el-button
-          :icon="Upload"
-          @click="handleDownloadTemplate"
-        >
+        <el-button :icon="Upload" @click="handleDownloadTemplate">
           {{ t('user.downloadTemplate') }}
         </el-button>
-        <el-button
-          type="success"
-          :icon="Upload"
-          @click="handleOpenImport"
-        >
+        <el-button type="success" :icon="Upload" @click="handleOpenImport">
           {{ t('user.import') }}
         </el-button>
       </template>
 
       <template #column-username="{ row }">
-        <span
-          style="font-weight: 500; color: var(--mainColor); cursor: pointer"
-          @click="handleOpenEdit(row)"
-        >{{ row.username }}</span>
+        <span style="font-weight: 500; color: var(--mainColor); cursor: pointer" @click="handleOpenEdit(row)">{{ row.username }}</span>
       </template>
 
       <template #column-nickname="{ row }">
@@ -73,13 +50,7 @@
 
       <template #column-roles="{ row }">
         <template v-if="row.roles && row.roles.length">
-          <el-tag
-            v-for="r in row.roles"
-            :key="r.id"
-            size="small"
-            style="margin-right: 4px"
-            type="warning"
-          >
+          <el-tag v-for="r in row.roles" :key="r.id" size="small" style="margin-right: 4px" type="warning">
             {{ r.name }}
           </el-tag>
         </template>
@@ -87,10 +58,7 @@
       </template>
 
       <template #column-status="{ row }">
-        <el-tag
-          :type="row.status === 1 ? 'success' : 'info'"
-          size="small"
-        >
+        <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
           {{ row.status === 1 ? t('user.enabled') : t('user.disabled') }}
         </el-tag>
       </template>
@@ -100,28 +68,12 @@
       </template>
 
       <template #column-actions="{ row }">
-        <div
-          class="table-actions"
-          style="white-space: normal; display: flex; gap: 4px; flex-wrap: wrap; align-items: center"
-        >
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :icon="Edit"
-            @click="handleOpenEdit(row)"
-          >
+        <div class="table-actions" style="white-space: normal; display: flex; gap: 4px; flex-wrap: wrap; align-items: center">
+          <el-button type="primary" link size="small" :icon="Edit" @click="handleOpenEdit(row)">
             {{ t('common.edit') }}
           </el-button>
-          <el-dropdown
-            trigger="click"
-            @command="(cmd) => handleActionCommand(cmd, row)"
-          >
-            <el-button
-              type="primary"
-              link
-              size="small"
-            >
+          <el-dropdown trigger="click" @command="(cmd) => handleActionCommand(cmd, row)">
+            <el-button type="primary" link size="small">
               {{ t('user.more') }}
               <el-icon class="el-icon--right">
                 <ArrowDown />
@@ -129,18 +81,10 @@
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item
-                  command="resetPwd"
-                  :icon="Key"
-                >
+                <el-dropdown-item command="resetPwd" :icon="Key">
                   {{ t('user.resetPwd') }}
                 </el-dropdown-item>
-                <el-dropdown-item
-                  command="delete"
-                  :icon="Delete"
-                  divided
-                  style="color: var(--el-color-danger)"
-                >
+                <el-dropdown-item command="delete" :icon="Delete" divided style="color: var(--el-color-danger)">
                   {{ t('common.delete') }}
                 </el-dropdown-item>
               </el-dropdown-menu>
@@ -151,19 +95,10 @@
     </ProTable>
 
     <!-- 新增/编辑用户对话框 -->
-    <UserFormDialog
-      ref="userFormDialogRef"
-      v-model="dialogVisible"
-      :is-edit="isEdit"
-      :row="currentRow"
-      @success="handleDialogSuccess"
-    />
+    <UserFormDialog ref="userFormDialogRef" v-model="dialogVisible" :is-edit="isEdit" :row="currentRow" @success="handleDialogSuccess" />
 
     <!-- 导入用户对话框 -->
-    <UserImportDialog
-      v-model="importDialogVisible"
-      @success="fetchUsers"
-    />
+    <UserImportDialog v-model="importDialogVisible" @success="fetchUsers" />
   </div>
 </template>
 

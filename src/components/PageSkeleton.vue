@@ -1,22 +1,10 @@
 <template>
   <div class="page-skeleton">
     <div class="page-skeleton__header">
-      <SkeletonLoader
-        variant="text"
-        width="200px"
-        height="24px"
-      />
+      <SkeletonLoader variant="text" width="200px" height="24px" />
       <div class="page-skeleton__actions">
-        <SkeletonLoader
-          variant="text"
-          width="100px"
-          height="32px"
-        />
-        <SkeletonLoader
-          variant="text"
-          width="80px"
-          height="32px"
-        />
+        <SkeletonLoader variant="text" width="100px" height="32px" />
+        <SkeletonLoader variant="text" width="80px" height="32px" />
       </div>
     </div>
     <div class="page-skeleton__content">

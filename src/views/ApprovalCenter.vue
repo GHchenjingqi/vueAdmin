@@ -1,8 +1,8 @@
 <template>
   <div class="page-container">
     <el-tabs v-model="activeTab" class="approval-tabs">
-      <el-tab-pane label="我的待办" name="pending" />
-      <el-tab-pane label="已处理" name="done" />
+      <el-tab-pane :label="t('workflow.myPending')" name="pending" />
+      <el-tab-pane :label="t('workflow.done')" name="done" />
     </el-tabs>
 
     <ProTable
@@ -19,29 +19,46 @@
           :type="(row as ApprovalTask).status === 'pending' ? 'warning' : (row as ApprovalTask).status === 'approved' ? 'success' : 'danger'"
           size="small"
         >
-          {{ (row as ApprovalTask).status === 'pending' ? '待审批' : (row as ApprovalTask).status === 'approved' ? '已通过' : '已驳回' }}
+          {{
+            (row as ApprovalTask).status === 'pending'
+              ? t('workflow.pendingApproval')
+              : (row as ApprovalTask).status === 'approved'
+                ? t('workflow.approved')
+                : t('workflow.rejected')
+          }}
         </el-tag>
       </template>
 
       <template #column-actions="{ row }">
         <template v-if="(row as ApprovalTask).status === 'pending'">
-          <el-button type="success" size="small" @click="handleApprove(row as ApprovalTask)">通过</el-button>
-          <el-button type="danger" size="small" @click="handleReject(row as ApprovalTask)">驳回</el-button>
+          <el-button type="success" size="small" @click="handleApprove(row as ApprovalTask)">
+            {{ t('workflow.approve') }}
+          </el-button>
+          <el-button type="danger" size="small" @click="handleReject(row as ApprovalTask)">
+            {{ t('workflow.reject') }}
+          </el-button>
         </template>
         <span v-else>-</span>
       </template>
     </ProTable>
 
-    <el-dialog v-model="approveDialog" :title="approveAction === 'approved' ? '审批通过' : '驳回'" width="450px">
+    <el-dialog v-model="approveDialog" :title="approveAction === 'approved' ? t('workflow.approveDialogTitle') : t('workflow.rejectDialogTitle')" width="450px">
       <el-form>
-        <el-form-item label="审批意见">
-          <el-input v-model="approveComment" type="textarea" :rows="3" :placeholder="approveAction === 'approved' ? '可选：填写审批意见' : '请填写驳回原因'" />
+        <el-form-item :label="t('workflow.comment')">
+          <el-input
+            v-model="approveComment"
+            type="textarea"
+            :rows="3"
+            :placeholder="approveAction === 'approved' ? t('workflow.placeholderApprovalComment') : t('workflow.placeholderRejectReason')"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="approveDialog = false">取消</el-button>
+        <el-button @click="approveDialog = false">
+          {{ t('common.cancel') }}
+        </el-button>
         <el-button :type="approveAction === 'approved' ? 'success' : 'danger'" :loading="submitting" @click="submitApprove">
-          {{ approveAction === 'approved' ? '确认通过' : '确认驳回' }}
+          {{ approveAction === 'approved' ? t('workflow.confirmApprove') : t('workflow.confirmReject') }}
         </el-button>
       </template>
     </el-dialog>
@@ -66,16 +83,16 @@ const approveComment = ref('')
 const approveTaskId = ref<number | null>(null)
 const submitting = ref(false)
 
-const columns = [
-  { prop: 'id', label: 'ID', width: 70 },
-  { prop: 'title', label: '审批事项', minWidth: 180 },
-  { prop: 'status', label: '状态', width: 100 },
-  { prop: 'approverName', label: '审批人', width: 100 },
-  { prop: 'comment', label: '意见', minWidth: 150, showOverflowTooltip: true },
-  { prop: 'assignedAt', label: '分配时间', width: 170 },
-  { prop: 'finishedAt', label: '完成时间', width: 170 },
-  { prop: 'actions', label: '操作', width: 160, fixed: 'right' },
-]
+const columns = computed(() => [
+  { prop: 'id', label: t('common.id'), width: 70 },
+  { prop: 'title', label: t('workflow.approvalTitle'), minWidth: 180 },
+  { prop: 'status', label: t('common.status'), width: 100 },
+  { prop: 'approverName', label: t('workflow.approverName'), width: 100 },
+  { prop: 'comment', label: t('workflow.comment'), minWidth: 150, showOverflowTooltip: true },
+  { prop: 'assignedAt', label: t('workflow.assignedAt'), width: 170 },
+  { prop: 'finishedAt', label: t('workflow.finishedAt'), width: 170 },
+  { prop: 'actions', label: t('common.actions'), width: 160, fixed: 'right' },
+])
 
 function onQuery(params: { pagination?: { pageNum: number; pageSize: number } }) {
   if (params.pagination) Object.assign(pagination, params.pagination)
@@ -115,11 +132,11 @@ async function submitApprove() {
   submitting.value = true
   try {
     await workflowApi.approveTask(approveTaskId.value, approveAction.value, approveComment.value || undefined)
-    ElMessage.success(approveAction.value === 'approved' ? '已通过' : '已驳回')
+    ElMessage.success(approveAction.value === 'approved' ? t('workflow.approvedMsg') : t('workflow.rejectedMsg'))
     approveDialog.value = false
     fetchTasks()
   } catch {
-    ElMessage.error('操作失败')
+    ElMessage.error(t('workflow.operationFailed'))
   } finally {
     submitting.value = false
   }

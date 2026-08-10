@@ -1,29 +1,12 @@
 <template>
-  <el-dropdown
-    trigger="click"
-    @command="handleCommand"
-  >
-    <el-button
-      text
-      :icon="Setting"
-      size="small"
-      class="column-settings__btn"
-    >
+  <el-dropdown trigger="click" @command="handleCommand">
+    <el-button text :icon="Setting" size="small" class="column-settings__btn">
       {{ t('common.columnSettings') }}
     </el-button>
     <template #dropdown>
       <el-dropdown-menu class="column-settings__menu">
-        <el-dropdown-item
-          v-for="col in settableColumns"
-          :key="col.prop"
-          :command="col.prop"
-          :divided="col.divided"
-        >
-          <el-checkbox
-            :model-value="columnVisibility[col.prop] !== false"
-            @click.stop
-            @change="toggleColumn(col.prop)"
-          >
+        <el-dropdown-item v-for="col in settableColumns" :key="col.prop" :command="col.prop" :divided="col.divided">
+          <el-checkbox :model-value="columnVisibility[col.prop] !== false" @click.stop @change="toggleColumn(col.prop)">
             {{ col.label }}
           </el-checkbox>
         </el-dropdown-item>

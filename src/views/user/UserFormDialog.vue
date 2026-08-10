@@ -7,24 +7,13 @@
     destroy-on-close
     @closed="handleClosed"
   >
-    <ProForm
-      ref="proFormRef"
-      v-model="form"
-      :schema="formSchema"
-      :columns="1"
-      :show-actions="false"
-      label-width="80px"
-    />
+    <ProForm ref="proFormRef" v-model="form" :schema="formSchema" :columns="1" :show-actions="false" label-width="80px" />
 
     <template #footer>
       <el-button @click="visible = false">
         {{ t('common.cancel') }}
       </el-button>
-      <el-button
-        type="primary"
-        :loading="submitLoading"
-        @click="handleSubmit"
-      >
+      <el-button type="primary" :loading="submitLoading" @click="handleSubmit">
         {{ t('common.confirm') }}
       </el-button>
     </template>

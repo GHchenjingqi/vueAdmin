@@ -10,16 +10,9 @@
           @click="handleTabClick(tab)"
           @contextmenu.prevent="showContextMenu($event, tab)"
         >
-          <MenuIcon
-            :name="tab.icon"
-            class="nav-tab-icon"
-          />
+          <MenuIcon :name="tab.icon" class="nav-tab-icon" />
           <span class="nav-tab-title">{{ tab.title }}</span>
-          <el-icon
-            v-if="tabs.length > 1"
-            class="nav-tab-close"
-            @click.stop="handleClose(tab)"
-          >
+          <el-icon v-if="tabs.length > 1" class="nav-tab-close" @click.stop="handleClose(tab)">
             <Close />
           </el-icon>
         </div>
@@ -28,43 +21,24 @@
 
     <!-- 右键菜单 -->
     <teleport to="body">
-      <div
-        v-if="contextMenu.visible"
-        class="tabs-context-menu"
-        :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-      >
-        <div
-          class="context-menu-item"
-          @click="handleClose(contextMenu.tab!)"
-        >
+      <div v-if="contextMenu.visible" class="tabs-context-menu" :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }">
+        <div class="context-menu-item" @click="handleClose(contextMenu.tab!)">
           <el-icon><Close /></el-icon>
           {{ t('common.close') }}
         </div>
-        <div
-          class="context-menu-item"
-          @click="handleCloseOthers(contextMenu.tab!)"
-        >
+        <div class="context-menu-item" @click="handleCloseOthers(contextMenu.tab!)">
           <el-icon><SwitchButton /></el-icon>
           {{ t('common.closeOthers') }}
         </div>
-        <div
-          class="context-menu-item"
-          @click="handleCloseLeft(contextMenu.tab!)"
-        >
+        <div class="context-menu-item" @click="handleCloseLeft(contextMenu.tab!)">
           <el-icon><ArrowLeft /></el-icon>
           {{ t('common.closeLeft') }}
         </div>
-        <div
-          class="context-menu-item"
-          @click="handleCloseRight(contextMenu.tab!)"
-        >
+        <div class="context-menu-item" @click="handleCloseRight(contextMenu.tab!)">
           <el-icon><ArrowRight /></el-icon>
           {{ t('common.closeRight') }}
         </div>
-        <div
-          class="context-menu-item"
-          @click="handleCloseAll"
-        >
+        <div class="context-menu-item" @click="handleCloseAll">
           <el-icon><Minus /></el-icon>
           {{ t('common.closeAll') }}
         </div>

@@ -12,45 +12,24 @@
     :aria-label="isCollapse ? t('sidebar.collapsed') : t('sidebar.navigation')"
     @select="handleSelect"
   >
-    <template
-      v-for="item in displayMenuTree"
-      :key="item.id || item.path"
-    >
+    <template v-for="item in displayMenuTree" :key="item.id || item.path">
       <!-- 有子菜单且不是叶子节点的菜单 -->
-      <el-sub-menu
-        v-if="item.children && item.children.length > 0"
-        :index="item.path || String(item.id)"
-      >
+      <el-sub-menu v-if="item.children && item.children.length > 0" :index="item.path || String(item.id)">
         <template #title>
-          <MenuIcon
-            v-if="item.icon"
-            :name="item.icon"
-          />
+          <MenuIcon v-if="item.icon" :name="item.icon" />
           <span>{{ t(menuKey(item), {}, item.name) }}</span>
         </template>
-        <template
-          v-for="child in item.children"
-          :key="child.id || child.path"
-        >
+        <template v-for="child in item.children" :key="child.id || child.path">
           <el-menu-item :index="child.path || String(child.id)">
-            <MenuIcon
-              v-if="child.icon"
-              :name="child.icon"
-            />
+            <MenuIcon v-if="child.icon" :name="child.icon" />
             <span>{{ t(menuKey(child), {}, child.name) }}</span>
           </el-menu-item>
         </template>
       </el-sub-menu>
 
       <!-- 叶子节点菜单 -->
-      <el-menu-item
-        v-else
-        :index="item.path || String(item.id)"
-      >
-        <MenuIcon
-          v-if="item.icon"
-          :name="item.icon"
-        />
+      <el-menu-item v-else :index="item.path || String(item.id)">
+        <MenuIcon v-if="item.icon" :name="item.icon" />
         <template #title>
           {{ t(menuKey(item), {}, item.name) }}
         </template>

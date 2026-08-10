@@ -13,20 +13,13 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openCreate()"
-        >
+        <el-button type="primary" :icon="Plus" @click="openCreate()">
           {{ t('knowledge.addContent') }}
         </el-button>
       </template>
 
       <template #column-status="{ row }">
-        <el-tag
-          :type="row.status === 'published' ? 'success' : 'info'"
-          size="small"
-        >
+        <el-tag :type="row.status === 'published' ? 'success' : 'info'" size="small">
           {{ row.status === 'published' ? t('knowledge.published') : t('knowledge.draft') }}
         </el-tag>
       </template>
@@ -36,13 +29,7 @@
       </template>
 
       <template #column-cover="{ row }">
-        <el-image
-          v-if="row.cover"
-          :src="row.cover"
-          style="width: 60px; height: 40px; border-radius: 4px; object-fit: cover"
-          fit="cover"
-          lazy
-        >
+        <el-image v-if="row.cover" :src="row.cover" style="width: 60px; height: 40px; border-radius: 4px; object-fit: cover" fit="cover" lazy>
           <template #error>
             <div class="cover-placeholder" />
           </template>
@@ -51,13 +38,7 @@
       </template>
 
       <template #column-tags="{ row }">
-        <el-tag
-          v-for="tag in row.tags || []"
-          :key="tag.id"
-          :color="tag.color"
-          style="color: #fff; margin-right: 4px; margin-bottom: 2px"
-          size="small"
-        >
+        <el-tag v-for="tag in row.tags || []" :key="tag.id" :color="tag.color" style="color: #fff; margin-right: 4px; margin-bottom: 2px" size="small">
           {{ tag.name }}
         </el-tag>
         <span v-if="!row.tags?.length">-</span>
@@ -73,68 +54,28 @@
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button
-            type="warning"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openEdit(row as any)"
-          >
+          <el-button type="warning" link size="small" :icon="Edit" @click="openEdit(row as any)">
             {{ t('common.edit') }}
           </el-button>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDelete(row as any)"
-          >
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row as any)">
             {{ t('common.delete') }}
           </el-button>
         </div>
       </template>
     </ProTable>
 
-    <el-drawer
-      v-model="drawerVisible"
-      :title="isEdit ? t('knowledge.editContent') : t('knowledge.addContent')"
-      size="100%"
-      direction="rtl"
-      destroy-on-close
-    >
+    <el-drawer v-model="drawerVisible" :title="isEdit ? t('knowledge.editContent') : t('knowledge.addContent')" size="100%" direction="rtl" destroy-on-close>
       <template #default>
         <div class="drawer-body">
           <div class="drawer-left">
-            <el-form
-              ref="formRef"
-              :model="form"
-              label-position="top"
-              :rules="rules"
-            >
-              <el-form-item
-                :label="t('knowledge.contentTitle')"
-                prop="title"
-              >
-                <el-input
-                  v-model="form.title"
-                  :placeholder="t('knowledge.inputContentTitle')"
-                />
+            <el-form ref="formRef" :model="form" label-position="top" :rules="rules">
+              <el-form-item :label="t('knowledge.contentTitle')" prop="title">
+                <el-input v-model="form.title" :placeholder="t('knowledge.inputContentTitle')" />
               </el-form-item>
-              <el-form-item
-                :label="t('knowledge.contentSummary')"
-                prop="summary"
-              >
-                <el-input
-                  v-model="form.summary"
-                  type="textarea"
-                  :rows="3"
-                  :placeholder="t('knowledge.inputContentSummary')"
-                />
+              <el-form-item :label="t('knowledge.contentSummary')" prop="summary">
+                <el-input v-model="form.summary" type="textarea" :rows="3" :placeholder="t('knowledge.inputContentSummary')" />
               </el-form-item>
-              <el-form-item
-                :label="t('knowledge.contentBody')"
-                prop="body"
-              >
+              <el-form-item :label="t('knowledge.contentBody')" prop="body">
                 <MdEditor
                   :model-value="form.body"
                   :language="locale === 'en-US' ? 'en-US' : 'zh-CN'"
@@ -150,7 +91,9 @@
           <div class="drawer-right">
             <el-form label-position="top">
               <el-form-item>
-                <template #label>{{ t('knowledge.cover') }}</template>
+                <template #label>
+                  {{ t('knowledge.cover') }}
+                </template>
                 <div class="cover-wrapper">
                   <div v-if="form.cover" class="cover-preview">
                     <el-image :src="form.cover" fit="cover" style="width: 100%; height: 120px; border-radius: 4px" />
@@ -159,13 +102,7 @@
                     </el-button>
                   </div>
                   <div class="cover-image-list">
-                    <div
-                      v-for="(img, i) in imageList"
-                      :key="i"
-                      class="cover-image-item"
-                      :class="{ active: form.cover === img }"
-                      @click="form.cover = img"
-                    >
+                    <div v-for="(img, i) in imageList" :key="i" class="cover-image-item" :class="{ active: form.cover === img }" @click="form.cover = img">
                       <el-image :src="img" fit="cover" lazy />
                     </div>
                     <div v-if="!imageList.length" class="cover-empty">
@@ -187,25 +124,10 @@
                 />
               </el-form-item>
               <el-form-item :label="t('knowledge.tags')">
-                <el-select
-                  v-model="form.tagIds"
-                  multiple
-                  collapse-tags
-                  :placeholder="t('knowledge.selectTags')"
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="tag in tagOptions"
-                    :key="tag.id"
-                    :label="tag.name"
-                    :value="tag.id"
-                  >
+                <el-select v-model="form.tagIds" multiple collapse-tags :placeholder="t('knowledge.selectTags')" style="width: 100%">
+                  <el-option v-for="tag in tagOptions" :key="tag.id" :label="tag.name" :value="tag.id">
                     <span>
-                      <el-tag
-                        :color="tag.color"
-                        style="color: #fff; margin-right: 4px"
-                        size="small"
-                      >{{ tag.name }}</el-tag>
+                      <el-tag :color="tag.color" style="color: #fff; margin-right: 4px" size="small">{{ tag.name }}</el-tag>
                     </span>
                   </el-option>
                 </el-select>
@@ -225,12 +147,7 @@
                   <el-button @click="drawerVisible = false">
                     {{ t('common.cancel') }}
                   </el-button>
-                  <el-button
-                    type="primary"
-                    :loading="submitLoading"
-                    @click="handleSubmit"
-                    style="margin-left: 0 !important;"
-                  >
+                  <el-button type="primary" :loading="submitLoading" style="margin-left: 0 !important" @click="handleSubmit">
                     {{ t('common.confirm') }}
                   </el-button>
                 </div>
@@ -397,7 +314,7 @@ async function openEdit(row: Record<string, unknown>) {
       body: (row.body as string) || '',
       cover: (row.cover as string) || '',
       categoryId: row.categoryId as number | undefined,
-      tagIds: ((row as unknown as KnowledgeContent).tagIds) || [],
+      tagIds: (row as unknown as KnowledgeContent).tagIds || [],
       status: ((row.status as string) || 'draft') as 'draft' | 'published',
     }
   }

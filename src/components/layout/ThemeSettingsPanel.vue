@@ -1,39 +1,20 @@
 <template>
   <!-- 抽屉面板（由外部 v-model 控制） -->
-  <el-drawer
-    v-model="visible"
-    :title="t('themeSettings.title')"
-    direction="rtl"
-    size="340px"
-    destroy-on-close
-  >
+  <el-drawer v-model="visible" :title="t('themeSettings.title')" direction="rtl" size="340px" destroy-on-close>
     <div class="panel-content">
       <!-- 界面主题 -->
       <div class="section">
         <!-- 深色/浅色切换 -->
         <div class="option-row">
           <span class="option-label">{{ t('themeSettings.darkMode') }}</span>
-          <el-switch
-            v-model="isDark"
-            inline-prompt
-            @change="handleThemeChange"
-          />
+          <el-switch v-model="isDark" inline-prompt @change="handleThemeChange" />
         </div>
 
         <!-- 语言切换 -->
         <div class="option-row">
           <span class="option-label">{{ t('themeSettings.language') }}</span>
-          <el-select
-            v-model="currentLocale"
-            style="width: 140px"
-            @change="handleLocaleChange"
-          >
-            <el-option
-              v-for="(label, key) in localeLabels"
-              :key="key"
-              :label="label"
-              :value="key"
-            />
+          <el-select v-model="currentLocale" style="width: 140px" @change="handleLocaleChange">
+            <el-option v-for="(label, key) in localeLabels" :key="key" :label="label" :value="key" />
           </el-select>
         </div>
 
@@ -50,28 +31,16 @@
               :title="color.name"
               @click="handlePrimaryColorChange(color.value)"
             >
-              <el-icon
-                v-if="primaryColor === color.value"
-                class="check-icon"
-              >
+              <el-icon v-if="primaryColor === color.value" class="check-icon">
                 <Check />
               </el-icon>
             </div>
             <!-- 自定义颜色 -->
-            <div
-              class="color-circle custom-color"
-              :style="{ borderColor: primaryColor }"
-              :title="t('themeSettings.customColor')"
-            >
+            <div class="color-circle custom-color" :style="{ borderColor: primaryColor }" :title="t('themeSettings.customColor')">
               <el-icon class="edit-icon">
                 <Edit />
               </el-icon>
-              <input
-                v-model="customColor"
-                type="color"
-                class="color-picker"
-                @change="handleCustomColorChange"
-              >
+              <input v-model="customColor" type="color" class="color-picker" @change="handleCustomColorChange" />
             </div>
           </div>
         </div>
@@ -79,10 +48,7 @@
         <!-- 字体大小 -->
         <div class="option-block">
           <span class="option-label">{{ t('themeSettings.fontSize') }}</span>
-          <el-radio-group
-            v-model="fontSize"
-            @change="handleFontSizeChange"
-          >
+          <el-radio-group v-model="fontSize" @change="handleFontSizeChange">
             <el-radio-button value="small">
               {{ t('themeSettings.fontSizeSmall') }}
             </el-radio-button>
@@ -115,11 +81,7 @@
 
       <!-- 重置按钮 -->
       <div class="reset-row">
-        <el-button
-          type="danger"
-          plain
-          @click="handleReset"
-        >
+        <el-button type="danger" plain @click="handleReset">
           <el-icon><RefreshRight /></el-icon>
           <span>{{ t('themeSettings.resetToDefault') }}</span>
         </el-button>

@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="layout-header-inner"
-    role="banner"
-    :aria-label="t('layout.header')"
-  >
+  <div class="layout-header-inner" role="banner" :aria-label="t('layout.header')">
     <!-- 移动端菜单按钮 -->
     <el-icon
       class="mobile-menu-btn"
@@ -28,36 +24,13 @@
         }"
       >
         <div class="brand-icon">
-          <img
-            v-if="siteLogo"
-            :src="previewUrl(siteLogo)"
-            alt="Logo"
-            class="brand-logo-img"
-          >
-          <svg
-            v-else
-            viewBox="0 0 64 64"
-            width="32"
-            height="32"
-          >
-            <rect
-              x="4"
-              y="4"
-              width="56"
-              height="56"
-              rx="8"
-              fill="#1890ff"
-            />
-            <path
-              d="M32 16 L44 32 L32 48 L20 32 Z"
-              fill="#ffffff"
-            />
+          <img v-if="siteLogo" :src="previewUrl(siteLogo)" alt="Logo" class="brand-logo-img" />
+          <svg v-else viewBox="0 0 64 64" width="32" height="32">
+            <rect x="4" y="4" width="56" height="56" rx="8" fill="#1890ff" />
+            <path d="M32 16 L44 32 L32 48 L20 32 Z" fill="#ffffff" />
           </svg>
         </div>
-        <span
-          v-show="!(layoutMode === 'classic' && isCollapse)"
-          class="brand-text"
-        >{{ siteTitle || 'Vue Admin' }}</span>
+        <span v-show="!(layoutMode === 'classic' && isCollapse)" class="brand-text">{{ siteTitle || 'Vue Admin' }}</span>
       </div>
 
       <!-- 折叠按钮（仅经典/混合布局显示） -->
@@ -84,15 +57,8 @@
         class="top-nav"
         @select="handleNavSelect"
       >
-        <el-menu-item
-          v-for="item in topLevelMenus"
-          :key="item.path || item.name"
-          :index="item.path || ''"
-        >
-          <MenuIcon
-            v-if="item.icon"
-            :name="item.icon"
-          />
+        <el-menu-item v-for="item in topLevelMenus" :key="item.path || item.name" :index="item.path || ''">
+          <MenuIcon v-if="item.icon" :name="item.icon" />
           <span>{{ t(menuKey(item), {}, item.name) }}</span>
         </el-menu-item>
       </el-menu>
@@ -107,14 +73,8 @@
       <NotificationCenter @unread-change="handleUnreadChange" />
 
       <!-- 深色主题切换 -->
-      <el-tooltip
-        :content="theme === 'dark' ? t('themeSettings.switchLight') : t('themeSettings.switchDark')"
-        placement="top"
-      >
-        <span
-          class="theme-toggle icon-btn"
-          @click="handleToggleTheme"
-        >
+      <el-tooltip :content="theme === 'dark' ? t('themeSettings.switchLight') : t('themeSettings.switchDark')" placement="top">
+        <span class="theme-toggle icon-btn" @click="handleToggleTheme">
           <el-icon :size="18">
             <Moon v-if="theme === 'dark'" />
             <Sunny v-else />
@@ -123,26 +83,10 @@
       </el-tooltip>
 
       <!-- 语言切换 -->
-      <el-dropdown
-        trigger="click"
-        popper-class="locale-dropdown-popper"
-        @command="handleLocaleChange"
-      >
+      <el-dropdown trigger="click" popper-class="locale-dropdown-popper" @command="handleLocaleChange">
         <span class="locale-btn">
-          <svg
-            class="locale-icon"
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle
-              cx="12"
-              cy="12"
-              r="10"
-            />
+          <svg class="locale-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
             <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
           <span class="locale-label">{{ localeLabels[locale] }}</span>
@@ -150,17 +94,9 @@
         </span>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item
-              v-for="(label, key) in localeLabels"
-              :key="key"
-              :command="key"
-              :class="{ active: locale === key }"
-            >
+            <el-dropdown-item v-for="(label, key) in localeLabels" :key="key" :command="key" :class="{ active: locale === key }">
               <span>{{ label }}</span>
-              <el-icon
-                v-if="locale === key"
-                class="locale-checked"
-              >
+              <el-icon v-if="locale === key" class="locale-checked">
                 <Check />
               </el-icon>
             </el-dropdown-item>
@@ -168,25 +104,15 @@
         </template>
       </el-dropdown>
 
-      <el-dropdown
-        trigger="click"
-        popper-class="user-dropdown-popper"
-        @command="handleUserCommand"
-      >
+      <el-dropdown trigger="click" popper-class="user-dropdown-popper" @command="handleUserCommand">
         <span class="user-info">
-          <el-avatar
-            :size="32"
-            :src="userAvatar"
-          >
+          <el-avatar :size="32" :src="userAvatar">
             <template v-if="!userAvatar">
               {{ username?.charAt(0)?.toUpperCase() }}
             </template>
           </el-avatar>
           <span class="username">{{ username }}</span>
-          <el-icon
-            :size="12"
-            class="caret-icon"
-          ><ArrowDown /></el-icon>
+          <el-icon :size="12" class="caret-icon"><ArrowDown /></el-icon>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
@@ -198,10 +124,7 @@
               <el-icon><User /></el-icon>
               {{ t('layout.profile') }}
             </el-dropdown-item>
-            <el-dropdown-item
-              command="logout"
-              divided
-            >
+            <el-dropdown-item command="logout" divided>
               <el-icon><SwitchButton /></el-icon>
               {{ t('layout.logout') }}
             </el-dropdown-item>

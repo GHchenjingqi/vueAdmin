@@ -69,8 +69,11 @@ export interface ApprovalTask {
 }
 
 export const workflowApi = {
-  list(params?: Record<string, unknown>) {
-    return request.get<{ rows: Workflow[]; total: number; page: number; pageSize: number }>('/workflows', { params })
+  list(params?: Record<string, unknown>, skipCache = false) {
+    return request.get<{ rows: Workflow[]; total: number; page: number; pageSize: number }>('/workflows', {
+      params,
+      ...(skipCache ? { skipCache: true } : {}),
+    } as Record<string, unknown>)
   },
   getById(id: number) {
     return request.get<Workflow>(`/workflows/${id}`)

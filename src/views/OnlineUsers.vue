@@ -15,28 +15,14 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-tag
-          type="success"
-          size="large"
-        >
-          {{ t('onlineUsers.currentlyOnline') }}: {{ onlineCount }}
-        </el-tag>
-        <el-button
-          :icon="Refresh"
-          :loading="loading"
-          @click="fetchData"
-        >
+        <el-tag type="success" size="large">{{ t('onlineUsers.currentlyOnline') }}: {{ onlineCount }}</el-tag>
+        <el-button :icon="Refresh" :loading="loading" @click="fetchData">
           {{ t('common.refresh') }}
         </el-button>
       </template>
 
       <template #column-actions="{ row }">
-        <el-button
-          type="danger"
-          link
-          size="small"
-          @click="handleKick(row)"
-        >
+        <el-button type="danger" link size="small" @click="handleKick(row)">
           {{ t('onlineUsers.forceOffline') }}
         </el-button>
       </template>

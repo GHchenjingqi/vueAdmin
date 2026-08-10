@@ -1,13 +1,6 @@
 <template>
-  <div
-    class="not-found-page"
-    role="main"
-    aria-labelledby="not-found-title"
-  >
-    <div
-      class="not-found-bg"
-      aria-hidden="true"
-    >
+  <div class="not-found-page" role="main" aria-labelledby="not-found-title">
+    <div class="not-found-bg" aria-hidden="true">
       <span class="cloud cloud-1" />
       <span class="cloud cloud-2" />
       <span class="cloud cloud-3" />
@@ -21,10 +14,7 @@
     </div>
 
     <div class="not-found-content">
-      <div
-        class="illustration"
-        aria-hidden="true"
-      >
+      <div class="illustration" aria-hidden="true">
         <div class="window">
           <div class="window-bar">
             <span class="window-dot" />
@@ -32,9 +22,7 @@
             <span class="window-dot" />
           </div>
           <div class="window-body">
-            <div class="code">
-              404
-            </div>
+            <div class="code">404</div>
           </div>
         </div>
 
@@ -52,10 +40,7 @@
         </div>
       </div>
 
-      <h1
-        id="not-found-title"
-        class="title"
-      >
+      <h1 id="not-found-title" class="title">
         {{ t('errorPage.notFoundTitle') }}
       </h1>
       <p class="desc">
@@ -63,24 +48,13 @@
       </p>
 
       <div class="actions">
-        <el-button
-          type="primary"
-          size="large"
-          class="action-btn action-btn--primary"
-          :loading="homeLoading"
-          @click="goHome"
-        >
+        <el-button type="primary" size="large" class="action-btn action-btn--primary" :loading="homeLoading" @click="goHome">
           <el-icon class="action-icon">
             <HomeFilled />
           </el-icon>
           {{ t('common.backToHome') }}
         </el-button>
-        <el-button
-          size="large"
-          class="action-btn action-btn--ghost"
-          :disabled="homeLoading"
-          @click="goBack"
-        >
+        <el-button size="large" class="action-btn action-btn--ghost" :disabled="homeLoading" @click="goBack">
           <el-icon class="action-icon">
             <ArrowLeft />
           </el-icon>

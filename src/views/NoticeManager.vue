@@ -13,39 +13,25 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openDialog()"
-        >
+        <el-button type="primary" :icon="Plus" @click="openDialog()">
           {{ t('notice.addNotice') }}
         </el-button>
       </template>
 
       <template #column-type="{ row }">
-        <el-tag
-          :type="row.type === 'notice' ? 'primary' : 'warning'"
-          size="small"
-        >
+        <el-tag :type="row.type === 'notice' ? 'primary' : 'warning'" size="small">
           {{ row.type === 'notice' ? t('notice.notice') : t('notice.announcement') }}
         </el-tag>
       </template>
 
       <template #column-status="{ row }">
-        <el-tag
-          :type="row.status === 'published' ? 'success' : 'info'"
-          size="small"
-        >
+        <el-tag :type="row.status === 'published' ? 'success' : 'info'" size="small">
           {{ row.status === 'published' ? t('notice.published') : t('notice.draft') }}
         </el-tag>
       </template>
 
       <template #column-isTop="{ row }">
-        <el-tag
-          v-if="row.isTop"
-          type="danger"
-          size="small"
-        >
+        <el-tag v-if="row.isTop" type="danger" size="small">
           {{ t('notice.top') }}
         </el-tag>
       </template>
@@ -60,40 +46,16 @@
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openDialog(row)"
-          >
+          <el-button type="primary" link size="small" :icon="Edit" @click="openDialog(row)">
             {{ t('common.edit') }}
           </el-button>
-          <el-button
-            v-if="row.status === 'draft'"
-            type="success"
-            link
-            size="small"
-            @click="handlePublish(row)"
-          >
+          <el-button v-if="row.status === 'draft'" type="success" link size="small" @click="handlePublish(row)">
             {{ t('notice.publish') }}
           </el-button>
-          <el-button
-            v-if="row.status === 'published'"
-            type="warning"
-            link
-            size="small"
-            @click="handleUnpublish(row)"
-          >
+          <el-button v-if="row.status === 'published'" type="warning" link size="small" @click="handleUnpublish(row)">
             {{ t('notice.unpublish') }}
           </el-button>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDelete(row)"
-          >
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">
             {{ t('common.delete') }}
           </el-button>
         </div>

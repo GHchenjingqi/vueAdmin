@@ -2,11 +2,7 @@
   <div class="page-container">
     <div class="knowledge-toolbar">
       <div class="toolbar-left">
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openCreate()"
-        >
+        <el-button type="primary" :icon="Plus" @click="openCreate()">
           {{ t('knowledge.addCategory') }}
         </el-button>
       </div>
@@ -21,54 +17,21 @@
       border
       stripe
     >
-      <el-table-column
-        prop="name"
-        :label="t('knowledge.categoryName')"
-        min-width="240"
-      />
-      <el-table-column
-        prop="sort"
-        :label="t('knowledge.sort')"
-        width="80"
-        align="center"
-      />
-      <el-table-column
-        prop="status"
-        :label="t('knowledge.status')"
-        width="100"
-        align="center"
-      >
+      <el-table-column prop="name" :label="t('knowledge.categoryName')" min-width="240" />
+      <el-table-column prop="sort" :label="t('knowledge.sort')" width="80" align="center" />
+      <el-table-column prop="status" :label="t('knowledge.status')" width="100" align="center">
         <template #default="{ row }">
-          <el-tag
-            :type="row.status === 1 ? 'success' : 'info'"
-            size="small"
-          >
+          <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
             {{ row.status === 1 ? t('knowledge.enabled') : t('knowledge.disabled') }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column
-        :label="t('common.actions')"
-        width="180"
-        fixed="right"
-      >
+      <el-table-column :label="t('common.actions')" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button
-            type="warning"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openEdit(row as any)"
-          >
+          <el-button type="warning" link size="small" :icon="Edit" @click="openEdit(row as any)">
             {{ t('common.edit') }}
           </el-button>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDelete(row as any)"
-          >
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row as any)">
             {{ t('common.delete') }}
           </el-button>
         </template>
@@ -82,25 +45,11 @@
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <el-form
-        ref="formRef"
-        :model="form"
-        label-width="100px"
-        :rules="rules"
-      >
-        <el-form-item
-          :label="t('knowledge.categoryName')"
-          prop="name"
-        >
-          <el-input
-            v-model="form.name"
-            :placeholder="t('knowledge.inputCategoryName')"
-          />
+      <el-form ref="formRef" :model="form" label-width="100px" :rules="rules">
+        <el-form-item :label="t('knowledge.categoryName')" prop="name">
+          <el-input v-model="form.name" :placeholder="t('knowledge.inputCategoryName')" />
         </el-form-item>
-        <el-form-item
-          :label="t('knowledge.parentCategory')"
-          prop="parentId"
-        >
+        <el-form-item :label="t('knowledge.parentCategory')" prop="parentId">
           <el-tree-select
             v-model="form.parentId"
             :data="parentOptions"
@@ -112,21 +61,10 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item
-          :label="t('knowledge.sort')"
-          prop="sort"
-        >
-          <el-input-number
-            v-model="form.sort"
-            :min="0"
-            controls-position="right"
-            style="width: 100%"
-          />
+        <el-form-item :label="t('knowledge.sort')" prop="sort">
+          <el-input-number v-model="form.sort" :min="0" controls-position="right" style="width: 100%" />
         </el-form-item>
-        <el-form-item
-          :label="t('knowledge.status')"
-          prop="status"
-        >
+        <el-form-item :label="t('knowledge.status')" prop="status">
           <el-radio-group v-model="form.status">
             <el-radio :value="1">
               {{ t('knowledge.enabled') }}
@@ -141,11 +79,7 @@
         <el-button @click="dialogVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button
-          type="primary"
-          :loading="submitLoading"
-          @click="handleSubmit"
-        >
+        <el-button type="primary" :loading="submitLoading" @click="handleSubmit">
           {{ t('common.confirm') }}
         </el-button>
       </template>

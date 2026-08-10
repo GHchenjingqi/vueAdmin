@@ -1,9 +1,5 @@
 <template>
-  <div
-    v-if="enabled && text"
-    class="watermark-overlay"
-    :style="{ backgroundImage: `url(${bgImage})` }"
-  />
+  <div v-if="enabled && text" class="watermark-overlay" :style="{ backgroundImage: `url(${bgImage})` }" />
 </template>
 
 <script setup lang="ts">

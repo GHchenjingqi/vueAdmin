@@ -12,30 +12,18 @@
     />
 
     <!-- 导出进度条 -->
-    <div
-      v-if="exporting"
-      class="export-progress"
-    >
+    <div v-if="exporting" class="export-progress">
       <div class="export-progress-inner">
         <el-icon class="is-loading">
           <Loading />
         </el-icon>
         <span class="export-progress-text">{{ exportStatusText }}</span>
-        <el-progress
-          v-if="exportPercent !== undefined && exportPercent > 0"
-          :percentage="exportPercent"
-          :stroke-width="6"
-          style="flex: 1; max-width: 300px"
-        />
+        <el-progress v-if="exportPercent !== undefined && exportPercent > 0" :percentage="exportPercent" :stroke-width="6" style="flex: 1; max-width: 300px" />
       </div>
     </div>
 
     <!-- 表格卡片 -->
-    <el-card
-      shadow="never"
-      class="table-card"
-      :style="modelType === 'dialog' ? { marginTop: '-35px' } : {}"
-    >
+    <el-card shadow="never" class="table-card" :style="modelType === 'dialog' ? { marginTop: '-35px' } : {}">
       <template #header>
         <div class="table-header-row">
           <div class="table-header-left q-title">
@@ -45,19 +33,8 @@
           </div>
           <div class="table-header-right">
             <slot name="header-buttons" />
-            <el-tooltip
-              v-if="searchFields?.length"
-              :content="showSearch ? t('common.hideSearch') : t('common.showSearch')"
-              placement="top"
-            >
-              <el-button
-                text
-                :icon="Search"
-                size="small"
-                class="search-toggle-btn"
-                circle
-                @click="showSearch = !showSearch"
-              />
+            <el-tooltip v-if="searchFields?.length" :content="showSearch ? t('common.hideSearch') : t('common.showSearch')" placement="top">
+              <el-button text :icon="Search" size="small" class="search-toggle-btn" circle @click="showSearch = !showSearch" />
             </el-tooltip>
             <ColumnSettings
               v-if="columnSettingsKey"
@@ -71,25 +48,11 @@
       </template>
 
       <!-- Tab 切换 -->
-      <div
-        v-if="orderTabs?.length"
-        class="nosel"
-      >
-        <el-tabs
-          v-model="activeTab"
-          type="card"
-          @tab-change="handleTabChange"
-        >
-          <el-tab-pane
-            v-for="tab in orderTabs"
-            :key="tab.value"
-            :name="tab.value"
-          >
+      <div v-if="orderTabs?.length" class="nosel">
+        <el-tabs v-model="activeTab" type="card" @tab-change="handleTabChange">
+          <el-tab-pane v-for="tab in orderTabs" :key="tab.value" :name="tab.value">
             <template #label>
-              <el-badge
-                :value="tab.badge"
-                :hidden="tab.badge === undefined || tab.badge === null || tab.badge === 0"
-              >
+              <el-badge :value="tab.badge" :hidden="tab.badge === undefined || tab.badge === null || tab.badge === 0">
                 {{ tab.label }}
               </el-badge>
             </template>
@@ -128,13 +91,7 @@
           @deselect="handleDeselect"
         >
           <!-- 拖拽手柄列 -->
-          <el-table-column
-            v-if="rowDrag"
-            width="40"
-            align="center"
-            class-name="drag-handle-column"
-            :resizable="false"
-          >
+          <el-table-column v-if="rowDrag" width="40" align="center" class-name="drag-handle-column" :resizable="false">
             <template #default>
               <el-icon class="drag-handle">
                 <Rank />
@@ -143,35 +100,17 @@
           </el-table-column>
 
           <!-- 复选框 -->
-          <el-table-column
-            v-if="showSelection"
-            type="selection"
-            width="55"
-            align="center"
-            :reserve-selection="reserveSelection"
-            :resizable="false"
-          />
+          <el-table-column v-if="showSelection" type="selection" width="55" align="center" :reserve-selection="reserveSelection" :resizable="false" />
 
           <!-- 展开 -->
-          <el-table-column
-            v-if="expandable"
-            type="expand"
-            :resizable="false"
-          >
+          <el-table-column v-if="expandable" type="expand" :resizable="false">
             <template #default="scope">
-              <slot
-                name="expand"
-                :row="scope.row"
-                :index="scope.$index"
-              />
+              <slot name="expand" :row="scope.row" :index="scope.$index" />
             </template>
           </el-table-column>
 
           <!-- 动态列渲染 -->
-          <template
-            v-for="column in columns"
-            :key="column.prop"
-          >
+          <template v-for="column in columns" :key="column.prop">
             <!-- 序号 -->
             <el-table-column
               v-if="column.prop === 'index'"
@@ -199,10 +138,7 @@
                   :fixed="column.fixed"
                   :resizable="column.resizable !== false"
                 >
-                  <template
-                    v-for="childColumn in column.children"
-                    :key="childColumn.prop"
-                  >
+                  <template v-for="childColumn in column.children" :key="childColumn.prop">
                     <el-table-column
                       v-if="columnVisibility[childColumn.prop] !== false && $slots[`column-${childColumn.prop}`]"
                       :prop="childColumn.prop"
@@ -215,11 +151,7 @@
                       :resizable="childColumn.resizable !== false"
                     >
                       <template #default="scope">
-                        <slot
-                          :name="`column-${childColumn.prop}`"
-                          :row="scope.row"
-                          :column="childColumn"
-                        />
+                        <slot :name="`column-${childColumn.prop}`" :row="scope.row" :column="childColumn" />
                       </template>
                     </el-table-column>
                     <el-table-column
@@ -234,10 +166,7 @@
                       :resizable="childColumn.resizable !== false"
                       :show-overflow-tooltip="childColumn.showOverflowTooltip || false"
                     >
-                      <template
-                        v-if="childColumn.formatter"
-                        #default="scope"
-                      >
+                      <template v-if="childColumn.formatter" #default="scope">
                         {{ childColumn.formatter(scope.row, scope.column) }}
                       </template>
                     </el-table-column>
@@ -261,11 +190,7 @@
                 :show-overflow-tooltip="column.showOverflowTooltip || false"
               >
                 <template #default="scope">
-                  <slot
-                    :name="`column-${column.prop}`"
-                    :row="scope.row"
-                    :column="column"
-                  />
+                  <slot :name="`column-${column.prop}`" :row="scope.row" :column="column" />
                 </template>
               </el-table-column>
               <el-table-column
@@ -280,10 +205,7 @@
                 :resizable="column.resizable !== false"
                 :show-overflow-tooltip="column.showOverflowTooltip || false"
               >
-                <template
-                  v-if="column.formatter"
-                  #default="scope"
-                >
+                <template v-if="column.formatter" #default="scope">
                   {{ column.formatter(scope.row, scope.column) }}
                 </template>
               </el-table-column>

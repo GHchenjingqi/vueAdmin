@@ -51,6 +51,7 @@ Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 
 - **主题定制**：亮色/暗黑模式、8 种预设主色、自定义颜色、4 级字体
 - **水印功能**：全局水印，防截图泄漏
 - **多语言**：中英文切换，轻量级 i18n 方案，可扩展
+  - **菜单自动翻译**：侧边栏/顶部导航菜单名按 `path` 自动映射为 `sidebar.*` i18n Key（kebab-case → camelCase，如 `/workflow-instances` → `sidebar.workflowInstances`）。**后端新增菜单时，必须同步在 `src/i18n/zh-CN.json`、`src/i18n/en-US.json` 的 `sidebar` 段补充对应 Key**，否则切换英文时菜单仍显示中文（`t()` 找不到 Key 时回退到数据库原始中文名）。完整规则见 `AI_DEVELOPMENT_GUIDE.md` 9.5 节。
 - **列设置**：表格列显隐可配、排序状态持久化
 - **SSE 实时推送**：一次性票据认证，安全可靠
 - **导出进度条**：大数据量导出时实时显示进度

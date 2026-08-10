@@ -1,9 +1,5 @@
 <template>
-  <el-icon
-    v-if="resolvedComponent"
-    :size="parsedSize"
-    :color="color"
-  >
+  <el-icon v-if="resolvedComponent" :size="parsedSize" :color="color">
     <component :is="resolvedComponent" />
   </el-icon>
 </template>

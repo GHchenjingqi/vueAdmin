@@ -1,25 +1,13 @@
 <template>
-  <el-card
-    shadow="never"
-    class="table-card"
-  >
-    <template
-      v-if="title || $slots.header"
-      #header
-    >
+  <el-card shadow="never" class="table-card">
+    <template v-if="title || $slots.header" #header>
       <div class="table-card-header">
-        <span
-          v-if="title"
-          class="table-card-title"
-        >{{ title }}</span>
+        <span v-if="title" class="table-card-title">{{ title }}</span>
         <slot name="header" />
       </div>
     </template>
     <slot />
-    <div
-      v-if="showPagination"
-      class="table-card-pagination"
-    >
+    <div v-if="showPagination" class="table-card-pagination">
       <el-pagination
         v-model:current-page="currentPage"
         v-model:page-size="currentPageSize"

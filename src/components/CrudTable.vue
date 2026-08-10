@@ -31,10 +31,7 @@
               {{ title }}
             </div>
           </el-col>
-          <el-col
-            :span="16"
-            style="margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap"
-          >
+          <el-col :span="16" style="margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap">
             <slot name="header-left" />
             <slot name="header-buttons" />
             <slot name="header-right" />
@@ -42,76 +39,24 @@
         </el-row>
       </template>
 
-      <template
-        v-for="(column, _index) in columns"
-        :key="column.prop || _index"
-        #[`column-${column.prop}`]="{ row }"
-      >
-        <slot
-          :name="`column-${column.prop}`"
-          :row="row"
-          :column="column"
-        >
-          <slot
-            v-if="!$slots[`column-${column.prop}`]"
-            :name="column.prop"
-            :row="row"
-          />
+      <template v-for="(column, _index) in columns" :key="column.prop || _index" #[`column-${column.prop}`]="{ row }">
+        <slot :name="`column-${column.prop}`" :row="row" :column="column">
+          <slot v-if="!$slots[`column-${column.prop}`]" :name="column.prop" :row="row" />
         </slot>
       </template>
 
       <template #actions="{ row }">
-        <div
-          v-if="$slots['actions']"
-          class="table-actions"
-        >
-          <slot
-            name="actions"
-            :row="row"
-          />
-          <slot
-            name="delete-action"
-            :row="row"
-          >
-            <el-button
-              v-if="enableDelete"
-              type="danger"
-              link
-              size="small"
-              :icon="Delete"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
+        <div v-if="$slots['actions']" class="table-actions">
+          <slot name="actions" :row="row" />
+          <slot name="delete-action" :row="row">
+            <el-button v-if="enableDelete" type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </slot>
         </div>
-        <div
-          v-else-if="enableDelete"
-          class="table-actions"
-        >
-          <slot
-            name="edit-action"
-            :row="row"
-          >
-            <el-button
-              type="primary"
-              link
-              size="small"
-              :icon="Edit"
-              @click="handleEdit(row)"
-            >
-              编辑
-            </el-button>
+        <div v-else-if="enableDelete" class="table-actions">
+          <slot name="edit-action" :row="row">
+            <el-button type="primary" link size="small" :icon="Edit" @click="handleEdit(row)">编辑</el-button>
           </slot>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDelete(row)"
-          >
-            删除
-          </el-button>
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">删除</el-button>
         </div>
       </template>
     </ProTable>
@@ -128,10 +73,7 @@
       @closed="handleDialogClosed"
     >
       <slot name="form" />
-      <template
-        v-for="item in formSchema"
-        :key="item.prop"
-      >
+      <template v-for="item in formSchema" :key="item.prop">
         <slot
           :name="`form-${item.prop}`"
           v-bind="{

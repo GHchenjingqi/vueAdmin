@@ -4,72 +4,25 @@
       <span>{{ t('register.title') }}</span>
     </template>
     <el-row justify="center">
-      <el-col
-        :xs="24"
-        :sm="12"
-        :md="12"
-      >
-        <el-form
-          ref="formRef"
-          :model="form"
-          :rules="rules"
-          label-width="100px"
-        >
-          <el-form-item
-            :label="t('register.username')"
-            prop="username"
-          >
-            <el-input
-              v-model="form.username"
-              :placeholder="t('register.inputUsername')"
-            />
+      <el-col :xs="24" :sm="12" :md="12">
+        <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+          <el-form-item :label="t('register.username')" prop="username">
+            <el-input v-model="form.username" :placeholder="t('register.inputUsername')" />
           </el-form-item>
-          <el-form-item
-            :label="t('register.password')"
-            prop="password"
-          >
-            <el-input
-              v-model="form.password"
-              type="password"
-              show-password
-              :placeholder="t('register.inputPassword')"
-            />
+          <el-form-item :label="t('register.password')" prop="password">
+            <el-input v-model="form.password" type="password" show-password :placeholder="t('register.inputPassword')" />
           </el-form-item>
-          <el-form-item
-            :label="t('register.confirmPassword')"
-            prop="confirmPassword"
-          >
-            <el-input
-              v-model="form.confirmPassword"
-              type="password"
-              show-password
-              :placeholder="t('register.confirmPassword2')"
-            />
+          <el-form-item :label="t('register.confirmPassword')" prop="confirmPassword">
+            <el-input v-model="form.confirmPassword" type="password" show-password :placeholder="t('register.confirmPassword2')" />
           </el-form-item>
-          <el-form-item
-            :label="t('register.email')"
-            prop="email"
-          >
-            <el-input
-              v-model="form.email"
-              :placeholder="t('register.inputEmail')"
-            />
+          <el-form-item :label="t('register.email')" prop="email">
+            <el-input v-model="form.email" :placeholder="t('register.inputEmail')" />
           </el-form-item>
-          <el-form-item
-            :label="t('register.phone')"
-            prop="phone"
-          >
-            <el-input
-              v-model="form.phone"
-              :placeholder="t('register.inputPhone')"
-            />
+          <el-form-item :label="t('register.phone')" prop="phone">
+            <el-input v-model="form.phone" :placeholder="t('register.inputPhone')" />
           </el-form-item>
           <el-form-item>
-            <el-button
-              type="primary"
-              :loading="loading"
-              @click="handleRegister"
-            >
+            <el-button type="primary" :loading="loading" @click="handleRegister">
               {{ t('register.register') }}
             </el-button>
             <el-button @click="resetForm">

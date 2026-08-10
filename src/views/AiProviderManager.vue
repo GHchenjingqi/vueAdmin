@@ -13,48 +13,26 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openDialog()"
-        >
+        <el-button type="primary" :icon="Plus" @click="openDialog()">
           {{ t('aiProvider.addProvider') }}
         </el-button>
       </template>
 
       <template #column-models="{ row }">
         <div class="model-tags">
-          <el-tag
-            v-for="m in row.models.split(',')"
-            :key="m"
-            size="small"
-            effect="plain"
-            class="model-tag"
-          >
+          <el-tag v-for="m in row.models.split(',')" :key="m" size="small" effect="plain" class="model-tag">
             {{ m.trim() }}
           </el-tag>
         </div>
       </template>
 
       <template #column-enabled="{ row }">
-        <el-switch
-          v-model="row.enabled"
-          :active-value="1"
-          :inactive-value="0"
-          :loading="switchingId === row.id"
-          @change="handleToggle(row)"
-        />
+        <el-switch v-model="row.enabled" :active-value="1" :inactive-value="0" :loading="switchingId === row.id" @change="handleToggle(row)" />
       </template>
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openDialog(row)"
-          >
+          <el-button type="primary" link size="small" :icon="Edit" @click="openDialog(row)">
             {{ t('common.edit') }}
           </el-button>
           <el-popconfirm
@@ -64,12 +42,7 @@
             @confirm="handleDelete(row)"
           >
             <template #reference>
-              <el-button
-                type="danger"
-                link
-                size="small"
-                :icon="Delete"
-              >
+              <el-button type="danger" link size="small" :icon="Delete">
                 {{ t('common.delete') }}
               </el-button>
             </template>

@@ -77,34 +77,34 @@ const editId = ref<number | null>(null)
 const formRef = ref<InstanceType<typeof import('element-plus').ElForm> | null>(null)
 const pagination = reactive({ pageNum: 1, pageSize: 10, total: 0 })
 
-const searchFields = [
-  { prop: 'keyword', label: '名称', type: 'input', placeholder: '搜索流程名称' },
-  {
-    prop: 'status',
-    label: '状态',
-    type: 'select',
-    placeholder: '全部',
-    options: [
-      { label: '启用', value: '1' },
-      { label: '禁用', value: '0' },
-    ],
-  },
-]
-
 const searchParams = reactive({ keyword: '', status: '' })
 
-const columns = [
-  { prop: 'name', label: '流程名称', minWidth: 160 },
-  { prop: 'description', label: '描述', minWidth: 200, showOverflowTooltip: true },
-  { prop: 'status', label: '状态', width: 80 },
-  { prop: 'draftVersionId', label: '草稿版本', width: 100 },
-  { prop: 'publishedVersionId', label: '线上版本', width: 100 },
-  { prop: 'createdAt', label: '创建时间', width: 170 },
-  { prop: 'actions', label: '操作', width: 280, fixed: 'right' },
-]
+const searchFields = computed(() => [
+  { prop: 'keyword', label: t('common.name'), type: 'input', placeholder: t('workflow.name') },
+  {
+    prop: 'status',
+    label: t('common.status'),
+    type: 'select',
+    placeholder: t('common.all'),
+    options: [
+      { label: t('common.enable'), value: '1' },
+      { label: t('common.disable'), value: '0' },
+    ],
+  },
+])
+
+const columns = computed(() => [
+  { prop: 'name', label: t('workflow.name'), minWidth: 160 },
+  { prop: 'description', label: t('common.description'), minWidth: 200, showOverflowTooltip: true },
+  { prop: 'status', label: t('common.status'), width: 80 },
+  { prop: 'draftVersionId', label: t('workflow.draftVersion'), width: 100 },
+  { prop: 'publishedVersionId', label: t('workflow.publishedVersion'), width: 100 },
+  { prop: 'createdAt', label: t('common.createdTime'), width: 170 },
+  { prop: 'actions', label: t('common.actions'), width: 280, fixed: 'right' },
+])
 
 const form = reactive({ name: '', description: '' })
-const rules = { name: [{ required: true, message: '请输入流程名称', trigger: 'blur' }] }
+const rules = { name: [{ required: true, message: t('workflow.ruleNameRequired'), trigger: 'blur' }] }
 
 function onQuery(params: { searchParams?: Record<string, unknown>; pagination?: { pageNum: number; pageSize: number } }) {
   if (params.searchParams) Object.assign(searchParams, params.searchParams)
@@ -115,7 +115,7 @@ function onQuery(params: { searchParams?: Record<string, unknown>; pagination?: 
 async function fetchWorkflows() {
   loading.value = true
   try {
-    const res = await workflowApi.list({ ...searchParams, page: pagination.pageNum, pageSize: pagination.pageSize })
+    const res = await workflowApi.list({ ...searchParams, page: pagination.pageNum, pageSize: pagination.pageSize }, true)
     workflows.value = res.data?.rows || []
     pagination.total = res.data?.total || 0
   } catch {
@@ -148,15 +148,15 @@ async function handleSubmit() {
   try {
     if (isEdit.value && editId.value) {
       await workflowApi.update(editId.value, form)
-      ElMessage.success('更新成功')
+      ElMessage.success(t('common.updateSuccess'))
     } else {
       await workflowApi.create(form)
-      ElMessage.success('创建成功')
+      ElMessage.success(t('common.createSuccess'))
     }
     dialogVisible.value = false
     fetchWorkflows()
   } catch {
-    ElMessage.error('操作失败')
+    ElMessage.error(t('workflow.operationFailed'))
   } finally {
     submitting.value = false
   }
@@ -168,7 +168,7 @@ async function handleToggle(row: Workflow, val: number | string | boolean) {
   if (Number(val) === Number(row.status)) return
   try {
     await workflowApi.toggle(row.id, Number(val) === 1)
-    ElMessage.success(Number(val) === 1 ? '已启用' : '已禁用')
+    ElMessage.success(Number(val) === 1 ? t('workflow.enabledMsg') : t('workflow.disabledMsg'))
   } catch {
     fetchWorkflows()
   }
@@ -177,10 +177,10 @@ async function handleToggle(row: Workflow, val: number | string | boolean) {
 async function handlePublish(row: Workflow) {
   try {
     await workflowApi.publish(row.id)
-    ElMessage.success('发布成功')
+    ElMessage.success(t('common.publish'))
     fetchWorkflows()
   } catch {
-    ElMessage.error('发布失败，请检查流程设计完整性')
+    ElMessage.error(t('workflow.publishFailedCheckDesign'))
   }
 }
 
@@ -190,9 +190,9 @@ function handleDesign(row: Workflow) {
 
 async function handleDelete(row: Workflow) {
   try {
-    await ElMessageBox.confirm(`确认删除流程「${row.name}」？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('workflow.confirmDelete', { name: row.name }), t('common.tip'), { type: 'warning' })
     await workflowApi.delete(row.id)
-    ElMessage.success('删除成功')
+    ElMessage.success(t('workflow.deleteSuccess'))
     fetchWorkflows()
   } catch {
     // 用户取消删除

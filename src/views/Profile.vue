@@ -1,34 +1,14 @@
 <template>
   <div class="page-container">
     <el-card shadow="never">
-      <el-tabs
-        v-model="activeTab"
-        class="profile-tabs"
-      >
+      <el-tabs v-model="activeTab" class="profile-tabs">
         <!-- ====== 个人信息 ====== -->
-        <el-tab-pane
-          :label="t('profile.personalInfo')"
-          name="info"
-        >
-          <el-form
-            ref="formRef"
-            :model="form"
-            :rules="rules"
-            label-width="80px"
-            size="default"
-            class="profile-form"
-          >
+        <el-tab-pane :label="t('profile.personalInfo')" name="info">
+          <el-form ref="formRef" :model="form" :rules="rules" label-width="80px" size="default" class="profile-form">
             <el-form-item :label="t('profile.avatar')">
               <div class="avatar-section">
-                <div
-                  class="avatar-wrapper"
-                  @click="triggerUpload"
-                >
-                  <el-avatar
-                    :size="100"
-                    :src="avatarPreview"
-                    class="profile-avatar"
-                  >
+                <div class="avatar-wrapper" @click="triggerUpload">
+                  <el-avatar :size="100" :src="avatarPreview" class="profile-avatar">
                     <span class="avatar-fallback">{{ form.username?.charAt(0)?.toUpperCase() }}</span>
                   </el-avatar>
                   <div class="avatar-overlay">
@@ -58,56 +38,22 @@
               </div>
             </el-form-item>
             <el-form-item :label="t('common.name')">
-              <el-input
-                v-model="form.username"
-                disabled
-              />
+              <el-input v-model="form.username" disabled />
             </el-form-item>
             <el-form-item :label="t('profile.nickname')">
-              <el-input
-                v-model="form.nickname"
-                :placeholder="t('profile.inputNickname')"
-                maxlength="30"
-                show-word-limit
-              />
+              <el-input v-model="form.nickname" :placeholder="t('profile.inputNickname')" maxlength="30" show-word-limit />
             </el-form-item>
-            <el-form-item
-              :label="t('profile.email')"
-              prop="email"
-            >
-              <el-input
-                v-model="form.email"
-                :placeholder="t('profile.inputEmail')"
-              />
+            <el-form-item :label="t('profile.email')" prop="email">
+              <el-input v-model="form.email" :placeholder="t('profile.inputEmail')" />
             </el-form-item>
-            <el-form-item
-              :label="t('profile.phone')"
-              prop="phone"
-            >
-              <el-input
-                v-model="form.phone"
-                :placeholder="t('profile.inputPhone')"
-              />
+            <el-form-item :label="t('profile.phone')" prop="phone">
+              <el-input v-model="form.phone" :placeholder="t('profile.inputPhone')" />
             </el-form-item>
-            <el-form-item
-              :label="t('profile.bio')"
-              prop="bio"
-            >
-              <el-input
-                v-model="form.bio"
-                type="textarea"
-                :rows="3"
-                maxlength="200"
-                show-word-limit
-                :placeholder="t('profile.inputBio')"
-              />
+            <el-form-item :label="t('profile.bio')" prop="bio">
+              <el-input v-model="form.bio" type="textarea" :rows="3" maxlength="200" show-word-limit :placeholder="t('profile.inputBio')" />
             </el-form-item>
             <el-form-item>
-              <el-button
-                type="primary"
-                :loading="saving"
-                @click="handleSave"
-              >
+              <el-button type="primary" :loading="saving" @click="handleSave">
                 {{ t('profile.saveChanges') }}
               </el-button>
               <el-button @click="handleReset">
@@ -118,57 +64,19 @@
         </el-tab-pane>
 
         <!-- ====== 修改密码 ====== -->
-        <el-tab-pane
-          :label="t('profile.changePassword')"
-          name="password"
-        >
-          <el-form
-            ref="pwdFormRef"
-            :model="pwdForm"
-            :rules="pwdRules"
-            label-width="80px"
-            size="default"
-            class="profile-form"
-          >
-            <el-form-item
-              :label="t('profile.oldPassword')"
-              prop="oldPassword"
-            >
-              <el-input
-                v-model="pwdForm.oldPassword"
-                type="password"
-                show-password
-                :placeholder="t('profile.inputOldPwd')"
-              />
+        <el-tab-pane :label="t('profile.changePassword')" name="password">
+          <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="80px" size="default" class="profile-form">
+            <el-form-item :label="t('profile.oldPassword')" prop="oldPassword">
+              <el-input v-model="pwdForm.oldPassword" type="password" show-password :placeholder="t('profile.inputOldPwd')" />
             </el-form-item>
-            <el-form-item
-              :label="t('profile.newPassword')"
-              prop="newPassword"
-            >
-              <el-input
-                v-model="pwdForm.newPassword"
-                type="password"
-                show-password
-                :placeholder="t('profile.inputNewPwd')"
-              />
+            <el-form-item :label="t('profile.newPassword')" prop="newPassword">
+              <el-input v-model="pwdForm.newPassword" type="password" show-password :placeholder="t('profile.inputNewPwd')" />
             </el-form-item>
-            <el-form-item
-              :label="t('profile.confirmPassword')"
-              prop="confirmPassword"
-            >
-              <el-input
-                v-model="pwdForm.confirmPassword"
-                type="password"
-                show-password
-                :placeholder="t('profile.inputConfirmPwd')"
-              />
+            <el-form-item :label="t('profile.confirmPassword')" prop="confirmPassword">
+              <el-input v-model="pwdForm.confirmPassword" type="password" show-password :placeholder="t('profile.inputConfirmPwd')" />
             </el-form-item>
             <el-form-item>
-              <el-button
-                type="primary"
-                :loading="changingPwd"
-                @click="handleChangePwd"
-              >
+              <el-button type="primary" :loading="changingPwd" @click="handleChangePwd">
                 {{ t('profile.confirmChange') }}
               </el-button>
               <el-button @click="handleResetPwd">

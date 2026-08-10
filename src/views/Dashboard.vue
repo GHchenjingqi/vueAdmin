@@ -1,14 +1,9 @@
 <template>
   <div class="page-container dashboard">
     <!-- 欢迎 -->
-    <section
-      class="welcome-card"
-      :aria-label="t('accessibility.welcomeAndStatus')"
-    >
+    <section class="welcome-card" :aria-label="t('accessibility.welcomeAndStatus')">
       <div class="welcome-left">
-        <div class="welcome-greeting">
-          {{ greetingText }}, {{ username }}
-        </div>
+        <div class="welcome-greeting">{{ greetingText }}, {{ username }}</div>
         <div class="welcome-sub">
           {{ welcomeSubText }}
         </div>
@@ -29,47 +24,19 @@
     </section>
 
     <!-- 数据卡片 - 骨架屏 -->
-    <el-row
-      v-if="loading"
-      :gutter="16"
-    >
-      <el-col
-        v-for="i in 4"
-        :key="i"
-        :xs="24"
-        :sm="12"
-        :md="6"
-      >
-        <el-card
-          shadow="hover"
-          class="stat-card"
-        >
-          <el-skeleton
-            :rows="2"
-            animated
-          />
+    <el-row v-if="loading" :gutter="16">
+      <el-col v-for="i in 4" :key="i" :xs="24" :sm="12" :md="6">
+        <el-card shadow="hover" class="stat-card">
+          <el-skeleton :rows="2" animated />
         </el-card>
       </el-col>
     </el-row>
 
     <!-- 数据卡片 - 实际内容 -->
-    <section
-      v-else
-      :aria-label="t('accessibility.statsOverview')"
-    >
+    <section v-else :aria-label="t('accessibility.statsOverview')">
       <el-row :gutter="16">
-        <el-col
-          v-for="item in statsCards as unknown as any[]"
-          :key="item.title"
-          :xs="24"
-          :sm="12"
-          :md="6"
-        >
-          <el-card
-            shadow="hover"
-            class="stat-card"
-            :aria-label="item.title + ': ' + item.value"
-          >
+        <el-col v-for="item in statsCards as unknown as any[]" :key="item.title" :xs="24" :sm="12" :md="6">
+          <el-card shadow="hover" class="stat-card" :aria-label="item.title + ': ' + item.value">
             <div class="stat-content">
               <div class="stat-info">
                 <div class="stat-title">
@@ -78,29 +45,16 @@
                 <div class="stat-value">
                   {{ item.value }}
                 </div>
-                <div
-                  v-if="item.trendText"
-                  class="stat-trend"
-                >
-                  <el-icon
-                    :size="12"
-                    :class="item.trendUp ? 'trend-up' : 'trend-down'"
-                  >
+                <div v-if="item.trendText" class="stat-trend">
+                  <el-icon :size="12" :class="item.trendUp ? 'trend-up' : 'trend-down'">
                     <CaretTop v-if="item.trendUp" />
                     <CaretBottom v-else />
                   </el-icon>
                   <span>{{ item.trendText }}</span>
                 </div>
               </div>
-              <div
-                class="stat-icon"
-                :style="{ background: item.iconBg }"
-              >
-                <MenuIcon
-                  :name="item.icon"
-                  :size="24"
-                  :color="item.iconColor"
-                />
+              <div class="stat-icon" :style="{ background: item.iconBg }">
+                <MenuIcon :name="item.icon" :size="24" :color="item.iconColor" />
               </div>
             </div>
           </el-card>
@@ -109,30 +63,15 @@
     </section>
 
     <!-- 快速入?提示 - 骨架屏 -->
-    <el-card
-      v-if="loading"
-      shadow="hover"
-      class="info-card"
-    >
+    <el-card v-if="loading" shadow="hover" class="info-card">
       <template #header>
-        <el-skeleton
-          :rows="1"
-          animated
-          style="width: 120px"
-        />
+        <el-skeleton :rows="1" animated style="width: 120px" />
       </template>
-      <el-skeleton
-        :rows="3"
-        animated
-      />
+      <el-skeleton :rows="3" animated />
     </el-card>
 
     <!-- 快速入?提示 - 实际内容 -->
-    <el-card
-      v-else
-      shadow="hover"
-      class="info-card"
-    >
+    <el-card v-else shadow="hover" class="info-card">
       <template #header>
         <span class="card-title">{{ t('dashboard.systemInfo') }}</span>
       </template>

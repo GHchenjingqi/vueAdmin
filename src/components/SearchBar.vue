@@ -1,34 +1,13 @@
 <template>
-  <el-card
-    shadow="never"
-    class="search-bar"
-  >
-    <el-form
-      :model="model"
-      inline
-      class="search-form"
-    >
+  <el-card shadow="never" class="search-bar">
+    <el-form :model="model" inline class="search-form">
       <slot />
       <el-form-item class="search-actions">
-        <el-button
-          type="primary"
-          :icon="Search"
-          @click="$emit('search')"
-        >
-          查询
-        </el-button>
-        <el-button
-          :icon="Refresh"
-          @click="$emit('reset')"
-        >
-          重置
-        </el-button>
+        <el-button type="primary" :icon="Search" @click="$emit('search')">查询</el-button>
+        <el-button :icon="Refresh" @click="$emit('reset')">重置</el-button>
       </el-form-item>
     </el-form>
-    <div
-      v-if="$slots.actions"
-      class="search-extra"
-    >
+    <div v-if="$slots.actions" class="search-extra">
       <slot name="actions" />
     </div>
   </el-card>

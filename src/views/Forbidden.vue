@@ -1,15 +1,8 @@
 ﻿<template>
   <el-card shadow="hover">
-    <el-result
-      icon="error"
-      title="403"
-      :sub-title="t('messages.forbidden')"
-    >
+    <el-result icon="error" title="403" :sub-title="t('messages.forbidden')">
       <template #extra>
-        <el-button
-          type="primary"
-          @click="$router.push('/dashboard')"
-        >
+        <el-button type="primary" @click="$router.push('/dashboard')">
           {{ t('common.backToHome') }}
         </el-button>
       </template>

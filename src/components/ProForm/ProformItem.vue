@@ -1,38 +1,14 @@
 <template>
-  <div
-    v-if="isLineType"
-    class="por-form-item__line"
-  >
-    <el-divider
-      v-bind="mergedComponentProps"
-      content-position="center"
-      border-style="dashed"
-    >
+  <div v-if="isLineType" class="por-form-item__line">
+    <el-divider v-bind="mergedComponentProps" content-position="center" border-style="dashed">
       {{ item.label }}
     </el-divider>
   </div>
 
-  <el-form-item
-    v-else
-    v-bind="resolvedFormItemProps"
-    :label="item.label"
-    :prop="item.prop"
-    :rules="resolvedRules"
-    :required="item.required"
-  >
-    <div
-      class="por-form-item__layout"
-      :class="{ 'por-form-item__layout--with-tip': !!resolvedTip }"
-    >
+  <el-form-item v-else v-bind="resolvedFormItemProps" :label="item.label" :prop="item.prop" :rules="resolvedRules" :required="item.required">
+    <div class="por-form-item__layout" :class="{ 'por-form-item__layout--with-tip': !!resolvedTip }">
       <div class="por-form-item__main">
-        <slot
-          :name="slotName"
-          :item="item"
-          :model-value="modelValue as any"
-          :form-data="formData"
-          :disabled="fieldDisabled"
-          :update-value="updateValue"
-        >
+        <slot :name="slotName" :item="item" :model-value="modelValue as any" :form-data="formData" :disabled="fieldDisabled" :update-value="updateValue">
           <template v-if="!isUploadType && !isCustomType">
             <component
               :is="customComponent"
@@ -229,10 +205,7 @@
         </slot>
       </div>
 
-      <span
-        v-if="resolvedTip"
-        class="tip"
-      >{{ resolvedTip }}</span>
+      <span v-if="resolvedTip" class="tip">{{ resolvedTip }}</span>
     </div>
   </el-form-item>
 </template>

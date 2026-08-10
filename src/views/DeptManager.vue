@@ -15,51 +15,26 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openCreateDialog()"
-        >
+        <el-button type="primary" :icon="Plus" @click="openCreateDialog()">
           {{ t('dept.addDept') }}
         </el-button>
       </template>
 
       <template #column-status="{ row }">
-        <el-tag
-          :type="row.status === 1 ? 'success' : 'info'"
-          size="small"
-        >
+        <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
           {{ row.status === 1 ? t('dept.enabled') : t('dept.disabled') }}
         </el-tag>
       </template>
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openEditDialog(row)"
-          >
+          <el-button type="primary" link size="small" :icon="Edit" @click="openEditDialog(row)">
             {{ t('common.edit') }}
           </el-button>
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :icon="Plus"
-            @click="openCreateDialog(row.id)"
-          >
+          <el-button type="primary" link size="small" :icon="Plus" @click="openCreateDialog(row.id)">
             {{ t('common.add') }}
           </el-button>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDelete(row)"
-          >
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">
             {{ t('common.delete') }}
           </el-button>
         </div>

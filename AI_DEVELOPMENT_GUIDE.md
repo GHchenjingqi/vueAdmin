@@ -638,6 +638,54 @@ type DotKey<T, Prefix extends string = ''> = {
 
 `t` 函数的第一个参数类型为 `DotKey<MessageSchema>`，在编译期校验翻译 Key 的合法性。
 
+### 9.5 菜单多语言切换（菜单 Key 映射规则）
+
+菜单名称来自后端 `menus` 表 / `bootstrap.ts` 种子数据，**存储的是中文名**（如 `流程管理`）。渲染侧边栏 / 顶部导航时，`LayoutSidebar.vue` 与 `LayoutHeader.vue` 中的 `menuKey()` 会把菜单的 `path` **自动转换为 i18n Key**，再交给 `t()` 翻译。
+
+**映射规则**（两处 `menuKey()` 逻辑保持一致）：
+
+1. 去掉首尾 `/`，按 `/` 分段；
+2. 每段做 kebab-case → camelCase（`-x` 转大写）；
+3. 用 `.` 拼接，统一加 `sidebar.` 前缀；
+4. `t()` 找不到 Key 时**回退到数据库原始中文名**（即 `item.name`）。
+
+```typescript
+// 路径 -> 生成的 i18n Key
+'/dashboard'          -> `sidebar.dashboard`
+'/online-users'       -> `sidebar.onlineUsers`
+'/server-monitor'     -> `sidebar.serverMonitor`
+'/workflow'           -> `sidebar.workflow`
+'/workflows'          -> `sidebar.workflows`
+'/workflow-instances' -> `sidebar.workflowInstances`
+'/approval-center'    -> `sidebar.approvalCenter`
+```
+
+> ⚠️ **新增菜单必须同步补翻译**：只要后端新增了菜单（尤其路由路径带 `-` 的多段路径），就必须在 `src/i18n/zh-CN.json`、`src/i18n/en-US.json` 的 `sidebar` 段中补上对应 Key，否则切换英文后仍显示中文（因为回退到了数据库原始名）。
+
+**示例**：`server/bootstrap.ts` 中新增了 `流程管理`（`/workflow`）及其子菜单，则两个语言包需补充：
+
+```jsonc
+// src/i18n/zh-CN.json
+"sidebar": {
+  // ... 已有 Key
+  "workflow": "流程管理",
+  "workflows": "工作流管理",
+  "workflowInstances": "运行实例",
+  "approvalCenter": "审批中心"
+}
+
+// src/i18n/en-US.json
+"sidebar": {
+  // ... 已有 Key
+  "workflow": "Process Management",
+  "workflows": "Workflows",
+  "workflowInstances": "Instances",
+  "approvalCenter": "Approval Center"
+}
+```
+
+> 注意：`workflow.approval` 等归属于 `workflow` 段（用于页面内文案），与侧边栏 `sidebar.*` 段是不同的 Key 空间，侧边栏菜单必须用 `sidebar.*`。
+
 ---
 
 ## 十、类型定义规范

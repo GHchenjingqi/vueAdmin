@@ -38,23 +38,25 @@
     <el-dialog v-model="detailVisible" :title="t('workflow.instance')" width="700px" top="5vh">
       <div v-if="detailData" class="detail-content">
         <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="状态">
+          <el-descriptions-item :label="t('common.status')">
             <el-tag :type="statusType(detailData.instance.status)" size="small">
               {{ statusLabel(detailData.instance.status) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="发起人">
+          <el-descriptions-item :label="t('workflow.startedBy')">
             {{ detailData.instance.startedBy }}
           </el-descriptions-item>
-          <el-descriptions-item label="开始时间">
+          <el-descriptions-item :label="t('workflow.startedAt')">
             {{ detailData.instance.startedAt || '-' }}
           </el-descriptions-item>
-          <el-descriptions-item label="结束时间">
+          <el-descriptions-item :label="t('workflow.finishedAt')">
             {{ detailData.instance.finishedAt || '-' }}
           </el-descriptions-item>
         </el-descriptions>
 
-        <div class="section-title">执行日志</div>
+        <div class="section-title">
+          {{ t('workflow.executionLogs') }}
+        </div>
         <el-timeline>
           <el-timeline-item v-for="log in detailData.logs" :key="log.id" :timestamp="log.finishedAt || log.startedAt" placement="top">
             <div class="log-item">
@@ -106,35 +108,35 @@ const detailVisible = ref(false)
 const detailData = ref<InstanceDetail | null>(null)
 const pagination = reactive({ pageNum: 1, pageSize: 10, total: 0 })
 
-const searchFields = [
-  {
-    prop: 'status',
-    label: '状态',
-    type: 'select',
-    placeholder: '全部',
-    options: [
-      { label: '待处理', value: 'pending' },
-      { label: '运行中', value: 'running' },
-      { label: '已通过', value: 'approved' },
-      { label: '已驳回', value: 'rejected' },
-      { label: '已终止', value: 'terminated' },
-      { label: '失败', value: 'failed' },
-    ],
-  },
-]
-
 const searchParams = reactive({ status: '' })
 
-const columns = [
-  { prop: 'id', label: 'ID', width: 70 },
-  { prop: 'title', label: '标题', minWidth: 160 },
-  { prop: 'status', label: '状态', width: 100 },
-  { prop: 'bindingKey', label: '业务标识', width: 120 },
-  { prop: 'bindingId', label: '业务ID', width: 80 },
-  { prop: 'startedAt', label: '开始时间', width: 170 },
-  { prop: 'finishedAt', label: '结束时间', width: 170 },
-  { prop: 'actions', label: '操作', width: 200, fixed: 'right' },
-]
+const searchFields = computed(() => [
+  {
+    prop: 'status',
+    label: t('common.status'),
+    type: 'select',
+    placeholder: t('common.all'),
+    options: [
+      { label: t('workflow.pending'), value: 'pending' },
+      { label: t('workflow.running'), value: 'running' },
+      { label: t('workflow.approved'), value: 'approved' },
+      { label: t('workflow.rejected'), value: 'rejected' },
+      { label: t('workflow.terminated'), value: 'terminated' },
+      { label: t('workflow.failed'), value: 'failed' },
+    ],
+  },
+])
+
+const columns = computed(() => [
+  { prop: 'id', label: t('common.id'), width: 70 },
+  { prop: 'title', label: t('workflow.instanceTitle'), minWidth: 160 },
+  { prop: 'status', label: t('common.status'), width: 100 },
+  { prop: 'bindingKey', label: t('workflow.bindingKey'), width: 120 },
+  { prop: 'bindingId', label: t('workflow.bindingId'), width: 80 },
+  { prop: 'startedAt', label: t('workflow.startedAt'), width: 170 },
+  { prop: 'finishedAt', label: t('workflow.finishedAt'), width: 170 },
+  { prop: 'actions', label: t('common.actions'), width: 200, fixed: 'right' },
+])
 
 function statusType(s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
   const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
@@ -151,13 +153,13 @@ function statusType(s: string): 'primary' | 'success' | 'warning' | 'info' | 'da
 
 function statusLabel(s: string): string {
   const map: Record<string, string> = {
-    pending: '待处理',
-    running: '运行中',
-    partial: '审批中',
-    approved: '已通过',
-    rejected: '已驳回',
-    terminated: '已终止',
-    failed: '失败',
+    pending: t('workflow.pending'),
+    running: t('workflow.running'),
+    partial: t('workflow.partial'),
+    approved: t('workflow.approved'),
+    rejected: t('workflow.rejected'),
+    terminated: t('workflow.terminated'),
+    failed: t('workflow.failed'),
   }
   return map[s] || s
 }
@@ -187,25 +189,25 @@ async function handleDetail(row: WorkflowInstance) {
     detailData.value = res.data as InstanceDetail | null
     detailVisible.value = true
   } catch {
-    ElMessage.error('加载详情失败')
+    ElMessage.error(t('workflow.loadDetailFailed'))
   }
 }
 
 async function handleRetry(row: WorkflowInstance) {
   try {
     await workflowApi.retryInstance(row.id)
-    ElMessage.success('重试已触发')
+    ElMessage.success(t('workflow.retryTriggered'))
     fetchInstances()
   } catch {
-    ElMessage.error('重试失败')
+    ElMessage.error(t('workflow.retryFailed'))
   }
 }
 
 async function handleTerminate(row: WorkflowInstance) {
   try {
-    await ElMessageBox.confirm('确认终止当前实例？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('workflow.confirmTerminate'), t('common.tip'), { type: 'warning' })
     await workflowApi.terminateInstance(row.id)
-    ElMessage.success('已终止')
+    ElMessage.success(t('workflow.terminatedMsg'))
     fetchInstances()
   } catch {
     // 用户取消或操作失败

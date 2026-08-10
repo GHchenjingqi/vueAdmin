@@ -1,12 +1,6 @@
 <template>
-  <div
-    v-loading="loading"
-    class="virtual-table-wrapper"
-  >
-    <AutoResizer
-      v-if="autoResize"
-      @resize="onResize"
-    >
+  <div v-loading="loading" class="virtual-table-wrapper">
+    <AutoResizer v-if="autoResize" @resize="onResize">
       <ElTableV2
         ref="tableRef"
         :columns="v2Columns"
@@ -19,10 +13,7 @@
         :sort-state="props.sortState as any"
         @column-sort="handleColumnSort as any"
       >
-        <template
-          v-if="$slots.overlay"
-          #overlay
-        >
+        <template v-if="$slots.overlay" #overlay>
           <slot name="overlay" />
         </template>
       </ElTableV2>
@@ -40,10 +31,7 @@
       :sort-state="props.sortState as any"
       @column-sort="handleColumnSort as any"
     >
-      <template
-        v-if="$slots.overlay"
-        #overlay
-      >
+      <template v-if="$slots.overlay" #overlay>
         <slot name="overlay" />
       </template>
     </ElTableV2>

@@ -2,58 +2,24 @@
   <div class="force-pwd-page">
     <div class="force-pwd-card">
       <div class="force-pwd-header">
-        <el-icon
-          :size="40"
-          color="#e6a23c"
-        >
+        <el-icon :size="40" color="#e6a23c">
           <WarningFilled />
         </el-icon>
         <h2>{{ t('forcePwd.title') }}</h2>
         <p>{{ t('forcePwd.subtitle') }}</p>
       </div>
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        size="large"
-        label-width="80px"
-        @keyup.enter="handleSubmit"
-      >
-        <el-form-item
-          :label="t('forcePwd.newPassword')"
-          prop="newPassword"
-        >
-          <el-input
-            v-model="form.newPassword"
-            type="password"
-            :placeholder="t('forcePwd.inputNewPwd')"
-            show-password
-          />
+      <el-form ref="formRef" :model="form" :rules="rules" size="large" label-width="80px" @keyup.enter="handleSubmit">
+        <el-form-item :label="t('forcePwd.newPassword')" prop="newPassword">
+          <el-input v-model="form.newPassword" type="password" :placeholder="t('forcePwd.inputNewPwd')" show-password />
         </el-form-item>
-        <el-form-item
-          :label="t('forcePwd.confirmPassword')"
-          prop="confirmPassword"
-        >
-          <el-input
-            v-model="form.confirmPassword"
-            type="password"
-            :placeholder="t('forcePwd.inputConfirmPwd')"
-            show-password
-          />
+        <el-form-item :label="t('forcePwd.confirmPassword')" prop="confirmPassword">
+          <el-input v-model="form.confirmPassword" type="password" :placeholder="t('forcePwd.inputConfirmPwd')" show-password />
         </el-form-item>
         <el-form-item>
-          <el-button
-            type="primary"
-            :loading="loading"
-            class="submit-btn"
-            @click="handleSubmit"
-          >
+          <el-button type="primary" :loading="loading" class="submit-btn" @click="handleSubmit">
             {{ t('forcePwd.confirmChange') }}
           </el-button>
-          <el-button
-            class="cancel-btn"
-            @click="handleLogout"
-          >
+          <el-button class="cancel-btn" @click="handleLogout">
             {{ t('forcePwd.relogin') }}
           </el-button>
         </el-form-item>

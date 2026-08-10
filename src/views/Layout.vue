@@ -31,11 +31,7 @@
         :width="sidebarCollapsed ? '64px' : sidebarWidth + 'px'"
         class="layout-aside"
       >
-        <LayoutSidebar
-          :is-collapse="sidebarCollapsed"
-          :menu-tree="menuTree"
-          :mode="layoutMode === 'mixed' ? 'sub' : 'main'"
-        />
+        <LayoutSidebar :is-collapse="sidebarCollapsed" :menu-tree="menuTree" :mode="layoutMode === 'mixed' ? 'sub' : 'main'" />
       </el-aside>
 
       <!-- ========== 移动端：抽屉式侧边栏 ========== -->
@@ -53,35 +49,19 @@
         <div class="mobile-drawer-header">
           <span class="mobile-drawer-title">{{ siteTitle || 'Vue Admin' }}</span>
         </div>
-        <LayoutSidebar
-          :is-collapse="false"
-          :menu-tree="menuTree"
-          :mode="layoutMode === 'mixed' ? 'sub' : 'main'"
-          @select="mobileMenuVisible = false"
-        />
+        <LayoutSidebar :is-collapse="false" :menu-tree="menuTree" :mode="layoutMode === 'mixed' ? 'sub' : 'main'" @select="mobileMenuVisible = false" />
       </el-drawer>
 
-      <el-main
-        id="main-content"
-        class="layout-main"
-        role="main"
-        :aria-label="t('layout.mainContent')"
-      >
+      <el-main id="main-content" class="layout-main" role="main" :aria-label="t('layout.mainContent')">
         <!-- 标签页导航（仅 tabs 模式显示） -->
         <NavTabs v-if="navMode === 'tabs'" />
         <!-- 路由视图 -->
         <ErrorBoundary :show-home="false">
           <template v-if="!loading">
             <router-view v-slot="{ Component, route }">
-              <transition
-                name="fade"
-                mode="out-in"
-              >
+              <transition name="fade" mode="out-in">
                 <keep-alive :include="cachedRoutes">
-                  <component
-                    :is="Component"
-                    :key="route.path"
-                  />
+                  <component :is="Component" :key="route.path" />
                 </keep-alive>
               </transition>
             </router-view>
@@ -94,10 +74,7 @@
     </el-container>
 
     <!-- 全局水印 -->
-    <Watermark
-      :text="watermarkText"
-      :enabled="watermarkEnabled"
-    />
+    <Watermark :text="watermarkText" :enabled="watermarkEnabled" />
 
     <!-- 主题设置面板（由用户头像下拉"布局设置"触发） -->
     <ThemeSettingsPanel v-model="settingsVisible" />

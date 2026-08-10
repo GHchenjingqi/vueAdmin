@@ -13,21 +13,13 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openCreate()"
-        >
+        <el-button type="primary" :icon="Plus" @click="openCreate()">
           {{ t('knowledge.addTag') }}
         </el-button>
       </template>
 
       <template #column-color="{ row }">
-        <el-tag
-          :color="row.color"
-          style="color: #fff"
-          size="small"
-        >
+        <el-tag :color="row.color" style="color: #fff" size="small">
           {{ row.name }}
         </el-tag>
       </template>
@@ -38,22 +30,10 @@
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button
-            type="warning"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openEdit(row as any)"
-          >
+          <el-button type="warning" link size="small" :icon="Edit" @click="openEdit(row as any)">
             {{ t('common.edit') }}
           </el-button>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDelete(row as any)"
-          >
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row as any)">
             {{ t('common.delete') }}
           </el-button>
         </div>
@@ -67,40 +47,19 @@
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <el-form
-        ref="formRef"
-        :model="form"
-        label-width="100px"
-        :rules="rules"
-      >
-        <el-form-item
-          :label="t('knowledge.tagName')"
-          prop="name"
-        >
-          <el-input
-            v-model="form.name"
-            :placeholder="t('knowledge.inputTagName')"
-          />
+      <el-form ref="formRef" :model="form" label-width="100px" :rules="rules">
+        <el-form-item :label="t('knowledge.tagName')" prop="name">
+          <el-input v-model="form.name" :placeholder="t('knowledge.inputTagName')" />
         </el-form-item>
-        <el-form-item
-          :label="t('knowledge.tagColor')"
-          prop="color"
-        >
-          <el-color-picker
-            v-model="form.color"
-            show-alpha
-          />
+        <el-form-item :label="t('knowledge.tagColor')" prop="color">
+          <el-color-picker v-model="form.color" show-alpha />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button
-          type="primary"
-          :loading="submitLoading"
-          @click="handleSubmit"
-        >
+        <el-button type="primary" :loading="submitLoading" @click="handleSubmit">
           {{ t('common.confirm') }}
         </el-button>
       </template>

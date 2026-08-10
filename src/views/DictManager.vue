@@ -14,27 +14,16 @@
       @query="onTypeQuery"
     >
       <template #header-buttons>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          @click="openTypeDialog()"
-        >
+        <el-button type="primary" :icon="Plus" @click="openTypeDialog()">
           {{ t('dict.addDict') }}
         </el-button>
-        <el-button
-          :icon="Refresh"
-          :loading="refreshCacheLoading"
-          @click="handleRefreshCache"
-        >
+        <el-button :icon="Refresh" :loading="refreshCacheLoading" @click="handleRefreshCache">
           {{ t('dict.refreshCache') }}
         </el-button>
       </template>
 
       <template #column-status="{ row }">
-        <el-tag
-          :type="row.status === 1 ? 'success' : 'info'"
-          size="small"
-        >
+        <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
           {{ row.status === 1 ? t('dict.enabled') : t('dict.disabled') }}
         </el-tag>
       </template>
@@ -45,31 +34,13 @@
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :icon="DataAnalysis"
-            @click="openDataDialog(row)"
-          >
+          <el-button type="primary" link size="small" :icon="DataAnalysis" @click="openDataDialog(row)">
             {{ t('dict.dictData') }}
           </el-button>
-          <el-button
-            type="warning"
-            link
-            size="small"
-            :icon="Edit"
-            @click="openTypeDialog(row)"
-          >
+          <el-button type="warning" link size="small" :icon="Edit" @click="openTypeDialog(row)">
             {{ t('common.edit') }}
           </el-button>
-          <el-button
-            type="danger"
-            link
-            size="small"
-            :icon="Delete"
-            @click="handleDeleteType(row)"
-          >
+          <el-button type="danger" link size="small" :icon="Delete" @click="handleDeleteType(row)">
             {{ t('common.delete') }}
           </el-button>
         </div>
@@ -84,23 +55,12 @@
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <ProForm
-        ref="typeFormRef"
-        v-model="typeForm"
-        :schema="typeFormSchema"
-        :columns="1"
-        :show-actions="false"
-        label-width="90px"
-      />
+      <ProForm ref="typeFormRef" v-model="typeForm" :schema="typeFormSchema" :columns="1" :show-actions="false" label-width="90px" />
       <template #footer>
         <el-button @click="typeDialogVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button
-          type="primary"
-          :loading="typeSubmitLoading"
-          @click="handleSubmitType"
-        >
+        <el-button type="primary" :loading="typeSubmitLoading" @click="handleSubmitType">
           {{ t('common.confirm') }}
         </el-button>
       </template>
@@ -116,10 +76,7 @@
       destroy-on-close
     >
       <div class="dict-data-dialog">
-        <div
-          class="dict-data-toolbar"
-          style="margin-bottom: 16px"
-        >
+        <div class="dict-data-toolbar" style="margin-bottom: 16px">
           <el-input
             v-model="dataSearchParams.keyword"
             :placeholder="t('dict.searchPlaceholder')"
@@ -130,88 +87,31 @@
             @change="onDataSearch"
             @keyup.enter="onDataSearch"
           />
-          <el-button
-            type="primary"
-            :icon="Plus"
-            @click="openDataItemDialog()"
-          >
+          <el-button type="primary" :icon="Plus" @click="openDataItemDialog()">
             {{ t('dict.addData') }}
           </el-button>
         </div>
 
-        <el-table
-          :key="locale"
-          v-loading="dataLoading"
-          :data="dataItems"
-          border
-          stripe
-          class="dict-data-table"
-        >
-          <el-table-column
-            prop="id"
-            :label="t('common.id')"
-            width="60"
-          />
-          <el-table-column
-            prop="label"
-            :label="t('dict.dictLabel')"
-            width="140"
-          />
-          <el-table-column
-            prop="value"
-            :label="t('dict.dictValue')"
-            width="140"
-          />
-          <el-table-column
-            prop="sort"
-            :label="t('dict.sort')"
-            width="70"
-            align="center"
-          />
-          <el-table-column
-            prop="status"
-            :label="t('dict.status')"
-            width="80"
-            align="center"
-          >
+        <el-table :key="locale" v-loading="dataLoading" :data="dataItems" border stripe class="dict-data-table">
+          <el-table-column prop="id" :label="t('common.id')" width="60" />
+          <el-table-column prop="label" :label="t('dict.dictLabel')" width="140" />
+          <el-table-column prop="value" :label="t('dict.dictValue')" width="140" />
+          <el-table-column prop="sort" :label="t('dict.sort')" width="70" align="center" />
+          <el-table-column prop="status" :label="t('dict.status')" width="80" align="center">
             <template #default="{ row }">
-              <el-tag
-                :type="row.status === 1 ? 'success' : 'info'"
-                size="small"
-              >
+              <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
                 {{ row.status === 1 ? t('dict.enabled') : t('dict.disabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column
-            prop="remark"
-            :label="t('dict.remark')"
-            min-width="140"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            :label="t('common.operation')"
-            width="180"
-            fixed="right"
-          >
+          <el-table-column prop="remark" :label="t('dict.remark')" min-width="140" show-overflow-tooltip />
+          <el-table-column :label="t('common.operation')" width="180" fixed="right">
             <template #default="{ row }">
               <div class="table-actions">
-                <el-button
-                  type="warning"
-                  link
-                  size="small"
-                  :icon="Edit"
-                  @click="openDataItemDialog(row)"
-                >
+                <el-button type="warning" link size="small" :icon="Edit" @click="openDataItemDialog(row)">
                   {{ t('common.edit') }}
                 </el-button>
-                <el-button
-                  type="danger"
-                  link
-                  size="small"
-                  :icon="Delete"
-                  @click="handleDeleteData(row)"
-                >
+                <el-button type="danger" link size="small" :icon="Delete" @click="handleDeleteData(row)">
                   {{ t('common.delete') }}
                 </el-button>
               </div>
@@ -240,23 +140,12 @@
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <ProForm
-        ref="dataFormRef"
-        v-model="dataForm"
-        :schema="dataFormSchema"
-        :columns="1"
-        :show-actions="false"
-        label-width="90px"
-      />
+      <ProForm ref="dataFormRef" v-model="dataForm" :schema="dataFormSchema" :columns="1" :show-actions="false" label-width="90px" />
       <template #footer>
         <el-button @click="dataItemDialogVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button
-          type="primary"
-          :loading="dataSubmitLoading"
-          @click="handleSubmitData"
-        >
+        <el-button type="primary" :loading="dataSubmitLoading" @click="handleSubmitData">
           {{ t('common.confirm') }}
         </el-button>
       </template>
