@@ -968,6 +968,17 @@
     "notFoundTitle": "Sorry, the page you visited does not exist",
     "notFoundDesc": "The page may have been deleted, moved, or is temporarily unavailable"
   },
+  "workflow": {
+    "title": "Workflows",
+    "addWorkflow": "New Workflow",
+    "name": "Workflow Name",
+    "designer": "Designer",
+    "publish": "Publish",
+    "instance": "Instances",
+    "retry": "Retry",
+    "terminate": "Terminate",
+    "approval": "Approval Center"
+  },
   "knowledge": {
     "cover": "Cover Image",
     "coverEmpty": "No images found in body, add Markdown images first"

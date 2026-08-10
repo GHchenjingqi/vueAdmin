@@ -6,7 +6,7 @@
 
 ## 项目概述
 
-Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 + Vite + TypeScript，后端使用 Express + Sequelize ORM + TypeScript。系统开箱即用，自带用户认证（JWT 双 Token 机制 + HttpOnly Cookie）、动态菜单、RBAC 权限、行级数据权限（部门数据隔离）、文件管理、系统设置、字典管理、通知公告、消息推送（SSE 实时推送）、在线用户管理、定时任务调度、服务监控、全局搜索、暗黑模式、水印、密码找回、操作日志、Excel 导出、Swagger API 文档（Redoc）、多语言国际化、AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理）、Web Vitals 性能监控等功能。
+Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 + Vite + TypeScript，后端使用 Express + Sequelize ORM + TypeScript。系统开箱即用，自带用户认证（JWT 双 Token 机制 + HttpOnly Cookie）、动态菜单、RBAC 权限、行级数据权限（部门数据隔离）、文件管理、系统设置、字典管理、通知公告、消息推送（SSE 实时推送）、在线用户管理、定时任务调度、服务监控、全局搜索、工作流引擎（审批流 + 可视化设计器 + 版本冻结 + 业务绑定触发）、暗黑模式、水印、密码找回、操作日志、Excel 导出、Swagger API 文档（Redoc）、多语言国际化、AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理）、Web Vitals 性能监控等功能。
 
 项目已实施多项安全加固与工程化优化：SQL 注入修复、SSE 一次性票据认证 + JWT-in-query 泄露修复、CSRF 纵深防御（Origin 校验 + SameSite=Strict）、Zod 共享 Schema 校验、Pinia 状态管理（9 个 Store）、轻量级 i18n 国际化、Composables 组合式函数（含 useSSE）、ProTable 组件拆分、BEM 命名规范、CSS 变量暗黑模式适配、响应式布局、XSS 防护（SVG 清洗）、数据库索引优化、生产环境错误信息脱敏（错误分级：409/400/500）、Helmet 安全头 + trust proxy、请求频率限制（滑动窗口 + Redis 多实例）、Sentry 错误监控 + Web Vitals RUM、Vitest 单元测试（35+ 前端文件 + 24 个后端文件）、E2E 测试（Playwright）、GitHub Actions CI/CD 流水线、Docker 多阶段构建、Kubernetes 部署清单 + 多副本一致性（Redis pub/sub 踢人）。
 
@@ -27,6 +27,14 @@ Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 
 | **文件管理** | 上传/下载/删除/预览、按日期分目录 |
 | **通知公告** | Markdown 富文本编辑、SSE 实时推送、已读标记 |
 
+### 流程管理模块
+
+| 页面 | 功能 |
+|------|------|
+| **工作流管理** | 流程定义/启用禁用/发布（版本冻结）、Vue Flow 可视化拖拽设计器 |
+| **运行实例** | 实例列表/状态追踪/执行链路日志/重试/终止 |
+| **审批中心** | 待办/已办审批列表、通过/驳回操作、SSE 实时通知 |
+
 ### 系统监控模块
 
 | 页面 | 功能 |
@@ -46,6 +54,7 @@ Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 
 - **列设置**：表格列显隐可配、排序状态持久化
 - **SSE 实时推送**：一次性票据认证，安全可靠
 - **导出进度条**：大数据量导出时实时显示进度
+- **工作流引擎**：可视化流程设计器（Vue Flow 拖拽画布）、5 种节点类型（开始/结束/条件判断/审批节点/发送通知）、条件表达式引擎（expr-eval 安全求值）、审批人规则动态解析（6 种规则类型）、版本冻结发布、SKIP 业务绑定触发、SSE 审批通知实时推送
 - **AI 代码生成助手**：浮动按钮 + 抽屉式对话界面，支持 Markdown/代码渲染、代码高亮、多提供商/模型切换、代码文件预览与一键应用（创建菜单/文件写入）、本地知识库 RAG 检索
 - **Web Vitals 性能监控**：Core Web Vitals（CLS/FCP/LCP/TTFB/INP）实时采集并上报 Sentry，用于 RUM 真实用户监控
 - **骨架屏加载**：页面和组件级别骨架屏（SkeletonLoader / PageSkeleton），提升加载感知体验
@@ -230,6 +239,7 @@ const formSchema = [
 | v4.1 | 行级数据权限 + CSRF 纵深防御 + 多副本踢下线 + 后端单元测试 + trust proxy |
 | v4.2 | AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理） + SSE Composable + Web Vitals |
 | v4.3 | 骨架屏组件 + 性能预算 + Lighthouse CI + GitHub Actions Release + 前后端测试增强 |
+| v4.4 | 工作流引擎（Vue Flow 可视化设计器 + 审批流 + 条件分支 + 版本冻结 + 业务绑定触发 + 审批人规则 + SSE 通知 + 3 测试文件 15 测试用例） |
 
 ---
 
@@ -267,6 +277,10 @@ const formSchema = [
 | [unplugin-vue-components](https://github.com/antfu/unplugin-vue-components) | ^32.1.0 | Element Plus 组件自动按需导入 |
 | [unplugin-icons](https://github.com/antfu/unplugin-icons) | ^23.0.1 | 图标自动按需导入 |
 | [vite-plugin-compression](https://github.com/anncwb/vite-plugin-compression) | ^0.5.1 | 构建时生成 Gzip 预压缩文件 |
+| [@vue-flow/core](https://vueflow.dev/) | ^1.48.2 | 可视化流程设计器画布（拖拽节点、连线、条件分支） |
+| [@vue-flow/background](https://vueflow.dev/) | ^1.48.2 | 设计器画布网格背景 |
+| [@vue-flow/controls](https://vueflow.dev/) | ^1.48.2 | 设计器缩放控制按钮 |
+| [@vue-flow/minimap](https://vueflow.dev/) | ^1.48.2 | 设计器小地图导航 |
 | [vitest](https://vitest.dev/) | ^4.1.9 | 单元测试框架（覆盖率报告） |
 | [vue-tsc](https://github.com/johnsoncodehk/volar/tree/master/packages/vue-tsc) | ^3.3.5 | TypeScript 类型检查 |
 
@@ -294,6 +308,7 @@ const formSchema = [
 | [Umzug](https://github.com/sequelize/umzug) | ^3.8.3 | 数据库迁移引擎（替代 sequelize.sync） |
 | [selfsigned](https://github.com/jfromaniello/selfsigned) | ^5.5.0 | 自签名 HTTPS 证书生成 |
 | [helmet](https://helmetjs.github.io/) | ^8.2.0 | 安全 HTTP 头（CSP / HSTS / XSS 防护） |
+| [expr-eval](https://github.com/silentmatt/expr-eval) | ^2.0.2 | 安全表达式求值器（工作流条件分支引擎） |
 | [openai](https://github.com/openai/openai-node) | ^4.47.0 | OpenAI / 兼容 API 客户端（AI 助手后端） |
 
 ### 测试与工程化
@@ -820,9 +835,10 @@ vue-admin/
 │   │       ├── dict.ts              # 字典管理 Schema
 │   │       ├── notice.ts            # 通知管理 Schema
 │   │       ├── role.ts              # 角色管理 Schema
+│   │       ├── workflow.ts          # 工作流定义/设计/触发/审批 Schema（新增）
 │   │       ├── common.ts            # 通用 Schema（pagination / id / dateRange）
 │   │       └── index.ts             # 统一导出
-│   ├── models/                      # 数据模型（Sequelize ORM，16 个模型）
+│   ├── models/                      # 数据模型（Sequelize ORM，25 个模型）
 │   │   ├── User.ts                  # 用户模型（含 deptId 索引、status / username 复合索引）
 │   │   ├── Role.ts                  # 角色模型（含 dataScope 数据权限范围字段）
 │   │   ├── UserRole.ts              # 用户-角色关联
@@ -838,8 +854,17 @@ vue-admin/
 │   │   ├── Task.ts                  # 定时任务
 │   │   ├── Log.ts                   # 操作日志
 │   │   ├── RefreshToken.ts          # Refresh Token 持久化（含 userId / purpose 联合索引）
-│   │   └── AiProvider.ts            # AI 提供商配置（实验性模块使用）
-│   ├── controllers/                 # 控制器层（19 个控制器）
+│   │   ├── AiProvider.ts            # AI 提供商配置（实验性模块使用）
+│   │   ├── Workflow.ts              # 工作流定义（含草稿/线上版本 ID）
+│   │   ├── WorkflowVersion.ts       # 工作流版本（草稿/已发布，版本冻结）
+│   │   ├── WorkflowNode.ts          # 工作流节点（start/end/condition/approve/notify）
+│   │   ├── WorkflowEdge.ts          # 工作流连线（含条件表达式）
+│   │   ├── WorkflowApproverRule.ts  # 审批人规则（6 种规则类型）
+│   │   ├── WorkflowBinding.ts       # 流程-业务单据绑定
+│   │   ├── WorkflowInstance.ts      # 流程运行实例（状态追踪）
+│   │   ├── ApprovalTask.ts          # 审批任务（待办/已办）
+│   │   └── WorkflowInstanceLog.ts   # 节点执行日志（输入/输出/错误/耗时）
+│   ├── controllers/                 # 控制器层（22 个控制器）
 │   │   ├── authController.ts        # 认证登录（SSE 票据签发、密码找回、Token 刷新）
 │   │   ├── userController.ts        # 用户管理（Excel 导出、数据权限过滤）
 │   │   ├── menuController.ts        # 菜单管理（树形 / 选项 / 后台列表）
@@ -858,8 +883,11 @@ vue-admin/
 │   │   ├── searchController.ts      # 全局搜索
 │   │   ├── taskController.ts        # 定时任务管理
 │   │   ├── onlineUserController.ts  # 在线用户管理（强制踢下线）
-│   │   └── serverController.ts      # 服务监控（CPU / 内存 / 磁盘）
-│   ├── services/                      # 服务层（业务逻辑，25+ 个文件）
+│   │   ├── serverController.ts      # 服务监控（CPU / 内存 / 磁盘）
+│   │   ├── workflowController.ts    # 工作流定义/设计 CRUD + 发布冻结
+│   │   ├── workflowInstanceController.ts # 流程实例触发/列表/详情/重试/终止
+│   │   └── approvalController.ts    # 审批任务列表/通过/驳回
+│   ├── services/                      # 服务层（业务逻辑，28+ 个文件）
 │   │   ├── authService.ts           # 认证服务（登录、Token 刷新、SSE 票据、密码找回）
 │   │   ├── userService.ts           # 用户服务（含数据权限 dataScope 解析）
 │   │   ├── roleService.ts           # 角色服务
@@ -867,8 +895,11 @@ vue-admin/
 │   │   ├── AiProviderService.ts     # AI 提供商管理（CRUD、多实例）
 │   │   ├── CodeInjector.ts          # AI 代码注入引擎（文件写入、菜单创建）
 │   │   ├── LocalFileRAG.ts          # 本地文件 RAG 检索（知识库索引）
+│   │   ├── workflowService.ts       # 工作流 CRUD + 版本发布冻结
+│   │   ├── workflowDesignService.ts # 草稿设计（节点/边/审批人规则增删改）
+│   │   ├── WorkflowEngine.ts        # 工作流执行引擎（5 种节点遍历 + 条件分支 + 审批流转）
 │   │   └── ...                        # menuService / dictService / noticeService / taskService 等
-│   ├── routes/                      # 路由层（14 个路由文件）
+│   ├── routes/                      # 路由层（15 个路由文件）
 │   │   ├── index.ts                 # 路由聚合入口（含 OpenAPI 注解 + Zod 校验中间件 + originValidator）
 │   │   ├── authRoutes.ts            # 认证路由
 │   │   ├── userRoutes.ts            # 用户管理路由
@@ -882,7 +913,8 @@ vue-admin/
 │   │   ├── noticeRoutes.ts          # 通知公告路由
 │   │   ├── logRoutes.ts             # 日志路由
 │   │   ├── uploadRoutes.ts          # 文件上传路由
-│   │   └── dashboardRoutes.ts       # 仪表盘路由
+│   │   ├── dashboardRoutes.ts       # 仪表盘路由
+│   │   └── workflowRoutes.ts        # 工作流路由（定义/设计/绑定/触发/实例/审批）
 │   ├── middleware/                  # 中间件（7 个）
 │   │   ├── auth.ts                  # JWT 认证中间件
 │   │   ├── accessLog.ts             # HTTP 访问日志（包装 res.end）
@@ -897,7 +929,7 @@ vue-admin/
 │   │   ├── common.ts               # 通用校验
 │   │   ├── dept.ts                  # 部门校验
 │   │   └── index.ts                 # 统一导出
-│   ├── utils/                       # 工具模块（15 个文件）
+│   ├── utils/                       # 工具模块（17 个文件）
 │   │   ├── fileLogger.ts            # 文件日志（按日期切割、30 天轮转、日志分级）
 │   │   ├── logger.ts                # 数据库操作日志工具
 │   │   ├── captcha.ts               # SVG 图形验证码生成
@@ -912,30 +944,45 @@ vue-admin/
 │   │   ├── dataScope.ts             # 数据权限工具（部门隔离 / dataScope 范围解析）
 │   │   ├── diff.ts                  # 对象差异对比工具
 │   │   ├── generateCert.ts          # HTTPS 自签名证书生成
-│   │   └── helpers.ts               # 通用辅助函数
-│   ├── migrations/                  # 数据库迁移（16 个，按时间戳排序）
+│   │   ├── helpers.ts               # 通用辅助函数
+│   │   ├── workflowExpression.ts    # 工作流条件表达式引擎（expr-eval 安全求值）
+│   │   └── approvalRuleResolver.ts  # 审批人规则动态解析（6 种规则类型）
+│   ├── migrations/                  # 数据库迁移（26 个，按时间戳排序）
 │   │   ├── 20260707_000001_create-users.cjs
 │   │   ├── 20260707_000002_create-roles.cjs
 │   │   ├── ...                      # 覆盖所有数据表
 │   │   ├── 20260707_000015_create-logs.cjs
-│   │   └── 20260717_000001_legacy-compat.ts # 旧数据兼容迁移（dataScope 字段补全）
-│   ├── seeders/                     # 种子数据（7 个）
+│   │   ├── 20260717_000001_legacy-compat.ts # 旧数据兼容迁移（dataScope 字段补全）
+│   │   ├── 20260810_000001_create-workflows.ts          # 工作流定义表
+│   │   ├── 20260810_000002_create-workflow-versions.ts  # 工作流版本表
+│   │   ├── 20260810_000003_create-workflow-nodes.ts     # 工作流节点表
+│   │   ├── 20260810_000004_create-workflow-edges.ts     # 工作流连线表
+│   │   ├── 20260810_000005_create-workflow-approver-rules.ts # 审批人规则表
+│   │   ├── 20260810_000006_create-workflow-bindings.ts  # 流程绑定表
+│   │   ├── 20260810_000007_create-workflow-instances.ts # 运行实例表
+│   │   ├── 20260810_000008_create-approval-tasks.ts     # 审批任务表
+│   │   └── 20260810_000009_create-workflow-instance-logs.ts # 节点执行日志表
+│   ├── seeders/                     # 种子数据（8 个）
 │   │   ├── 20260707_000001_admin_user.cjs
 │   │   ├── 20260707_000002_default_roles.cjs
 │   │   ├── 20260707_000003_default_departments.cjs
 │   │   ├── 20260707_000004_default_menus.cjs
 │   │   ├── 20260707_000005_admin_role.cjs
 │   │   ├── 20260707_000006_default_settings.cjs
-│   │   └── 20260707_000007_default_tasks.cjs
+│   │   ├── 20260707_000007_default_tasks.cjs
+│   │   └── 20260810_000008_workflow_menus.ts            # 工作流管理菜单种子
 │   ├── scripts/
 │   │   └── migrate.ts               # 迁移 CLI 脚本（up / down / seed / reset / status）
 │   ├── types/                       # 类型声明
 │   │   ├── express.d.ts             # Express 类型扩展（req.user）
 │   │   └── sequelize.d.ts           # Sequelize 类型扩展
-│   ├── __tests__/                   # 后端单元测试（24 个测试文件）
+│   ├── __tests__/                   # 后端单元测试（27 个测试文件）
 │   │   ├── authMiddleware.test.ts
 │   │   ├── authService.test.ts
 │   │   ├── captcha.test.ts
+│   │   ├── workflowExpression.test.ts       # 工作流条件表达式测试（5 用例）
+│   │   ├── approvalRuleResolver.test.ts     # 审批人规则解析测试（6 用例）
+│   │   ├── workflowEngine.test.ts           # 工作流引擎测试（4 用例）
 │   │   ├── dataScope.test.ts        # 数据权限范围解析测试
 │   │   ├── errorHandler.test.ts
 │   │   ├── fileLogger.test.ts
@@ -971,7 +1018,7 @@ vue-admin/
 │   │   ├── initSession.ts           # 会话初始化（页面刷新后恢复登录态 + 站点信息）
 │   │   ├── keepAlive.ts             # 路由组件缓存管理（白名单动态配置）
 │   │   └── preload.ts               # 路由预加载（兄弟路由）
-│   ├── api/                         # API 请求封装（TypeScript，18 个 API 模块）
+│   ├── api/                         # API 请求封装（TypeScript，19 个 API 模块）
 │   │   ├── index.ts                 # 统一导出
 │   │   ├── auth.ts                  # 认证 API
 │   │   ├── user.ts                  # 用户管理 API
@@ -989,7 +1036,8 @@ vue-admin/
 │   │   ├── onlineUser.ts            # 在线用户 API
 │   │   ├── task.ts                  # 定时任务 API
 │   │   ├── server.ts                # 服务监控 API
-│   │   └── ai.ts                    # AI 代码生成 API（聊天 / 文件应用 / 提供商管理）
+│   │   ├── ai.ts                    # AI 代码生成 API（聊天 / 文件应用 / 提供商管理）
+│   │   └── workflow.ts              # 工作流 API（定义/设计/绑定/触发/实例/审批）
 │   ├── stores/                      # Pinia 状态管理（9 个 Store）
 │   │   ├── index.ts                 # 统一导出
 │   │   ├── pinia.ts                 # Pinia 实例
@@ -1065,7 +1113,7 @@ vue-admin/
 │   │       ├── GlobalSearch.vue     # 全局搜索（⌘K / Ctrl+K，键盘导航）
 │   │       ├── NotificationCenter.vue # 通知中心（SSE 票据认证、未读红点）
 │   │       └── ThemeSettingsPanel.vue # 主题设置面板（暗黑模式、主色、字号、布局）
-│   ├── views/                       # 页面组件（24 个页面）
+│   ├── views/                       # 页面组件（28 个页面）
 │   │   ├── Layout.vue               # 主布局（响应式、标签页、骨架屏、水印、AI 助手悬浮按钮）
 │   │   ├── Login.vue                # 登录页（验证码、记住我、响应式）
 │   │   ├── LoginPage.vue            # 登录页配置页
@@ -1091,6 +1139,10 @@ vue-admin/
 │   │   ├── ServerMonitor.vue        # 服务监控
 │   │   ├── ForceChangePassword.vue  # 强制改密
 │   │   ├── ResetPassword.vue        # 重置密码
+│   │   ├── WorkflowList.vue         # 工作流管理（ProTable 列表 + 创建/编辑/发布/启用禁用）
+│   │   ├── WorkflowDesigner.vue     # 可视化流程设计器（Vue Flow 拖拽画布 + 节点配置面板）
+│   │   ├── WorkflowInstance.vue     # 运行实例（列表 + 执行链路日志 + 重试/终止）
+│   │   ├── ApprovalCenter.vue       # 审批中心（待办/已办 + 通过/驳回 + SSE 实时通知）
 │   │   ├── NotFound.vue             # 404
 │   │   ├── Forbidden.vue            # 403
 │   │   ├── RouteView.vue            # 路由占位组件

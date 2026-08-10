@@ -394,6 +394,25 @@ async function seedData() {
       })
       logInfo('默认定时任务已创建')
     }
+
+    // 增量：流程管理目录 + 工作流相关菜单
+    let workflowMenu = await Menu.findOne({ where: { path: '/workflow' } })
+    if (!workflowMenu) {
+      workflowMenu = await Menu.create({ parentId: 0, name: '流程管理', path: '/workflow', icon: 'Connection', type: 'C', sort: 80 })
+      logInfo('已补充菜单: 流程管理')
+    }
+    const workflowChildren = [
+      { name: '工作流管理', path: '/workflows', component: 'views/WorkflowList.vue', icon: 'List', sort: 0 },
+      { name: '运行实例', path: '/workflow-instances', component: 'views/WorkflowInstance.vue', icon: 'Monitor', sort: 1 },
+      { name: '审批中心', path: '/approval-center', component: 'views/ApprovalCenter.vue', icon: 'EditPen', sort: 2 },
+    ]
+    for (const child of workflowChildren) {
+      const exists = await Menu.findOne({ where: { name: child.name } })
+      if (!exists) {
+        await Menu.create({ parentId: workflowMenu.id, type: 'M', ...child })
+        logInfo(`已补充菜单: ${child.name}`)
+      }
+    }
   }
 }
 /**

@@ -34,6 +34,12 @@ const routes = [
         component: () => import('@/views/AiProviderManager.vue'),
         meta: { title: 'AI 提供商管理' },
       },
+      {
+        path: 'workflows/:id/design',
+        name: 'WorkflowDesigner',
+        component: () => import('@/views/WorkflowDesigner.vue'),
+        meta: { title: '流程设计' },
+      },
     ],
   },
   {
