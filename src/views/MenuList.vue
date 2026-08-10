@@ -17,51 +17,99 @@
       @query="onQuery($event)"
     >
       <template #header-buttons>
-        <el-button type="primary" :icon="Plus" @click="openCreateDialog()">
+        <el-button
+          type="primary"
+          :icon="Plus"
+          @click="openCreateDialog()"
+        >
           {{ t('menu.addMenu') }}
         </el-button>
       </template>
 
       <template #column-name="{ row }">
-        <MenuIcon :name="row.icon" style="margin-right: 6px; vertical-align: middle" />
+        <MenuIcon
+          :name="row.icon"
+          style="margin-right: 6px; vertical-align: middle"
+        />
         <span>{{ row.name }}</span>
       </template>
 
       <template #column-type="{ row }">
-        <el-tag :type="row.type === 'C' ? 'warning' : row.type === 'F' ? 'success' : 'primary'" size="small">
+        <el-tag
+          :type="row.type === 'C' ? 'warning' : row.type === 'F' ? 'success' : 'primary'"
+          size="small"
+        >
           {{ row.type === 'C' ? t('menu.catalog') : row.type === 'F' ? t('menu.button') : t('menu.menu') }}
         </el-tag>
       </template>
 
       <template #column-status="{ row }">
-        <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
+        <el-tag
+          :type="row.status === 1 ? 'success' : 'info'"
+          size="small"
+        >
           {{ row.status === 1 ? t('common.enable') : t('common.disable') }}
         </el-tag>
       </template>
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button type="primary" link size="small" :icon="Edit" @click="openEditDialog(row)">
+          <el-button
+            type="primary"
+            link
+            size="small"
+            :icon="Edit"
+            @click="openEditDialog(row)"
+          >
             {{ t('common.edit') }}
           </el-button>
-          <el-button type="primary" link size="small" :icon="Plus" @click="openCreateDialog(row.id)">
+          <el-button
+            type="primary"
+            link
+            size="small"
+            :icon="Plus"
+            @click="openCreateDialog(row.id)"
+          >
             {{ t('common.add') }}
           </el-button>
-          <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">
+          <el-button
+            type="danger"
+            link
+            size="small"
+            :icon="Delete"
+            @click="handleDelete(row)"
+          >
             {{ t('common.delete') }}
           </el-button>
         </div>
       </template>
     </ProTable>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? t('menu.editMenu') : t('menu.addMenu')" width="600px" :close-on-click-modal="false" destroy-on-close>
-      <ProForm ref="proFormRef" v-model="form" :schema="formSchema" :columns="1" :show-actions="false" label-width="100px" />
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? t('menu.editMenu') : t('menu.addMenu')"
+      width="600px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <ProForm
+        ref="proFormRef"
+        v-model="form"
+        :schema="formSchema"
+        :columns="1"
+        :show-actions="false"
+        label-width="100px"
+      />
 
       <template #footer>
         <el-button @click="dialogVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button type="primary" :loading="submitLoading" @click="handleSubmit">
+        <el-button
+          type="primary"
+          :loading="submitLoading"
+          @click="handleSubmit"
+        >
           {{ t('common.confirm') }}
         </el-button>
       </template>

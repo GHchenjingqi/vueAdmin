@@ -16,8 +16,8 @@ import type { Menu } from '@/types/api'
 /** 已注册的动态路由名称集合，用于避免重复注册 */
 const addedRoutes: Set<string> = new Set()
 
-/** 所有视图页面的 Vite glob 导入 */
-const viewModules: Record<string, () => Promise<unknown>> = import.meta.glob('/src/views/**/*.vue')
+/** 所有视图页面的 Vite glob 导入（含业务模块） */
+const viewModules: Record<string, () => Promise<unknown>> = import.meta.glob('/src/{views,modules}/**/*.vue')
 
 /**
  * 递归注册动态路由

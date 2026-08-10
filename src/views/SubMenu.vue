@@ -1,14 +1,24 @@
 <template>
   <div>
-    <template v-for="item in menus" :key="item.id">
-      <el-sub-menu v-if="item.children && item.children.length" :index="item.path || item.id">
+    <template
+      v-for="item in menus"
+      :key="item.id"
+    >
+      <el-sub-menu
+        v-if="item.children && item.children.length"
+        :index="item.path || item.id"
+      >
         <template #title>
           <MenuIcon :name="item.icon" />
           <span>{{ t(menuKey(item), {}, item.name) }}</span>
         </template>
         <SubMenu :menus="item.children" />
       </el-sub-menu>
-      <el-menu-item v-else-if="item.type === 'M'" :index="item.path" @mouseenter="onMenuHover(item.path)">
+      <el-menu-item
+        v-else-if="item.type === 'M'"
+        :index="item.path"
+        @mouseenter="onMenuHover(item.path)"
+      >
         <MenuIcon :name="item.icon" />
         <template #title>
           {{ t(menuKey(item), {}, item.name) }}

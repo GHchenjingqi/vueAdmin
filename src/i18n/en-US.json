@@ -943,6 +943,10 @@
     "collapsed": "Collapsed Side Navigation",
     "aiProviders": "AI Providers",
     "dashboard": "Dashboard",
+    "knowledge": "Knowledge Base",
+    "category": "Category",
+    "tag": "Tag",
+    "content": "Content",
     "system": "System",
     "settings": "Settings",
     "users": "Users",
@@ -963,5 +967,9 @@
   "errorPage": {
     "notFoundTitle": "Sorry, the page you visited does not exist",
     "notFoundDesc": "The page may have been deleted, moved, or is temporarily unavailable"
+  },
+  "knowledge": {
+    "cover": "Cover Image",
+    "coverEmpty": "No images found in body, add Markdown images first"
   }
 }

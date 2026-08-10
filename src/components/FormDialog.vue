@@ -22,17 +22,27 @@
       :disabled="disabled"
     >
       <template #content="slotProps">
-        <slot name="content" v-bind="slotProps" />
+        <slot
+          name="content"
+          v-bind="slotProps"
+        />
       </template>
     </ProForm>
 
     <template #footer>
       <slot name="footer">
         <div class="dialog-footer">
-          <el-button :disabled="loading" @click="visible = false">
+          <el-button
+            :disabled="loading"
+            @click="visible = false"
+          >
             {{ t('common.cancel') }}
           </el-button>
-          <el-button type="primary" :loading="loading" @click="handleConfirm">
+          <el-button
+            type="primary"
+            :loading="loading"
+            @click="handleConfirm"
+          >
             {{ confirmText || t('common.confirm') }}
           </el-button>
         </div>

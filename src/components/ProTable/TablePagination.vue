@@ -1,5 +1,8 @@
 <template>
-  <div v-if="showPagination" class="table-pagination">
+  <div
+    v-if="showPagination"
+    class="table-pagination"
+  >
     <el-pagination
       v-model:current-page="currentPage"
       v-model:page-size="currentPageSize"

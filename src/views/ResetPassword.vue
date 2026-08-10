@@ -2,7 +2,10 @@
   <div class="reset-pwd-page">
     <div class="reset-pwd-card">
       <div class="reset-pwd-header">
-        <el-icon :size="40" color="#409eff">
+        <el-icon
+          :size="40"
+          color="#409eff"
+        >
           <Key />
         </el-icon>
         <h2>{{ t('resetPwd.title') }}</h2>
@@ -10,36 +13,73 @@
       </div>
 
       <!-- Token 无效 -->
-      <el-result v-if="tokenStatus === 'invalid'" icon="error" :title="t('resetPwd.linkExpired')">
+      <el-result
+        v-if="tokenStatus === 'invalid'"
+        icon="error"
+        :title="t('resetPwd.linkExpired')"
+      >
         <template #extra>
           <p style="color: var(--text-secondary); margin-bottom: 16px">
             {{ t('resetPwd.linkExpiredDesc') }}
           </p>
-          <el-button type="primary" @click="router.push('/login')">
+          <el-button
+            type="primary"
+            @click="router.push('/login')"
+          >
             {{ t('resetPwd.returnToLogin') }}
           </el-button>
         </template>
       </el-result>
 
       <!-- 重置成功 -->
-      <el-result v-else-if="tokenStatus === 'success'" icon="success" :title="t('resetPwd.resetSuccess')">
+      <el-result
+        v-else-if="tokenStatus === 'success'"
+        icon="success"
+        :title="t('resetPwd.resetSuccess')"
+      >
         <template #extra>
           <p style="color: var(--text-secondary); margin-bottom: 16px">
             {{ t('resetPwd.resetSuccessDesc') }}
           </p>
-          <el-button type="primary" @click="router.push('/login')">
+          <el-button
+            type="primary"
+            @click="router.push('/login')"
+          >
             {{ t('resetPwd.goToLogin') }}
           </el-button>
         </template>
       </el-result>
 
       <!-- 重置表单 -->
-      <el-form v-else ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="handleSubmit">
-        <el-form-item :label="t('resetPwd.newPassword')" prop="newPassword">
-          <el-input v-model="form.newPassword" type="password" :placeholder="t('resetPwd.inputNewPwd')" show-password />
+      <el-form
+        v-else
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        size="large"
+        @keyup.enter="handleSubmit"
+      >
+        <el-form-item
+          :label="t('resetPwd.newPassword')"
+          prop="newPassword"
+        >
+          <el-input
+            v-model="form.newPassword"
+            type="password"
+            :placeholder="t('resetPwd.inputNewPwd')"
+            show-password
+          />
         </el-form-item>
-        <el-form-item :label="t('resetPwd.confirmPassword')" prop="confirmPassword">
-          <el-input v-model="form.confirmPassword" type="password" :placeholder="t('resetPwd.inputConfirmPwd')" show-password />
+        <el-form-item
+          :label="t('resetPwd.confirmPassword')"
+          prop="confirmPassword"
+        >
+          <el-input
+            v-model="form.confirmPassword"
+            type="password"
+            :placeholder="t('resetPwd.inputConfirmPwd')"
+            show-password
+          />
         </el-form-item>
 
         <div class="password-hint">
@@ -64,7 +104,12 @@
         </div>
 
         <el-form-item>
-          <el-button type="primary" :loading="loading" class="submit-btn" @click="handleSubmit">
+          <el-button
+            type="primary"
+            :loading="loading"
+            class="submit-btn"
+            @click="handleSubmit"
+          >
             {{ t('resetPwd.confirmReset') }}
           </el-button>
           <el-button @click="router.push('/login')">

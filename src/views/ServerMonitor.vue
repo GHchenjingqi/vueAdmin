@@ -2,8 +2,16 @@
   <div class="server-monitor">
     <!-- 4张系统信息卡-->
     <el-row :gutter="16">
-      <el-col v-for="card in systemCards" :key="card.label" :xs="12" :sm="6">
-        <el-card shadow="hover" class="info-card">
+      <el-col
+        v-for="card in systemCards"
+        :key="card.label"
+        :xs="12"
+        :sm="6"
+      >
+        <el-card
+          shadow="hover"
+          class="info-card"
+        >
           <div class="info-card__content">
             <div class="info-card__label">
               {{ card.label }}
@@ -11,14 +19,22 @@
             <div class="info-card__value">
               {{ card.value }}
             </div>
-            <MenuIcon :name="card.icon" :size="40" :color="card.iconColor" class="info-card__icon" />
+            <MenuIcon
+              :name="card.icon"
+              :size="40"
+              :color="card.iconColor"
+              class="info-card__icon"
+            />
           </div>
         </el-card>
       </el-col>
     </el-row>
 
     <!-- CPU & 内存 实时折线-->
-    <el-row :gutter="16" class="chart-row">
+    <el-row
+      :gutter="16"
+      class="chart-row"
+    >
       <el-col :span="12">
         <el-card shadow="hover">
           <template #header>
@@ -27,7 +43,10 @@
               {{ t('server.cpuUsage') }}
             </span>
           </template>
-          <div ref="cpuChartRef" class="line-chart" />
+          <div
+            ref="cpuChartRef"
+            class="line-chart"
+          />
           <div class="line-detail">
             <div class="line-stat">
               <span class="line-stat__label">{{ t('server.model') }}</span>
@@ -52,7 +71,10 @@
               {{ t('server.memoryUsage') }}
             </span>
           </template>
-          <div ref="memoryChartRef" class="line-chart" />
+          <div
+            ref="memoryChartRef"
+            class="line-chart"
+          />
           <div class="line-detail">
             <div class="line-stat">
               <span class="line-stat__label">{{ t('server.totalMemory') }}</span>
@@ -60,11 +82,17 @@
             </div>
             <div class="line-stat">
               <span class="line-stat__label">{{ t('server.used') }}</span>
-              <span class="line-stat__value" style="color: #e6a23c">{{ formatMB(stats.memory.used) }}</span>
+              <span
+                class="line-stat__value"
+                style="color: #e6a23c"
+              >{{ formatMB(stats.memory.used) }}</span>
             </div>
             <div class="line-stat">
               <span class="line-stat__label">{{ t('server.free') }}</span>
-              <span class="line-stat__value" style="color: #67c23a">{{ formatMB(stats.memory.free) }}</span>
+              <span
+                class="line-stat__value"
+                style="color: #67c23a"
+              >{{ formatMB(stats.memory.free) }}</span>
             </div>
           </div>
         </el-card>
@@ -72,8 +100,15 @@
     </el-row>
 
     <!-- 磁盘 仪表-->
-    <el-row :gutter="16" class="chart-row">
-      <el-col v-for="disk in stats.disks" :key="disk.caption" :span="12">
+    <el-row
+      :gutter="16"
+      class="chart-row"
+    >
+      <el-col
+        v-for="disk in stats.disks"
+        :key="disk.caption"
+        :span="12"
+      >
         <el-card shadow="hover">
           <template #header>
             <span class="card-title">
@@ -82,15 +117,24 @@
               <span class="disk-size-tag">{{ disk.total ? formatGB(disk.total) : '' }}</span>
             </span>
           </template>
-          <div :ref="(el: Element | ComponentPublicInstance | null) => setDiskGaugeRef(el, disk.caption)" class="disk-gauge" />
+          <div
+            :ref="(el: Element | ComponentPublicInstance | null) => setDiskGaugeRef(el, disk.caption)"
+            class="disk-gauge"
+          />
           <div class="disk-gauge-detail">
             <div class="line-stat">
               <span class="line-stat__label">{{ t('server.used2') }}</span>
-              <span class="line-stat__value" style="color: #409eff">{{ disk.used ? disk.used + ' GB' : '-' }}</span>
+              <span
+                class="line-stat__value"
+                style="color: #409eff"
+              >{{ disk.used ? disk.used + ' GB' : '-' }}</span>
             </div>
             <div class="line-stat">
               <span class="line-stat__label">{{ t('server.free') }}</span>
-              <span class="line-stat__value" style="color: #67c23a">{{ disk.free ? disk.free + ' GB' : '-' }}</span>
+              <span
+                class="line-stat__value"
+                style="color: #67c23a"
+              >{{ disk.free ? disk.free + ' GB' : '-' }}</span>
             </div>
             <div class="line-stat">
               <span class="line-stat__label">{{ t('server.total') }}</span>
@@ -99,7 +143,10 @@
           </div>
         </el-card>
       </el-col>
-      <el-col v-if="!stats.disks || stats.disks.length === 0" :span="24">
+      <el-col
+        v-if="!stats.disks || stats.disks.length === 0"
+        :span="24"
+      >
         <el-card shadow="hover">
           <el-empty :description="t('server.noDiskData')" />
         </el-card>
@@ -116,16 +163,27 @@
         size="small"
         @change="handleRefreshToggle"
       />
-      <el-popover placement="top" :width="280" trigger="click">
+      <el-popover
+        placement="top"
+        :width="280"
+        trigger="click"
+      >
         <template #reference>
-          <el-button size="small" :icon="Setting">
+          <el-button
+            size="small"
+            :icon="Setting"
+          >
             {{ t('server.historyConfig') }}
           </el-button>
         </template>
         <div class="config-popover">
           <div class="config-item">
             <span>{{ t('server.persistentStorage') }}</span>
-            <el-switch v-model="config.persistEnabled" size="small" @change="handleConfigChange" />
+            <el-switch
+              v-model="config.persistEnabled"
+              size="small"
+              @change="handleConfigChange"
+            />
           </div>
           <div class="config-item">
             <span>{{ t('server.retentionMinutes') }}</span>
@@ -144,7 +202,13 @@
           </div>
         </div>
       </el-popover>
-      <el-button size="small" type="primary" :icon="Refresh" :loading="loading" @click="fetchStats">
+      <el-button
+        size="small"
+        type="primary"
+        :icon="Refresh"
+        :loading="loading"
+        @click="fetchStats"
+      >
         {{ t('server.refreshNow') }}
       </el-button>
     </div>

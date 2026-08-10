@@ -26,9 +26,21 @@ const breadcrumbItems = computed(() => {
     .filter((r) => r.name !== 'Layout' && (r.meta?.title || r.name))
     .map((r) => ({
       path: r.path,
-      title: t(breadcrumbKey(r.path), {}, (r.meta?.title as string) || (r.name as string) || ''),
+      title: resolveBreadcrumbTitle(r),
     }))
 })
+
+function resolveBreadcrumbTitle(route: { path: string; meta?: { title?: string }; name?: unknown }): string {
+  const key = breadcrumbKey(route.path)
+  const translated = t(key)
+  if (translated !== key) return translated
+  const metaTitle = route.meta?.title
+  if (metaTitle) {
+    const translatedMeta = t(metaTitle)
+    if (translatedMeta !== metaTitle) return translatedMeta
+  }
+  return (route.name as string) || ''
+}
 
 /**
  * 将路由路径转换为面包屑 i18n key

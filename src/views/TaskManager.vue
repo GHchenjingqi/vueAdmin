@@ -14,17 +14,29 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button type="primary" :icon="Plus" @click="handleCreate">
+        <el-button
+          type="primary"
+          :icon="Plus"
+          @click="handleCreate"
+        >
           {{ t('task.addTask') }}
         </el-button>
       </template>
 
       <template #column-status="{ row }">
-        <el-switch :model-value="row.status" :active-value="1" :inactive-value="0" @change="(val) => handleToggleStatus(row, val)" />
+        <el-switch
+          :model-value="row.status"
+          :active-value="1"
+          :inactive-value="0"
+          @change="(val) => handleToggleStatus(row, val)"
+        />
       </template>
 
       <template #column-isRunning="{ row }">
-        <el-tag :type="row.isRunning ? 'success' : 'info'" size="small">
+        <el-tag
+          :type="row.isRunning ? 'success' : 'info'"
+          size="small"
+        >
           {{ row.isRunning ? t('task.running') : t('task.stopped') }}
         </el-tag>
       </template>
@@ -34,31 +46,72 @@
       </template>
 
       <template #column-lastResult="{ row }">
-        <el-tooltip :content="row.lastResult" placement="top" :disabled="!row.lastResult">
+        <el-tooltip
+          :content="row.lastResult"
+          placement="top"
+          :disabled="!row.lastResult"
+        >
           <span class="result-text">{{ row.lastResult || '-' }}</span>
         </el-tooltip>
       </template>
 
       <template #column-actions="{ row }">
-        <el-button type="primary" link size="small" @click="handleEdit(row)">
+        <el-button
+          type="primary"
+          link
+          size="small"
+          @click="handleEdit(row)"
+        >
           {{ t('common.edit') }}
         </el-button>
-        <el-button type="success" link size="small" @click="handleExecute(row)">
+        <el-button
+          type="success"
+          link
+          size="small"
+          @click="handleExecute(row)"
+        >
           {{ t('common.execute') }}
         </el-button>
-        <el-button type="danger" link size="small" @click="handleDelete(row)">
+        <el-button
+          type="danger"
+          link
+          size="small"
+          @click="handleDelete(row)"
+        >
           {{ t('common.delete') }}
         </el-button>
       </template>
     </ProTable>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? t('task.editTask') : t('task.addTask')" width="550px" destroy-on-close>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item :label="t('task.taskName')" prop="name">
-          <el-input v-model="form.name" :placeholder="t('task.inputTaskName')" />
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? t('task.editTask') : t('task.addTask')"
+      width="550px"
+      destroy-on-close
+    >
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="100px"
+      >
+        <el-form-item
+          :label="t('task.taskName')"
+          prop="name"
+        >
+          <el-input
+            v-model="form.name"
+            :placeholder="t('task.inputTaskName')"
+          />
         </el-form-item>
-        <el-form-item :label="t('task.cronExpression')" prop="cronExpression">
-          <el-input v-model="form.cronExpression" :placeholder="t('task.inputCron')">
+        <el-form-item
+          :label="t('task.cronExpression')"
+          prop="cronExpression"
+        >
+          <el-input
+            v-model="form.cronExpression"
+            :placeholder="t('task.inputCron')"
+          >
             <template #append>
               <el-tooltip placement="top">
                 <template #content>
@@ -71,25 +124,54 @@
             </template>
           </el-input>
         </el-form-item>
-        <el-form-item :label="t('task.handler')" prop="handler">
-          <el-select v-model="form.handler" :placeholder="t('task.selectHandler')" style="width: 100%">
-            <el-option :label="t('task.cleanupLogs')" value="cleanupLogs" />
-            <el-option :label="t('task.heartbeat')" value="heartbeat" />
-            <el-option :label="t('task.cleanupOldFiles')" value="cleanupOldFiles" />
+        <el-form-item
+          :label="t('task.handler')"
+          prop="handler"
+        >
+          <el-select
+            v-model="form.handler"
+            :placeholder="t('task.selectHandler')"
+            style="width: 100%"
+          >
+            <el-option
+              :label="t('task.cleanupLogs')"
+              value="cleanupLogs"
+            />
+            <el-option
+              :label="t('task.heartbeat')"
+              value="heartbeat"
+            />
+            <el-option
+              :label="t('task.cleanupOldFiles')"
+              value="cleanupOldFiles"
+            />
           </el-select>
         </el-form-item>
         <el-form-item :label="t('task.status')">
-          <el-switch v-model="form.status" :active-value="1" :inactive-value="0" />
+          <el-switch
+            v-model="form.status"
+            :active-value="1"
+            :inactive-value="0"
+          />
         </el-form-item>
         <el-form-item :label="t('task.description')">
-          <el-input v-model="form.description" type="textarea" :rows="2" :placeholder="t('common.optional')" />
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            :rows="2"
+            :placeholder="t('common.optional')"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+        <el-button
+          type="primary"
+          :loading="submitting"
+          @click="handleSubmit"
+        >
           {{ t('common.save') }}
         </el-button>
       </template>

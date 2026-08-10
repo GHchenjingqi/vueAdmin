@@ -34,6 +34,35 @@ const localeLoaders: Record<LocaleKey, () => Promise<{ default: MessageSchema }>
   'en-US': () => import('./en-US.json'),
 }
 
+// 将扁平点号键转换为嵌套对象，例如 { 'knowledge.title': '知识库' } → { knowledge: { title: '知识库' } }
+function dotKeysToNested(obj: Record<string, string>): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const key in obj) {
+    const parts = key.split('.')
+    let current = result
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!current[parts[i]] || typeof current[parts[i]] !== 'object') {
+        current[parts[i]] = {}
+      }
+      current = current[parts[i]] as Record<string, unknown>
+    }
+    current[parts[parts.length - 1]] = obj[key]
+  }
+  return result
+}
+
+// 合并业务模块的国际化翻译
+const moduleI18nModules = import.meta.glob('../modules/*/i18n/*.ts', { eager: true })
+for (const path in moduleI18nModules) {
+  const match = path.match(/i18n\/([\w-]+)\.ts$/)
+  if (!match) continue
+  const locale = match[1] as LocaleKey
+  const mod = moduleI18nModules[path] as { default: Record<string, string> }
+  if (messageCache[locale]) {
+    Object.assign(messageCache[locale] as Record<string, unknown>, dotKeysToNested(mod.default))
+  }
+}
+
 /** 正在加载中的 promise（防止并发重复加载） */
 const loadingPromises: Partial<Record<LocaleKey, Promise<MessageSchema>>> = {}
 

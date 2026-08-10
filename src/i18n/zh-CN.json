@@ -943,6 +943,10 @@
     "collapsed": "折叠侧边导航",
     "aiProviders": "AI 提供商",
     "dashboard": "仪表盘",
+    "knowledge": "知识库",
+    "category": "分类管理",
+    "tag": "标签管理",
+    "content": "内容管理",
     "system": "系统管理",
     "settings": "基础设置",
     "users": "用户管理",
@@ -963,5 +967,9 @@
   "errorPage": {
     "notFoundTitle": "抱歉，您访问的页面不存在",
     "notFoundDesc": "您访问的页面可能已被删除、移动或暂时不可用"
+  },
+  "knowledge": {
+    "cover": "封面图片",
+    "coverEmpty": "正文中暂无图片，请先添加 Markdown 图片"
   }
 }

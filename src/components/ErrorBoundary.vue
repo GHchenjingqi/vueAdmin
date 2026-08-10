@@ -1,8 +1,23 @@
 <template>
-  <el-result v-if="hasError" status="error" :title="errorMessage || '页面发生错误'" :sub-title="errorDetail">
+  <el-result
+    v-if="hasError"
+    status="error"
+    :title="errorMessage || '页面发生错误'"
+    :sub-title="errorDetail"
+  >
     <template #extra>
-      <el-button type="primary" @click="reset">重试</el-button>
-      <el-button v-if="showHome" @click="goHome">返回首页</el-button>
+      <el-button
+        type="primary"
+        @click="reset"
+      >
+        重试
+      </el-button>
+      <el-button
+        v-if="showHome"
+        @click="goHome"
+      >
+        返回首页
+      </el-button>
     </template>
   </el-result>
   <slot v-else />

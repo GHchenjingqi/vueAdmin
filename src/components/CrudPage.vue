@@ -16,28 +16,70 @@
       @selection-change="crud.handleSelectionChange"
     >
       <template #header-buttons>
-        <el-button v-if="showBatchDelete" type="danger" :icon="Delete" :disabled="!crud.hasSelection.value" @click="crud.handleBatchDelete">
+        <el-button
+          v-if="showBatchDelete"
+          type="danger"
+          :icon="Delete"
+          :disabled="!crud.hasSelection.value"
+          @click="crud.handleBatchDelete"
+        >
           批量删除
           <template v-if="crud.hasSelection.value">
             {{ ` (${crud.selectedIds.value.length})` }}
           </template>
         </el-button>
-        <el-button type="primary" :icon="Plus" @click="crud.openCreate">
+        <el-button
+          type="primary"
+          :icon="Plus"
+          @click="crud.openCreate"
+        >
           {{ createLabel }}
         </el-button>
         <slot name="header-buttons" />
-        <el-button v-if="showExport" :icon="Download" @click="handleExport">导出</el-button>
+        <el-button
+          v-if="showExport"
+          :icon="Download"
+          @click="handleExport"
+        >
+          导出
+        </el-button>
       </template>
 
-      <template v-for="col in columns" :key="col.prop" #[`column-${col.prop}`]="{ row }">
-        <slot :name="`column-${col.prop}`" :row="row" />
+      <template
+        v-for="col in columns"
+        :key="col.prop"
+        #[`column-${col.prop}`]="{ row }"
+      >
+        <slot
+          :name="`column-${col.prop}`"
+          :row="row"
+        />
       </template>
 
       <template #column-actions="{ row }">
         <div class="table-actions">
-          <el-button type="primary" link size="small" :icon="Edit" @click="crud.openEdit(row)">编辑</el-button>
-          <slot name="actions" :row="row" />
-          <el-button type="danger" link size="small" :icon="Delete" @click="crud.handleDelete(row)">删除</el-button>
+          <el-button
+            type="primary"
+            link
+            size="small"
+            :icon="Edit"
+            @click="crud.openEdit(row)"
+          >
+            编辑
+          </el-button>
+          <slot
+            name="actions"
+            :row="row"
+          />
+          <el-button
+            type="danger"
+            link
+            size="small"
+            :icon="Delete"
+            @click="crud.handleDelete(row)"
+          >
+            删除
+          </el-button>
         </div>
       </template>
     </ProTable>
@@ -51,8 +93,15 @@
       :schema="props.formSchema"
       @confirm="crud.handleSubmit"
     >
-      <template v-for="item in props.formSchema" :key="item.prop" #[`content-${item.prop}`]="slotProps">
-        <slot :name="`form-${item.prop}`" v-bind="slotProps" />
+      <template
+        v-for="item in props.formSchema"
+        :key="item.prop"
+        #[`content-${item.prop}`]="slotProps"
+      >
+        <slot
+          :name="`form-${item.prop}`"
+          v-bind="slotProps"
+        />
       </template>
     </FormDialog>
   </div>

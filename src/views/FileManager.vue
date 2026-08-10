@@ -16,8 +16,19 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <input ref="fileInputRef" type="file" style="display: none" accept="*/*" @change="handleFileSelect" />
-        <el-button type="primary" :icon="Upload" :loading="uploading" @click="triggerUpload">
+        <input
+          ref="fileInputRef"
+          type="file"
+          style="display: none"
+          accept="*/*"
+          @change="handleFileSelect"
+        >
+        <el-button
+          type="primary"
+          :icon="Upload"
+          :loading="uploading"
+          @click="triggerUpload"
+        >
           {{ t('file.uploadFile') }}
         </el-button>
       </template>
@@ -31,11 +42,20 @@
           :preview-src-list="[previewUrl(row.url)]"
           preview-teleported
         />
-        <MenuIcon v-else :name="fileIcon(row.ext)" :size="28" :color="fileIconColor(row.ext)" />
+        <MenuIcon
+          v-else
+          :name="fileIcon(row.ext)"
+          :size="28"
+          :color="fileIconColor(row.ext)"
+        />
       </template>
 
       <template #column-name="{ row }">
-        <a :href="previewUrl(row.url)" target="_blank" style="color: var(--text-primary); text-decoration: none">
+        <a
+          :href="previewUrl(row.url)"
+          target="_blank"
+          style="color: var(--text-primary); text-decoration: none"
+        >
           {{ row.name }}
         </a>
       </template>
@@ -45,7 +65,10 @@
       </template>
 
       <template #column-ext="{ row }">
-        <el-tag :type="fileTagType(row.ext)" size="small">
+        <el-tag
+          :type="fileTagType(row.ext)"
+          size="small"
+        >
           {{ (row.ext || '').replace('.', '') || t('file.unknown') }}
         </el-tag>
       </template>
@@ -55,20 +78,38 @@
       </template>
 
       <template #column-actions="{ row }">
-        <el-button type="primary" link size="small" @click="copyUrl(row.url)">
+        <el-button
+          type="primary"
+          link
+          size="small"
+          @click="copyUrl(row.url)"
+        >
           <el-icon><Link /></el-icon>
           {{ t('file.copyLink') }}
         </el-button>
-        <el-button type="danger" link size="small" @click="handleDelete(row)">
+        <el-button
+          type="danger"
+          link
+          size="small"
+          @click="handleDelete(row)"
+        >
           <el-icon><Delete /></el-icon>
           {{ t('common.delete') }}
         </el-button>
       </template>
     </ProTable>
 
-    <div v-if="selectedIds.length > 0" class="batch-bar">
+    <div
+      v-if="selectedIds.length > 0"
+      class="batch-bar"
+    >
       <span>{{ t('file.selected') }} {{ selectedIds.length }} {{ t('file.items') }}</span>
-      <el-button type="danger" size="small" :icon="Delete" @click="handleBatchDelete">
+      <el-button
+        type="danger"
+        size="small"
+        :icon="Delete"
+        @click="handleBatchDelete"
+      >
         {{ t('file.batchDelete') }}
       </el-button>
     </div>

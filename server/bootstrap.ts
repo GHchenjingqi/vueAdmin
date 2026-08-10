@@ -16,6 +16,10 @@ import NoticeRead from './models/NoticeRead.js'
 import Message from './models/Message.js'
 import Task from './models/Task.js'
 import AiProvider from './models/AiProvider.js'
+import KnowledgeCategory from './modules/knowledge/models/Category.js'
+import KnowledgeTag from './modules/knowledge/models/Tag.js'
+import KnowledgeContent from './modules/knowledge/models/Content.js'
+import KnowledgeContentTag from './modules/knowledge/models/ContentTag.js'
 import config from './config/index.js'
 import { logInfo, cleanOldLogs } from './utils/fileLogger.js'
 import { loadSiteInfo, injectSiteInfo } from './utils/siteCache.js'
@@ -122,6 +126,12 @@ async function seedData() {
     const message = await Menu.create({ parentId: 0, name: '消息管理', path: '/message', icon: 'ChatLineSquare', type: 'C', sort: 70 })
     await Menu.create({ parentId: message.id, name: '消息发布', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', type: 'M', sort: 0 })
     await Menu.create({ parentId: message.id, name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', type: 'M', sort: 1 })
+
+    // 知识库目录（与系统管理同级）
+    const knowledge = await Menu.create({ parentId: 0, name: '知识库', path: '/knowledge', icon: 'Reading', type: 'C', sort: 80 })
+    await Menu.create({ parentId: knowledge.id, name: '分类管理', path: '/knowledge/categories', component: 'modules/knowledge/views/CategoryManager.vue', icon: 'FolderOpened', type: 'M', sort: 0 })
+    await Menu.create({ parentId: knowledge.id, name: '标签管理', path: '/knowledge/tags', component: 'modules/knowledge/views/TagManager.vue', icon: 'PriceTag', type: 'M', sort: 1 })
+    await Menu.create({ parentId: knowledge.id, name: '内容管理', path: '/knowledge/contents', component: 'modules/knowledge/views/ContentManager.vue', icon: 'Notebook', type: 'M', sort: 2 })
 
     logInfo('默认菜单已创建')
 
@@ -238,6 +248,16 @@ async function seedData() {
     if (!aiProviderMenu) {
       await Menu.create({ parentId: systemParentId, name: 'AI 提供商', path: '/ai-providers', component: 'views/AiProviderManager.vue', icon: 'Aim', sort: 13 })
       logInfo('已补充菜单: AI 提供商')
+    }
+
+    // 增量：知识库菜单
+    const knowledgeMenu = await Menu.findOne({ where: { name: '知识库' } })
+    if (!knowledgeMenu) {
+      const kb = await Menu.create({ parentId: 0, name: '知识库', path: '/knowledge', icon: 'Reading', type: 'C', sort: 80 })
+      await Menu.create({ parentId: kb.id, name: '分类管理', path: '/knowledge/categories', component: 'modules/knowledge/views/CategoryManager.vue', icon: 'FolderOpened', type: 'M', sort: 0 })
+      await Menu.create({ parentId: kb.id, name: '标签管理', path: '/knowledge/tags', component: 'modules/knowledge/views/TagManager.vue', icon: 'PriceTag', type: 'M', sort: 1 })
+      await Menu.create({ parentId: kb.id, name: '内容管理', path: '/knowledge/contents', component: 'modules/knowledge/views/ContentManager.vue', icon: 'Notebook', type: 'M', sort: 2 })
+      logInfo('已补充菜单: 知识库')
     }
 
     // 增量：系统监控目录 + 将在线用户移到系统监控下
@@ -392,6 +412,12 @@ export default async function bootstrap(app) {
     Role.belongsToMany(Menu, { through: RoleMenu, foreignKey: 'roleId', as: 'menus' })
     Menu.belongsToMany(Role, { through: RoleMenu, foreignKey: 'menuId', as: 'roles' })
     Message.belongsTo(User, { foreignKey: 'fromUserId', as: 'fromUser' })
+
+    // 知识库模型关联
+    KnowledgeContent.belongsTo(KnowledgeCategory, { foreignKey: 'categoryId', as: 'category' })
+    KnowledgeCategory.hasMany(KnowledgeContent, { foreignKey: 'categoryId', as: 'contents' })
+    KnowledgeContent.belongsToMany(KnowledgeTag, { through: KnowledgeContentTag, foreignKey: 'contentId', otherKey: 'tagId', as: 'tags' })
+    KnowledgeTag.belongsToMany(KnowledgeContent, { through: KnowledgeContentTag, foreignKey: 'tagId', otherKey: 'contentId', as: 'contents' })
 
         // 先确保数据库存在，再认证连接（CREATE 后必须重新 authenticate）
     await ensureDatabaseExists()

@@ -1,9 +1,24 @@
 <template>
   <div class="notification-center">
-    <el-popover placement="bottom" :width="420" trigger="click" :visible="popoverVisible" popper-class="notice-popover" @show="handlePopoverShow">
+    <el-popover
+      placement="bottom"
+      :width="420"
+      trigger="click"
+      :visible="popoverVisible"
+      popper-class="notice-popover"
+      @show="handlePopoverShow"
+    >
       <template #reference>
-        <el-badge :value="totalUnread" :hidden="totalUnread === 0" class="notice-badge">
-          <el-icon :size="18" class="notice-icon" @click="popoverVisible = !popoverVisible">
+        <el-badge
+          :value="totalUnread"
+          :hidden="totalUnread === 0"
+          class="notice-badge"
+        >
+          <el-icon
+            :size="18"
+            class="notice-icon"
+            @click="popoverVisible = !popoverVisible"
+          >
             <Bell />
           </el-icon>
         </el-badge>
@@ -11,35 +26,72 @@
 
       <div class="notice-header">
         <span class="notice-title">{{ t('notification.title') }}</span>
-        <el-button v-if="totalUnread > 0" type="primary" link size="small" @click="handleMarkAllRead">
+        <el-button
+          v-if="totalUnread > 0"
+          type="primary"
+          link
+          size="small"
+          @click="handleMarkAllRead"
+        >
           {{ t('notification.readAll') }}
         </el-button>
       </div>
 
-      <el-tabs v-model="activeTab" class="notice-tabs">
-        <el-tab-pane :label="noticeTabLabel" name="notice">
-          <div v-loading="notificationStore.loading" class="notice-list">
-            <div v-if="noticeItems.length === 0" class="notice-empty">
+      <el-tabs
+        v-model="activeTab"
+        class="notice-tabs"
+      >
+        <el-tab-pane
+          :label="noticeTabLabel"
+          name="notice"
+        >
+          <div
+            v-loading="notificationStore.loading"
+            class="notice-list"
+          >
+            <div
+              v-if="noticeItems.length === 0"
+              class="notice-empty"
+            >
               {{ t('notification.noNotices') }}
             </div>
-            <div v-for="item in noticeItems" :key="`notice-${item.id}`" class="notice-item" :class="{ unread: !item.read }" @click="handleNoticeClick(item)">
+            <div
+              v-for="item in noticeItems"
+              :key="`notice-${item.id}`"
+              class="notice-item"
+              :class="{ unread: !item.read }"
+              @click="handleNoticeClick(item)"
+            >
               <div class="notice-item-left">
-                <el-tag :type="item.type === 'notice' ? 'primary' : 'warning'" size="small" class="notice-type-tag">
+                <el-tag
+                  :type="item.type === 'notice' ? 'primary' : 'warning'"
+                  size="small"
+                  class="notice-type-tag"
+                >
                   {{ item.type === 'notice' ? t('notification.notice') : t('notification.announcement') }}
                 </el-tag>
                 <span class="notice-item-title">{{ item.title }}</span>
               </div>
               <div class="notice-item-right">
-                <span v-if="!item.read" class="notice-dot" />
+                <span
+                  v-if="!item.read"
+                  class="notice-dot"
+                />
                 <span class="notice-time">{{ formatTime(item.publishTime) }}</span>
               </div>
             </div>
           </div>
         </el-tab-pane>
 
-        <el-tab-pane :label="messageTabLabel" name="message">
+        <el-tab-pane
+          :label="messageTabLabel"
+          name="message"
+        >
           <div class="notice-list">
-            <div v-if="messageItems.length === 0" class="notice-empty">
+            <div
+              v-if="messageItems.length === 0"
+              class="notice-empty"
+            >
               {{ t('notification.noMessages') }}
             </div>
             <div
@@ -50,13 +102,20 @@
               @click="handleMessageClick(item)"
             >
               <div class="notice-item-left">
-                <el-tag :type="messageTypeTag(item.type)" size="small" class="notice-type-tag">
+                <el-tag
+                  :type="messageTypeTag(item.type)"
+                  size="small"
+                  class="notice-type-tag"
+                >
                   {{ messageTypeLabel(item.type) }}
                 </el-tag>
                 <span class="notice-item-title">{{ item.title }}</span>
               </div>
               <div class="notice-item-right">
-                <span v-if="!isMessageRead(item)" class="notice-dot" />
+                <span
+                  v-if="!isMessageRead(item)"
+                  class="notice-dot"
+                />
                 <span class="notice-time">{{ formatTime(item.createdAt || item.sendTime) }}</span>
               </div>
             </div>
@@ -66,7 +125,12 @@
 
       <el-divider style="margin: 4px 0" />
       <div class="notice-footer">
-        <el-button type="primary" link size="small" @click="goToMore">
+        <el-button
+          type="primary"
+          link
+          size="small"
+          @click="goToMore"
+        >
           {{ t('notification.viewMore') }}
         </el-button>
       </div>
@@ -79,17 +143,32 @@
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <div v-if="noticeDetail" class="notice-detail-meta">
-        <el-tag :type="noticeDetail.type === 'notice' ? 'primary' : 'warning'" size="small">
+      <div
+        v-if="noticeDetail"
+        class="notice-detail-meta"
+      >
+        <el-tag
+          :type="noticeDetail.type === 'notice' ? 'primary' : 'warning'"
+          size="small"
+        >
           {{ noticeDetail.type === 'notice' ? t('notification.notice') : t('notification.announcement') }}
         </el-tag>
         <span class="notice-detail-info">{{ t('notification.publisherLabel') }}{{ noticeDetail.publisherName || '-' }}</span>
         <span class="notice-detail-info">{{ noticeDetail.publishTime ? new Date(noticeDetail.publishTime).toLocaleString() : '-' }}</span>
       </div>
       <el-divider v-if="noticeDetail" />
-      <div v-loading="noticeDetailLoading" class="notice-detail-content">
-        <MdPreview v-if="noticeDetail?.content" :model-value="noticeDetail.content" />
-        <el-empty v-else-if="!noticeDetailLoading" :description="t('notification.noContent')" />
+      <div
+        v-loading="noticeDetailLoading"
+        class="notice-detail-content"
+      >
+        <MdPreview
+          v-if="noticeDetail?.content"
+          :model-value="noticeDetail.content"
+        />
+        <el-empty
+          v-else-if="!noticeDetailLoading"
+          :description="t('notification.noContent')"
+        />
       </div>
     </el-dialog>
 
@@ -100,15 +179,26 @@
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <el-descriptions v-if="messageDetail" :column="1" border>
+      <el-descriptions
+        v-if="messageDetail"
+        :column="1"
+        border
+      >
         <el-descriptions-item :label="t('common.type')">
-          <el-tag :type="messageTypeTag(messageDetail.type)" size="small">
+          <el-tag
+            :type="messageTypeTag(messageDetail.type)"
+            size="small"
+          >
             {{ messageTypeLabel(messageDetail.type) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item :label="t('message.sender')">
           <span v-if="messageDetail.fromUser">{{ messageDetail.fromUser.nickname || messageDetail.fromUser.username }}</span>
-          <el-tag v-else type="info" size="small">
+          <el-tag
+            v-else
+            type="info"
+            size="small"
+          >
             {{ t('message.system') }}
           </el-tag>
         </el-descriptions-item>

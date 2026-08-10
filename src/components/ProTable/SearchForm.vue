@@ -1,9 +1,25 @@
 <template>
   <el-collapse-transition>
-    <div v-if="searchFields?.length && showSearch" class="search-form">
-      <el-card shadow="never" class="search-form__card">
-        <el-form ref="queryFormRef" :model="searchModel" :inline="true" @keyup.enter="handleSearch">
-          <el-form-item v-for="field in searchFields" :key="field.prop" :label="field.label" :prop="field.prop">
+    <div
+      v-if="searchFields?.length && showSearch"
+      class="search-form"
+    >
+      <el-card
+        shadow="never"
+        class="search-form__card"
+      >
+        <el-form
+          ref="queryFormRef"
+          :model="searchModel"
+          :inline="true"
+          @keyup.enter="handleSearch"
+        >
+          <el-form-item
+            v-for="field in searchFields"
+            :key="field.prop"
+            :label="field.label"
+            :prop="field.prop"
+          >
             <template v-if="field.type === 'select'">
               <el-select
                 v-model="(searchModel as any)[field.prop]"
@@ -12,7 +28,12 @@
                 style="width: 240px"
                 @change="handleSearch"
               >
-                <el-option v-for="option in getOptions(field.options)" :key="option.value" :label="option.label" :value="option.value" />
+                <el-option
+                  v-for="option in getOptions(field.options)"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
               </el-select>
             </template>
             <template v-else-if="field.type === 'dateRange'">
@@ -41,10 +62,18 @@
             </template>
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" :icon="Search" :loading="loading" @click="handleSearch">
+            <el-button
+              type="primary"
+              :icon="Search"
+              :loading="loading"
+              @click="handleSearch"
+            >
               {{ t('common.search') }}
             </el-button>
-            <el-button :icon="Refresh" @click="handleReset">
+            <el-button
+              :icon="Refresh"
+              @click="handleReset"
+            >
               {{ t('common.reset') }}
             </el-button>
           </el-form-item>

@@ -1,5 +1,9 @@
 <template>
-  <div class="skeleton-loader" :class="[variant]" :style="{ width, height }">
+  <div
+    class="skeleton-loader"
+    :class="[variant]"
+    :style="{ width, height }"
+  >
     <div class="skeleton-pulse" />
   </div>
 </template>

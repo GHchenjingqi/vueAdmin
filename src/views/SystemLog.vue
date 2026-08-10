@@ -14,13 +14,24 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button :icon="Download" @click="handleExport">
+        <el-button
+          :icon="Download"
+          @click="handleExport"
+        >
           {{ t('log.export') }}
         </el-button>
-        <el-button :icon="Warning" type="warning" @click="showFailureStats">
+        <el-button
+          :icon="Warning"
+          type="warning"
+          @click="showFailureStats"
+        >
           {{ t('log.loginFailureStats') }}
         </el-button>
-        <el-button :icon="Delete" type="danger" @click="handleCleanup">
+        <el-button
+          :icon="Delete"
+          type="danger"
+          @click="handleCleanup"
+        >
           {{ t('log.cleanup') }}
         </el-button>
       </template>
@@ -29,21 +40,44 @@
       </template>
 
       <template #column-actions="{ row }">
-        <el-button type="primary" link size="small" @click="openDetailDialog(row)">
+        <el-button
+          type="primary"
+          link
+          size="small"
+          @click="openDetailDialog(row)"
+        >
           {{ t('log.detail') }}
         </el-button>
       </template>
     </ProTable>
 
-    <el-dialog v-model="detailVisible" :title="t('log.logDetail')" width="720px" :close-on-click-modal="false">
+    <el-dialog
+      v-model="detailVisible"
+      :title="t('log.logDetail')"
+      width="720px"
+      :close-on-click-modal="false"
+    >
       <template v-if="currentLog">
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item :label="t('log.logType')" :span="2">
-            <el-tag :type="currentLog.type === 'login' ? 'success' : 'warning'" size="small">
+        <el-descriptions
+          :column="2"
+          border
+          size="small"
+        >
+          <el-descriptions-item
+            :label="t('log.logType')"
+            :span="2"
+          >
+            <el-tag
+              :type="currentLog.type === 'login' ? 'success' : 'warning'"
+              size="small"
+            >
               {{ currentLog.type === 'login' ? t('log.loginLog') : t('log.operationLog') }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('log.operationTime')" :span="2">
+          <el-descriptions-item
+            :label="t('log.operationTime')"
+            :span="2"
+          >
             {{ formatTime(currentLog.createdAt) }}
           </el-descriptions-item>
           <el-descriptions-item :label="t('log.operator')">
@@ -52,16 +86,28 @@
           <el-descriptions-item :label="t('log.userId')">
             {{ currentLog.userId || '-' }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('log.action')" :span="2">
+          <el-descriptions-item
+            :label="t('log.action')"
+            :span="2"
+          >
             {{ currentLog.action }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('log.target')" :span="2">
+          <el-descriptions-item
+            :label="t('log.target')"
+            :span="2"
+          >
             {{ currentLog.target || '-' }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('log.ipAddress')" :span="2">
+          <el-descriptions-item
+            :label="t('log.ipAddress')"
+            :span="2"
+          >
             {{ currentLog.ipAddress || '-' }}
           </el-descriptions-item>
-          <el-descriptions-item label="User-Agent" :span="2">
+          <el-descriptions-item
+            label="User-Agent"
+            :span="2"
+          >
             <pre class="detail-pre">{{ currentLog.userAgent || '-' }}</pre>
           </el-descriptions-item>
         </el-descriptions>
@@ -76,7 +122,10 @@
             <table class="diff-table">
               <thead>
                 <tr>
-                  <th class="diff-th" style="width: 120px">
+                  <th
+                    class="diff-th"
+                    style="width: 120px"
+                  >
                     {{ t('log.field') }}
                   </th>
                   <th class="diff-th diff-old">
@@ -88,7 +137,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="change in parsedChanges" :key="change.field" class="diff-row">
+                <tr
+                  v-for="change in parsedChanges"
+                  :key="change.field"
+                  class="diff-row"
+                >
                   <td class="diff-td diff-field">
                     {{ change.field }}
                   </td>
@@ -107,7 +160,11 @@
         <!-- 原始详情（作为 fallback） -->
         <template v-if="currentLog.type === 'login'">
           <el-divider />
-          <el-descriptions :column="1" border size="small">
+          <el-descriptions
+            :column="1"
+            border
+            size="small"
+          >
             <el-descriptions-item :label="t('log.operationDetail')">
               <pre class="detail-pre">{{ currentLog.details || '-' }}</pre>
             </el-descriptions-item>
@@ -116,8 +173,17 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="failureVisible" :title="t('log.loginFailureTitle')" width="800px">
-      <el-descriptions :column="2" border size="small" style="margin-bottom: 16px">
+    <el-dialog
+      v-model="failureVisible"
+      :title="t('log.loginFailureTitle')"
+      width="800px"
+    >
+      <el-descriptions
+        :column="2"
+        border
+        size="small"
+        style="margin-bottom: 16px"
+      >
         <el-descriptions-item :label="t('log.totalFailures')">
           {{ failureData.total }}
         </el-descriptions-item>
@@ -129,11 +195,33 @@
       <h4 style="margin-bottom: 12px">
         {{ t('log.ipAttackStats') }}
       </h4>
-      <el-table :data="failureData.ipStats" border stripe size="small" max-height="300">
-        <el-table-column prop="ip" :label="t('log.ip')" width="160" />
-        <el-table-column prop="count" :label="t('log.failureCount')" width="100" />
-        <el-table-column prop="usernames" :label="t('log.attemptedUsernames')" min-width="180" />
-        <el-table-column prop="lastTime" :label="t('log.lastTime')" width="180" />
+      <el-table
+        :data="failureData.ipStats"
+        border
+        stripe
+        size="small"
+        max-height="300"
+      >
+        <el-table-column
+          prop="ip"
+          :label="t('log.ip')"
+          width="160"
+        />
+        <el-table-column
+          prop="count"
+          :label="t('log.failureCount')"
+          width="100"
+        />
+        <el-table-column
+          prop="usernames"
+          :label="t('log.attemptedUsernames')"
+          min-width="180"
+        />
+        <el-table-column
+          prop="lastTime"
+          :label="t('log.lastTime')"
+          width="180"
+        />
       </el-table>
     </el-dialog>
   </div>

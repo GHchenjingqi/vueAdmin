@@ -2,22 +2,40 @@
   <div class="login-page">
     <!-- 语言切换 -->
     <div class="login-locale">
-      <el-dropdown trigger="click" @command="handleLocaleChange">
-        <el-button text :icon="localeIcon">
+      <el-dropdown
+        trigger="click"
+        @command="handleLocaleChange"
+      >
+        <el-button
+          text
+          :icon="localeIcon"
+        >
           {{ locale === 'zh-CN' ? '简体中文' : 'English' }}
           <el-icon><ArrowDown /></el-icon>
         </el-button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="zh-CN" :class="{ active: locale === 'zh-CN' }">
+            <el-dropdown-item
+              command="zh-CN"
+              :class="{ active: locale === 'zh-CN' }"
+            >
               <span>简体中文</span>
-              <el-icon v-if="locale === 'zh-CN'" class="locale-checked">
+              <el-icon
+                v-if="locale === 'zh-CN'"
+                class="locale-checked"
+              >
                 <Check />
               </el-icon>
             </el-dropdown-item>
-            <el-dropdown-item command="en-US" :class="{ active: locale === 'en-US' }">
+            <el-dropdown-item
+              command="en-US"
+              :class="{ active: locale === 'en-US' }"
+            >
               <span>English</span>
-              <el-icon v-if="locale === 'en-US'" class="locale-checked">
+              <el-icon
+                v-if="locale === 'en-US'"
+                class="locale-checked"
+              >
                 <Check />
               </el-icon>
             </el-dropdown-item>
@@ -28,8 +46,17 @@
     <!-- 左上角品牌标识 -->
     <div class="brand-header">
       <div class="brand-logo">
-        <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="brand-logo-img" />
-        <el-icon v-else :size="36" color="var(--mainColor, #409eff)">
+        <img
+          v-if="siteLogo"
+          :src="siteLogo"
+          alt="Logo"
+          class="brand-logo-img"
+        >
+        <el-icon
+          v-else
+          :size="36"
+          color="var(--mainColor, #409eff)"
+        >
           <Odometer />
         </el-icon>
       </div>
@@ -61,7 +88,15 @@
         </div>
 
         <!-- 登录表单 -->
-        <el-form ref="formRef" :model="form" :rules="rules" size="large" class="login-form" aria-label="登录表单" @keyup.enter="handleLogin">
+        <el-form
+          ref="formRef"
+          :model="form"
+          :rules="rules"
+          size="large"
+          class="login-form"
+          aria-label="登录表单"
+          @keyup.enter="handleLogin"
+        >
           <el-form-item prop="username">
             <el-input
               v-model="form.username"
@@ -84,7 +119,10 @@
               :aria-label="t('login.password')"
             />
           </el-form-item>
-          <el-form-item v-if="captchaEnabled" prop="captchaText">
+          <el-form-item
+            v-if="captchaEnabled"
+            prop="captchaText"
+          >
             <div class="captcha-row">
               <el-input
                 v-model="form.captchaText"
@@ -112,12 +150,22 @@
             <el-checkbox v-model="form.rememberMe">
               {{ t('login.rememberMe') }}
             </el-checkbox>
-            <el-link type="primary" :underline="false" @click="showForgotDialog = true">
+            <el-link
+              type="primary"
+              :underline="false"
+              @click="showForgotDialog = true"
+            >
               {{ t('login.forgotPassword') }}
             </el-link>
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" :loading="loading" :disabled="loginDisabled" class="login-btn" @click="handleLogin">
+            <el-button
+              type="primary"
+              :loading="loading"
+              :disabled="loginDisabled"
+              class="login-btn"
+              @click="handleLogin"
+            >
               {{ loginButtonText }}
             </el-button>
           </el-form-item>
@@ -131,17 +179,37 @@
     </div>
 
     <!-- 忘记密码对话框 -->
-    <el-dialog v-model="showForgotDialog" :title="t('login.forgotPassword')" width="420px" :close-on-click-modal="false" destroy-on-close>
-      <el-form ref="forgotFormRef" :model="forgotForm" :rules="forgotRules">
-        <el-form-item prop="email" :label="t('login.email')">
-          <el-input v-model="forgotForm.email" :placeholder="t('login.inputEmail')" />
+    <el-dialog
+      v-model="showForgotDialog"
+      :title="t('login.forgotPassword')"
+      width="420px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <el-form
+        ref="forgotFormRef"
+        :model="forgotForm"
+        :rules="forgotRules"
+      >
+        <el-form-item
+          prop="email"
+          :label="t('login.email')"
+        >
+          <el-input
+            v-model="forgotForm.email"
+            :placeholder="t('login.inputEmail')"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showForgotDialog = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button :loading="forgotLoading" type="primary" @click="handleForgotPassword">
+        <el-button
+          :loading="forgotLoading"
+          type="primary"
+          @click="handleForgotPassword"
+        >
           {{ t('login.sendResetEmail') }}
         </el-button>
       </template>

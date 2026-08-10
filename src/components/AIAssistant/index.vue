@@ -1,30 +1,91 @@
 <template>
   <div class="ai-assistant">
     <!-- 浮动触发按钮 -->
-    <div class="ai-fab" :class="{ active: isOpen }" @click="toggleDrawer">
+    <div
+      class="ai-fab"
+      :class="{ active: isOpen }"
+      @click="toggleDrawer"
+    >
       <div class="ai-fab-inner">
-        <svg viewBox="0 0 24 24" fill="none" class="ai-fab-icon">
-          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="currentColor" opacity="0.2" />
-          <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
-          <circle cx="15.5" cy="10" r="1.5" fill="currentColor" />
-          <path d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          class="ai-fab-icon"
+        >
+          <path
+            d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"
+            fill="currentColor"
+            opacity="0.2"
+          />
+          <circle
+            cx="8.5"
+            cy="10"
+            r="1.5"
+            fill="currentColor"
+          />
+          <circle
+            cx="15.5"
+            cy="10"
+            r="1.5"
+            fill="currentColor"
+          />
+          <path
+            d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
         </svg>
       </div>
-      <span v-if="loading" class="ai-fab-dot" />
+      <span
+        v-if="loading"
+        class="ai-fab-dot"
+      />
     </div>
 
     <!-- 抽屉式对话界面 -->
-    <el-drawer v-model="isOpen" :size="540" direction="rtl" :with-header="false" :close-on-click-modal="true" class="ai-drawer">
+    <el-drawer
+      v-model="isOpen"
+      :size="540"
+      direction="rtl"
+      :with-header="false"
+      :close-on-click-modal="true"
+      class="ai-drawer"
+    >
       <div class="ai-drawer-body">
         <!-- 头部 -->
         <div class="ai-header">
           <div class="ai-header-left">
             <div class="ai-header-icon">
-              <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
-                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="currentColor" opacity="0.2" />
-                <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
-                <circle cx="15.5" cy="10" r="1.5" fill="currentColor" />
-                <path d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                width="22"
+                height="22"
+              >
+                <path
+                  d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"
+                  fill="currentColor"
+                  opacity="0.2"
+                />
+                <circle
+                  cx="8.5"
+                  cy="10"
+                  r="1.5"
+                  fill="currentColor"
+                />
+                <circle
+                  cx="15.5"
+                  cy="10"
+                  r="1.5"
+                  fill="currentColor"
+                />
+                <path
+                  d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
               </svg>
             </div>
             <div>
@@ -37,28 +98,95 @@
             </div>
           </div>
           <div class="ai-header-right">
-            <el-tag :type="apiStatus.apiConfigured ? 'success' : 'danger'" size="small" effect="light">
+            <el-tag
+              :type="apiStatus.apiConfigured ? 'success' : 'danger'"
+              size="small"
+              effect="light"
+            >
               <el-icon :size="12">
-                <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="6" fill="currentColor" /></svg>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                ><circle
+                  cx="12"
+                  cy="12"
+                  r="6"
+                  fill="currentColor"
+                /></svg>
               </el-icon>
               {{ apiStatus.apiConfigured ? t('ai.connected') : t('ai.notConfigured') }}
             </el-tag>
-            <el-button size="small" text :icon="Close" class="ai-close-btn" @click="isOpen = false" />
+            <el-button
+              size="small"
+              text
+              :icon="Close"
+              class="ai-close-btn"
+              @click="isOpen = false"
+            />
           </div>
         </div>
 
         <!-- 消息列表 -->
-        <div ref="messageListRef" class="ai-messages">
+        <div
+          ref="messageListRef"
+          class="ai-messages"
+        >
           <!-- 空状态 -->
-          <div v-if="messages.length === 0" class="ai-empty">
+          <div
+            v-if="messages.length === 0"
+            class="ai-empty"
+          >
             <div class="ai-empty-illustration">
-              <svg viewBox="0 0 120 100" fill="none" class="ai-empty-svg">
-                <rect x="10" y="20" width="100" height="60" rx="12" stroke="currentColor" stroke-width="1.5" opacity="0.15" />
-                <circle cx="35" cy="45" r="4" fill="currentColor" opacity="0.3" />
-                <circle cx="50" cy="45" r="4" fill="currentColor" opacity="0.3" />
-                <circle cx="65" cy="45" r="4" fill="currentColor" opacity="0.3" />
-                <path d="M30 60c5 4 12 6 20 6s15-2 20-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.3" />
-                <path d="M85 45l10-5M85 50l10 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.2" />
+              <svg
+                viewBox="0 0 120 100"
+                fill="none"
+                class="ai-empty-svg"
+              >
+                <rect
+                  x="10"
+                  y="20"
+                  width="100"
+                  height="60"
+                  rx="12"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.15"
+                />
+                <circle
+                  cx="35"
+                  cy="45"
+                  r="4"
+                  fill="currentColor"
+                  opacity="0.3"
+                />
+                <circle
+                  cx="50"
+                  cy="45"
+                  r="4"
+                  fill="currentColor"
+                  opacity="0.3"
+                />
+                <circle
+                  cx="65"
+                  cy="45"
+                  r="4"
+                  fill="currentColor"
+                  opacity="0.3"
+                />
+                <path
+                  d="M30 60c5 4 12 6 20 6s15-2 20-6"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  opacity="0.3"
+                />
+                <path
+                  d="M85 45l10-5M85 50l10 5"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  opacity="0.2"
+                />
               </svg>
             </div>
             <h4 class="ai-empty-title">
@@ -68,42 +196,110 @@
               {{ t('ai.emptyDesc') }}
             </p>
             <div class="ai-empty-hints">
-              <el-button v-for="hint in quickHints" :key="hint" size="small" round plain :disabled="loading" @click="sendMessage(hint)">
+              <el-button
+                v-for="hint in quickHints"
+                :key="hint"
+                size="small"
+                round
+                plain
+                :disabled="loading"
+                @click="sendMessage(hint)"
+              >
                 {{ hint }}
               </el-button>
             </div>
           </div>
 
           <!-- 消息 -->
-          <template v-for="(msg, idx) in messages" :key="idx">
-            <div class="ai-message" :class="msg.role">
-              <div class="ai-message-avatar" :class="msg.role">
-                <svg v-if="msg.role === 'user'" viewBox="0 0 24 24" fill="none" width="16" height="16">
-                  <circle cx="12" cy="8" r="4" fill="currentColor" />
-                  <path d="M4 20c0-4 3.5-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.5" />
+          <template
+            v-for="(msg, idx) in messages"
+            :key="idx"
+          >
+            <div
+              class="ai-message"
+              :class="msg.role"
+            >
+              <div
+                class="ai-message-avatar"
+                :class="msg.role"
+              >
+                <svg
+                  v-if="msg.role === 'user'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  width="16"
+                  height="16"
+                >
+                  <circle
+                    cx="12"
+                    cy="8"
+                    r="4"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M4 20c0-4 3.5-7 8-7s8 3 8 7"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
                 </svg>
-                <svg v-else viewBox="0 0 24 24" fill="none" width="16" height="16">
-                  <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2" />
-                  <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
-                  <circle cx="15.5" cy="10" r="1.5" fill="currentColor" />
-                  <path d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                <svg
+                  v-else
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  width="16"
+                  height="16"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    fill="currentColor"
+                    opacity="0.2"
+                  />
+                  <circle
+                    cx="8.5"
+                    cy="10"
+                    r="1.5"
+                    fill="currentColor"
+                  />
+                  <circle
+                    cx="15.5"
+                    cy="10"
+                    r="1.5"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  />
                 </svg>
               </div>
               <div class="ai-message-body">
                 <!-- 用户消息 -->
-                <div v-if="msg.role === 'user'" class="ai-bubble user-bubble">
+                <div
+                  v-if="msg.role === 'user'"
+                  class="ai-bubble user-bubble"
+                >
                   {{ msg.content }}
                 </div>
 
                 <!-- AI 回复 -->
                 <template v-else>
-                  <div v-if="msg.explanation" class="ai-explanation markdown-body">
+                  <div
+                    v-if="msg.explanation"
+                    class="ai-explanation markdown-body"
+                  >
                     <!-- eslint-disable vue/no-v-html -->
                     <div v-html="renderMarkdown(msg.explanation)" />
                     <!-- eslint-enable vue/no-v-html -->
                   </div>
 
-                  <div v-if="msg.files && msg.files.length > 0" class="ai-files-section">
+                  <div
+                    v-if="msg.files && msg.files.length > 0"
+                    class="ai-files-section"
+                  >
                     <div class="ai-files-header">
                       <div class="ai-files-header-left">
                         <el-icon :size="16">
@@ -111,8 +307,18 @@
                         </el-icon>
                         <span>{{ t('ai.generatedFiles', { count: msg.files.length }) }}</span>
                       </div>
-                      <el-button type="primary" size="small" plain :loading="applyingAll" :disabled="applyingAll" @click="applyAllFiles(msg.files)">
-                        <el-icon :size="14" style="margin-right: 4px">
+                      <el-button
+                        type="primary"
+                        size="small"
+                        plain
+                        :loading="applyingAll"
+                        :disabled="applyingAll"
+                        @click="applyAllFiles(msg.files)"
+                      >
+                        <el-icon
+                          :size="14"
+                          style="margin-right: 4px"
+                        >
                           <Upload />
                         </el-icon>
                         {{ t('ai.applyAll') }}
@@ -128,23 +334,46 @@
                         @click="activeFilePath = activeFilePath === file.path ? '' : file.path"
                       >
                         <div class="ai-file-item-header">
-                          <el-tag :type="file.isNew ? 'success' : 'warning'" size="small" effect="plain" class="file-tag">
+                          <el-tag
+                            :type="file.isNew ? 'success' : 'warning'"
+                            size="small"
+                            effect="plain"
+                            class="file-tag"
+                          >
                             {{ file.isNew ? t('ai.fileNew') : t('ai.fileModified') }}
                           </el-tag>
                           <span class="ai-file-path">{{ file.path }}</span>
-                          <el-tag size="small" effect="plain" class="ai-file-lang-tag">
+                          <el-tag
+                            size="small"
+                            effect="plain"
+                            class="ai-file-lang-tag"
+                          >
                             {{ file.language }}
                           </el-tag>
-                          <el-icon class="ai-file-expand-icon" :class="{ rotated: activeFilePath === file.path }">
+                          <el-icon
+                            class="ai-file-expand-icon"
+                            :class="{ rotated: activeFilePath === file.path }"
+                          >
                             <ArrowDown />
                           </el-icon>
                         </div>
-                        <div v-show="activeFilePath === file.path" class="ai-file-item-body">
-                          <div v-if="file.description" class="ai-file-desc">
+                        <div
+                          v-show="activeFilePath === file.path"
+                          class="ai-file-item-body"
+                        >
+                          <div
+                            v-if="file.description"
+                            class="ai-file-desc"
+                          >
                             {{ file.description }}
                           </div>
                           <div class="ai-file-actions">
-                            <el-button size="small" text :icon="CopyDocument" @click.stop="copyCode(file.content)">
+                            <el-button
+                              size="small"
+                              text
+                              :icon="CopyDocument"
+                              @click.stop="copyCode(file.content)"
+                            >
                               {{ t('ai.copy') }}
                             </el-button>
                             <el-button
@@ -171,7 +400,10 @@
                     </div>
                   </div>
 
-                  <div v-if="msg.usage" class="ai-usage">
+                  <div
+                    v-if="msg.usage"
+                    class="ai-usage"
+                  >
                     <el-icon :size="12">
                       <DataAnalysis />
                     </el-icon>
@@ -183,13 +415,42 @@
           </template>
 
           <!-- 加载状态 -->
-          <div v-if="loading" class="ai-message assistant">
+          <div
+            v-if="loading"
+            class="ai-message assistant"
+          >
             <div class="ai-message-avatar assistant">
-              <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
-                <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2" />
-                <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
-                <circle cx="15.5" cy="10" r="1.5" fill="currentColor" />
-                <path d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                width="16"
+                height="16"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  fill="currentColor"
+                  opacity="0.2"
+                />
+                <circle
+                  cx="8.5"
+                  cy="10"
+                  r="1.5"
+                  fill="currentColor"
+                />
+                <circle
+                  cx="15.5"
+                  cy="10"
+                  r="1.5"
+                  fill="currentColor"
+                />
+                <path
+                  d="M8 14.5c.828.667 2.333 1.5 4 1.5s3.172-.833 4-1.5"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
               </svg>
             </div>
             <div class="ai-loading">
@@ -214,10 +475,26 @@
                 @keydown="handleKeydown"
               />
               <div class="ai-input-actions">
-                <el-tooltip :content="t('ai.send')" placement="top">
-                  <button class="ai-send-btn" :class="{ active: inputText.trim() && !loading }" :disabled="!inputText.trim() || loading" @click="sendMessage()">
-                    <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                      <path d="M3 12L21 3l-5 9 5 9-18-9z" fill="currentColor" />
+                <el-tooltip
+                  :content="t('ai.send')"
+                  placement="top"
+                >
+                  <button
+                    class="ai-send-btn"
+                    :class="{ active: inputText.trim() && !loading }"
+                    :disabled="!inputText.trim() || loading"
+                    @click="sendMessage()"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      width="18"
+                      height="18"
+                    >
+                      <path
+                        d="M3 12L21 3l-5 9 5 9-18-9z"
+                        fill="currentColor"
+                      />
                     </svg>
                   </button>
                 </el-tooltip>
@@ -229,19 +506,41 @@
               </div>
               <div class="ai-hint-right">
                 <!-- 模型/提供商切换 -->
-                <el-dropdown v-if="enabledProviders.length > 0" trigger="click" @command="handleDropdownCommand">
-                  <el-button text size="small" type="info" :icon="ArrowDown" class="ai-model-btn">
+                <el-dropdown
+                  v-if="enabledProviders.length > 0"
+                  trigger="click"
+                  @command="handleDropdownCommand"
+                >
+                  <el-button
+                    text
+                    size="small"
+                    type="info"
+                    :icon="ArrowDown"
+                    class="ai-model-btn"
+                  >
                     {{ currentModel || t('ai.selectModel') }}
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item :disabled="true" class="ai-dropdown-provider-label">
+                      <el-dropdown-item
+                        :disabled="true"
+                        class="ai-dropdown-provider-label"
+                      >
                         {{ t('ai.providerModel', { name: selectedProviderName }) }}
                       </el-dropdown-item>
-                      <el-dropdown-item v-for="m in currentModels" :key="m" :command="'model:' + m" :class="{ active: currentModel === m }">
+                      <el-dropdown-item
+                        v-for="m in currentModels"
+                        :key="m"
+                        :command="'model:' + m"
+                        :class="{ active: currentModel === m }"
+                      >
                         {{ m }}
                       </el-dropdown-item>
-                      <el-dropdown-item divided :disabled="true" class="ai-dropdown-provider-label">
+                      <el-dropdown-item
+                        divided
+                        :disabled="true"
+                        class="ai-dropdown-provider-label"
+                      >
                         {{ t('ai.switchProvider') }}
                       </el-dropdown-item>
                       <el-dropdown-item
@@ -255,10 +554,24 @@
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
-                <el-button v-if="!apiStatus.apiConfigured" text size="small" type="warning" :icon="Setting" @click="showProviderManager = true">
+                <el-button
+                  v-if="!apiStatus.apiConfigured"
+                  text
+                  size="small"
+                  type="warning"
+                  :icon="Setting"
+                  @click="showProviderManager = true"
+                >
                   {{ t('ai.configureApi') }}
                 </el-button>
-                <el-button v-else text size="small" type="info" :icon="Setting" @click="showProviderManager = true">
+                <el-button
+                  v-else
+                  text
+                  size="small"
+                  type="info"
+                  :icon="Setting"
+                  @click="showProviderManager = true"
+                >
                   {{ t('ai.manageProvider') }}
                 </el-button>
               </div>
@@ -278,9 +591,16 @@
       append-to-body
       class="ai-provider-dialog"
     >
-      <div v-if="allProviders.length === 0 && !providerFormVisible" class="provider-empty">
+      <div
+        v-if="allProviders.length === 0 && !providerFormVisible"
+        class="provider-empty"
+      >
         <el-empty :description="t('ai.noProvider')">
-          <el-button type="primary" :icon="Plus" @click="openAddProvider">
+          <el-button
+            type="primary"
+            :icon="Plus"
+            @click="openAddProvider"
+          >
             {{ t('ai.addProvider') }}
           </el-button>
         </el-empty>
@@ -288,14 +608,26 @@
 
       <template v-else>
         <!-- 提供商列表 -->
-        <div v-show="!providerFormVisible" class="provider-list-wrap">
+        <div
+          v-show="!providerFormVisible"
+          class="provider-list-wrap"
+        >
           <div class="provider-list-toolbar">
-            <el-button size="small" type="primary" :icon="Plus" @click="openAddProvider">
+            <el-button
+              size="small"
+              type="primary"
+              :icon="Plus"
+              @click="openAddProvider"
+            >
               {{ t('ai.add') }}
             </el-button>
           </div>
           <div class="provider-list">
-            <div v-for="p in allProviders" :key="p.id" class="provider-card-item">
+            <div
+              v-for="p in allProviders"
+              :key="p.id"
+              class="provider-card-item"
+            >
               <div class="provider-card-left">
                 <div class="provider-card-name">
                   {{ p.name }}
@@ -304,16 +636,35 @@
                   {{ p.apiBaseUrl }}
                 </div>
                 <div class="provider-card-models">
-                  <el-tag v-for="m in p.models.split(',')" :key="m" size="small" effect="plain" class="provider-card-model-tag">
+                  <el-tag
+                    v-for="m in p.models.split(',')"
+                    :key="m"
+                    size="small"
+                    effect="plain"
+                    class="provider-card-model-tag"
+                  >
                     {{ m.trim() }}
                   </el-tag>
                 </div>
               </div>
               <div class="provider-card-right">
-                <div class="provider-switch-wrap" @click="toggleProviderEnabled(p, p.enabled !== 1)">
-                  <el-switch :model-value="p.enabled === 1" size="small" :loading="switchingId === p.id" class="provider-switch" />
+                <div
+                  class="provider-switch-wrap"
+                  @click="toggleProviderEnabled(p, p.enabled !== 1)"
+                >
+                  <el-switch
+                    :model-value="p.enabled === 1"
+                    size="small"
+                    :loading="switchingId === p.id"
+                    class="provider-switch"
+                  />
                 </div>
-                <el-button size="small" text :icon="Edit" @click="openEditProvider(p)" />
+                <el-button
+                  size="small"
+                  text
+                  :icon="Edit"
+                  @click="openEditProvider(p)"
+                />
                 <el-popconfirm
                   :title="t('ai.deleteConfirm')"
                   :confirm-button-text="t('ai.delete')"
@@ -321,7 +672,12 @@
                   @confirm="handleDeleteProvider(p)"
                 >
                   <template #reference>
-                    <el-button size="small" text type="danger" :icon="Delete" />
+                    <el-button
+                      size="small"
+                      text
+                      type="danger"
+                      :icon="Delete"
+                    />
                   </template>
                 </el-popconfirm>
               </div>
@@ -330,15 +686,41 @@
         </div>
 
         <!-- 提供商表单 -->
-        <div v-show="providerFormVisible" class="provider-form-wrap">
-          <el-form ref="providerFormRef" :model="providerForm" :rules="providerRules" label-width="100px" size="small">
-            <el-form-item :label="t('ai.providerName')" prop="name">
-              <el-input v-model="providerForm.name" :placeholder="t('aiProvider.namePlaceholder')" maxlength="100" />
+        <div
+          v-show="providerFormVisible"
+          class="provider-form-wrap"
+        >
+          <el-form
+            ref="providerFormRef"
+            :model="providerForm"
+            :rules="providerRules"
+            label-width="100px"
+            size="small"
+          >
+            <el-form-item
+              :label="t('ai.providerName')"
+              prop="name"
+            >
+              <el-input
+                v-model="providerForm.name"
+                :placeholder="t('aiProvider.namePlaceholder')"
+                maxlength="100"
+              />
             </el-form-item>
-            <el-form-item :label="t('ai.apiUrl')" prop="apiBaseUrl">
-              <el-input v-model="providerForm.apiBaseUrl" :placeholder="t('aiProvider.apiUrlPlaceholder')" maxlength="255" />
+            <el-form-item
+              :label="t('ai.apiUrl')"
+              prop="apiBaseUrl"
+            >
+              <el-input
+                v-model="providerForm.apiBaseUrl"
+                :placeholder="t('aiProvider.apiUrlPlaceholder')"
+                maxlength="255"
+              />
             </el-form-item>
-            <el-form-item :label="t('ai.apiKey')" prop="apiKey">
+            <el-form-item
+              :label="t('ai.apiKey')"
+              prop="apiKey"
+            >
               <el-input
                 v-model="providerForm.apiKey"
                 type="password"
@@ -347,21 +729,43 @@
                 maxlength="500"
               />
             </el-form-item>
-            <el-form-item :label="t('ai.defaultModel')" prop="defaultModel">
-              <el-input v-model="providerForm.defaultModel" :placeholder="t('aiProvider.modelPlaceholder')" maxlength="100" />
+            <el-form-item
+              :label="t('ai.defaultModel')"
+              prop="defaultModel"
+            >
+              <el-input
+                v-model="providerForm.defaultModel"
+                :placeholder="t('aiProvider.modelPlaceholder')"
+                maxlength="100"
+              />
             </el-form-item>
-            <el-form-item :label="t('ai.availableModels')" prop="models">
-              <el-input v-model="providerForm.models" :placeholder="t('ai.modelsPlaceholder')" maxlength="500" />
+            <el-form-item
+              :label="t('ai.availableModels')"
+              prop="models"
+            >
+              <el-input
+                v-model="providerForm.models"
+                :placeholder="t('ai.modelsPlaceholder')"
+                maxlength="500"
+              />
               <div class="form-tip">
                 {{ t('ai.modelsTip') }}
               </div>
             </el-form-item>
           </el-form>
           <div class="provider-form-actions">
-            <el-button size="small" @click="providerFormVisible = false">
+            <el-button
+              size="small"
+              @click="providerFormVisible = false"
+            >
               {{ t('ai.cancel') }}
             </el-button>
-            <el-button size="small" type="primary" :loading="providerSubmitLoading" @click="handleSubmitProvider">
+            <el-button
+              size="small"
+              type="primary"
+              :loading="providerSubmitLoading"
+              @click="handleSubmitProvider"
+            >
               {{ t('ai.save') }}
             </el-button>
           </div>

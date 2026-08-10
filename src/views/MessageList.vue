@@ -15,19 +15,28 @@
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button :icon="Select" @click="handleReadAll">
+        <el-button
+          :icon="Select"
+          @click="handleReadAll"
+        >
           {{ t('message.readAll') }}
         </el-button>
       </template>
 
       <template #column-type="{ row }">
-        <el-tag :type="typeTag(row.type)" size="small">
+        <el-tag
+          :type="typeTag(row.type)"
+          size="small"
+        >
           {{ typeLabel(row.type) }}
         </el-tag>
       </template>
 
       <template #column-isRead="{ row }">
-        <el-tag :type="isRead(row as Message) ? 'success' : 'warning'" size="small">
+        <el-tag
+          :type="isRead(row as Message) ? 'success' : 'warning'"
+          size="small"
+        >
           {{ isRead(row as Message) ? t('message.read') : t('message.unread') }}
         </el-tag>
       </template>
@@ -38,7 +47,11 @@
 
       <template #column-fromUser="{ row }">
         <span v-if="row.fromUser">{{ row.fromUser.nickname || row.fromUser.username }}</span>
-        <el-tag v-else type="info" size="small">
+        <el-tag
+          v-else
+          type="info"
+          size="small"
+        >
           {{ t('message.system') }}
         </el-tag>
       </template>
@@ -48,28 +61,53 @@
       </template>
 
       <template #column-actions="{ row }">
-        <el-button type="primary" link size="small" @click="handleView(row as Message)">
+        <el-button
+          type="primary"
+          link
+          size="small"
+          @click="handleView(row as Message)"
+        >
           {{ t('common.view') }}
         </el-button>
-        <el-button type="danger" link size="small" @click="handleDelete(row as Message)">
+        <el-button
+          type="danger"
+          link
+          size="small"
+          @click="handleDelete(row as Message)"
+        >
           {{ t('common.delete') }}
         </el-button>
       </template>
     </ProTable>
 
-    <el-dialog v-model="dialogVisible" :title="t('message.messageDetail')" width="600px" destroy-on-close>
-      <el-descriptions :column="1" border>
+    <el-dialog
+      v-model="dialogVisible"
+      :title="t('message.messageDetail')"
+      width="600px"
+      destroy-on-close
+    >
+      <el-descriptions
+        :column="1"
+        border
+      >
         <el-descriptions-item :label="t('notice.title')">
           {{ currentMessage.title }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('common.type')">
-          <el-tag :type="typeTag(currentMessage.type)" size="small">
+          <el-tag
+            :type="typeTag(currentMessage.type)"
+            size="small"
+          >
             {{ typeLabel(currentMessage.type) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item :label="t('message.sender')">
           <span v-if="currentMessage.fromUser">{{ currentMessage.fromUser.nickname || currentMessage.fromUser.username }}</span>
-          <el-tag v-else type="info" size="small">
+          <el-tag
+            v-else
+            type="info"
+            size="small"
+          >
             {{ t('message.system') }}
           </el-tag>
         </el-descriptions-item>

@@ -1,12 +1,25 @@
 <template>
   <el-config-provider :locale="elementLocale">
     <!-- 跳过导航链接 - 仅键盘焦点时可见 -->
-    <a href="#main-content" class="skip-to-content" tabindex="0">
+    <a
+      href="#main-content"
+      class="skip-to-content"
+      tabindex="0"
+    >
       {{ t('accessibility.skipToContent') }}
     </a>
 
-    <div v-if="!sessionInitialized" class="session-loading" role="status" aria-live="polite" :aria-label="t('accessibility.initializingSession')">
-      <el-icon class="is-loading" :size="32">
+    <div
+      v-if="!sessionInitialized"
+      class="session-loading"
+      role="status"
+      aria-live="polite"
+      :aria-label="t('accessibility.initializingSession')"
+    >
+      <el-icon
+        class="is-loading"
+        :size="32"
+      >
         <Loading />
       </el-icon>
       <span class="sr-only">{{ t('common.loading') }}</span>

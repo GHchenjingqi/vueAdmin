@@ -1,27 +1,59 @@
 <template>
   <div class="settings-page">
     <el-row :gutter="20">
-      <el-col :xs="24" :sm="24" :md="12">
-        <el-card shadow="never" class="settings-card">
+      <el-col
+        :xs="24"
+        :sm="24"
+        :md="12"
+      >
+        <el-card
+          shadow="never"
+          class="settings-card"
+        >
           <template #header>
             <div class="q-title">
               {{ t('settings.siteInfo') }}
             </div>
           </template>
-          <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" label-position="right">
+          <el-form
+            ref="formRef"
+            :model="form"
+            :rules="rules"
+            label-width="120px"
+            label-position="right"
+          >
             <el-row :gutter="40">
               <el-col :span="24">
-                <el-form-item :label="t('settings.siteTitle')" prop="site_title">
-                  <el-input v-model="form.site_title" :placeholder="t('settings.inputSiteTitle')" maxlength="100" show-word-limit />
+                <el-form-item
+                  :label="t('settings.siteTitle')"
+                  prop="site_title"
+                >
+                  <el-input
+                    v-model="form.site_title"
+                    :placeholder="t('settings.inputSiteTitle')"
+                    maxlength="100"
+                    show-word-limit
+                  />
                 </el-form-item>
               </el-col>
               <el-col :span="24">
-                <el-form-item :label="t('settings.siteKeywords')" prop="site_keywords">
-                  <el-input v-model="form.site_keywords" :placeholder="t('settings.inputKeywords')" maxlength="200" show-word-limit />
+                <el-form-item
+                  :label="t('settings.siteKeywords')"
+                  prop="site_keywords"
+                >
+                  <el-input
+                    v-model="form.site_keywords"
+                    :placeholder="t('settings.inputKeywords')"
+                    maxlength="200"
+                    show-word-limit
+                  />
                 </el-form-item>
               </el-col>
             </el-row>
-            <el-form-item :label="t('settings.siteDescription')" prop="site_description">
+            <el-form-item
+              :label="t('settings.siteDescription')"
+              prop="site_description"
+            >
               <el-input
                 v-model="form.site_description"
                 type="textarea"
@@ -34,27 +66,48 @@
           </el-form>
         </el-card>
 
-        <el-card shadow="never" class="settings-card">
+        <el-card
+          shadow="never"
+          class="settings-card"
+        >
           <template #header>
             <div class="q-title">
               {{ t('settings.featureToggle') }}
             </div>
           </template>
-          <el-form :model="form" label-width="120px" label-position="right">
+          <el-form
+            :model="form"
+            label-width="120px"
+            label-position="right"
+          >
             <el-row :gutter="40">
               <el-col :span="24">
                 <el-form-item :label="t('settings.loginCaptcha')">
-                  <el-switch v-model="form.captcha_enabled" :active-text="t('settings.open')" :inactive-text="t('settings.close')" />
+                  <el-switch
+                    v-model="form.captcha_enabled"
+                    :active-text="t('settings.open')"
+                    :inactive-text="t('settings.close')"
+                  />
                 </el-form-item>
-                <div class="form-tip" style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px">
+                <div
+                  class="form-tip"
+                  style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px"
+                >
                   {{ t('settings.captchaTip') }}
                 </div>
               </el-col>
               <el-col :span="24">
                 <el-form-item :label="t('settings.imageCompress')">
-                  <el-switch v-model="form.image_compress" :active-text="t('settings.open')" :inactive-text="t('settings.close')" />
+                  <el-switch
+                    v-model="form.image_compress"
+                    :active-text="t('settings.open')"
+                    :inactive-text="t('settings.close')"
+                  />
                 </el-form-item>
-                <div class="form-tip" style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px">
+                <div
+                  class="form-tip"
+                  style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px"
+                >
                   {{ t('settings.compressTip') }}
                 </div>
               </el-col>
@@ -62,17 +115,31 @@
           </el-form>
         </el-card>
       </el-col>
-      <el-col :xs="24" :sm="24" :md="12">
-        <el-card shadow="never" class="settings-card">
+      <el-col
+        :xs="24"
+        :sm="24"
+        :md="12"
+      >
+        <el-card
+          shadow="never"
+          class="settings-card"
+        >
           <template #header>
             <div class="q-title">
               {{ t('settings.brand') }}
             </div>
           </template>
-          <el-form :model="form" label-width="120px" label-position="right">
+          <el-form
+            :model="form"
+            label-width="120px"
+            label-position="right"
+          >
             <el-row :gutter="40">
               <el-col :span="24">
-                <el-form-item :label="t('settings.siteLogo')" style="margin-bottom: 40px">
+                <el-form-item
+                  :label="t('settings.siteLogo')"
+                  style="margin-bottom: 40px"
+                >
                   <div style="width: 100%">
                     <div class="upload-row">
                       <el-upload
@@ -84,15 +151,33 @@
                         :before-upload="beforeUpload"
                         accept="image/*"
                       >
-                        <el-button type="primary" :icon="Upload">
+                        <el-button
+                          type="primary"
+                          :icon="Upload"
+                        >
                           {{ t('settings.selectImage') }}
                         </el-button>
                       </el-upload>
-                      <el-image v-if="form.site_logo" :src="previewUrl(form.site_logo)" fit="contain" class="logo-preview" />
-                      <el-button v-if="form.site_logo" type="danger" link :icon="Delete" @click="form.site_logo = ''">
+                      <el-image
+                        v-if="form.site_logo"
+                        :src="previewUrl(form.site_logo)"
+                        fit="contain"
+                        class="logo-preview"
+                      />
+                      <el-button
+                        v-if="form.site_logo"
+                        type="danger"
+                        link
+                        :icon="Delete"
+                        @click="form.site_logo = ''"
+                      >
                         {{ t('settings.remove') }}
                       </el-button>
-                      <el-button link :icon="FolderOpened" @click="openFilePicker('site_logo')">
+                      <el-button
+                        link
+                        :icon="FolderOpened"
+                        @click="openFilePicker('site_logo')"
+                      >
                         {{ t('settings.fromLibrary') }}
                       </el-button>
                     </div>
@@ -103,7 +188,10 @@
                 </el-form-item>
               </el-col>
               <el-col :span="24">
-                <el-form-item :label="t('settings.browserIcon')" style="margin-bottom: 36px">
+                <el-form-item
+                  :label="t('settings.browserIcon')"
+                  style="margin-bottom: 36px"
+                >
                   <div style="width: 100%">
                     <div class="upload-row">
                       <el-upload
@@ -115,15 +203,32 @@
                         :before-upload="beforeUpload"
                         accept="image/*"
                       >
-                        <el-button type="primary" :icon="Upload">
+                        <el-button
+                          type="primary"
+                          :icon="Upload"
+                        >
                           {{ t('settings.selectIcon') }}
                         </el-button>
                       </el-upload>
-                      <img v-if="form.site_favicon" :src="previewUrl(form.site_favicon)" class="favicon-preview" />
-                      <el-button v-if="form.site_favicon" type="danger" link :icon="Delete" @click="form.site_favicon = ''">
+                      <img
+                        v-if="form.site_favicon"
+                        :src="previewUrl(form.site_favicon)"
+                        class="favicon-preview"
+                      >
+                      <el-button
+                        v-if="form.site_favicon"
+                        type="danger"
+                        link
+                        :icon="Delete"
+                        @click="form.site_favicon = ''"
+                      >
                         {{ t('settings.remove') }}
                       </el-button>
-                      <el-button :icon="FolderOpened" link @click="openFilePicker('site_favicon')">
+                      <el-button
+                        :icon="FolderOpened"
+                        link
+                        @click="openFilePicker('site_favicon')"
+                      >
                         {{ t('settings.fromLibrary') }}
                       </el-button>
                     </div>
@@ -137,19 +242,33 @@
           </el-form>
         </el-card>
 
-        <el-card shadow="never" class="settings-card">
+        <el-card
+          shadow="never"
+          class="settings-card"
+        >
           <template #header>
             <div class="q-title">
               {{ t('settings.watermark') }}
             </div>
           </template>
-          <el-form :model="form" label-width="120px" label-position="right">
+          <el-form
+            :model="form"
+            label-width="120px"
+            label-position="right"
+          >
             <el-row :gutter="40">
               <el-col :span="24">
                 <el-form-item :label="t('settings.globalWatermark')">
-                  <el-switch v-model="form.watermark_enabled" :active-text="t('settings.open')" :inactive-text="t('settings.close')" />
+                  <el-switch
+                    v-model="form.watermark_enabled"
+                    :active-text="t('settings.open')"
+                    :inactive-text="t('settings.close')"
+                  />
                 </el-form-item>
-                <div class="form-tip" style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px">
+                <div
+                  class="form-tip"
+                  style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px"
+                >
                   {{ t('settings.watermarkTip') }}
                 </div>
               </el-col>
@@ -163,7 +282,10 @@
                     :disabled="!form.watermark_enabled"
                   />
                 </el-form-item>
-                <div class="form-tip" style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px">
+                <div
+                  class="form-tip"
+                  style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px"
+                >
                   {{ t('settings.watermarkTextTip') }}
                 </div>
               </el-col>
@@ -176,56 +298,114 @@
     <!-- 邮箱配置 -->
     <el-row :gutter="20">
       <el-col :span="24">
-        <el-card shadow="never" class="settings-card">
+        <el-card
+          shadow="never"
+          class="settings-card"
+        >
           <template #header>
             <div class="q-title">
               {{ t('settings.emailConfig') }}
             </div>
           </template>
-          <el-form :model="form" label-width="120px" label-position="right">
+          <el-form
+            :model="form"
+            label-width="120px"
+            label-position="right"
+          >
             <el-row :gutter="40">
               <el-col :span="12">
                 <el-form-item :label="t('settings.enableEmail')">
-                  <el-switch v-model="form.smtp_enabled" :active-text="t('settings.open')" :inactive-text="t('settings.close')" />
+                  <el-switch
+                    v-model="form.smtp_enabled"
+                    :active-text="t('settings.open')"
+                    :inactive-text="t('settings.close')"
+                  />
                 </el-form-item>
-                <div class="form-tip" style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px">
+                <div
+                  class="form-tip"
+                  style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px"
+                >
                   {{ t('settings.emailEnableTip') }}
                 </div>
               </el-col>
             </el-row>
             <el-row :gutter="40">
               <el-col :span="12">
-                <el-form-item :label="t('settings.smtpHost')" prop="smtp_host">
-                  <el-input v-model="form.smtp_host" :placeholder="t('settings.inputSmtpHost')" :disabled="!form.smtp_enabled" />
+                <el-form-item
+                  :label="t('settings.smtpHost')"
+                  prop="smtp_host"
+                >
+                  <el-input
+                    v-model="form.smtp_host"
+                    :placeholder="t('settings.inputSmtpHost')"
+                    :disabled="!form.smtp_enabled"
+                  />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item :label="t('settings.smtpPort')" prop="smtp_port">
-                  <el-input-number v-model="form.smtp_port" :min="1" :max="65535" :disabled="!form.smtp_enabled" style="width: 100%" />
+                <el-form-item
+                  :label="t('settings.smtpPort')"
+                  prop="smtp_port"
+                >
+                  <el-input-number
+                    v-model="form.smtp_port"
+                    :min="1"
+                    :max="65535"
+                    :disabled="!form.smtp_enabled"
+                    style="width: 100%"
+                  />
                 </el-form-item>
               </el-col>
             </el-row>
             <el-row :gutter="40">
               <el-col :span="12">
                 <el-form-item :label="t('settings.smtpSecure')">
-                  <el-switch v-model="form.smtp_secure" :active-text="t('settings.ssl')" :inactive-text="t('settings.tls')" :disabled="!form.smtp_enabled" />
+                  <el-switch
+                    v-model="form.smtp_secure"
+                    :active-text="t('settings.ssl')"
+                    :inactive-text="t('settings.tls')"
+                    :disabled="!form.smtp_enabled"
+                  />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item :label="t('settings.senderName')" prop="smtp_sender_name">
-                  <el-input v-model="form.smtp_sender_name" :placeholder="t('settings.inputSenderName')" :disabled="!form.smtp_enabled" />
+                <el-form-item
+                  :label="t('settings.senderName')"
+                  prop="smtp_sender_name"
+                >
+                  <el-input
+                    v-model="form.smtp_sender_name"
+                    :placeholder="t('settings.inputSenderName')"
+                    :disabled="!form.smtp_enabled"
+                  />
                 </el-form-item>
               </el-col>
             </el-row>
             <el-row :gutter="40">
               <el-col :span="12">
-                <el-form-item :label="t('settings.smtpUser')" prop="smtp_user">
-                  <el-input v-model="form.smtp_user" :placeholder="t('settings.inputSmtpUser')" :disabled="!form.smtp_enabled" />
+                <el-form-item
+                  :label="t('settings.smtpUser')"
+                  prop="smtp_user"
+                >
+                  <el-input
+                    v-model="form.smtp_user"
+                    :placeholder="t('settings.inputSmtpUser')"
+                    :disabled="!form.smtp_enabled"
+                  />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item :label="t('settings.smtpPass')" prop="smtp_pass">
-                  <el-input v-model="form.smtp_pass" type="password" show-password :placeholder="t('settings.inputSmtpPass')" :disabled="!form.smtp_enabled" />
+                <el-form-item
+                  :label="t('settings.smtpPass')"
+                  prop="smtp_pass"
+                >
+                  <el-input
+                    v-model="form.smtp_pass"
+                    type="password"
+                    show-password
+                    :placeholder="t('settings.inputSmtpPass')"
+                    :disabled="!form.smtp_enabled"
+                  />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -234,10 +414,20 @@
       </el-col>
     </el-row>
     <div class="settings-actions">
-      <el-button type="primary" :loading="saving" :icon="Check" size="large" @click="handleSave">
+      <el-button
+        type="primary"
+        :loading="saving"
+        :icon="Check"
+        size="large"
+        @click="handleSave"
+      >
         {{ t('settings.saveSettings') }}
       </el-button>
-      <el-button :icon="Refresh" size="large" @click="handleReset">
+      <el-button
+        :icon="Refresh"
+        size="large"
+        @click="handleReset"
+      >
         {{ t('settings.reset') }}
       </el-button>
     </div>
@@ -267,7 +457,10 @@
         <span class="file-picker__count">{{ t('filePicker.total') }}: {{ pickerFilteredFiles.length }}</span>
       </div>
 
-      <div v-loading="pickerLoading" class="file-picker__grid">
+      <div
+        v-loading="pickerLoading"
+        class="file-picker__grid"
+      >
         <div
           v-for="file in pickerFilteredFiles"
           :key="file.url"
@@ -277,12 +470,24 @@
           @dblclick="handlePickerConfirm(file)"
         >
           <div class="file-picker__thumb">
-            <el-image v-if="isImageFile(file.ext)" :src="pickerPreviewUrl(file.url)" fit="cover" style="width: 100%; height: 100%" />
-            <el-icon v-else :size="32" color="#909399">
+            <el-image
+              v-if="isImageFile(file.ext)"
+              :src="pickerPreviewUrl(file.url)"
+              fit="cover"
+              style="width: 100%; height: 100%"
+            />
+            <el-icon
+              v-else
+              :size="32"
+              color="#909399"
+            >
               <Document />
             </el-icon>
           </div>
-          <div class="file-picker__name" :title="file.name">
+          <div
+            class="file-picker__name"
+            :title="file.name"
+          >
             {{ file.name }}
           </div>
           <div class="file-picker__size">
@@ -290,14 +495,21 @@
           </div>
         </div>
 
-        <el-empty v-if="!pickerLoading && pickerFilteredFiles.length === 0" :description="t('filePicker.noFiles')" />
+        <el-empty
+          v-if="!pickerLoading && pickerFilteredFiles.length === 0"
+          :description="t('filePicker.noFiles')"
+        />
       </div>
 
       <template #footer>
         <el-button @click="filePickerVisible = false">
           {{ t('common.cancel') }}
         </el-button>
-        <el-button type="primary" :disabled="!pickerSelectedUrl" @click="handlePickerConfirm()">
+        <el-button
+          type="primary"
+          :disabled="!pickerSelectedUrl"
+          @click="handlePickerConfirm()"
+        >
           {{ t('common.confirm') }}
         </el-button>
       </template>

@@ -1,6 +1,9 @@
 <template>
   <div class="header-search">
-    <div ref="wrapperRef" class="search-wrapper">
+    <div
+      ref="wrapperRef"
+      class="search-wrapper"
+    >
       <el-input
         ref="searchInputRef"
         v-model="searchKeyword"
@@ -24,14 +27,29 @@
   <!-- 搜索下拉：渲染到 body 避免被任何祖先容器裁切 -->
   <Teleport to="body">
     <!-- 搜索历史 -->
-    <div v-if="dropdownVisible && !searchKeyword && searchHistory.length > 0" class="search-results-dropdown" :style="dropdownStyle" @mousedown.prevent>
+    <div
+      v-if="dropdownVisible && !searchKeyword && searchHistory.length > 0"
+      class="search-results-dropdown"
+      :style="dropdownStyle"
+      @mousedown.prevent
+    >
       <div class="search-history-header">
         <span class="search-history-title">{{ t('search.recentSearch') }}</span>
-        <el-button text size="small" type="danger" @click="clearHistory">
+        <el-button
+          text
+          size="small"
+          type="danger"
+          @click="clearHistory"
+        >
           {{ t('search.clearHistory') }}
         </el-button>
       </div>
-      <div v-for="item in searchHistory" :key="item" class="search-history-item" @click="searchFromHistory(item)">
+      <div
+        v-for="item in searchHistory"
+        :key="item"
+        class="search-history-item"
+        @click="searchFromHistory(item)"
+      >
         <el-icon class="history-icon">
           <Clock />
         </el-icon>
@@ -47,9 +65,16 @@
       @mousedown.prevent
     >
       <template v-if="searchResults.length > 0">
-        <div v-for="(group, groupIndex) in searchResults" :key="group.module" class="search-group">
+        <div
+          v-for="(group, groupIndex) in searchResults"
+          :key="group.module"
+          class="search-group"
+        >
           <div class="search-group-title">
-            <MenuIcon :name="group.icon" :size="14" />
+            <MenuIcon
+              :name="group.icon"
+              :size="14"
+            />
             {{ group.module }}
           </div>
           <div
@@ -64,19 +89,34 @@
           >
             <div class="search-item-main">
               <!-- eslint-disable vue/no-v-html -->
-              <span class="search-item-label" v-html="highlightText(item.label, searchKeyword)" />
+              <span
+                class="search-item-label"
+                v-html="highlightText(item.label, searchKeyword)"
+              />
               <!-- eslint-enable vue/no-v-html -->
-              <el-tag v-if="item.status !== undefined" :type="item.status === 1 ? 'success' : 'danger'" size="small" effect="plain" class="search-item-tag">
+              <el-tag
+                v-if="item.status !== undefined"
+                :type="item.status === 1 ? 'success' : 'danger'"
+                size="small"
+                effect="plain"
+                class="search-item-tag"
+              >
                 {{ item.status === 1 ? t('common.enable') : t('common.disable') }}
               </el-tag>
             </div>
             <!-- eslint-disable vue/no-v-html -->
-            <span class="search-item-desc" v-html="highlightText(item.description, searchKeyword)" />
+            <span
+              class="search-item-desc"
+              v-html="highlightText(item.description, searchKeyword)"
+            />
             <!-- eslint-enable vue/no-v-html -->
           </div>
         </div>
       </template>
-      <div v-else class="search-empty">
+      <div
+        v-else
+        class="search-empty"
+      >
         <el-icon :size="32">
           <Search />
         </el-icon>
@@ -85,7 +125,10 @@
       </div>
 
       <!-- 搜索结果底部提示 -->
-      <div v-if="searchResults.length > 0" class="search-footer-hint">
+      <div
+        v-if="searchResults.length > 0"
+        class="search-footer-hint"
+      >
         <span>
           <kbd>↑↓</kbd>
           {{ t('search.navigate') }}

@@ -9,7 +9,11 @@
     @submit.prevent
   >
     <el-row :gutter="gutter">
-      <el-col v-for="item in visibleSchema" :key="item.prop" v-bind="getColProps(item)">
+      <el-col
+        v-for="item in visibleSchema"
+        :key="item.prop"
+        v-bind="getColProps(item)"
+      >
         <ProFormItem
           :item="item"
           :model-value="getFieldValue(item.prop)"
@@ -18,22 +22,51 @@
           :readonly="readonly"
           @update:model-value="setFieldValue(item.prop, $event, item)"
         >
-          <template v-for="slotName in forwardedSlotNames" :key="slotName" #[slotName]="slotProps">
-            <slot :name="slotName" v-bind="slotProps as Record<string, unknown>" />
+          <template
+            v-for="slotName in forwardedSlotNames"
+            :key="slotName"
+            #[slotName]="slotProps"
+          >
+            <slot
+              :name="slotName"
+              v-bind="slotProps as Record<string, unknown>"
+            />
           </template>
           <template #content="slotProps">
-            <slot name="content" v-bind="slotProps as Record<string, unknown>" />
+            <slot
+              name="content"
+              v-bind="slotProps as Record<string, unknown>"
+            />
           </template>
         </ProFormItem>
       </el-col>
 
-      <el-col v-if="showActions" :span="24">
-        <div class="pro-form__actions" style="text-align: center">
-          <slot name="action" :model="formData" :submit="handleSubmit" :reset="handleReset" :loading="submitLoading">
-            <el-button type="primary" :loading="submitLoading" @click="handleSubmit">
+      <el-col
+        v-if="showActions"
+        :span="24"
+      >
+        <div
+          class="pro-form__actions"
+          style="text-align: center"
+        >
+          <slot
+            name="action"
+            :model="formData"
+            :submit="handleSubmit"
+            :reset="handleReset"
+            :loading="submitLoading"
+          >
+            <el-button
+              type="primary"
+              :loading="submitLoading"
+              @click="handleSubmit"
+            >
               {{ submitText }}
             </el-button>
-            <el-button v-if="showReset" @click="handleReset">
+            <el-button
+              v-if="showReset"
+              @click="handleReset"
+            >
               {{ resetText }}
             </el-button>
           </slot>

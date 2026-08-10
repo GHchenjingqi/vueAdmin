@@ -37,8 +37,8 @@ app.use(
         // 允许 Vite HMR WebSocket（开发模式）和 API 请求
         connectSrc: ["'self'", 'ws://localhost:24678', 'ws://127.0.0.1:24678'],
         // Vite 需要 unsafe-inline 进行 HMR
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cdn.redoc.ly'],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cdn.redoc.ly', 'https://unpkg.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://unpkg.com'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
       },

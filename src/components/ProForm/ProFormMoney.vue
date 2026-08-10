@@ -1,5 +1,10 @@
 <template>
-  <el-input v-bind="$attrs" :model-value="displayValue" @update:model-value="handleInput" @blur="handleBlur" />
+  <el-input
+    v-bind="$attrs"
+    :model-value="displayValue"
+    @update:model-value="handleInput"
+    @blur="handleBlur"
+  />
 </template>
 
 <script setup lang="ts">

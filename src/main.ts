@@ -52,4 +52,11 @@ if (import.meta.env.PROD) {
   reportWebVitals()
 }
 
+// 自动注册业务模块
+const moduleModules = import.meta.glob('./modules/*/index.ts', { eager: true })
+for (const path in moduleModules) {
+  const mod = moduleModules[path] as { register?: (...args: unknown[]) => void }
+  mod.register?.(app, router)
+}
+
 app.mount('#app')

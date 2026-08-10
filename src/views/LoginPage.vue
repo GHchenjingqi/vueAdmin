@@ -3,9 +3,16 @@
     <template #header>
       <span>{{ t('login.title') }}</span>
     </template>
-    <el-result icon="success" :title="t('login.alreadyLoggedIn')" :sub-title="t('login.welcomeBack', { username })">
+    <el-result
+      icon="success"
+      :title="t('login.alreadyLoggedIn')"
+      :sub-title="t('login.welcomeBack', { username })"
+    >
       <template #extra>
-        <el-button type="primary" @click="switchAccount">
+        <el-button
+          type="primary"
+          @click="switchAccount"
+        >
           {{ t('login.switchAccount') }}
         </el-button>
       </template>
