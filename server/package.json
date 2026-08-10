@@ -24,6 +24,7 @@
     "dotenv": "^16.4.0",
     "esbuild": "^0.25.0",
     "exceljs": "^4.4.0",
+    "expr-eval": "^2.0.2",
     "express": "^4.19.0",
     "helmet": "^8.2.0",
     "ioredis": "^5.11.1",

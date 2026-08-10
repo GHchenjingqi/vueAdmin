@@ -34,6 +34,30 @@ const routes = [
         component: () => import('@/views/AiProviderManager.vue'),
         meta: { title: 'AI 提供商管理' },
       },
+      {
+        path: 'workflows',
+        name: 'Workflows',
+        component: () => import('@/views/WorkflowList.vue'),
+        meta: { title: '工作流管理' },
+      },
+      {
+        path: 'workflows/:id/design',
+        name: 'WorkflowDesigner',
+        component: () => import('@/views/WorkflowDesigner.vue'),
+        meta: { title: '流程设计' },
+      },
+      {
+        path: 'workflow-instances',
+        name: 'WorkflowInstances',
+        component: () => import('@/views/WorkflowInstance.vue'),
+        meta: { title: '运行实例' },
+      },
+      {
+        path: 'approval-center',
+        name: 'ApprovalCenter',
+        component: () => import('@/views/ApprovalCenter.vue'),
+        meta: { title: '审批中心' },
+      },
     ],
   },
   {

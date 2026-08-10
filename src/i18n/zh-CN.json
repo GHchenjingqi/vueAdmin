@@ -963,5 +963,16 @@
   "errorPage": {
     "notFoundTitle": "抱歉，您访问的页面不存在",
     "notFoundDesc": "您访问的页面可能已被删除、移动或暂时不可用"
+  },
+  "workflow": {
+    "title": "工作流管理",
+    "addWorkflow": "新建工作流",
+    "name": "流程名称",
+    "designer": "流程设计",
+    "publish": "发布",
+    "instance": "运行实例",
+    "retry": "重试",
+    "terminate": "终止",
+    "approval": "审批中心"
   }
 }

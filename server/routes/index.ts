@@ -1941,4 +1941,8 @@ router.get('/server/stats', authMiddleware, serverController.getStats)
 // ==================== AI 助手 ====================
 router.use(aiRoutes)
 
+// ==================== 工作流管理 ====================
+import workflowRoutes from './workflowRoutes.js'
+router.use(workflowRoutes)
+
 export default router
