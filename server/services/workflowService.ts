@@ -7,20 +7,23 @@ import WorkflowApproverRule from '../models/WorkflowApproverRule.js'
 import WorkflowBinding from '../models/WorkflowBinding.js'
 import { AppError } from '../middleware/errorHandler.js'
 
-export async function listWorkflows(params: { keyword?: string; status?: number; page?: number; pageSize?: number }) {
-  const { keyword, status, page = 1, pageSize = 10 } = params
+export async function listWorkflows(params: { keyword?: string; status?: number | string; page?: number; pageSize?: number }) {
+  const { keyword, status } = params
+  const pageNum = Number(params.page) || 1
+  const pageSizeNum = Number(params.pageSize) || 10
   const where: any = {}
-  if (status !== undefined) where.status = status
+  // 空字符串 / null / undefined 视为不筛选（前端 ProTable 默认会带空 status 参数）
+  if (status !== undefined && status !== null && status !== '') where.status = Number(status)
   if (keyword) where.name = { [Op.like]: `%${keyword}%` }
 
   const { rows, count } = await Workflow.findAndCountAll({
     where,
-    offset: (page - 1) * pageSize,
-    limit: pageSize,
+    offset: (pageNum - 1) * pageSizeNum,
+    limit: pageSizeNum,
     order: [['createdAt', 'DESC']],
   })
 
-  return { rows, total: count, page, pageSize }
+  return { rows, total: count, page: pageNum, pageSize: pageSizeNum }
 }
 
 export async function getWorkflowById(id: number) {

@@ -6,6 +6,7 @@
   "scripts": {
     "reinstall": "npx -y rimraf node_modules server/node_modules package-lock.json server/package-lock.json",
     "install:all": "npm install && cd server && npm install",
+    "stop": "powershell -NoProfile -Command \"Get-Process -Id ((Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue).OwningProcess) -ErrorAction SilentlyContinue | Stop-Process -Force\"",
     "dev": "cd server && npm run dev",
     "build": "vite build",
     "start": "cd server && npm run build && cross-env NODE_ENV=production node dist/app.js",

@@ -163,6 +163,9 @@ async function handleSubmit() {
 }
 
 async function handleToggle(row: Workflow, val: number | string | boolean) {
+  if (!row?.id) return
+  // el-switch 在挂载时会触发一次 change（val 与当前状态一致），属于初始化噪音，直接忽略
+  if (Number(val) === Number(row.status)) return
   try {
     await workflowApi.toggle(row.id, Number(val) === 1)
     ElMessage.success(Number(val) === 1 ? '已启用' : '已禁用')
