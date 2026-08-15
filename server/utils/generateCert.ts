@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import selfsigned from 'selfsigned'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -28,8 +29,6 @@ export async function getOrCreateCert(): Promise<{ key: string; cert: string }> 
   }
 
   // 生成新证书
-  const selfsignedModule = await import('selfsigned')
-  const selfsigned = selfsignedModule.default as { generate: (attrs: unknown[], options: Record<string, unknown>) => Promise<SelfSignedResult> }
   const pems: SelfSignedResult = await selfsigned.generate(
     [
       { name: 'commonName', value: '192.168.12.251' },

@@ -33,13 +33,14 @@ export async function deleteNode(workflowId: number, nodeKey: string) {
 }
 
 export async function upsertEdge(workflowId: number, data: {
-  sourceNodeKey: string; targetNodeKey: string; conditionType?: string; conditionExpr?: string
+  sourceNodeKey: string; targetNodeKey: string; sourceHandle?: string; conditionType?: string; conditionExpr?: string
 }) {
   const versionId = await getDraftVersionId(workflowId)
   const [edge] = await WorkflowEdge.upsert({
     workflowId, versionId,
     sourceNodeKey: data.sourceNodeKey,
     targetNodeKey: data.targetNodeKey,
+    sourceHandle: data.sourceHandle || null,
     conditionType: data.conditionType || 'always',
     conditionExpr: data.conditionExpr || null,
   } as any)

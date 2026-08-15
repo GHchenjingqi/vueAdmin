@@ -6,6 +6,8 @@
 import { Op } from 'sequelize'
 import ApprovalTask from '../models/ApprovalTask.js'
 import WorkflowInstance from '../models/WorkflowInstance.js'
+import Workflow from '../models/Workflow.js'
+import User from '../models/User.js'
 import WorkflowEngine from '../services/WorkflowEngine.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { sendToUser } from '../utils/sseManager.js'
@@ -16,13 +18,28 @@ export const listMyTasks = async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10, status } = req.query
     const where = { approverId: req.user.id }
-    if (status) where.status = status
+    // 已办：传入逗号分隔的多个状态（如 approved,rejected）
+    if (status) {
+      const statusList = String(status).split(',').filter(Boolean)
+      where.status = statusList.length > 1 ? { [Op.in]: statusList } : status
+    }
 
     const { rows, count } = await ApprovalTask.findAndCountAll({
       where,
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
       order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: WorkflowInstance,
+          as: 'instance',
+          attributes: ['id', 'title', 'status', 'currentNodeKey', 'startedBy', 'startedAt'],
+          include: [
+            { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
+            { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
+          ],
+        },
+      ],
     })
 
     res.json({ code: 0, data: { rows, total: count, page: Number(page), pageSize: Number(pageSize) } })

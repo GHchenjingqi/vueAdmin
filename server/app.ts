@@ -14,6 +14,9 @@ import originValidator from './middleware/originValidator.js'
 import bootstrap from './bootstrap.js'
 import { closeRedis } from './config/redis.js'
 import config from './config/index.js'
+import { createPublicApp } from './public/index.js'
+import { registerPublicModule } from './public/registry.js'
+import { knowledgePublicModule } from './modules/knowledge/public.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -149,6 +152,12 @@ app.use('/uploads', express.static(uploadsDir))
 
 // ---------- API 路由（优先匹配）----------
 app.use('/api/v1', apiRoutes)
+
+// ---------- 对外站（匿名可读、SEO 友好、EJS 服务端渲染）----------
+// 通过 PUBLIC_PATH 配置挂载路径，便于后续拆分到独立子域（如 www.）；默认 /site，避免与 admin SPA 根路径冲突
+registerPublicModule(knowledgePublicModule)
+const publicPath = process.env.PUBLIC_PATH ?? '/site'
+app.use(publicPath, createPublicApp(publicPath))
 
 // ---------- 错误处理 ----------
 // Sentry 错误处理器（必须在所有路由之后，自定义 errorHandler 之前）

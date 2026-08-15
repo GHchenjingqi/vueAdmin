@@ -8,6 +8,7 @@ import WorkflowInstanceLog from '../models/WorkflowInstanceLog.js'
 import ApprovalTask from '../models/ApprovalTask.js'
 import Workflow from '../models/Workflow.js'
 import WorkflowBinding from '../models/WorkflowBinding.js'
+import User from '../models/User.js'
 import WorkflowEngine from '../services/WorkflowEngine.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { logOperation } from '../utils/logger.js'
@@ -59,6 +60,10 @@ export const listInstances = async (req, res, next) => {
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
       order: [['createdAt', 'DESC']],
+      include: [
+        { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
+        { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
+      ],
     })
 
     res.json({ code: 0, data: { rows, total: count, page: Number(page), pageSize: Number(pageSize) } })
@@ -70,7 +75,12 @@ export const listInstances = async (req, res, next) => {
 /** 实例详情（含节点日志与审批记录） */
 export const getInstanceDetail = async (req, res, next) => {
   try {
-    const instance = await WorkflowInstance.findByPk(Number(req.params.id))
+    const instance = await WorkflowInstance.findByPk(Number(req.params.id), {
+      include: [
+        { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
+        { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
+      ],
+    })
     if (!instance) throw new AppError(404, '实例不存在')
 
     const [logs, approvals] = await Promise.all([

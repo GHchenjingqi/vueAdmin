@@ -16,6 +16,9 @@ import NoticeRead from './models/NoticeRead.js'
 import Message from './models/Message.js'
 import Task from './models/Task.js'
 import AiProvider from './models/AiProvider.js'
+import Workflow from './models/Workflow.js'
+import WorkflowInstance from './models/WorkflowInstance.js'
+import ApprovalTask from './models/ApprovalTask.js'
 import KnowledgeCategory from './modules/knowledge/models/Category.js'
 import KnowledgeTag from './modules/knowledge/models/Tag.js'
 import KnowledgeContent from './modules/knowledge/models/Content.js'
@@ -29,6 +32,10 @@ import { resolve, join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import { readFileSync, existsSync } from 'fs'
+import express from 'express'
+import { getOrCreateCert } from './utils/generateCert.js'
+import { updateUserActivity, initKickSubscriber, closeKickSubscriber } from './utils/onlineUsers.js'
+import { initScheduler } from './utils/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -421,8 +428,6 @@ async function seedData() {
  */
 export default async function bootstrap(app) {
   try {
-    const express = (await import('express')).default
-
     // 模型关联
     User.belongsTo(Department, { foreignKey: 'deptId', as: 'dept' })
     Department.hasMany(User, { foreignKey: 'deptId', as: 'users' })
@@ -431,6 +436,11 @@ export default async function bootstrap(app) {
     Role.belongsToMany(Menu, { through: RoleMenu, foreignKey: 'roleId', as: 'menus' })
     Menu.belongsToMany(Role, { through: RoleMenu, foreignKey: 'menuId', as: 'roles' })
     Message.belongsTo(User, { foreignKey: 'fromUserId', as: 'fromUser' })
+
+    // 工作流模型关联（用于列表一次性返回流程名 / 发起人名，避免前端兜底）
+    WorkflowInstance.belongsTo(Workflow, { foreignKey: 'workflowId', as: 'workflow' })
+    WorkflowInstance.belongsTo(User, { foreignKey: 'startedBy', as: 'starter' })
+    ApprovalTask.belongsTo(WorkflowInstance, { foreignKey: 'instanceId', as: 'instance' })
 
     // 知识库模型关联
     KnowledgeContent.belongsTo(KnowledgeCategory, { foreignKey: 'categoryId', as: 'category' })
@@ -472,7 +482,6 @@ export default async function bootstrap(app) {
     await loadSiteInfo()
 
     // 自签名证书（开发环境），解决 Chrome HTTPS-First 模式报错
-    const { getOrCreateCert } = await import('./utils/generateCert.js')
     const { key, cert } = await getOrCreateCert()
 
     // 提前创建 HTTPS 服务器实例，供 Vite HMR WebSocket 挂载（setupFrontend 需要）
@@ -481,7 +490,6 @@ export default async function bootstrap(app) {
     await setupFrontend(app, process.env.NODE_ENV === 'production', express, httpsServer)
 
     // 在线用户追踪中间件
-    const { updateUserActivity } = await import('./utils/onlineUsers.js')
     app.use('/api', (req, res, next) => {
       if (req.user) {
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress
@@ -491,11 +499,9 @@ export default async function bootstrap(app) {
     })
 
     // 初始化定时任务调度器
-    const { initScheduler } = await import('./utils/scheduler.js')
     await initScheduler()
 
     // 初始化跨副本踢下线订阅（Redis pub/sub；不可用时自动降级单副本）
-    const { initKickSubscriber } = await import('./utils/onlineUsers.js')
     await initKickSubscriber()
 
     // HTTPS 服务器监听（开发环境使用自签名证书）
@@ -551,10 +557,8 @@ export default async function bootstrap(app) {
       try {
         await closeServers
         // 2. 关闭跨副本踢下线订阅
-        const { closeKickSubscriber } = await import('./utils/onlineUsers.js')
         await closeKickSubscriber()
         // 3. 关闭数据库连接
-        const { sequelize } = await import('./config/database.js')
         if (sequelize) {
           await sequelize.close()
           logInfo('数据库连接已关闭')

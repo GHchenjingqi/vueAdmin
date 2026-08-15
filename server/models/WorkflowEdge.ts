@@ -7,6 +7,7 @@ class WorkflowEdge extends Model<InferAttributes<WorkflowEdge>, InferCreationAtt
   declare versionId: number
   declare sourceNodeKey: string
   declare targetNodeKey: string
+  declare sourceHandle: string | null
   declare conditionType: string
   declare conditionExpr: string | null
 
@@ -39,6 +40,11 @@ WorkflowEdge.init({
     type: DataTypes.STRING(50),
     allowNull: false,
     comment: '目标节点 key',
+  },
+  sourceHandle: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: '源节点出口 handle（条件节点：true / false）',
   },
   conditionType: {
     type: DataTypes.ENUM('always', 'expression'),

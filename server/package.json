@@ -17,18 +17,22 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@esbuild/win32-x64": "^0.28.2",
+    "@esbuild/win32-x64": "^0.23.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^16.4.0",
+    "ejs": "^5.0.2",
     "esbuild": "^0.25.0",
     "exceljs": "^4.4.0",
     "expr-eval": "^2.0.2",
     "express": "^4.19.0",
+    "express-rate-limit": "^7.5.1",
     "helmet": "^8.2.0",
     "ioredis": "^5.11.1",
+    "isomorphic-dompurify": "^3.22.0",
     "jsonwebtoken": "^9.0.3",
+    "marked": "^12.0.2",
     "multer": "^2.2.0",
     "mysql2": "^3.9.0",
     "node-cron": "^4.5.0",
@@ -39,6 +43,7 @@
     "svg-captcha": "^1.4.0",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
+    "tsx": "^4.19.0",
     "umzug": "^3.8.3",
     "zod": "^3.23.8"
   },
@@ -47,13 +52,13 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/express-rate-limit": "^5.1.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^26.0.0",
     "@types/node-cron": "^3.0.11",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }

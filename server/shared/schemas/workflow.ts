@@ -25,6 +25,7 @@ export const updateNodeSchema = workflowNodeSchema.partial()
 export const workflowEdgeSchema = z.object({
   sourceNodeKey: z.string().min(1).max(50),
   targetNodeKey: z.string().min(1).max(50),
+  sourceHandle: z.string().max(20).optional(),
   conditionType: z.enum(['always', 'expression']).default('always'),
   conditionExpr: z.string().max(500).optional(),
 })

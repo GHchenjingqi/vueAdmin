@@ -26,6 +26,7 @@ export interface WorkflowEdge {
   id?: number
   sourceNodeKey: string
   targetNodeKey: string
+  sourceHandle?: string | null
   conditionType: 'always' | 'expression'
   conditionExpr?: string
 }
@@ -52,6 +53,8 @@ export interface WorkflowInstance {
   startedAt: string | null
   finishedAt: string | null
   createdAt: string
+  workflow?: { id: number; name: string }
+  starter?: { id: number; username: string; nickname?: string }
 }
 
 export interface ApprovalTask {
@@ -66,6 +69,7 @@ export interface ApprovalTask {
   assignedAt: string | null
   finishedAt: string | null
   createdAt: string
+  instance?: WorkflowInstance
 }
 
 export const workflowApi = {

@@ -100,14 +100,16 @@
                     <el-button class="cover-remove" size="small" circle @click="form.cover = ''">
                       <el-icon><Close /></el-icon>
                     </el-button>
+                    <el-button class="cover-change" size="small" type="primary" plain @click="coverPickerVisible = true">
+                      {{ t('knowledge.changeCover') }}
+                    </el-button>
                   </div>
-                  <div class="cover-image-list">
-                    <div v-for="(img, i) in imageList" :key="i" class="cover-image-item" :class="{ active: form.cover === img }" @click="form.cover = img">
-                      <el-image :src="img" fit="cover" lazy />
-                    </div>
-                    <div v-if="!imageList.length" class="cover-empty">
-                      {{ t('knowledge.coverEmpty') }}
-                    </div>
+                  <div v-else class="cover-empty cover-empty--action" @click="coverPickerVisible = true">
+                    <el-icon :size="22">
+                      <Picture />
+                    </el-icon>
+                    <span>{{ t('knowledge.selectCover') }}</span>
+                    <span class="cover-empty-tip">{{ t('knowledge.noCoverTip') }}</span>
                   </div>
                 </div>
               </el-form-item>
@@ -157,13 +159,48 @@
         </div>
       </template>
     </el-drawer>
+
+    <el-dialog v-model="coverPickerVisible" :title="t('knowledge.coverPickerTitle')" width="640px" append-to-body destroy-on-close>
+      <div class="cover-picker">
+        <div class="cover-picker-current">
+          <span class="cover-picker-label">{{ t('knowledge.currentCover') }}</span>
+          <div v-if="form.cover" class="cover-picker-current-img">
+            <el-image :src="form.cover" fit="cover" style="width: 160px; height: 90px; border-radius: 4px" />
+            <el-button type="danger" size="small" link :icon="Close" @click="form.cover = ''">
+              {{ t('knowledge.removeCover') }}
+            </el-button>
+          </div>
+          <span v-else class="cover-picker-none">{{ t('knowledge.noCover') }}</span>
+        </div>
+
+        <el-divider />
+
+        <div class="cover-image-list">
+          <div v-for="(img, i) in imageList" :key="i" class="cover-image-item" :class="{ active: form.cover === img }" @click="form.cover = img">
+            <el-image :src="img" fit="cover" lazy />
+            <el-icon class="cover-image-check">
+              <CircleCheck />
+            </el-icon>
+          </div>
+          <div v-if="!imageList.length" class="cover-empty">
+            {{ t('knowledge.coverEmpty') }}
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="coverPickerVisible = false">
+          {{ t('common.confirm') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Delete, Close } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Close, Picture, CircleCheck } from '@element-plus/icons-vue'
 import { knowledgeCategoryApi, knowledgeTagApi, knowledgeContentApi } from '../api'
 import { useI18n } from '@/i18n'
 import ProTable from '@/components/ProTable/index.vue'
@@ -183,6 +220,7 @@ const formRef = ref()
 
 const drawerVisible = ref(false)
 const isEdit = ref(false)
+const coverPickerVisible = ref(false)
 const submitLoading = ref(false)
 
 const searchFields = computed(() => [
@@ -431,16 +469,67 @@ onMounted(() => {
   --el-button-size: 24px;
 }
 
+.cover-change {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.cover-empty--action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 0;
+  border: 1px dashed var(--el-border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--el-text-color-secondary);
+  transition:
+    border-color 0.2s,
+    color 0.2s;
+  &:hover {
+    border-color: var(--el-color-primary);
+    color: var(--el-color-primary);
+  }
+  .cover-empty-tip {
+    font-size: 11px;
+    color: var(--el-text-color-placeholder);
+  }
+}
+
+.cover-picker {
+  .cover-picker-current {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .cover-picker-label {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .cover-picker-current-img {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cover-picker-none {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+}
+
 .cover-image-list {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  margin-top: 8px;
-  max-height: 200px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 360px;
   overflow-y: auto;
 }
 
 .cover-image-item {
+  position: relative;
   cursor: pointer;
   border: 2px solid transparent;
   border-radius: 4px;
@@ -459,7 +548,22 @@ onMounted(() => {
 .cover-image-item .el-image {
   display: block;
   width: 100%;
-  height: 60px;
+  height: 80px;
+}
+
+.cover-image-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: var(--el-color-primary);
+  background: var(--el-bg-color);
+  border-radius: 50%;
+  font-size: 18px;
+  opacity: 0;
+}
+
+.cover-image-item.active .cover-image-check {
+  opacity: 1;
 }
 
 .cover-empty {
@@ -467,6 +571,7 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
   text-align: center;
   padding: 12px 0;
+  grid-column: 1 / -1;
 }
 
 .drawer-actions :deep(.el-button) {

@@ -21,19 +21,40 @@
         <el-switch :model-value="(row as Workflow).status" :active-value="1" :inactive-value="0" @change="(val) => handleToggle(row as Workflow, val)" />
       </template>
 
+      <template #column-draftVersionId="{ row }">
+        <span>{{ (row as Workflow).draftVersionId ? `V${(row as Workflow).draftVersionId}` : '-' }}</span>
+      </template>
+      <template #column-publishedVersionId="{ row }">
+        <span>{{ (row as Workflow).publishedVersionId ? `V${(row as Workflow).publishedVersionId}` : '-' }}</span>
+      </template>
+
       <template #column-actions="{ row }">
-        <el-button type="primary" link size="small" @click="handleDesign(row as Workflow)">
-          {{ t('workflow.designer') }}
-        </el-button>
-        <el-button type="success" link size="small" :disabled="!(row as Workflow).publishedVersionId" @click="handlePublish(row as Workflow)">
-          {{ t('workflow.publish') }}
-        </el-button>
-        <el-button type="warning" link size="small" @click="handleEdit(row as Workflow)">
-          {{ t('common.edit') }}
-        </el-button>
-        <el-button type="danger" link size="small" @click="handleDelete(row as Workflow)">
-          {{ t('common.delete') }}
-        </el-button>
+        <div class="table-actions">
+          <el-button type="primary" link size="small" @click="handleDesign(row as Workflow)">
+            {{ t('workflow.designer') }}
+          </el-button>
+          <el-dropdown trigger="click" @command="(cmd) => handleActionCommand(cmd, row as Workflow)">
+            <el-button type="primary" link size="small">
+              {{ t('common.more') }}
+              <el-icon class="el-icon--right">
+                <ArrowDown />
+              </el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="publish" :disabled="!(row as Workflow).draftVersionId">
+                  {{ (row as Workflow).publishedVersionId ? t('workflow.republish') : t('common.publish') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="edit" :icon="Edit">
+                  {{ t('common.edit') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="delete" :icon="Delete" divided style="color: var(--el-color-danger)">
+                  {{ t('common.delete') }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </template>
     </ProTable>
 
@@ -60,7 +81,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, ArrowDown } from '@element-plus/icons-vue'
 import ProTable from '@/components/ProTable/index.vue'
 import { workflowApi, type Workflow } from '@/api/workflow'
 import { useI18n } from '@/i18n'
@@ -87,8 +108,8 @@ const searchFields = computed(() => [
     type: 'select',
     placeholder: t('common.all'),
     options: [
-      { label: t('common.enable'), value: '1' },
-      { label: t('common.disable'), value: '0' },
+      { label: t('common.enable'), value: 1 },
+      { label: t('common.disable'), value: 0 },
     ],
   },
 ])
@@ -100,7 +121,7 @@ const columns = computed(() => [
   { prop: 'draftVersionId', label: t('workflow.draftVersion'), width: 100 },
   { prop: 'publishedVersionId', label: t('workflow.publishedVersion'), width: 100 },
   { prop: 'createdAt', label: t('common.createdTime'), width: 170 },
-  { prop: 'actions', label: t('common.actions'), width: 280, fixed: 'right' },
+  { prop: 'actions', label: t('common.actions'), width: 150, fixed: 'right' },
 ])
 
 const form = reactive({ name: '', description: '' })
@@ -149,12 +170,25 @@ async function handleSubmit() {
     if (isEdit.value && editId.value) {
       await workflowApi.update(editId.value, form)
       ElMessage.success(t('common.updateSuccess'))
+      dialogVisible.value = false
+      fetchWorkflows()
     } else {
-      await workflowApi.create(form)
+      const res = await workflowApi.create(form)
       ElMessage.success(t('common.createSuccess'))
+      dialogVisible.value = false
+      const newId = (res.data as unknown as { id?: number } | undefined)?.id
+      try {
+        await ElMessageBox.confirm(t('workflow.goToDesignerTip'), t('workflow.designer'), {
+          confirmButtonText: t('workflow.designer'),
+          cancelButtonText: t('common.cancel'),
+          type: 'success',
+        })
+        if (newId) router.push(`/workflows/${newId}/design`)
+        else fetchWorkflows()
+      } catch {
+        fetchWorkflows()
+      }
     }
-    dialogVisible.value = false
-    fetchWorkflows()
   } catch {
     ElMessage.error(t('workflow.operationFailed'))
   } finally {
@@ -166,9 +200,17 @@ async function handleToggle(row: Workflow, val: number | string | boolean) {
   if (!row?.id) return
   // el-switch 在挂载时会触发一次 change（val 与当前状态一致），属于初始化噪音，直接忽略
   if (Number(val) === Number(row.status)) return
+  const enable = Number(val) === 1
   try {
-    await workflowApi.toggle(row.id, Number(val) === 1)
-    ElMessage.success(Number(val) === 1 ? t('workflow.enabledMsg') : t('workflow.disabledMsg'))
+    const tipKey = enable ? 'workflow.confirmEnable' : 'workflow.confirmDisable'
+    const extra = row.publishedVersionId ? `\n${t('workflow.hasPublishedWarn')}` : ''
+    await ElMessageBox.confirm(t(tipKey, { name: row.name }) + extra, t('common.tip'), {
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
+      type: 'warning',
+    })
+    await workflowApi.toggle(row.id, enable)
+    ElMessage.success(enable ? t('workflow.enabledMsg') : t('workflow.disabledMsg'))
   } catch {
     fetchWorkflows()
   }
@@ -184,13 +226,20 @@ async function handlePublish(row: Workflow) {
   }
 }
 
+function handleActionCommand(cmd: string, row: Workflow) {
+  if (cmd === 'publish') handlePublish(row)
+  else if (cmd === 'edit') handleEdit(row)
+  else if (cmd === 'delete') handleDelete(row)
+}
+
 function handleDesign(row: Workflow) {
   router.push(`/workflows/${row.id}/design`)
 }
 
 async function handleDelete(row: Workflow) {
   try {
-    await ElMessageBox.confirm(t('workflow.confirmDelete', { name: row.name }), t('common.tip'), { type: 'warning' })
+    const extra = row.publishedVersionId ? `\n${t('workflow.hasPublishedWarn')}` : ''
+    await ElMessageBox.confirm(t('workflow.confirmDelete', { name: row.name }) + extra, t('common.tip'), { type: 'warning' })
     await workflowApi.delete(row.id)
     ElMessage.success(t('workflow.deleteSuccess'))
     fetchWorkflows()
@@ -201,3 +250,11 @@ async function handleDelete(row: Workflow) {
 
 onMounted(fetchWorkflows)
 </script>
+
+<style lang="scss" scoped>
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+</style>
