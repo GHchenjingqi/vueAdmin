@@ -23,6 +23,9 @@ import * as taskController from '../controllers/taskController.js'
 import * as onlineUserController from '../controllers/onlineUserController.js'
 import * as serverController from '../controllers/serverController.js'
 import aiRoutes from './ai.routes.js'
+import knowledgeRoutes from '../modules/knowledge/routes/index.js'
+// ==================== 工作流管理 ====================
+import workflowRoutes from './workflowRoutes.js'
 
 const router = Router()
 
@@ -1940,5 +1943,7 @@ router.get('/server/stats', authMiddleware, serverController.getStats)
 
 // ==================== AI 助手 ====================
 router.use(aiRoutes)
+router.use(workflowRoutes)
+router.use('/knowledge', knowledgeRoutes)
 
 export default router

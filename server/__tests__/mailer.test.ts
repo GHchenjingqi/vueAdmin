@@ -21,16 +21,17 @@ describe('mailer', () => {
     process.env = originalEnv
   })
 
-  it('SMTP_HOST 未配置时 transporter 为 null', async () => {
+  it('SMTP_HOST 未配置且无 DB 配置时 getTransporter 返回 null', async () => {
     delete process.env.SMTP_HOST
 
-    const { default: transporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer')
 
+    const transporter = await getTransporter()
     expect(transporter).toBeNull()
     expect(mockCreateTransport).not.toHaveBeenCalled()
   })
 
-  it('SMTP_HOST 配置时创建 transporter', async () => {
+  it('SMTP_HOST 环境变量配置时创建 transporter', async () => {
     process.env.SMTP_HOST = 'smtp.example.com'
     process.env.SMTP_PORT = '587'
     process.env.SMTP_SECURE = 'false'
@@ -40,7 +41,8 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { default: transporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer')
+    const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
     expect(mockCreateTransport).toHaveBeenCalledWith({
@@ -61,7 +63,8 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { default: transporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer')
+    const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
     expect(mockCreateTransport).toHaveBeenCalledWith(
@@ -76,7 +79,8 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { default: transporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer')
+    const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
     expect(mockCreateTransport).toHaveBeenCalledWith(
@@ -91,7 +95,8 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { default: transporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer')
+    const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
     expect(mockCreateTransport).toHaveBeenCalledWith(
@@ -106,7 +111,8 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { default: transporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer')
+    const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
     expect(mockCreateTransport).toHaveBeenCalledWith(

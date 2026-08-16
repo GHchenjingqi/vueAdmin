@@ -17,9 +17,9 @@ export const passwordSchema = z
   .regex(/[^A-Za-z0-9]/, '密码必须包含至少一个特殊字符')
 
 export const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1, '原密码不能为空'),
+  oldPassword: z.string().optional(),
   newPassword: passwordSchema,
-}).refine(data => data.oldPassword !== data.newPassword, {
+}).refine(data => !data.oldPassword || data.oldPassword !== data.newPassword, {
   message: '新密码不能与原密码相同',
   path: ['newPassword'],
 })

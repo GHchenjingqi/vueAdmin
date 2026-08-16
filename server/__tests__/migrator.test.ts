@@ -63,9 +63,10 @@ describe('migrator', () => {
   })
 
   it('should have migrations glob pointing to server/migrations', () => {
-    const glob: string = migrator.options.migrations.glob
-    expect(glob).toContain('migrations')
-    expect(glob).toContain('.ts')
+    const glob = migrator.options.migrations.glob as string | string[]
+    const globText = Array.isArray(glob) ? glob.join(',') : String(glob)
+    expect(globText).toContain('migrations')
+    expect(globText).toMatch(/\{ts,js\}|\.ts|\.js/)
   })
 
   it('should have context set to sequelize query interface', () => {
@@ -112,9 +113,10 @@ describe('seeder', () => {
   })
 
   it('should have migrations glob pointing to server/seeders', () => {
-    const glob: string = seeder.options.migrations.glob
-    expect(glob).toContain('seeders')
-    expect(glob).toContain('.ts')
+    const glob = seeder.options.migrations.glob as string | string[]
+    const globText = Array.isArray(glob) ? glob.join(',') : String(glob)
+    expect(globText).toContain('seeders')
+    expect(globText).toMatch(/\{ts,js\}|\.ts|\.js/)
   })
 
   it('should have SeederMeta storage', () => {

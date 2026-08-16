@@ -1,0 +1,21 @@
+<h1><%= pageTitle %></h1>
+<div class="post-list">
+  <% if (items && items.length) { %>
+    <% items.forEach(function(item) { %>
+      <article class="post-card">
+        <% if (item.cover) { %>
+          <img src="<%= item.cover %>" alt="<%= item.title %>" class="post-cover">
+        <% } %>
+        <h2><a href="<%= item.url %>"><%= item.title %></a></h2>
+        <p class="post-summary"><%= item.summary %></p>
+        <div class="post-meta">
+          <span><%= item.author %></span>
+          <span><%= item.publishTime %></span>
+        </div>
+      </article>
+    <% }); %>
+  <% } else { %>
+    <p class="empty">暂无内容</p>
+  <% } %>
+</div>
+<%- paginationHtml %>

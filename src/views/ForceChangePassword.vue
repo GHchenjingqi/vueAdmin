@@ -19,7 +19,7 @@
           <el-button type="primary" :loading="loading" class="submit-btn" @click="handleSubmit">
             {{ t('forcePwd.confirmChange') }}
           </el-button>
-          <el-button @click="handleLogout">
+          <el-button class="cancel-btn" @click="handleLogout">
             {{ t('forcePwd.relogin') }}
           </el-button>
         </el-form-item>
@@ -56,6 +56,7 @@ import { useUserStore } from '@/stores'
 import { checkPasswordStrength, createConfirmValidator } from '@/utils/validators'
 import { getErrorMessage } from '@/utils/error'
 import { useI18n } from '@/i18n'
+import { initDynamicRoutes } from '@/router/initSession'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -92,6 +93,7 @@ const handleSubmit = async () => {
     await authApi.changePassword({ newPassword: form.newPassword })
     ElMessage.success(t('forcePwd.changeSuccess'))
     userStore.setPasswordResetRequired(false)
+    await initDynamicRoutes()
     router.push('/')
   } catch (err: unknown) {
     const axiosErr = err as { response?: { data?: { message?: string } } }
@@ -146,8 +148,9 @@ const handleLogout = async () => {
   color: var(--text-secondary);
 }
 
-.submit-btn {
-  width: 100%;
+.submit-btn,
+.cancel-btn {
+  flex: 1;
 }
 
 .password-hint {

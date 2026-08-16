@@ -16,6 +16,9 @@ vi.mock('../config/index.js', () => ({
     jwt: {
       secret: 'test-secret',
     },
+    redis: {
+      enabled: false,
+    },
   },
 }))
 

@@ -88,6 +88,11 @@ const restoreSession = async (): Promise<void> => {
 }
 
 onMounted(async () => {
+  // 同步 localeStore 的语言到 i18n/index.ts
+  // i18n/index.ts 在模块导入时就初始化了，需要确保与持久化的 localeStore 一致
+  const { setLocale } = await import('@/i18n')
+  setLocale(appStore.locale as 'zh-CN' | 'en-US')
+
   const SESSION_TIMEOUT = 15000
   const timeoutPromise = new Promise<void>((resolve) => {
     setTimeout(() => {
@@ -103,6 +108,11 @@ onMounted(async () => {
   if (userStore.isLoggedIn) {
     try {
       await initDynamicRoutes()
+      // 动态路由注册完成后，若当前路由为 404 且路径是仪表盘相关路径，
+      // 说明是动态路由注册前的重定向残留，跳转到仪表盘
+      if (router.currentRoute.value.name === 'NotFound' && ['/', '/dashboard'].includes(router.currentRoute.value.path)) {
+        await router.replace('/dashboard')
+      }
     } catch (err: unknown) {
       // 菜单加载失败：若已无登录态则退回登录页
       if (!userStore.isLoggedIn) {

@@ -202,7 +202,7 @@ export async function changePassword(
 
   // 管理员重置密码
   if (options.reset) {
-    const newPassword = crypto.randomBytes(4).toString('hex')
+    const newPassword = '123456'
     user.password = newPassword
     user.passwordResetRequired = 1
     await user.save()

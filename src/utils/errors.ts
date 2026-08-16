@@ -119,27 +119,29 @@ export function isNetworkError(err: unknown): boolean {
 
 /** 检查是否为认证/授权错误（401/403） */
 export function isAuthError(err: unknown): boolean {
-  if (!err || !(err instanceof Error)) return false
-  const appErr = err as AppError
-  // AppError 实例直接读 status；Axios 风格的 plain Error 从 response 对象读取
-  if (appErr.status === 401 || appErr.status === 403) return true
-  const axiosErr = err as { response?: { status?: number } }
-  if (axiosErr.response?.status === 401 || axiosErr.response?.status === 403) return true
-  return appErr.code === 'UNAUTHORIZED' || appErr.code === 'FORBIDDEN'
+  if (!err) return false
+  if (err instanceof AppError) {
+    return err.status === 401 || err.status === 403 || err.code === 'UNAUTHORIZED' || err.code === 'FORBIDDEN'
+  }
+  const obj = err as { response?: { status?: number } }
+  return obj.response?.status === 401 || obj.response?.status === 403
 }
 
 /** 检查是否为验证错误（400 或 Validation 相关） */
 export function isValidationError(err: unknown): boolean {
   if (!err) return false
-  if (err instanceof Error) {
-    const appErr = err as AppError
-    if (appErr.status === 400) return true
-    if (appErr.code === 'VALIDATION_ERROR') return true
-    const message = appErr.message.toLowerCase()
+  if (err instanceof AppError) {
+    if (err.status === 400) return true
+    if (err.code === 'VALIDATION_ERROR') return true
+    const message = err.message.toLowerCase()
     if (/validation|validate|bad request/i.test(message)) return true
-    // Axios 风格的 plain Error：从 response.status 读取
+  }
+  if (err instanceof Error) {
+    const message = err.message.toLowerCase()
+    if (/validation|validate|bad request/i.test(message)) return true
     const axiosErr = err as { response?: { status?: number } }
     if (axiosErr.response?.status === 400) return true
   }
-  return false
+  const obj = err as { response?: { status?: number } }
+  return obj.response?.status === 400
 }

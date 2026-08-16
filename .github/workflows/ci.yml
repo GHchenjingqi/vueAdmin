@@ -41,6 +41,14 @@ jobs:
       - name: Run vue-tsc
         run: npm run typecheck
 
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci --ignore-scripts
+
+      - name: Run server typecheck
+        working-directory: server
+        run: npm run typecheck
+
   # Phase 0.1: 依赖安全扫描
   # 扫描前端和后端依赖中的已知漏洞，阻断 high/critical 级别的合并
   audit:
@@ -155,7 +163,7 @@ jobs:
           --health-cmd="mysqladmin ping"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -173,25 +181,65 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare server env
+        run: |
+          cat > server/.env <<'EOF'
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_NAME=vue_admin
+          DB_USER=root
+          DB_PASSWORD=root
+          SERVER_PORT=5173
+          JWT_SECRET=test_jwt_secret_key_for_ci
+          ALLOWED_ORIGINS=https://localhost:5173,http://localhost:5173,https://127.0.0.1:5173,http://127.0.0.1:5173
+          REDIS_ENABLED=false
+          LOG_LEVEL=error
+          EOF
+          # 去掉 heredoc 缩进空格
+          sed -i 's/^          //' server/.env
 
       - name: Start backend server
-        working-directory: server
         run: |
-          nohup npm run dev &
-          sleep 10
+          nohup npm run dev > /tmp/vue-admin-e2e.log 2>&1 &
+          echo $! > /tmp/vue-admin-e2e.pid
+          # 等待 HTTPS 就绪（自签名证书）
+          for i in $(seq 1 60); do
+            if curl -k -fsS https://localhost:5173/health >/dev/null 2>&1; then
+              echo "server ready on attempt $i"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "server failed to start" >&2
+          cat /tmp/vue-admin-e2e.log || true
+          exit 1
         env:
-          NODE_ENV: test
-          DB_HOST: localhost
+          NODE_ENV: development
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: vue_admin
           DB_USER: root
           DB_PASSWORD: root
-          DB_NAME: vue_admin
-          JWT_SECRET: test_jwt_secret_key
+          SERVER_PORT: 5173
+          JWT_SECRET: test_jwt_secret_key_for_ci
+          ALLOWED_ORIGINS: https://localhost:5173,http://localhost:5173
+          REDIS_ENABLED: 'false'
 
       - name: Run E2E tests
         run: npm run test:e2e
         env:
-          NODE_ENV: test
+          CI: true
+          E2E_BASE_URL: https://localhost:5173
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-server-log
+          path: /tmp/vue-admin-e2e.log
+          retention-days: 7
 
       - name: Upload E2E report
         if: always()

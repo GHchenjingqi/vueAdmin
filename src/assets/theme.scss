@@ -758,7 +758,12 @@ body,
 .el-menu {
   border-right: 1px solid var(--sidebar-border);
   background-color: var(--sidebar-bg);
-
+  .el-sub-menu .el-menu-item {
+    margin-top: 4px;
+    margin-bottom: 4px;
+    height: 40px !important;
+    line-height: 40px !important;
+  }
   &:not(.el-menu--horizontal) {
     .el-menu-item:hover,
     .el-sub-menu__title:hover {
@@ -832,9 +837,9 @@ body,
 
   /* 去掉 light 效果，统一使用主色调 */
   &.el-tag--primary {
-    --el-tag-bg-color: var(--el-color-primary);
-    --el-tag-text-color: #ffffff;
-    --el-tag-border-color: var(--el-color-primary);
+    --el-tag-bg-color: var(--el-color-primary) !important;
+    --el-tag-text-color: #ffffff !important;
+    --el-tag-border-color: var(--el-color-primary) !important;
   }
 
   &.el-tag--light {

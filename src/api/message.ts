@@ -1,5 +1,5 @@
 /**
- * 站内消息 API
+ * 站内消息 API（收件箱）
  */
 import request from '@/utils/request'
 import type { PaginatedData, ListQueryParams } from '@/types/response'
@@ -7,7 +7,7 @@ import type { Message } from '@/types/api'
 
 export const messageApi = {
   /** 获取消息列表 */
-  list(params: ListQueryParams) {
+  list(params: ListQueryParams & { type?: string; isRead?: string | number | boolean }) {
     return request.get<PaginatedData<Message>>('/messages', { params })
   },
 
@@ -16,9 +16,9 @@ export const messageApi = {
     return request.get<Message>(`/messages/${id}`)
   },
 
-  /** 发送消息 */
-  send(data: { title: string; content: string; receiverId: number }) {
-    return request.post<Message>('/messages', data)
+  /** 获取未读消息数 */
+  getUnreadCount() {
+    return request.get<{ count: number }>('/messages', { params: { scope: 'unread-count' } })
   },
 
   /** 标记已读 */
@@ -28,7 +28,7 @@ export const messageApi = {
 
   /** 全部标记已读 */
   markAllRead() {
-    return request.patch<null>('/messages')
+    return request.patch<null>('/messages', { readAll: true })
   },
 
   /** 删除消息 */

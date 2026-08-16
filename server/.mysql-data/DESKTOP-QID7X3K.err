@@ -1,0 +1,16 @@
+2026-08-10T01:07:56.940266Z 0 [System] [MY-015017] [Server] MySQL Server Initialization - start.
+2026-08-10T01:07:56.944402Z 0 [System] [MY-013169] [Server] C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe (mysqld 8.4.8) initializing of server in progress as process 22676
+2026-08-10T01:07:56.957446Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-08-10T01:07:57.116330Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-08-10T01:07:57.975074Z 6 [Warning] [MY-010453] [Server] root@localhost is created with an empty password ! Please consider switching off the --initialize-insecure option.
+2026-08-10T01:07:59.447913Z 0 [System] [MY-015018] [Server] MySQL Server Initialization - end.
+2026-08-10T01:08:11.390997Z 0 [System] [MY-015015] [Server] MySQL Server - start.
+2026-08-10T01:08:11.491409Z 0 [System] [MY-010116] [Server] C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe (mysqld 8.4.8) starting as process 12928
+2026-08-10T01:08:11.502104Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-08-10T01:08:11.583308Z 1 [ERROR] [MY-013039] [InnoDB] Can't create UNDO tablespace innodb_undo_001  since '.\undo_001' already exists.
+2026-08-10T01:08:11.583956Z 1 [ERROR] [MY-012930] [InnoDB] Plugin initialization aborted with error Generic error.
+2026-08-10T01:08:11.643212Z 1 [ERROR] [MY-010334] [Server] Failed to initialize DD Storage Engine
+2026-08-10T01:08:11.643911Z 0 [ERROR] [MY-010020] [Server] Data Dictionary initialization failed.
+2026-08-10T01:08:11.644124Z 0 [ERROR] [MY-010119] [Server] Aborting
+2026-08-10T01:08:11.645864Z 0 [System] [MY-010910] [Server] C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe: Shutdown complete (mysqld 8.4.8)  MySQL Community Server - GPL.
+2026-08-10T01:08:11.646600Z 0 [System] [MY-015016] [Server] MySQL Server - end.

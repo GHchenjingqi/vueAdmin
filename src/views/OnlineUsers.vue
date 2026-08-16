@@ -112,8 +112,8 @@ function formatTime(time: string | undefined | null): string {
   return new Date(time).toLocaleString()
 }
 
-function onQuery(): void {
-  // computed 会自动过滤，无需额外逻辑
+function onQuery(params: { searchParams?: Record<string, unknown> }): void {
+  if (params.searchParams) Object.assign(searchParams, params.searchParams)
 }
 
 async function fetchData(): Promise<void> {

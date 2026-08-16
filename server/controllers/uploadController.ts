@@ -162,7 +162,7 @@ export const listFiles = (_req, res, next) => {
     const data = listUploadedFiles()
     res.json({ code: 0, data })
   } catch (err) {
-    next(err)
+next(err)
   }
 }
 

@@ -1,8 +1,6 @@
 import sequelize from './config/database.js';
 (async () => {
-  const [cols]: any = await sequelize.query("SHOW COLUMNS FROM role_menus");
-  console.log('role_menus columns:', JSON.stringify(cols.map((c: any) => c.Field)));
-  const [tables]: any = await sequelize.query("SHOW TABLES LIKE 'role_menus'");
-  console.log('table exists:', tables.length);
+  const [tables]: any = await sequelize.query("SHOW TABLES");
+  console.log('All tables:', JSON.stringify(tables.map((t: any) => Object.values(t)[0])));
   await sequelize.close();
 })().catch((e) => { console.error('ERR', e.message); process.exit(1); });

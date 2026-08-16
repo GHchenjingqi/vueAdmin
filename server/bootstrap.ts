@@ -16,14 +16,26 @@ import NoticeRead from './models/NoticeRead.js'
 import Message from './models/Message.js'
 import Task from './models/Task.js'
 import AiProvider from './models/AiProvider.js'
+import Workflow from './models/Workflow.js'
+import WorkflowInstance from './models/WorkflowInstance.js'
+import ApprovalTask from './models/ApprovalTask.js'
+import KnowledgeCategory from './modules/knowledge/models/Category.js'
+import KnowledgeTag from './modules/knowledge/models/Tag.js'
+import KnowledgeContent from './modules/knowledge/models/Content.js'
+import KnowledgeContentTag from './modules/knowledge/models/ContentTag.js'
 import config from './config/index.js'
 import { logInfo, cleanOldLogs } from './utils/fileLogger.js'
 import { loadSiteInfo, injectSiteInfo } from './utils/siteCache.js'
 import { migrator, seeder } from './utils/migrator.js'
+import { ensureDatabaseExists } from './utils/ensureDatabase.js'
 import { resolve, join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import { readFileSync, existsSync } from 'fs'
+import express from 'express'
+import { getOrCreateCert } from './utils/generateCert.js'
+import { updateUserActivity, initKickSubscriber, closeKickSubscriber } from './utils/onlineUsers.js'
+import { initScheduler } from './utils/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -33,36 +45,6 @@ const projectRoot = existsSync(resolve(__dirname, '../index.html'))
   ? resolve(__dirname, '..')
   : resolve(__dirname, '../..')
 
-/**
- * 自动创建数据库（如果不存在）
- * 使用 mysql2 裸连接（不指定数据库名），避免 "Unknown database" 错误
- */
-async function createDatabaseIfNotExists() {
-  try {
-    const mysql2 = await import('mysql2/promise')
-    const db = config.database
-    const conn = await mysql2.createConnection({
-      host: db.host,
-      port: db.port,
-      user: db.user,
-      password: db.password,
-    })
-    await conn.execute(
-      `CREATE DATABASE IF NOT EXISTS \`${db.name}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-    )
-    await conn.end()
-    logInfo(`数据库 ${db.name} 已自动创建`)
-  } catch (err) {
-    logInfo('数据库自动创建（可忽略）: ' + err.message)
-  }
-}
-
-/**
- * 前端静态资源配置
- * - 生产环境（NODE_ENV=production）：使用预构建 dist 目录
- * - 开发环境（NODE_ENV!=production）：优先使用 Vite 中间件（HMR 热更新），
- *   这样后端 `npm run dev` 也能实时反映前端源码改动，无需每次手动 `vite build`。
- */
 async function setupFrontend(app, isProduction, express, httpsServer) {
   const distDir = resolve(projectRoot, 'dist')
 
@@ -74,7 +56,7 @@ async function setupFrontend(app, isProduction, express, httpsServer) {
         root: projectRoot,
         server: {
           middlewareMode: true,
-          hmr: { server: httpsServer },
+          hmr: { server: httpsServer, clientPort: config.server.port },
         },
         appType: 'spa',
         open: false,
@@ -129,7 +111,7 @@ async function seedData() {
 
   const menuCount = await Menu.count()
   if (menuCount === 0) {
-    const system = await Menu.create({ parentId: 0, name: '系统管理', path: '/system', icon: 'Setting', type: 'C', sort: 1 })
+    const system = await Menu.create({ parentId: 0, name: '系统管理', path: '/system', icon: 'Setting', type: 'C', sort: 100 })
     const dashboard = await Menu.create({ parentId: 0, name: '仪表盘', path: '/dashboard', component: 'views/Dashboard.vue', icon: 'Odometer', type: 'M', sort: 0 })
     await Menu.create({ parentId: system.id, name: '基础设置', path: '/settings', component: 'views/Settings.vue', icon: 'Setting', type: 'M', sort: 0 })
     await Menu.create({ parentId: system.id, name: '用户管理', path: '/users', component: 'views/UserList.vue', icon: 'User', type: 'M', sort: 1 })
@@ -138,16 +120,25 @@ async function seedData() {
     await Menu.create({ parentId: system.id, name: '菜单管理', path: '/menus', component: 'views/MenuList.vue', icon: 'Grid', type: 'M', sort: 4 })
     await Menu.create({ parentId: system.id, name: '字典管理', path: '/dict', component: 'views/DictManager.vue', icon: 'Collection', type: 'M', sort: 5 })
     await Menu.create({ parentId: system.id, name: '文件管理', path: '/files', component: 'views/FileManager.vue', icon: 'FolderOpened', type: 'M', sort: 6 })
-    await Menu.create({ parentId: system.id, name: '通知管理', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', type: 'M', sort: 7 })
     await Menu.create({ parentId: system.id, name: '系统日志', path: '/logs', component: 'views/SystemLog.vue', icon: 'Document', type: 'M', sort: 10 })
-    await Menu.create({ parentId: system.id, name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', type: 'M', sort: 11 })
-    await Menu.create({ parentId: system.id, name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', type: 'M', sort: 12 })
+    await Menu.create({ parentId: system.id, name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', type: 'M', sort: 7 })
     await Menu.create({ parentId: system.id, name: 'AI 提供商', path: '/ai-providers', component: 'views/AiProviderManager.vue', icon: 'Aim', type: 'M', sort: 13 })
 
     // 系统监控目录（与系统管理同级）
-    const monitor = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'C', sort: 2 })
+    const monitor = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'C', sort: 110 })
     await Menu.create({ parentId: monitor.id, name: '在线用户', path: '/online-users', component: 'views/OnlineUsers.vue', icon: 'Connection', type: 'M', sort: 0 })
     await Menu.create({ parentId: monitor.id, name: '服务监控', path: '/server-monitor', component: 'views/ServerMonitor.vue', icon: 'DataBoard', type: 'M', sort: 1 })
+
+    // 消息管理目录（与系统管理同级）
+    const message = await Menu.create({ parentId: 0, name: '消息管理', path: '/message', icon: 'ChatLineSquare', type: 'C', sort: 70 })
+    await Menu.create({ parentId: message.id, name: '消息发布', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', type: 'M', sort: 0 })
+    await Menu.create({ parentId: message.id, name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', type: 'M', sort: 1 })
+
+    // 知识库目录（与系统管理同级）
+    const knowledge = await Menu.create({ parentId: 0, name: '知识库', path: '/knowledge', icon: 'Reading', type: 'C', sort: 80 })
+    await Menu.create({ parentId: knowledge.id, name: '分类管理', path: '/knowledge/categories', component: 'modules/knowledge/views/CategoryManager.vue', icon: 'FolderOpened', type: 'M', sort: 0 })
+    await Menu.create({ parentId: knowledge.id, name: '标签管理', path: '/knowledge/tags', component: 'modules/knowledge/views/TagManager.vue', icon: 'PriceTag', type: 'M', sort: 1 })
+    await Menu.create({ parentId: knowledge.id, name: '内容管理', path: '/knowledge/contents', component: 'modules/knowledge/views/ContentManager.vue', icon: 'Notebook', type: 'M', sort: 2 })
 
     logInfo('默认菜单已创建')
 
@@ -161,6 +152,13 @@ async function seedData() {
       { optionKey: 'captcha_enabled', optionValue: '1', autoload: 1, description: '登录时是否开启验证码: 1=开启 0=关闭' },
       { optionKey: 'watermark_enabled', optionValue: '0', autoload: 1, description: '是否开启全局水印: 1=开启 0=关闭' },
       { optionKey: 'watermark_text', optionValue: 'Vue Admin', autoload: 1, description: '水印文字内容' },
+      { optionKey: 'smtp_enabled', optionValue: '0', autoload: 0, description: '是否启用 SMTP 邮件发送: 1=开启 0=关闭' },
+      { optionKey: 'smtp_host', optionValue: '', autoload: 0, description: 'SMTP 服务器地址' },
+      { optionKey: 'smtp_port', optionValue: '465', autoload: 0, description: 'SMTP 服务器端口' },
+      { optionKey: 'smtp_secure', optionValue: '1', autoload: 0, description: 'SMTP 是否启用 SSL: 1=开启 0=关闭' },
+      { optionKey: 'smtp_user', optionValue: '', autoload: 0, description: 'SMTP 邮箱账号' },
+      { optionKey: 'smtp_pass', optionValue: '', autoload: 0, description: 'SMTP 邮箱密码/授权码' },
+      { optionKey: 'smtp_sender_name', optionValue: 'Vue Admin', autoload: 0, description: '发件人名称' },
     ]
     await Setting.bulkCreate(defaultSettings)
     logInfo('默认系统设置已创建')
@@ -189,6 +187,15 @@ async function seedData() {
       const adminUser = await User.findOne({ where: { username: 'admin' } })
       if (adminUser) {
         await UserRole.create({ userId: adminUser.id, roleId: adminRole.id })
+      }
+
+      // 普通用户仅拥有消息管理相关菜单权限
+      const messageMenus = await Menu.findAll({
+        where: { name: ['消息管理', '消息发布', '消息通知'] },
+        attributes: ['id'],
+      })
+      if (messageMenus.length > 0) {
+        await RoleMenu.bulkCreate(messageMenus.map(m => ({ roleId: userRole.id, menuId: m.id })))
       }
 
       logInfo('默认角色数据已创建')
@@ -220,7 +227,6 @@ async function seedData() {
     const supplements = [
       { name: '文件管理', path: '/files', component: 'views/FileManager.vue', icon: 'FolderOpened', sort: 4 },
       { name: '基础设置', path: '/settings', component: 'views/Settings.vue', icon: 'Setting', sort: 5 },
-      { name: '通知管理', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', sort: 6 },
       { name: '部门管理', path: '/depts', component: 'views/DeptManager.vue', icon: 'Share', sort: 7 },
       { name: '角色管理', path: '/roles', component: 'views/RoleManager.vue', icon: 'Avatar', sort: 8 },
     ]
@@ -234,7 +240,6 @@ async function seedData() {
 
     // 增量：补充新菜单
     const newMenus = [
-      { name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', sort: 11 },
       { name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', sort: 12 },
     ]
     for (const m of newMenus) {
@@ -252,10 +257,20 @@ async function seedData() {
       logInfo('已补充菜单: AI 提供商')
     }
 
+    // 增量：知识库菜单
+    const knowledgeMenu = await Menu.findOne({ where: { name: '知识库' } })
+    if (!knowledgeMenu) {
+      const kb = await Menu.create({ parentId: 0, name: '知识库', path: '/knowledge', icon: 'Reading', type: 'C', sort: 80 })
+      await Menu.create({ parentId: kb.id, name: '分类管理', path: '/knowledge/categories', component: 'modules/knowledge/views/CategoryManager.vue', icon: 'FolderOpened', type: 'M', sort: 0 })
+      await Menu.create({ parentId: kb.id, name: '标签管理', path: '/knowledge/tags', component: 'modules/knowledge/views/TagManager.vue', icon: 'PriceTag', type: 'M', sort: 1 })
+      await Menu.create({ parentId: kb.id, name: '内容管理', path: '/knowledge/contents', component: 'modules/knowledge/views/ContentManager.vue', icon: 'Notebook', type: 'M', sort: 2 })
+      logInfo('已补充菜单: 知识库')
+    }
+
     // 增量：系统监控目录 + 将在线用户移到系统监控下
     let monitorMenu = await Menu.findOne({ where: { name: '系统监控' } })
     if (!monitorMenu) {
-      monitorMenu = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'D', sort: 2 })
+      monitorMenu = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'D', sort: 110 })
       logInfo('已补充菜单: 系统监控')
     }
     // 查找已有的在线用户菜单并移到系统监控下
@@ -270,6 +285,43 @@ async function seedData() {
     if (!serverMonitorMenu) {
       await Menu.create({ parentId: monitorMenu.id, name: '服务监控', path: '/server-monitor', component: 'views/ServerMonitor.vue', icon: 'DataBoard', type: 'M', sort: 1 })
       logInfo('已补充菜单: 服务监控')
+    }
+
+    // 增量：消息管理目录 + 将消息发布/消息通知移入
+    let messageMenu = await Menu.findOne({ where: { name: '消息管理' } })
+    if (!messageMenu) {
+      messageMenu = await Menu.create({ parentId: 0, name: '消息管理', path: '/message', icon: 'ChatLineSquare', type: 'C', sort: 70 })
+      logInfo('已补充菜单: 消息管理')
+    }
+    // 将消息发布移到消息管理下
+    const publishMenu = await Menu.findOne({ where: { name: '消息发布' } })
+    if (publishMenu && publishMenu.parentId !== messageMenu.id) {
+      publishMenu.parentId = messageMenu.id
+      await publishMenu.save()
+      logInfo('已移动: 消息发布 → 消息管理')
+    }
+    // 将消息通知移到消息管理下
+    const msgMenu = await Menu.findOne({ where: { name: '消息通知' } })
+    if (msgMenu && msgMenu.parentId !== messageMenu.id) {
+      msgMenu.parentId = messageMenu.id
+      await msgMenu.save()
+      logInfo('已移动: 消息通知 → 消息管理')
+    }
+
+    // 增量：确保普通用户角色拥有消息管理菜单权限
+    const userRole = await Role.findOne({ where: { code: 'user' } })
+    if (userRole) {
+      const messageMenuNames = ['消息管理', '消息发布', '消息通知']
+      for (const name of messageMenuNames) {
+        const menu = await Menu.findOne({ where: { name } })
+        if (menu) {
+          const existing = await RoleMenu.findOne({ where: { roleId: userRole.id, menuId: menu.id } })
+          if (!existing) {
+            await RoleMenu.create({ roleId: userRole.id, menuId: menu.id })
+            logInfo(`已授权: 普通用户 → ${name}`)
+          }
+        }
+      }
     }
 
     // 增量：字典管理
@@ -314,6 +366,22 @@ async function seedData() {
       logInfo('已更新: captcha_enabled → 1（验证码默认开启）')
     }
 
+    // 增量：邮箱配置（兼容已有系统）
+    const smtpEnabled = await Setting.findOne({ where: { optionKey: 'smtp_enabled' } })
+    if (!smtpEnabled) {
+      const emailSettings = [
+        { optionKey: 'smtp_enabled', optionValue: '0', autoload: 0, description: '是否启用 SMTP 邮件发送: 1=开启 0=关闭' },
+        { optionKey: 'smtp_host', optionValue: '', autoload: 0, description: 'SMTP 服务器地址' },
+        { optionKey: 'smtp_port', optionValue: '465', autoload: 0, description: 'SMTP 服务器端口' },
+        { optionKey: 'smtp_secure', optionValue: '1', autoload: 0, description: 'SMTP 是否启用 SSL: 1=开启 0=关闭' },
+        { optionKey: 'smtp_user', optionValue: '', autoload: 0, description: 'SMTP 邮箱账号' },
+        { optionKey: 'smtp_pass', optionValue: '', autoload: 0, description: 'SMTP 邮箱密码/授权码' },
+        { optionKey: 'smtp_sender_name', optionValue: 'Vue Admin', autoload: 0, description: '发件人名称' },
+      ]
+      await Setting.bulkCreate(emailSettings)
+      logInfo('默认邮箱配置已补充')
+    }
+
     // 增量：默认定时任务
     const taskCount = await Task.count()
     if (taskCount === 0) {
@@ -333,6 +401,25 @@ async function seedData() {
       })
       logInfo('默认定时任务已创建')
     }
+
+    // 增量：流程管理目录 + 工作流相关菜单
+    let workflowMenu = await Menu.findOne({ where: { path: '/workflow' } })
+    if (!workflowMenu) {
+      workflowMenu = await Menu.create({ parentId: 0, name: '流程管理', path: '/workflow', icon: 'Connection', type: 'C', sort: 80 })
+      logInfo('已补充菜单: 流程管理')
+    }
+    const workflowChildren = [
+      { name: '工作流管理', path: '/workflows', component: 'views/WorkflowList.vue', icon: 'List', sort: 0 },
+      { name: '运行实例', path: '/workflow-instances', component: 'views/WorkflowInstance.vue', icon: 'Monitor', sort: 1 },
+      { name: '审批中心', path: '/approval-center', component: 'views/ApprovalCenter.vue', icon: 'EditPen', sort: 2 },
+    ]
+    for (const child of workflowChildren) {
+      const exists = await Menu.findOne({ where: { name: child.name } })
+      if (!exists) {
+        await Menu.create({ parentId: workflowMenu.id, type: 'M', ...child })
+        logInfo(`已补充菜单: ${child.name}`)
+      }
+    }
   }
 }
 /**
@@ -341,8 +428,6 @@ async function seedData() {
  */
 export default async function bootstrap(app) {
   try {
-    const express = (await import('express')).default
-
     // 模型关联
     User.belongsTo(Department, { foreignKey: 'deptId', as: 'dept' })
     Department.hasMany(User, { foreignKey: 'deptId', as: 'users' })
@@ -352,16 +437,21 @@ export default async function bootstrap(app) {
     Menu.belongsToMany(Role, { through: RoleMenu, foreignKey: 'menuId', as: 'roles' })
     Message.belongsTo(User, { foreignKey: 'fromUserId', as: 'fromUser' })
 
-    // 先测试连接，数据库不存在则自动创建
-    try {
-      await sequelize.authenticate()
-    } catch (connErr) {
-      if (connErr.message.includes('Unknown database')) {
-        await createDatabaseIfNotExists()
-      } else {
-        throw connErr
-      }
-    }
+    // 工作流模型关联（用于列表一次性返回流程名 / 发起人名，避免前端兜底）
+    WorkflowInstance.belongsTo(Workflow, { foreignKey: 'workflowId', as: 'workflow' })
+    WorkflowInstance.belongsTo(User, { foreignKey: 'startedBy', as: 'starter' })
+    ApprovalTask.belongsTo(WorkflowInstance, { foreignKey: 'instanceId', as: 'instance' })
+
+    // 知识库模型关联
+    KnowledgeContent.belongsTo(KnowledgeCategory, { foreignKey: 'categoryId', as: 'category' })
+    KnowledgeCategory.hasMany(KnowledgeContent, { foreignKey: 'categoryId', as: 'contents' })
+    KnowledgeContent.belongsToMany(KnowledgeTag, { through: KnowledgeContentTag, foreignKey: 'contentId', otherKey: 'tagId', as: 'tags' })
+    KnowledgeTag.belongsToMany(KnowledgeContent, { through: KnowledgeContentTag, foreignKey: 'tagId', otherKey: 'contentId', as: 'contents' })
+
+        // 先确保数据库存在，再认证连接（CREATE 后必须重新 authenticate）
+    await ensureDatabaseExists()
+    await sequelize.authenticate()
+    logInfo(`数据库连接成功: ${config.database.host}:${config.database.port}/${config.database.name}`)
 
     // 执行数据库迁移（替代 sequelize.sync()）
     const pending = await migrator.pending()
@@ -392,7 +482,6 @@ export default async function bootstrap(app) {
     await loadSiteInfo()
 
     // 自签名证书（开发环境），解决 Chrome HTTPS-First 模式报错
-    const { getOrCreateCert } = await import('./utils/generateCert.js')
     const { key, cert } = await getOrCreateCert()
 
     // 提前创建 HTTPS 服务器实例，供 Vite HMR WebSocket 挂载（setupFrontend 需要）
@@ -401,7 +490,6 @@ export default async function bootstrap(app) {
     await setupFrontend(app, process.env.NODE_ENV === 'production', express, httpsServer)
 
     // 在线用户追踪中间件
-    const { updateUserActivity } = await import('./utils/onlineUsers.js')
     app.use('/api', (req, res, next) => {
       if (req.user) {
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress
@@ -411,11 +499,9 @@ export default async function bootstrap(app) {
     })
 
     // 初始化定时任务调度器
-    const { initScheduler } = await import('./utils/scheduler.js')
     await initScheduler()
 
     // 初始化跨副本踢下线订阅（Redis pub/sub；不可用时自动降级单副本）
-    const { initKickSubscriber } = await import('./utils/onlineUsers.js')
     await initKickSubscriber()
 
     // HTTPS 服务器监听（开发环境使用自签名证书）
@@ -423,7 +509,6 @@ export default async function bootstrap(app) {
       const banner = [
         '='.repeat(50),
         `  🚀 Vue Admin 服务启动成功`,
-        `  🌐 访问地址:  https://192.168.12.251:${config.server.port}`,
         `  🌐 本地地址:  https://localhost:${config.server.port}`,
         `  📡 API 接口:  https://localhost:${config.server.port}/api`,
         `  📖 API 文档:  https://localhost:${config.server.port}/api/docs`,
@@ -472,10 +557,8 @@ export default async function bootstrap(app) {
       try {
         await closeServers
         // 2. 关闭跨副本踢下线订阅
-        const { closeKickSubscriber } = await import('./utils/onlineUsers.js')
         await closeKickSubscriber()
         // 3. 关闭数据库连接
-        const { sequelize } = await import('./config/database.js')
         if (sequelize) {
           await sequelize.close()
           logInfo('数据库连接已关闭')

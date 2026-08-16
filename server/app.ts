@@ -13,6 +13,10 @@ import { slowQueryLogMiddleware } from './middleware/slowQueryLog.js'
 import originValidator from './middleware/originValidator.js'
 import bootstrap from './bootstrap.js'
 import { closeRedis } from './config/redis.js'
+import config from './config/index.js'
+import { createPublicApp } from './public/index.js'
+import { registerPublicModule } from './public/registry.js'
+import { knowledgePublicModule } from './modules/knowledge/public.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -36,8 +40,8 @@ app.use(
         // 允许 Vite HMR WebSocket（开发模式）和 API 请求
         connectSrc: ["'self'", 'ws://localhost:24678', 'ws://127.0.0.1:24678'],
         // Vite 需要 unsafe-inline 进行 HMR
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cdn.redoc.ly'],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cdn.redoc.ly', 'https://unpkg.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://unpkg.com'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
       },
@@ -55,29 +59,20 @@ app.use((_req, res, next) => {
   next()
 })
 
-// CORS 跨域白名单
-// 生产环境严格限制，开发环境放宽到局域网 IP
-const allowedOrigins = [
-  'http://localhost:5174',
-  'http://127.0.0.1:5174',
-  'http://192.168.12.251:5174',
-  'https://localhost:5174',
-  'https://127.0.0.1:5174',
-  'https://192.168.12.251:5174',
-]
+// CORS 跨域白名单（来自 config.app.allowedOrigins / ALLOWED_ORIGINS，禁止硬编码内网 IP）
+const allowedOrigins = config.app.allowedOrigins
 app.use(
   cors({
     origin: (origin, callback) => {
       // 允许无 origin 的请求（服务端、Postman 等）
       if (!origin) return callback(null, true)
-      // 生产环境只允许白名单
-      if (process.env.NODE_ENV === 'production') {
-        return callback(null, allowedOrigins.includes(origin))
-      }
-      // 开发环境允许所有局域网 IP（形如 http://192.168.x.x:5173）
       if (allowedOrigins.includes(origin)) return callback(null, true)
-      const ipOrigin = /^https?:\/\/(\d{1,3}\.){3}\d{1,3}:\d+$/.test(origin)
-      return callback(null, ipOrigin)
+      // 开发环境允许局域网 IP（形如 http://192.168.x.x:5173），生产仅白名单
+      if (process.env.NODE_ENV !== 'production') {
+        const ipOrigin = /^https?:\/\/(\d{1,3}\.){3}\d{1,3}:\d+$/.test(origin)
+        return callback(null, ipOrigin)
+      }
+      return callback(null, false)
     },
     credentials: true,
   }),
@@ -157,6 +152,12 @@ app.use('/uploads', express.static(uploadsDir))
 
 // ---------- API 路由（优先匹配）----------
 app.use('/api/v1', apiRoutes)
+
+// ---------- 对外站（匿名可读、SEO 友好、EJS 服务端渲染）----------
+// 通过 PUBLIC_PATH 配置挂载路径，便于后续拆分到独立子域（如 www.）；默认 /site，避免与 admin SPA 根路径冲突
+registerPublicModule(knowledgePublicModule)
+const publicPath = process.env.PUBLIC_PATH ?? '/site'
+app.use(publicPath, createPublicApp(publicPath))
 
 // ---------- 错误处理 ----------
 // Sentry 错误处理器（必须在所有路由之后，自定义 errorHandler 之前）
