@@ -15,10 +15,21 @@ export async function upsertNode(workflowId: number, data: {
   nodeKey: string; name: string; type: string; config?: string; x?: number; y?: number
 }) {
   const versionId = await getDraftVersionId(workflowId)
-  const [node] = await WorkflowNode.upsert({
+  const existing = await WorkflowNode.findOne({ where: { versionId, nodeKey: data.nodeKey } })
+  if (existing) {
+    await existing.update({
+      name: data.name,
+      type: data.type,
+      config: data.config ?? null,
+      x: data.x ?? null,
+      y: data.y ?? null,
+    })
+    return existing
+  }
+  const node = await WorkflowNode.create({
     workflowId, versionId, nodeKey: data.nodeKey,
     name: data.name, type: data.type,
-    config: data.config || null,
+    config: data.config ?? null,
     x: data.x ?? null, y: data.y ?? null,
   } as any)
   return node

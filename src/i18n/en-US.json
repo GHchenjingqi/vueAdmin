@@ -976,7 +976,7 @@
     "title": "Workflows",
     "addWorkflow": "New Workflow",
     "name": "Workflow Name",
-    "designer": "Designer",
+    "design": "Designer",
     "publish": "Publish",
     "instance": "Instances",
     "retry": "Retry",

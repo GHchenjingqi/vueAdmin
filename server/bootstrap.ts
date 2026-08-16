@@ -56,7 +56,7 @@ async function setupFrontend(app, isProduction, express, httpsServer) {
         root: projectRoot,
         server: {
           middlewareMode: true,
-          hmr: { server: httpsServer },
+          hmr: { server: httpsServer, clientPort: config.server.port },
         },
         appType: 'spa',
         open: false,

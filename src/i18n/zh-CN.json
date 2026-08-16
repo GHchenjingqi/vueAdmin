@@ -976,7 +976,7 @@
     "title": "工作流管理",
     "addWorkflow": "新建工作流",
     "name": "流程名称",
-    "designer": "流程设计",
+    "design": "流程设计",
     "publish": "发布",
     "instance": "运行实例",
     "retry": "重试",

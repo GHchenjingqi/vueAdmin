@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="<%= pageDescription %>">
+  <meta property="og:title" content="<%= pageTitle %>">
+  <meta property="og:description" content="<%= pageDescription %>">
+  <meta property="og:image" content="<%= ogImage %>">
+  <title><%= pageTitle %></title>
+  <link rel="stylesheet" href="<%= base %>/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="<%= base %>" class="logo"><%= siteConfig.title %></a>
+      <nav class="site-nav">
+        <a href="<%= base %>">首页</a>
+      </nav>
+    </div>
+  </header>
+  <main class="site-main container">
+    <%- content %>
+  </main>
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; 2026 <%= siteConfig.title %></p>
+    </div>
+  </footer>
+</body>
+</html>

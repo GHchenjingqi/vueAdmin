@@ -626,7 +626,9 @@ async function handleSave() {
       }
     }
 
-    await reloadDesign()
+    loadedNodeKeys.value = new Set(flowNodes.value.map((n) => n.id))
+    loadedEdges.value = flowEdges.value.map((e) => ({ ...e }))
+    loadedRulesByNode.value = new Map(Array.from(rulesByNode.value.entries()).map(([k, v]) => [k, v.map((r) => ({ ...r }))] as [string, ApproverRule[]]))
     dirty.value = false
     ElMessage.success(t('workflow.designer.saveSuccess'))
   } catch {

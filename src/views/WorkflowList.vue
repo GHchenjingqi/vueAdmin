@@ -31,7 +31,7 @@
       <template #column-actions="{ row }">
         <div class="table-actions">
           <el-button type="primary" link size="small" @click="handleDesign(row as Workflow)">
-            {{ t('workflow.designer') }}
+            {{ t('workflow.design') }}
           </el-button>
           <el-dropdown trigger="click" @command="(cmd) => handleActionCommand(cmd, row as Workflow)">
             <el-button type="primary" link size="small">
@@ -178,8 +178,8 @@ async function handleSubmit() {
       dialogVisible.value = false
       const newId = (res.data as unknown as { id?: number } | undefined)?.id
       try {
-        await ElMessageBox.confirm(t('workflow.goToDesignerTip'), t('workflow.designer'), {
-          confirmButtonText: t('workflow.designer'),
+        await ElMessageBox.confirm(t('workflow.goToDesignerTip'), t('workflow.design'), {
+          confirmButtonText: t('workflow.design'),
           cancelButtonText: t('common.cancel'),
           type: 'success',
         })
