@@ -16,7 +16,7 @@ import { createCache, stableKey } from '../utils/cache.js'
 import { applyCurrentTenantScope } from '../modules/tenant/scope.js'
 
 // 我的审批列表缓存：键含 userId + 租户约束 + 状态 + 分页，TTL 短以保证待办变化可见
-const approvalTaskListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
+const approvalTaskListCache = createCache<{ rows: ApprovalTask[]; total: number; page: number; pageSize: number }>({
   namespace: 'approval-tasks',
   max: 300,
   maxAgeMs: 30 * 1000,
@@ -26,7 +26,7 @@ const approvalTaskListCache = createCache<{ rows: any[]; total: number; page: nu
 export const listMyTasks = async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10, status } = req.query
-    const where: any = { approverId: req.user.id }
+    const where: Record<string, unknown> = { approverId: req.user.id }
     // 已办：传入逗号分隔的多个状态（如 approved,rejected）
     if (status) {
       const statusList = String(status).split(',').filter(Boolean)

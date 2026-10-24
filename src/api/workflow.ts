@@ -40,6 +40,18 @@ export interface ApproverRule {
   name?: string
 }
 
+export interface WorkflowFormField {
+  id?: number
+  workflowId?: number
+  fieldKey: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'select' | 'date'
+  required?: number | boolean
+  options?: string | null
+  placeholder?: string | null
+  sort?: number
+}
+
 export interface WorkflowInstance {
   id: number
   workflowId: number
@@ -167,11 +179,18 @@ export const workflowApi = {
   getBindings() {
     return request.get<unknown[]>('/workflow-bindings')
   },
-  createBinding(data: { workflowId: number; bindingKey: string; entityName?: string; formKey?: string }) {
+  createBinding(data: { workflowId: number; bindingKey: string; entityName?: string; formKey?: string; callbackUrl?: string }) {
     return request.post<unknown>('/workflow-bindings', data)
   },
   deleteBinding(id: number) {
     return request.delete<null>(`/workflow-bindings/${id}`)
+  },
+  // 工作流表单字段（业务发起参数定义）
+  getFormFields(id: number) {
+    return request.get<WorkflowFormField[]>(`/workflows/${id}/form-fields`)
+  },
+  saveFormFields(id: number, fields: WorkflowFormField[]) {
+    return request.post<WorkflowFormField[]>(`/workflows/${id}/form-fields`, { fields })
   },
   // 事务化整图批量保存（节点 upsert + 边/规则整版本替换，含图合法性校验）
   saveDesign(id: number, data: WorkflowDesignPayload) {

@@ -15,6 +15,7 @@ import {
   triggerWorkflowSchema,
   approveTaskSchema,
   workflowDesignPayloadSchema,
+  workflowFormFieldsPayloadSchema,
 } from '../shared/schemas/workflow.js'
 import * as workflowController from '../controllers/workflowController.js'
 import * as workflowInstanceController from '../controllers/workflowInstanceController.js'
@@ -70,6 +71,17 @@ router.get('/workflows/:id/design/validate', authMiddleware, validate(idParamSch
 router.get('/workflow-bindings', authMiddleware, workflowController.listBindings)
 router.post('/workflow-bindings', authMiddleware, validate(workflowBindingSchema), workflowController.createBinding)
 router.delete('/workflow-bindings/:id', authMiddleware, workflowController.deleteBinding)
+
+// ==================== 工作流表单字段（业务发起参数定义） ====================
+
+router.get('/workflows/:id/form-fields', authMiddleware, validate(idParamSchema, 'params'), workflowController.getFormFields)
+router.post(
+  '/workflows/:id/form-fields',
+  authMiddleware,
+  validate(idParamSchema, 'params'),
+  validate(workflowFormFieldsPayloadSchema),
+  workflowController.saveFormFields,
+)
 
 // ==================== 触发与实例 ====================
 

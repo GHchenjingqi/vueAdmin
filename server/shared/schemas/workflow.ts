@@ -46,6 +46,21 @@ export const workflowBindingSchema = z.object({
   bindingKey: z.string().min(1).max(100),
   entityName: z.string().max(100).optional(),
   formKey: z.string().max(100).optional(),
+  callbackUrl: z.string().max(500).optional(),
+})
+
+export const workflowFormFieldSchema = z.object({
+  fieldKey: z.string().min(1).max(50),
+  label: z.string().min(1).max(100),
+  type: z.enum(['text', 'textarea', 'number', 'select', 'date']),
+  required: z.boolean().default(false),
+  options: z.string().max(2000).optional(),
+  placeholder: z.string().max(200).optional(),
+  sort: z.number().int().min(0).default(0),
+})
+
+export const workflowFormFieldsPayloadSchema = z.object({
+  fields: z.array(workflowFormFieldSchema),
 })
 
 export const triggerWorkflowSchema = z.object({

@@ -15,12 +15,25 @@
 // - 类型(ESM .d.ts)只暴露命名导出 LRUCache，无 default；
 // - 运行时(tsx 走 CJS) 则是默认导出。
 // 统一在此收口：优先取 default（CJS 运行时），回退到命名导出（ESM 类型对齐）。
-// LRU 实例以 any 承接，规避 v6 ESM 类型声明中 maxAge/del/reset 的联合类型怪异问题。
+// 此处只声明本文件用到的极简构造/实例接口，规避 v6 ESM 类型声明中
+// maxAge/del/reset 的联合类型怪异问题，同时避免 any 一把梭。
 import * as LRUCacheNS from 'lru-cache'
 import config from '../config/index.js'
 import { getRedis } from '../config/redis.js'
+import type { Redis } from 'ioredis'
 
-const LRU: any = (LRUCacheNS as any).default ?? LRUCacheNS
+/** 本文件用到的 lru-cache 实例行为子集 */
+interface LRUInstance {
+  get(key: string): unknown
+  set(key: string, value: unknown): void
+  del(key: string): void
+  reset(): void
+}
+
+/** lru-cache 构造器子集 */
+type LRUConstructor = new (opts: { max: number; maxAge: number }) => LRUInstance
+
+const LRU = ((LRUCacheNS as unknown as { default?: LRUConstructor }).default ?? (LRUCacheNS as unknown as LRUConstructor)) as LRUConstructor
 
 const REDIS_PREFIX = 'wb:cache'
 
@@ -92,7 +105,7 @@ export function createCache<T>(opts: CacheOptions = {}): ICache<T> {
   const redisKey = (key: string) => `${REDIS_PREFIX}:${ns}:${key}`
 
   /** 等待 Redis 连接就绪；未启用/连接关闭/超时则返回 null（缓存优雅降级到 L1/loader） */
-  async function whenReady(): Promise<any | null> {
+  async function whenReady(): Promise<Redis | null> {
     if (!l2Enabled) return null
     const r = getRedis()
     if (!r) return null
@@ -175,28 +188,28 @@ export function createCache<T>(opts: CacheOptions = {}): ICache<T> {
   }
 
   return {
-    get: (key) => (lru as any).get(key),
+    get: (key) => lru.get(key) as T | undefined,
     set: (key, value) => {
-      ;(lru as any).set(key, clone(value))
+      lru.set(key, clone(value))
     },
     del: (key) => {
-      ;(lru as any).del(key)
+      lru.del(key)
       void redisDel(key)
     },
     clear: async () => {
-      ;(lru as any).reset()
+      lru.reset()
       await redisClear()
     },
     getOrSet: async (key, loader) => {
-      const hit = (lru as any).get(key)
+      const hit = lru.get(key) as T | undefined
       if (hit !== undefined) return hit
       const l2 = await redisGet(key)
       if (l2 !== undefined) {
-        ;(lru as any).set(key, l2)
+        lru.set(key, l2)
         return l2
       }
       const value = await loader()
-      ;(lru as any).set(key, clone(value))
+      lru.set(key, clone(value))
       void redisSet(key, value)
       return value
     },

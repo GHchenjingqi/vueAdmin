@@ -17,7 +17,7 @@ import { applyCurrentTenantScope, currentTenantConstraint } from '../modules/ten
 
 // 流程实例列表缓存；键含 where + 分页 + 租户约束（applyCurrentTenantScope 在键生成前注入，
 // 防止不同租户同一查询共用缓存键导致跨租户泄漏）
-const instanceListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
+const instanceListCache = createCache<{ rows: WorkflowInstance[]; total: number; page: number; pageSize: number }>({
   namespace: 'wf-instances',
   max: 200,
   maxAgeMs: 30 * 1000,
@@ -62,7 +62,7 @@ export const trigger = async (req, res, next) => {
 export const listInstances = async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10, status, bindingKey, bindingId } = req.query
-    const where: any = {}
+    const where: Record<string, unknown> = {}
     if (status) where.status = status
     if (bindingKey) where.bindingKey = bindingKey
     if (bindingId) where.bindingId = Number(bindingId)

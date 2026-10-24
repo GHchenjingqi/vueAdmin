@@ -58,6 +58,9 @@ Workflow.init(
       allowNull: true,
       comment: '租户ID',
     },
+    // 必要 any：Sequelize 6 的 ModelAttributes 泛型要求 attributes 覆盖隐式
+    // timestamps（createdAt/updatedAt），显式补写反而与模型定义重复——
+    // 与全仓 models 目录其余模型的 init 收尾保持一致。
   } as any,
   {
     sequelize,

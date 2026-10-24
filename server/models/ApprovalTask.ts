@@ -83,6 +83,8 @@ ApprovalTask.init(
       allowNull: true,
       comment: '租户ID',
     },
+    // 必要 any：Sequelize 6 ModelAttributes 泛型与隐式 timestamps 的摩擦，
+    // 详见 models/Workflow.ts 同处注释。
   } as any,
   {
     sequelize,

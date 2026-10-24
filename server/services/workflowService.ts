@@ -11,7 +11,7 @@ import { createCache, stableKey } from '../utils/cache.js'
 import { applyCurrentTenantScope } from '../modules/tenant/scope.js'
 
 // 工作流定义列表缓存；写操作（增删改/启用停用/发布）后整命名空间失效
-const workflowListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
+const workflowListCache = createCache<{ rows: Workflow[]; total: number; page: number; pageSize: number }>({
   namespace: 'workflows',
   max: 100,
   maxAgeMs: 2 * 60 * 1000,
@@ -21,7 +21,7 @@ export async function listWorkflows(params: { keyword?: string; status?: number 
   const { keyword, status } = params
   const pageNum = Number(params.page) || 1
   const pageSizeNum = Number(params.pageSize) || 10
-  const where: any = {}
+  const where: Record<string, unknown> = {}
   // 空字符串 / null / undefined 视为不筛选（前端 ProTable 默认会带空 status 参数）
   if (status !== undefined && status !== null && status !== '') where.status = Number(status)
   if (keyword) where.name = { [Op.like]: `%${keyword}%` }
@@ -153,11 +153,22 @@ export async function getFormFields(workflowId: number) {
   return fields
 }
 
+/** 表单字段保存入参（设计器「表单设计」抽屉提交） */
+export interface FormFieldInput {
+  fieldKey: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'select' | 'date'
+  required?: boolean | number
+  options?: string | null
+  placeholder?: string | null
+  sort?: number
+}
+
 /**
  * 整批替换工作流的表单字段（事务内删除旧 + 插入新）。
  * 用于设计器「表单设计」抽屉保存。
  */
-export async function setFormFields(workflowId: number, fields: Array<Record<string, unknown>>) {
+export async function setFormFields(workflowId: number, fields: FormFieldInput[]) {
   const workflow = await getWorkflowById(workflowId)
   const { sequelize } = WorkflowFormField
   await sequelize.transaction(async (t) => {
@@ -173,7 +184,7 @@ export async function setFormFields(workflowId: number, fields: Array<Record<str
           options: f.options ?? null,
           placeholder: f.placeholder ?? null,
           sort: typeof f.sort === 'number' ? f.sort : idx,
-        })) as any,
+        })),
         { transaction: t },
       )
     }

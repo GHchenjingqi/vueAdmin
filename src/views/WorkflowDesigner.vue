@@ -16,6 +16,9 @@
         <el-button type="success" :loading="publishing" @click="handlePublish">
           {{ t('common.publish') }}
         </el-button>
+        <el-button type="warning" plain @click="openFormDrawer">
+          {{ t('workflow.formDesign') }}
+        </el-button>
       </div>
     </div>
 
@@ -213,6 +216,70 @@
         </div>
       </div>
     </div>
+
+    <!-- 表单设计抽屉：定义业务发起时需要填写的参数 -->
+    <el-drawer v-model="formDrawerVisible" :title="t('workflow.formDesign')" size="60%" :destroy-on-close="true">
+      <div v-loading="formLoading" class="form-design-body">
+        <el-alert :title="t('workflow.formDesignTip')" type="info" :closable="false" show-icon style="margin-bottom: 12px" />
+        <el-table :data="formFields" border size="small" empty-text="暂无字段，点击下方添加">
+          <el-table-column :label="t('workflow.fieldKey')" min-width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.fieldKey" :disabled="!!row.id" placeholder="fieldKey" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('workflow.fieldLabel')" min-width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.label" placeholder="显示名称" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('workflow.fieldType')" width="120">
+            <template #default="{ row }">
+              <el-select v-model="row.type" size="small" style="width: 100%">
+                <el-option v-for="ft in formFieldTypes" :key="ft.value" :label="ft.label" :value="ft.value" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('workflow.fieldRequired')" width="90" align="center">
+            <template #default="{ row }">
+              <el-switch v-model="row.required" :active-value="1" :inactive-value="0" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('workflow.fieldOptions')" min-width="140">
+            <template #default="{ row }">
+              <el-input v-if="row.type === 'select'" v-model="row.options" placeholder="逗号分隔，如 选项A,选项B" />
+              <span v-else class="muted">-</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('workflow.fieldPlaceholder')" min-width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.placeholder" placeholder="占位提示" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('common.actions')" width="70" align="center">
+            <template #default="{ $index }">
+              <el-button type="danger" link size="small" @click="removeFormField($index)">
+                {{ t('common.delete') }}
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="form-design-footer">
+          <el-button size="small" :icon="Plus" @click="addFormField">
+            {{ t('workflow.addField') }}
+          </el-button>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="formDrawerVisible = false">
+          {{ t('common.cancel') }}
+        </el-button>
+        <el-button type="primary" :loading="formSaving" @click="saveFormFields">
+          {{ t('common.save') }}
+        </el-button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -241,7 +308,15 @@ import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 import { ArrowLeft, Delete, Plus, CircleCheckFilled, CircleCloseFilled, Aim, Bell, EditPen } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { workflowApi, type Workflow, type WorkflowNode, type WorkflowEdge, type ApproverRule, type WorkflowDesignPayload } from '@/api/workflow'
+import {
+  workflowApi,
+  type Workflow,
+  type WorkflowNode,
+  type WorkflowEdge,
+  type ApproverRule,
+  type WorkflowDesignPayload,
+  type WorkflowFormField,
+} from '@/api/workflow'
 import { roleApi, deptApi, userApi } from '@/api'
 import { useI18n } from '@/i18n'
 import WorkflowNodeComp from './workflow/WorkflowNode.vue'
@@ -319,6 +394,72 @@ const selectedEdge = ref<FlowEdge | null>(null)
 const notifyConfig = reactive({ title: '', content: '' })
 const approverRules = ref<ApproverRule[]>([])
 const conditionEdges = ref<ConditionEdgeItem[]>([])
+
+// ==================== 表单设计（业务发起参数定义） ====================
+const formDrawerVisible = ref(false)
+const formLoading = ref(false)
+const formSaving = ref(false)
+const formFields = ref<WorkflowFormField[]>([])
+const formFieldTypes = [
+  { value: 'text', label: t('workflow.typeText') },
+  { value: 'textarea', label: t('workflow.typeTextarea') },
+  { value: 'number', label: t('workflow.typeNumber') },
+  { value: 'select', label: t('workflow.typeSelect') },
+  { value: 'date', label: t('workflow.typeDate') },
+]
+
+async function openFormDrawer() {
+  formDrawerVisible.value = true
+  formLoading.value = true
+  try {
+    const res = await workflowApi.getFormFields(workflowId)
+    formFields.value = (res.data || []).map((f) => ({ ...f, required: f.required ? 1 : 0 }))
+  } catch {
+    formFields.value = []
+  } finally {
+    formLoading.value = false
+  }
+}
+
+function addFormField() {
+  formFields.value.push({ fieldKey: '', label: '', type: 'text', required: 0, options: null, placeholder: '', sort: formFields.value.length })
+}
+
+function removeFormField(idx: number) {
+  formFields.value.splice(idx, 1)
+}
+
+async function saveFormFields() {
+  for (const f of formFields.value) {
+    if (!f.fieldKey || !f.label) {
+      ElMessage.warning(t('workflow.formFieldRequiredTip'))
+      return
+    }
+    if (f.type === 'select' && !f.options) {
+      ElMessage.warning(t('workflow.formFieldOptionsTip'))
+      return
+    }
+  }
+  formSaving.value = true
+  try {
+    const payload = formFields.value.map((f, idx) => ({
+      fieldKey: f.fieldKey,
+      label: f.label,
+      type: f.type,
+      required: !!f.required,
+      options: f.type === 'select' ? f.options || null : null,
+      placeholder: f.placeholder || null,
+      sort: idx,
+    }))
+    await workflowApi.saveFormFields(workflowId, payload)
+    ElMessage.success(t('common.save') + t('common.success'))
+    formDrawerVisible.value = false
+  } catch {
+    ElMessage.error(t('workflow.operationFailed'))
+  } finally {
+    formSaving.value = false
+  }
+}
 
 // 草稿快照（用于保存 diff：识别删除项）
 const loadedNodeKeys = ref<Set<string>>(new Set())

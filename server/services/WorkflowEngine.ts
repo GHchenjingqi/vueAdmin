@@ -7,6 +7,7 @@ import { evaluateCondition } from '../utils/workflowExpression.js'
 import { resolveApprovers } from '../utils/approvalRuleResolver.js'
 import { sendToUser } from '../utils/sseManager.js'
 import { logInfo } from '../utils/fileLogger.js'
+import { errMessage } from '../utils/errMessage.js'
 import { loadGraphCached, type Graph } from './workflowGraphCache.js'
 import { fireWorkflowCallback } from './workflowCallbackService.js'
 
@@ -89,8 +90,8 @@ export default class WorkflowEngine {
       const state = emptyState(instance.input ? JSON.parse(instance.input) : {})
       await this.commit(instance, state, { status: 'running' as InstanceStatus, startedAt: instance.startedAt || new Date() })
       await this.processNode(instance, graph, state, startNode.nodeKey)
-    } catch (err: any) {
-      logInfo(`工作流实例 [${instance.id}] 执行异常: ${err?.message ?? err}`)
+    } catch (err: unknown) {
+      logInfo(`工作流实例 [${instance.id}] 执行异常: ${errMessage(err)}`)
       await instance.update({ status: 'failed', finishedAt: new Date() }).catch(() => {})
     }
   }
@@ -136,8 +137,8 @@ export default class WorkflowEngine {
       await this.completeNode(instance, graph, state, nodeKey, log, nextKeys)
       await this.advance(instance, graph, state, nodeKey, nextKeys)
       await this.commit(instance, state, {})
-    } catch (err: any) {
-      logInfo(`工作流实例 [${instance.id}] 审批续跑异常: ${err?.message ?? err}`)
+    } catch (err: unknown) {
+      logInfo(`工作流实例 [${instance.id}] 审批续跑异常: ${errMessage(err)}`)
       await instance.update({ status: 'failed', finishedAt: new Date() }).catch(() => {})
     }
   }
@@ -253,10 +254,10 @@ export default class WorkflowEngine {
       await this.completeNode(instance, graph, state, nodeKey, log, nextKeys)
       await this.advance(instance, graph, state, nodeKey, nextKeys)
       await this.commit(instance, state, {})
-    } catch (err: any) {
-      await log.update({ status: 'failed', error: err?.message ?? String(err), finishedAt: new Date() }).catch(() => {})
+    } catch (err: unknown) {
+      await log.update({ status: 'failed', error: errMessage(err), finishedAt: new Date() }).catch(() => {})
       await instance.update({ status: 'failed', finishedAt: new Date() }).catch(() => {})
-      logInfo(`工作流实例 [${instance.id}] 节点 [${nodeKey}] 执行失败: ${err?.message ?? err}`)
+      logInfo(`工作流实例 [${instance.id}] 节点 [${nodeKey}] 执行失败: ${errMessage(err)}`)
     }
   }
 
@@ -318,7 +319,7 @@ export default class WorkflowEngine {
         publisherId: 0,
         publisherName: '系统',
         publishTime: new Date(),
-      } as any)
+      })
     } catch {
       // 通知发送失败不影响流程推进
     }

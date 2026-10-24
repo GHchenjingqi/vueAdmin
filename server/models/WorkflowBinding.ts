@@ -7,6 +7,7 @@ class WorkflowBinding extends Model<InferAttributes<WorkflowBinding>, InferCreat
   declare bindingKey: string
   declare entityName: string | null
   declare formKey: string | null
+  declare callbackUrl: string | null
   declare status: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
@@ -40,6 +41,11 @@ WorkflowBinding.init(
       type: DataTypes.STRING(100),
       allowNull: true,
       comment: '前端表单 Schema key',
+    },
+    callbackUrl: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: '实例结束回调地址（业务状态同步）',
     },
     status: {
       type: DataTypes.TINYINT,

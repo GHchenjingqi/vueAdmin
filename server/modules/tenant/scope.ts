@@ -24,7 +24,7 @@ export function currentTenantConstraint(): { tenantId: number } | null {
  * 将租户约束合并进既有 where（原地修改并返回）。
  * 必须在缓存键生成之前调用，确保键含租户维度。
  */
-export function applyCurrentTenantScope<T extends Record<string, any>>(where: T): T {
+export function applyCurrentTenantScope<T extends Record<string, unknown>>(where: T): T {
   const constraint = currentTenantConstraint()
   if (constraint) Object.assign(where, constraint)
   return where

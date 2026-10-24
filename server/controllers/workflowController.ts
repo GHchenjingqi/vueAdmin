@@ -208,3 +208,24 @@ export const deleteBinding = async (req, res, next) => {
     next(err)
   }
 }
+
+/** 获取工作流表单字段 */
+export const getFormFields = async (req, res, next) => {
+  try {
+    const fields = await workflowService.getFormFields(Number(req.params.id))
+    res.json({ code: 0, data: fields })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** 整批保存（替换）工作流表单字段 */
+export const saveFormFields = async (req, res, next) => {
+  try {
+    const fields = await workflowService.setFormFields(Number(req.params.id), req.body.fields || [])
+    logOperation(req, '保存流程表单字段', `流程ID: ${req.params.id}`)
+    res.json({ code: 0, data: fields, message: '保存成功' })
+  } catch (err) {
+    next(err)
+  }
+}
