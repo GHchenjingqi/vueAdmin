@@ -58,7 +58,7 @@ export const sse = async (req, res, next) => {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     })
 
@@ -182,6 +182,20 @@ export const markAllRead = async (req, res, next) => {
   try {
     const result = await markAllReadService(req.user.id)
     res.json({ code: 0, data: result, message: '全部标记为已读' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * 标记单条通知为已读
+ * POST /api/notices/:id/read
+ */
+export const markRead = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id)
+    const result = await updateNotice(id, { isRead: true, userId: req.user.id })
+    res.json({ code: 0, data: result, message: '已标记为已读' })
   } catch (err) {
     next(err)
   }

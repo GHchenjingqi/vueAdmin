@@ -23,7 +23,7 @@ const __dirname = dirname(__filename)
 export const migrator = new Umzug({
   migrations: {
     // dist 下为 .js，tsx 源码运行为 .ts
-glob: resolve(__dirname, '../migrations/*.{ts,js}').replace(/\\/g, '/'),
+    glob: resolve(__dirname, '../migrations/*.{ts,js}').replace(/\\/g, '/'),
     resolve: ({ name, path, context }) => {
       const fileUrl = pathToFileURL(path!).href
       return {
@@ -45,6 +45,7 @@ glob: resolve(__dirname, '../migrations/*.{ts,js}').replace(/\\/g, '/'),
     modelName: 'SequelizeMeta',
   }),
   logger: {
+    debug: (msg) => console.debug(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     info: (msg) => logInfo(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     warn: (msg) => console.warn(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     error: (msg) => logError(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
@@ -58,7 +59,7 @@ glob: resolve(__dirname, '../migrations/*.{ts,js}').replace(/\\/g, '/'),
 export const seeder = new Umzug({
   migrations: {
     // dist 下为 .js，tsx 源码运行为 .ts
-glob: resolve(__dirname, '../seeders/*.{ts,js}').replace(/\\/g, '/'),
+    glob: resolve(__dirname, '../seeders/*.{ts,js}').replace(/\\/g, '/'),
     resolve: ({ name, path, context }) => {
       const fileUrl = pathToFileURL(path!).href
       return {
@@ -80,6 +81,7 @@ glob: resolve(__dirname, '../seeders/*.{ts,js}').replace(/\\/g, '/'),
     modelName: 'SeederMeta',
   }),
   logger: {
+    debug: (msg) => console.debug(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     info: (msg) => logInfo(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     warn: (msg) => console.warn(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     error: (msg) => logError(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),

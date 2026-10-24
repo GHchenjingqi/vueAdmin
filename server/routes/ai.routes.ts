@@ -6,12 +6,26 @@
  */
 
 import { Router } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { chatSchema, applySchema } from '../shared/schemas/ai.js'
 import { createAiProviderSchema, updateAiProviderSchema, aiProviderQuerySchema, aiProviderIdSchema } from '../shared/schemas/aiProvider.js'
 import * as aiController from '../controllers/aiController.js'
 import * as aiProviderController from '../controllers/aiProviderController.js'
+
+/**
+ * M0 临时平台超管守卫 — 仅限 admin 用户通过
+ * 正式守卫见 M1/M6 tenantContext
+ */
+function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = req.user
+  if (!user || user.username !== 'admin') {
+    res.status(403).json({ code: 403, message: '仅平台超管可执行此操作' })
+    return
+  }
+  next()
+}
 
 const router = Router()
 
@@ -76,7 +90,7 @@ router.post('/ai/chat', authMiddleware, validate(chatSchema), aiController.chat)
  *       200:
  *         description: 应用结果
  */
-router.post('/ai/apply', authMiddleware, validate(applySchema), aiController.apply)
+router.post('/ai/apply', authMiddleware, requirePlatformAdmin, validate(applySchema), aiController.apply)
 
 /**
  * @openapi

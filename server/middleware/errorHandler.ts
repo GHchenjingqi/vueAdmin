@@ -69,8 +69,7 @@ const errorHandler = (err: ErrorWithStatus, req: Request | null, res: Response, 
   const { statusCode, message } = classifyError(err)
 
   // 生产环境对 500 服务器错误脱敏，避免泄露内部实现细节
-  const safeMessage =
-    process.env.NODE_ENV === 'production' && statusCode === 500 ? '服务器内部错误' : message
+  const safeMessage = process.env.NODE_ENV === 'production' && statusCode === 500 ? '服务器内部错误' : message
 
   res.status(statusCode).json({
     code: statusCode,

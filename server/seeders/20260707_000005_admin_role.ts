@@ -1,12 +1,14 @@
 import type { QueryInterface } from 'sequelize'
 
 export async function up(queryInterface: QueryInterface): Promise<void> {
-  await queryInterface.bulkInsert('user_roles', [{
-    userId: 1,
-    roleId: 1,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }])
+  await queryInterface.bulkInsert('user_roles', [
+    {
+      userId: 1,
+      roleId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ])
   await queryInterface.sequelize.query(`
     INSERT INTO role_menus (roleId, menuId, createdAt, updatedAt)
     SELECT 1, id, NOW(), NOW() FROM menus

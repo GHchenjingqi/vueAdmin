@@ -30,7 +30,10 @@ export async function getUnreadCount(userId: number) {
 export async function listUserNotices(userId: number) {
   const notices = await Notice.findAll({
     where: { status: 'published' },
-    order: [['isTop', 'DESC'], ['publishTime', 'DESC']],
+    order: [
+      ['isTop', 'DESC'],
+      ['publishTime', 'DESC'],
+    ],
     limit: 10,
     attributes: ['id', 'title', 'type', 'publishTime', 'isTop'],
   })
@@ -58,7 +61,10 @@ export async function listPublishedNotices(page: number, pageSize: number) {
   const offset = (page - 1) * pageSize
   const { rows, count } = await Notice.findAndCountAll({
     where: { status: 'published' },
-    order: [['isTop', 'DESC'], ['publishTime', 'DESC']],
+    order: [
+      ['isTop', 'DESC'],
+      ['publishTime', 'DESC'],
+    ],
     offset,
     limit: pageSize,
     attributes: ['id', 'title', 'content', 'type', 'publisherName', 'publishTime', 'isTop', 'createdAt'],
@@ -69,21 +75,12 @@ export async function listPublishedNotices(page: number, pageSize: number) {
 /**
  * 获取管理端通知分页列表
  */
-export async function listAdminNotices(query: {
-  page: number
-  pageSize: number
-  keyword?: string
-  type?: string
-  status?: string
-}) {
+export async function listAdminNotices(query: { page: number; pageSize: number; keyword?: string; type?: string; status?: string }) {
   const { page, pageSize, keyword, type, status } = query
-  const where: Record<string, unknown> = {}
+  const where: any = {}
 
   if (keyword) {
-    where[Op.or] = [
-      { title: { [Op.like]: `%${keyword}%` } },
-      { content: { [Op.like]: `%${keyword}%` } },
-    ]
+    where[Op.or] = [{ title: { [Op.like]: `%${keyword}%` } }, { content: { [Op.like]: `%${keyword}%` } }]
   }
   if (type) where.type = type
   if (status) where.status = status
@@ -91,7 +88,11 @@ export async function listAdminNotices(query: {
   const offset = (page - 1) * pageSize
   const { rows, count } = await Notice.findAndCountAll({
     where,
-    order: [['isTop', 'DESC'], ['sort', 'ASC'], ['createdAt', 'DESC']],
+    order: [
+      ['isTop', 'DESC'],
+      ['sort', 'ASC'],
+      ['createdAt', 'DESC'],
+    ],
     offset,
     limit: pageSize,
   })
@@ -124,12 +125,18 @@ export async function createNotice(data: {
   if (!title || !content) {
     throw new AppError(400, '标题和内容不能为空')
   }
+  if (type && !['notice', 'announcement'].includes(type)) {
+    throw new AppError(400, `非法的通知类型: ${type}（仅支持 notice / announcement）`)
+  }
+  if (status && !['draft', 'published'].includes(status)) {
+    throw new AppError(400, `非法的通知状态: ${status}（仅支持 draft / published）`)
+  }
 
   const notice = await Notice.create({
     title,
     content,
-    type: type || 'notice',
-    status: status || 'draft',
+    type: (type || 'notice') as 'notice' | 'announcement',
+    status: (status || 'draft') as 'draft' | 'published',
     publisherId: userId || null,
     publisherName: username || null,
     isTop: isTop || 0,

@@ -1,10 +1,4 @@
-import {
-  listContents,
-  getContentById,
-  createContent,
-  updateContent,
-  deleteContent,
-} from '../services/contentService.js'
+import { listContents, getContentById, createContent, updateContent, deleteContent } from '../services/contentService.js'
 
 export async function list(req: any, res: any, next: any) {
   try {

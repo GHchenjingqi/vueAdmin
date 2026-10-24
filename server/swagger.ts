@@ -8,9 +8,7 @@ const options = {
       version: '1.0.0',
       description: 'Vue Admin 后台管理系统接口文档',
     },
-    servers: [
-      { url: 'http://localhost:3000/api/v1', description: '本地开发' },
-    ],
+    servers: [{ url: 'http://localhost:3000/api/v1', description: '本地开发' }],
     components: {
       securitySchemes: {
         bearerAuth: {

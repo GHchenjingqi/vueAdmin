@@ -79,8 +79,15 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
 
 export async function down(queryInterface: QueryInterface): Promise<void> {
   const keys = [
-    'site_title', 'site_description', 'site_keywords', 'site_logo', 'site_favicon',
-    'image_compress', 'captcha_enabled', 'watermark_enabled', 'watermark_text',
+    'site_title',
+    'site_description',
+    'site_keywords',
+    'site_logo',
+    'site_favicon',
+    'image_compress',
+    'captcha_enabled',
+    'watermark_enabled',
+    'watermark_text',
   ]
   const placeholders = keys.map(() => '?').join(', ')
   await queryInterface.sequelize.query(`DELETE FROM settings WHERE optionKey IN (${placeholders})`, {

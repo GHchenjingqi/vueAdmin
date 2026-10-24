@@ -17,6 +17,7 @@ import config from './config/index.js'
 import { createPublicApp } from './public/index.js'
 import { registerPublicModule } from './public/registry.js'
 import { knowledgePublicModule } from './modules/knowledge/public.js'
+import { logInfo } from './utils/fileLogger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -84,10 +85,9 @@ if (process.env.NODE_ENV === 'production') {
     dsn: process.env.SENTRY_DSN || '',
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0.2,
+    // v9+ 起 Express 请求追踪由 expressIntegration 自动完成，无需手动注册请求中间件
+    integrations: [Sentry.expressIntegration()],
   })
-  // 请求处理器（必须在路由之前注册）
-  app.use(Sentry.Handlers.requestHandler())
-  app.use(Sentry.Handlers.tracingHandler())
 }
 
 // ---------- 健康检查（优先于所有路由）----------
@@ -102,7 +102,7 @@ app.get('/favicon.ico', (_req, res) => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
       <rect width="32" height="32" rx="6" fill="#409EFF"/>
       <text x="16" y="22" font-size="18" font-weight="bold" fill="white" text-anchor="middle" font-family="Arial">V</text>
-    </svg>`
+    </svg>`,
   )
 })
 
@@ -161,13 +161,35 @@ app.use(publicPath, createPublicApp(publicPath))
 
 // ---------- 错误处理 ----------
 // Sentry 错误处理器（必须在所有路由之后，自定义 errorHandler 之前）
+// Sentry v9+ API：setupExpressErrorHandler 内部即注册 expressErrorHandler
 if (process.env.NODE_ENV === 'production') {
-  app.use(Sentry.Handlers.errorHandler())
+  Sentry.setupExpressErrorHandler(app)
 }
 app.use(errorHandler)
 
 // ---------- 启动服务（数据库迁移、数据迁移、种子数据、前端托管、HTTP 监听）----------
 bootstrap(app)
+
+// ---------- 工作流超时催办调度（默认关闭，需 WORKFLOW_TIMEOUT_CRON=1 启用）----------
+// 动态 import 避免在未启用时硬依赖 node-cron；启用后每 5 分钟扫描一次超时审批任务。
+if (process.env.WORKFLOW_TIMEOUT_CRON === '1') {
+  void (async () => {
+    try {
+      const cron = await import('node-cron')
+      cron.schedule('*/5 * * * *', async () => {
+        try {
+          const { processOverdueTasks } = await import('./services/workflowTimeoutService.js')
+          await processOverdueTasks()
+        } catch (err) {
+          logInfo(`工作流超时任务处理异常: ${(err as Error).message}`)
+        }
+      })
+      logInfo('工作流超时调度已启用')
+    } catch {
+      // node-cron 不可用时静默跳过
+    }
+  })()
+}
 
 // ---------- 优雅关闭（处理 SIGTERM/SIGINT）----------
 process.on('SIGTERM', async () => {

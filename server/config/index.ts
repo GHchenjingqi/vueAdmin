@@ -8,10 +8,10 @@ const __dirname = dirname(__filename)
 
 // 兼容源码开发（config/../.env）和编译后运行（dist/config/../../.env）
 const envPath = [
-  resolve(__dirname, '../.env'),        // 源码位置
-  resolve(__dirname, '../../.env'),     // 编译后位置
-  resolve(process.cwd(), '.env'),       // 运行目录
-].find(p => existsSync(p))
+  resolve(__dirname, '../.env'), // 源码位置
+  resolve(__dirname, '../../.env'), // 编译后位置
+  resolve(process.cwd(), '.env'), // 运行目录
+].find((p) => existsSync(p))
 if (envPath) dotenv.config({ path: envPath })
 
 /** 解析 Origin 白名单：环境变量优先，开发环境附带安全默认值 */
@@ -22,12 +22,7 @@ function resolveAllowedOrigins(): string[] {
     .filter(Boolean)
 
   const port = parseInt(process.env.SERVER_PORT || '5173', 10) || 5173
-  const defaults = [
-    `http://localhost:${port}`,
-    `https://localhost:${port}`,
-    `http://127.0.0.1:${port}`,
-    `https://127.0.0.1:${port}`,
-  ]
+  const defaults = [`http://localhost:${port}`, `https://localhost:${port}`, `http://127.0.0.1:${port}`, `https://127.0.0.1:${port}`]
 
   // 生产环境：仅使用 ALLOWED_ORIGINS；未配置时退回同源默认端口，避免空数组
   if (process.env.NODE_ENV === 'production') {
@@ -44,8 +39,13 @@ const config = {
     port: parseInt(process.env.SERVER_PORT || '5173', 10) || 5173,
   },
   app: {
+    nodeEnv: process.env.NODE_ENV || 'development',
     // Origin 白名单（CORS + CSRF 纵深防御），通过 ALLOWED_ORIGINS 配置，禁止硬编码内网 IP
     allowedOrigins: resolveAllowedOrigins(),
+    // AI 代码注入开关：生产默认关闭，仅平台超管开启
+    aiAssistantEnabled: process.env.AI_INJECTOR_ENABLED === 'true',
+    // 自签名证书：开发默认 true；生产由 NODE_ENV=production 触发校验
+    useSelfSignedCert: process.env.USE_SELF_SIGNED_CERT !== 'false',
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
@@ -66,10 +66,7 @@ const config = {
 }
 
 // P0 级别：生产环境必须设置 JWT_SECRET，否则拒绝启动
-if (
-  process.env.NODE_ENV === 'production' &&
-  (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'vue_admin_secret_key_2024')
-) {
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'vue_admin_secret_key_2024')) {
   console.error('FATAL: 生产环境必须设置自定义 JWT_SECRET 环境变量！请在 .env 文件中配置。')
   process.exit(1)
 }

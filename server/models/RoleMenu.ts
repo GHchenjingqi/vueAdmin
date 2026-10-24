@@ -10,26 +10,29 @@ class RoleMenu extends Model<InferAttributes<RoleMenu>, InferCreationAttributes<
   declare readonly updatedAt: CreationOptional<Date>
 }
 
-RoleMenu.init({
-  id: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    primaryKey: true,
-    autoIncrement: true,
+RoleMenu.init(
+  {
+    id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    roleId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      comment: '角色 ID',
+    },
+    menuId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      comment: '菜单 ID',
+    },
+  } as any,
+  {
+    sequelize,
+    tableName: 'role_menus',
+    indexes: [{ unique: true, fields: ['roleId', 'menuId'] }],
   },
-  roleId: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: false,
-    comment: '角色 ID',
-  },
-  menuId: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: false,
-    comment: '菜单 ID',
-  },
-} as any, {
-  sequelize,
-  tableName: 'role_menus',
-  indexes: [{ unique: true, fields: ['roleId', 'menuId'] }],
-})
+)
 
 export default RoleMenu

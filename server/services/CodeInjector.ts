@@ -12,6 +12,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import config from '../config/index.js'
 import Menu from '../models/Menu.js'
 import Role from '../models/Role.js'
 import RoleMenu from '../models/RoleMenu.js'
@@ -88,17 +89,7 @@ function isPathAllowed(relativePath: string): boolean {
   }
 
   // 不允许写入危险文件
-  const blockedPatterns = [
-    /\.env/,
-    /package\.json/,
-    /package-lock\.json/,
-    /tsconfig\.json/,
-    /vite\.config/,
-    /\.git/,
-    /server\.js$/,
-    /app\.ts$/,
-    /index\.html$/,
-  ]
+  const blockedPatterns = [/\.env/, /package\.json/, /package-lock\.json/, /tsconfig\.json/, /vite\.config/, /\.git/, /server\.js$/, /app\.ts$/, /index\.html$/]
   for (const pattern of blockedPatterns) {
     if (pattern.test(relativePath)) return false
   }
@@ -194,8 +185,8 @@ async function registerRoute(routeFilePath: string): Promise<boolean> {
     if (!newContent.includes('// ==================== AI 生成路由')) {
       // 在最后一行 export default 之前添加
       const lines = content.split('\n')
-      const lastImportIndex = lines.findLastIndex(line => line.startsWith('import'))
-      const lastUseIndex = lines.findLastIndex(line => line.includes('router.use('))
+      const lastImportIndex = lines.findLastIndex((line) => line.startsWith('import'))
+      const lastUseIndex = lines.findLastIndex((line) => line.includes('router.use('))
 
       if (lastImportIndex >= 0) {
         lines.splice(lastImportIndex + 1, 0, `import aiGeneratedRoutes from '../${routeFilePath.replace('server/', '')}.js'`)
@@ -297,6 +288,9 @@ async function addPermissionsToAdmins(menuId: number): Promise<{ roleId: number;
  * 将 AI 生成的代码应用到项目
  */
 export async function apply(files: GeneratedCodeFile[], userId: number): Promise<ApplyResult> {
+  if (config.app.aiAssistantEnabled !== true) {
+    throw new Error('AI 代码注入已被禁用')
+  }
   const appliedFiles: string[] = []
   const skippedFiles: string[] = []
   const createdMenuIds: number[] = []
@@ -350,7 +344,7 @@ export async function apply(files: GeneratedCodeFile[], userId: number): Promise
   }
 
   // 第三步：自动注册路由（如果是路由文件）
-  const routeFile = files.find(f => f.path.includes('routes/') && f.path.endsWith('.ts'))
+  const routeFile = files.find((f) => f.path.includes('routes/') && f.path.endsWith('.ts'))
   if (routeFile && appliedFiles.includes(routeFile.path)) {
     const registered = await registerRoute(routeFile.path)
     if (!registered) {
@@ -361,12 +355,7 @@ export async function apply(files: GeneratedCodeFile[], userId: number): Promise
   // 第四步：自动创建菜单（如果有前端视图文件）
   const analysis = extractModuleName(files)
   if (analysis.frontComponentPath && appliedFiles.includes(analysis.frontComponentPath)) {
-    const menuResult = await createMenu(
-      analysis.moduleName,
-      analysis.moduleNameCn,
-      analysis.frontComponentPath,
-      userId,
-    )
+    const menuResult = await createMenu(analysis.moduleName, analysis.moduleNameCn, analysis.frontComponentPath, userId)
     if (menuResult) {
       createdMenuIds.push(menuResult.menuId)
       // 给管理员添加权限

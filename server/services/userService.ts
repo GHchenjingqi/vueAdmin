@@ -12,20 +12,25 @@ import { logOperation } from '../utils/logger.js'
 import { exportExcel } from '../utils/exportExcel.js'
 import { normalizeIds, prepareChangeLog } from '../utils/helpers.js'
 import { applyDataScopeWhere, isTargetInScope } from '../utils/dataScope.js'
+import { createCache, stableKey } from '../utils/cache.js'
 import User from '../models/User.js'
 import Department from '../models/Department.js'
 import Role from '../models/Role.js'
 import UserRole from '../models/UserRole.js'
 
-const USER_PROFILE_ATTRS = [
-  'id', 'username', 'nickname', 'email', 'phone', 'avatar',
-  'bio', 'status', 'deptId', 'createdAt', 'updatedAt',
-] as const
+const USER_PROFILE_ATTRS = ['id', 'username', 'nickname', 'email', 'phone', 'avatar', 'bio', 'status', 'deptId', 'createdAt', 'updatedAt']
 
 const USER_INCLUDES = [
   { model: Department, as: 'dept', attributes: ['id', 'name'] },
   { model: Role, as: 'roles', attributes: ['id', 'name', 'code'], through: { attributes: [] } },
 ]
+
+// 用户列表缓存（租户作用域已编码进 where，键含 where+分页；写操作后整命名空间失效）
+const userListCache = createCache<{ rows: any[]; total: number }>({
+  namespace: 'users',
+  max: 200,
+  maxAgeMs: 60 * 1000,
+})
 
 type UserQueryParams = {
   username?: string
@@ -61,36 +66,30 @@ export function buildUserWhere(query: UserQueryParams) {
  * 获取用户列表（分页搜索）
  * @param reqUser 当前登录用户（用于数据权限过滤，可选）
  */
-export async function listUsers(
-  query: UserQueryParams,
-  page: number,
-  pageSize: number,
-  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
-) {
+export async function listUsers(query: UserQueryParams, page: number, pageSize: number, reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
   const where = buildUserWhere(query)
   applyDataScopeWhere(where, reqUser || {}, query.deptId)
   const offset = (page - 1) * pageSize
 
-  const { rows, count } = await User.findAndCountAll({
-    where,
-    offset,
-    limit: pageSize,
-    attributes: { exclude: ['password'] },
-    include: USER_INCLUDES,
-    order: [['id', 'DESC']],
+  const cacheKey = stableKey({ where, offset, limit: pageSize })
+  return userListCache.getOrSet(cacheKey, async () => {
+    const { rows, count } = await User.findAndCountAll({
+      where,
+      offset,
+      limit: pageSize,
+      attributes: { exclude: ['password'] },
+      include: USER_INCLUDES,
+      order: [['id', 'DESC']],
+    })
+    return { rows, total: count }
   })
-
-  return { rows, total: count }
 }
 
 /**
  * 获取单个用户详情
  * @param reqUser 当前登录用户（用于数据权限校验，可选）
  */
-export async function getUserById(
-  userId: number,
-  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
-) {
+export async function getUserById(userId: number, reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
   const user = await User.findByPk(userId, {
     attributes: USER_PROFILE_ATTRS,
     include: USER_INCLUDES,
@@ -137,11 +136,12 @@ export async function createUser(
 
   if (roleIds && roleIds.length > 0) {
     await UserRole.bulkCreate(
-      roleIds.map(roleId => ({ userId: user.id, roleId })),
+      roleIds.map((roleId) => ({ userId: user.id, roleId })),
       { ignoreDuplicates: true },
     )
   }
 
+  await userListCache.clear()
   return { id: user.id }
 }
 
@@ -181,22 +181,20 @@ export async function updateUser(
     await UserRole.destroy({ where: { userId: userId } })
     if (roleIds.length > 0) {
       await UserRole.bulkCreate(
-        roleIds.map(roleId => ({ userId, roleId })),
+        roleIds.map((roleId) => ({ userId, roleId })),
         { ignoreDuplicates: true },
       )
     }
   }
 
+  await userListCache.clear()
   return { changes, summary }
 }
 
 /**
  * 修改密码（管理员重置 / 用户自助改密）
  */
-export async function changePassword(
-  userId: number,
-  options: { reset: boolean; oldPassword?: string; password?: string },
-) {
+export async function changePassword(userId: number, options: { reset: boolean; oldPassword?: string; password?: string }) {
   const user = await User.findByPk(userId)
   if (!user) throw new AppError(404, '用户不存在')
 
@@ -211,9 +209,14 @@ export async function changePassword(
 
   // 用户自助改密
   const { oldPassword, password: newPassword } = options
-  if (!newPassword || newPassword.length < 8 ||
-      !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) ||
-      !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+  if (
+    !newPassword ||
+    newPassword.length < 8 ||
+    !/[A-Z]/.test(newPassword) ||
+    !/[a-z]/.test(newPassword) ||
+    !/[0-9]/.test(newPassword) ||
+    !/[^A-Za-z0-9]/.test(newPassword)
+  ) {
     throw new AppError(400, '密码需至少8位，包含大小写字母、数字和特殊字符')
   }
   if (!oldPassword) throw new AppError(400, '原密码不能为空')
@@ -231,10 +234,7 @@ export async function changePassword(
 /**
  * 删除单个用户
  */
-export async function deleteUser(
-  userId: number,
-  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
-) {
+export async function deleteUser(userId: number, reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
   const user = await User.findByPk(userId)
   if (!user) throw new AppError(404, '用户不存在')
   if (!isTargetInScope((user as any).deptId, reqUser)) {
@@ -244,6 +244,7 @@ export async function deleteUser(
   const username = user.username
   await UserRole.destroy({ where: { userId } })
   await user.destroy()
+  await userListCache.clear()
 
   return { id: userId, username }
 }
@@ -251,10 +252,7 @@ export async function deleteUser(
 /**
  * 批量删除用户
  */
-export async function batchDeleteUsers(
-  ids: number[],
-  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
-) {
+export async function batchDeleteUsers(ids: number[], reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
   const users = await User.findAll({ where: { id: { [Op.in]: ids } } })
   if (users.length === 0) {
     throw new AppError(404, '用户不存在')
@@ -266,6 +264,7 @@ export async function batchDeleteUsers(
 
   await UserRole.destroy({ where: { userId: { [Op.in]: ids } } })
   const count = await User.destroy({ where: { id: { [Op.in]: ids } } })
+  await userListCache.clear()
 
   return { count, ids }
 }
@@ -273,9 +272,7 @@ export async function batchDeleteUsers(
 /**
  * 导出用户列表 Excel
  */
-export async function exportUsers(
-  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
-) {
+export async function exportUsers(reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
   const where: any = {}
   applyDataScopeWhere(where, reqUser || {})
   const users = await User.findAll({
@@ -285,7 +282,7 @@ export async function exportUsers(
     order: [['id', 'DESC']],
   })
 
-  const data = users.map(u => ({
+  const data = users.map((u) => ({
     id: u.id,
     username: u.username,
     nickname: u.nickname || '',
@@ -376,7 +373,12 @@ export async function importUsers(
       continue
     }
 
-    const roleIds = roleIdsStr ? roleIdsStr.split(/[,，]/).map(s => Number(s.trim())).filter(n => !isNaN(n)) : []
+    const roleIds = roleIdsStr
+      ? roleIdsStr
+          .split(/[,，]/)
+          .map((s) => Number(s.trim()))
+          .filter((n) => !isNaN(n))
+      : []
     const status = statusCell === '禁用' || Number(statusCell) === 0 ? 0 : 1
 
     try {
@@ -400,7 +402,7 @@ export async function importUsers(
 
       if (roleIds.length > 0) {
         await UserRole.bulkCreate(
-          roleIds.map(roleId => ({ userId: user.id, roleId })),
+          roleIds.map((roleId) => ({ userId: user.id, roleId })),
           { ignoreDuplicates: true },
         )
       }
@@ -411,5 +413,6 @@ export async function importUsers(
     }
   }
 
+  await userListCache.clear()
   return result
 }

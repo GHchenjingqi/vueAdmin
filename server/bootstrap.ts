@@ -34,6 +34,13 @@ import { dirname } from 'path'
 import { readFileSync, existsSync } from 'fs'
 import express from 'express'
 import { getOrCreateCert } from './utils/generateCert.js'
+import './modules/tenant/models/Tenant.js'
+import './modules/billing/models/Plan.js'
+import './modules/billing/models/Subscription.js'
+import './modules/billing/models/Usage.js'
+import './modules/billing/models/Invoice.js'
+import './modules/billing/models/Payment.js'
+import { registerTenantScope } from './modules/tenant/hooks/sequelizeTenantScope.js'
 import { updateUserActivity, initKickSubscriber, closeKickSubscriber } from './utils/onlineUsers.js'
 import { initScheduler } from './utils/scheduler.js'
 
@@ -41,9 +48,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 // 项目根目录（兼容源码和编译后）
-const projectRoot = existsSync(resolve(__dirname, '../index.html'))
-  ? resolve(__dirname, '..')
-  : resolve(__dirname, '../..')
+const projectRoot = existsSync(resolve(__dirname, '../index.html')) ? resolve(__dirname, '..') : resolve(__dirname, '../..')
 
 async function setupFrontend(app, isProduction, express, httpsServer) {
   const distDir = resolve(projectRoot, 'dist')
@@ -66,10 +71,7 @@ async function setupFrontend(app, isProduction, express, httpsServer) {
       const indexHtml = readFileSync(indexHtmlPath, 'utf-8')
       app.get(/^(?!\/api).*$/, async (_req, res) => {
         const html = await vite.transformIndexHtml(_req.url, indexHtml)
-        const sanitized = html.replace(
-          /<meta\s+http-equiv="Content-Security-Policy".*?\/?>/gi,
-          '',
-        )
+        const sanitized = html.replace(/<meta\s+http-equiv="Content-Security-Policy".*?\/?>/gi, '')
         res.setHeader('Content-Type', 'text/html; charset=utf-8')
         res.send(sanitized)
       })
@@ -112,7 +114,15 @@ async function seedData() {
   const menuCount = await Menu.count()
   if (menuCount === 0) {
     const system = await Menu.create({ parentId: 0, name: '系统管理', path: '/system', icon: 'Setting', type: 'C', sort: 100 })
-    const dashboard = await Menu.create({ parentId: 0, name: '仪表盘', path: '/dashboard', component: 'views/Dashboard.vue', icon: 'Odometer', type: 'M', sort: 0 })
+    const dashboard = await Menu.create({
+      parentId: 0,
+      name: '仪表盘',
+      path: '/dashboard',
+      component: 'views/Dashboard.vue',
+      icon: 'Odometer',
+      type: 'M',
+      sort: 0,
+    })
     await Menu.create({ parentId: system.id, name: '基础设置', path: '/settings', component: 'views/Settings.vue', icon: 'Setting', type: 'M', sort: 0 })
     await Menu.create({ parentId: system.id, name: '用户管理', path: '/users', component: 'views/UserList.vue', icon: 'User', type: 'M', sort: 1 })
     await Menu.create({ parentId: system.id, name: '部门管理', path: '/depts', component: 'views/DeptManager.vue', icon: 'Share', type: 'M', sort: 2 })
@@ -122,23 +132,79 @@ async function seedData() {
     await Menu.create({ parentId: system.id, name: '文件管理', path: '/files', component: 'views/FileManager.vue', icon: 'FolderOpened', type: 'M', sort: 6 })
     await Menu.create({ parentId: system.id, name: '系统日志', path: '/logs', component: 'views/SystemLog.vue', icon: 'Document', type: 'M', sort: 10 })
     await Menu.create({ parentId: system.id, name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', type: 'M', sort: 7 })
-    await Menu.create({ parentId: system.id, name: 'AI 提供商', path: '/ai-providers', component: 'views/AiProviderManager.vue', icon: 'Aim', type: 'M', sort: 13 })
+    await Menu.create({
+      parentId: system.id,
+      name: 'AI 提供商',
+      path: '/ai-providers',
+      component: 'views/AiProviderManager.vue',
+      icon: 'Aim',
+      type: 'M',
+      sort: 13,
+    })
 
     // 系统监控目录（与系统管理同级）
     const monitor = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'C', sort: 110 })
-    await Menu.create({ parentId: monitor.id, name: '在线用户', path: '/online-users', component: 'views/OnlineUsers.vue', icon: 'Connection', type: 'M', sort: 0 })
-    await Menu.create({ parentId: monitor.id, name: '服务监控', path: '/server-monitor', component: 'views/ServerMonitor.vue', icon: 'DataBoard', type: 'M', sort: 1 })
+    await Menu.create({
+      parentId: monitor.id,
+      name: '在线用户',
+      path: '/online-users',
+      component: 'views/OnlineUsers.vue',
+      icon: 'Connection',
+      type: 'M',
+      sort: 0,
+    })
+    await Menu.create({
+      parentId: monitor.id,
+      name: '服务监控',
+      path: '/server-monitor',
+      component: 'views/ServerMonitor.vue',
+      icon: 'DataBoard',
+      type: 'M',
+      sort: 1,
+    })
 
     // 消息管理目录（与系统管理同级）
     const message = await Menu.create({ parentId: 0, name: '消息管理', path: '/message', icon: 'ChatLineSquare', type: 'C', sort: 70 })
     await Menu.create({ parentId: message.id, name: '消息发布', path: '/notices', component: 'views/NoticeManager.vue', icon: 'Bell', type: 'M', sort: 0 })
-    await Menu.create({ parentId: message.id, name: '消息通知', path: '/messages', component: 'views/MessageList.vue', icon: 'ChatLineSquare', type: 'M', sort: 1 })
+    await Menu.create({
+      parentId: message.id,
+      name: '消息通知',
+      path: '/messages',
+      component: 'views/MessageList.vue',
+      icon: 'ChatLineSquare',
+      type: 'M',
+      sort: 1,
+    })
 
     // 知识库目录（与系统管理同级）
     const knowledge = await Menu.create({ parentId: 0, name: '知识库', path: '/knowledge', icon: 'Reading', type: 'C', sort: 80 })
-    await Menu.create({ parentId: knowledge.id, name: '分类管理', path: '/knowledge/categories', component: 'modules/knowledge/views/CategoryManager.vue', icon: 'FolderOpened', type: 'M', sort: 0 })
-    await Menu.create({ parentId: knowledge.id, name: '标签管理', path: '/knowledge/tags', component: 'modules/knowledge/views/TagManager.vue', icon: 'PriceTag', type: 'M', sort: 1 })
-    await Menu.create({ parentId: knowledge.id, name: '内容管理', path: '/knowledge/contents', component: 'modules/knowledge/views/ContentManager.vue', icon: 'Notebook', type: 'M', sort: 2 })
+    await Menu.create({
+      parentId: knowledge.id,
+      name: '分类管理',
+      path: '/knowledge/categories',
+      component: 'modules/knowledge/views/CategoryManager.vue',
+      icon: 'FolderOpened',
+      type: 'M',
+      sort: 0,
+    })
+    await Menu.create({
+      parentId: knowledge.id,
+      name: '标签管理',
+      path: '/knowledge/tags',
+      component: 'modules/knowledge/views/TagManager.vue',
+      icon: 'PriceTag',
+      type: 'M',
+      sort: 1,
+    })
+    await Menu.create({
+      parentId: knowledge.id,
+      name: '内容管理',
+      path: '/knowledge/contents',
+      component: 'modules/knowledge/views/ContentManager.vue',
+      icon: 'Notebook',
+      type: 'M',
+      sort: 2,
+    })
 
     logInfo('默认菜单已创建')
 
@@ -181,7 +247,7 @@ async function seedData() {
 
       // 超级管理员拥有所有菜单权限
       const allMenus = await Menu.findAll({ attributes: ['id'] })
-      await RoleMenu.bulkCreate(allMenus.map(m => ({ roleId: adminRole.id, menuId: m.id })))
+      await RoleMenu.bulkCreate(allMenus.map((m) => ({ roleId: adminRole.id, menuId: m.id })))
 
       // 默认 admin 用户赋予超级管理员角色
       const adminUser = await User.findOne({ where: { username: 'admin' } })
@@ -195,7 +261,7 @@ async function seedData() {
         attributes: ['id'],
       })
       if (messageMenus.length > 0) {
-        await RoleMenu.bulkCreate(messageMenus.map(m => ({ roleId: userRole.id, menuId: m.id })))
+        await RoleMenu.bulkCreate(messageMenus.map((m) => ({ roleId: userRole.id, menuId: m.id })))
       }
 
       logInfo('默认角色数据已创建')
@@ -239,9 +305,7 @@ async function seedData() {
     }
 
     // 增量：补充新菜单
-    const newMenus = [
-      { name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', sort: 12 },
-    ]
+    const newMenus = [{ name: '定时任务', path: '/tasks', component: 'views/TaskManager.vue', icon: 'Clock', sort: 12 }]
     for (const m of newMenus) {
       const exists = await Menu.findOne({ where: { name: m.name } })
       if (!exists) {
@@ -261,16 +325,40 @@ async function seedData() {
     const knowledgeMenu = await Menu.findOne({ where: { name: '知识库' } })
     if (!knowledgeMenu) {
       const kb = await Menu.create({ parentId: 0, name: '知识库', path: '/knowledge', icon: 'Reading', type: 'C', sort: 80 })
-      await Menu.create({ parentId: kb.id, name: '分类管理', path: '/knowledge/categories', component: 'modules/knowledge/views/CategoryManager.vue', icon: 'FolderOpened', type: 'M', sort: 0 })
-      await Menu.create({ parentId: kb.id, name: '标签管理', path: '/knowledge/tags', component: 'modules/knowledge/views/TagManager.vue', icon: 'PriceTag', type: 'M', sort: 1 })
-      await Menu.create({ parentId: kb.id, name: '内容管理', path: '/knowledge/contents', component: 'modules/knowledge/views/ContentManager.vue', icon: 'Notebook', type: 'M', sort: 2 })
+      await Menu.create({
+        parentId: kb.id,
+        name: '分类管理',
+        path: '/knowledge/categories',
+        component: 'modules/knowledge/views/CategoryManager.vue',
+        icon: 'FolderOpened',
+        type: 'M',
+        sort: 0,
+      })
+      await Menu.create({
+        parentId: kb.id,
+        name: '标签管理',
+        path: '/knowledge/tags',
+        component: 'modules/knowledge/views/TagManager.vue',
+        icon: 'PriceTag',
+        type: 'M',
+        sort: 1,
+      })
+      await Menu.create({
+        parentId: kb.id,
+        name: '内容管理',
+        path: '/knowledge/contents',
+        component: 'modules/knowledge/views/ContentManager.vue',
+        icon: 'Notebook',
+        type: 'M',
+        sort: 2,
+      })
       logInfo('已补充菜单: 知识库')
     }
 
     // 增量：系统监控目录 + 将在线用户移到系统监控下
     let monitorMenu = await Menu.findOne({ where: { name: '系统监控' } })
     if (!monitorMenu) {
-      monitorMenu = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'D', sort: 110 })
+      monitorMenu = await Menu.create({ parentId: 0, name: '系统监控', path: '/monitor', icon: 'Monitor', type: 'C', sort: 110 })
       logInfo('已补充菜单: 系统监控')
     }
     // 查找已有的在线用户菜单并移到系统监控下
@@ -283,7 +371,15 @@ async function seedData() {
     // 独立检查"服务监控"菜单（不受系统监控目录是否已存在的影响）
     const serverMonitorMenu = await Menu.findOne({ where: { name: '服务监控' } })
     if (!serverMonitorMenu) {
-      await Menu.create({ parentId: monitorMenu.id, name: '服务监控', path: '/server-monitor', component: 'views/ServerMonitor.vue', icon: 'DataBoard', type: 'M', sort: 1 })
+      await Menu.create({
+        parentId: monitorMenu.id,
+        name: '服务监控',
+        path: '/server-monitor',
+        component: 'views/ServerMonitor.vue',
+        icon: 'DataBoard',
+        type: 'M',
+        sort: 1,
+      })
       logInfo('已补充菜单: 服务监控')
     }
 
@@ -329,7 +425,12 @@ async function seedData() {
     if (!dictMenu) {
       await Menu.create({
         parentId: systemParentId,
-        name: '字典管理', path: '/dict', component: 'views/DictManager.vue', icon: 'Collection', type: 'M', sort: 3,
+        name: '字典管理',
+        path: '/dict',
+        component: 'views/DictManager.vue',
+        icon: 'Collection',
+        type: 'M',
+        sort: 3,
       })
       logInfo('字典管理菜单已补充')
     }
@@ -448,7 +549,7 @@ export default async function bootstrap(app) {
     KnowledgeContent.belongsToMany(KnowledgeTag, { through: KnowledgeContentTag, foreignKey: 'contentId', otherKey: 'tagId', as: 'tags' })
     KnowledgeTag.belongsToMany(KnowledgeContent, { through: KnowledgeContentTag, foreignKey: 'tagId', otherKey: 'contentId', as: 'contents' })
 
-        // 先确保数据库存在，再认证连接（CREATE 后必须重新 authenticate）
+    // 先确保数据库存在，再认证连接（CREATE 后必须重新 authenticate）
     await ensureDatabaseExists()
     await sequelize.authenticate()
     logInfo(`数据库连接成功: ${config.database.host}:${config.database.port}/${config.database.name}`)
@@ -464,6 +565,9 @@ export default async function bootstrap(app) {
     }
 
     cleanOldLogs()
+
+    // 注册多租户全局 scope hook（在模型关联之后、数据操作之前）
+    registerTenantScope()
 
     // 兼容旧版数据库的增量迁移已收敛为一次性 Umzug 迁移
     // （server/migrations/20260717_000001_legacy-compat.ts），由上方 migrator.up() 统一执行，
@@ -481,6 +585,11 @@ export default async function bootstrap(app) {
 
     await loadSiteInfo()
 
+    // 生产环境禁止使用自签名证书
+    if (config.app.nodeEnv === 'production' && config.app.useSelfSignedCert) {
+      throw new Error('生产环境禁止使用自签名证书，请配置正式证书或反代 TLS')
+    }
+
     // 自签名证书（开发环境），解决 Chrome HTTPS-First 模式报错
     const { key, cert } = await getOrCreateCert()
 
@@ -493,7 +602,7 @@ export default async function bootstrap(app) {
     app.use('/api', (req, res, next) => {
       if (req.user) {
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress
-        updateUserActivity(req.user.id, ip, req.headers['user-agent'])
+        updateUserActivity(req.user.id, ip, req.headers['user-agent'], { tenantId: req.user.tenantId })
       }
       next()
     })

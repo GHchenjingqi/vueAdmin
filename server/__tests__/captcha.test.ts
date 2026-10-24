@@ -3,7 +3,7 @@
  * 覆盖：generate、verify、过期清理
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { generate, verify } from '../utils/captcha'
+import { generate, verify } from '../utils/captcha.js'
 
 // Mock svg-captcha
 vi.mock('svg-captcha', () => ({

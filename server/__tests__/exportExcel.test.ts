@@ -26,7 +26,7 @@ vi.mock('exceljs', () => ({
   },
 }))
 
-const { exportExcel } = await import('../utils/exportExcel')
+const { exportExcel } = await import('../utils/exportExcel.js')
 
 describe('exportExcel', () => {
   beforeEach(() => {
@@ -83,9 +83,7 @@ describe('exportExcel', () => {
 
     await exportExcel({ columns, data, filename: 'test.xlsx' })
 
-    expect(mockSheet.columns).toEqual([
-      { header: '姓名', key: 'name', width: 16 },
-    ])
+    expect(mockSheet.columns).toEqual([{ header: '姓名', key: 'name', width: 16 }])
   })
 
   it('列指定 width 时使用自定义宽度', async () => {
@@ -94,9 +92,7 @@ describe('exportExcel', () => {
 
     await exportExcel({ columns, data, filename: 'test.xlsx' })
 
-    expect(mockSheet.columns).toEqual([
-      { header: '姓名', key: 'name', width: 30 },
-    ])
+    expect(mockSheet.columns).toEqual([{ header: '姓名', key: 'name', width: 30 }])
   })
 
   it('多列导出', async () => {
@@ -105,9 +101,7 @@ describe('exportExcel', () => {
       { label: '年龄', prop: 'age' },
       { label: '邮箱', prop: 'email', width: 30 },
     ]
-    const data = [
-      { name: 'Alice', age: 25, email: 'alice@example.com' },
-    ]
+    const data = [{ name: 'Alice', age: 25, email: 'alice@example.com' }]
 
     await exportExcel({ columns, data, filename: 'test.xlsx' })
 

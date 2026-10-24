@@ -1,11 +1,4 @@
-import {
-  listCategories,
-  listCategoryOptions,
-  getCategoryById,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-} from '../services/categoryService.js'
+import { listCategories, listCategoryOptions, getCategoryById, createCategory, updateCategory, deleteCategory } from '../services/categoryService.js'
 
 export async function list(req: any, res: any, next: any) {
   try {

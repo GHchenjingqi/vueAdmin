@@ -30,7 +30,10 @@ export async function loadDictOptions(dictType: string) {
   const items = await DictData.findAll({
     where: { dictType, status: 1 },
     attributes: ['label', 'value', 'sort'],
-    order: [['sort', 'ASC'], ['id', 'ASC']],
+    order: [
+      ['sort', 'ASC'],
+      ['id', 'ASC'],
+    ],
   })
   cache[dictType] = items.map((item) => ({
     label: item.label,

@@ -3,13 +3,28 @@ import Role from '../models/Role.js'
 import UserRole from '../models/UserRole.js'
 import Department from '../models/Department.js'
 import { Op } from 'sequelize'
+import { createCache } from './cache.js'
 
 interface ApproverRule {
   ruleType: string
   ruleConfig: string | null
 }
 
+// 审批人解析结果按「规则 + 发起人」缓存（默认 60s TTL 兜底）。
+// 测试环境（NODE_ENV=test）下 createCache 自动禁用，保证单测确定性。
+const approverCache = createCache<number[]>({ max: 1000, maxAgeMs: 60 * 1000 })
+
+function approverCacheKey(rules: ApproverRule[], startedBy: number): string {
+  return JSON.stringify({ r: rules, s: startedBy })
+}
+
 export async function resolveApprovers(rules: ApproverRule[], context: { startedBy: number }): Promise<number[]> {
+  return approverCache.getOrSet(approverCacheKey(rules, context.startedBy), () =>
+    resolveApproversUncached(rules, context),
+  )
+}
+
+async function resolveApproversUncached(rules: ApproverRule[], context: { startedBy: number }): Promise<number[]> {
   const userIdsSet = new Set<number>()
 
   for (const rule of rules) {
@@ -23,7 +38,7 @@ export async function resolveApprovers(rules: ApproverRule[], context: { started
       case 'direct_leader': {
         const level = config.level || 1
         const leaderIds = await resolveDirectLeader(context.startedBy, level)
-        leaderIds.forEach(id => userIdsSet.add(id))
+        leaderIds.forEach((id) => userIdsSet.add(id))
         break
       }
       case 'dept_manager': {
@@ -41,7 +56,7 @@ export async function resolveApprovers(rules: ApproverRule[], context: { started
         const roleIds: number[] = config.roleIds || []
         if (roleIds.length > 0) {
           const userRoles = await UserRole.findAll({ where: { roleId: { [Op.in]: roleIds } } })
-          userRoles.forEach(ur => userIdsSet.add(ur.userId))
+          userRoles.forEach((ur) => userIdsSet.add(ur.userId))
         }
         break
       }
@@ -49,20 +64,20 @@ export async function resolveApprovers(rules: ApproverRule[], context: { started
         const deptIds: number[] = config.deptIds || []
         if (deptIds.length > 0) {
           const users = await User.findAll({ where: { deptId: { [Op.in]: deptIds }, status: 1 } })
-          users.forEach(u => userIdsSet.add(u.id))
+          users.forEach((u) => userIdsSet.add(u.id))
         }
         break
       }
       case 'user': {
         const userIds: number[] = config.userIds || []
-        userIds.forEach(id => userIdsSet.add(id))
+        userIds.forEach((id) => userIdsSet.add(id))
         break
       }
     }
   }
 
   // 排除发起人自身（除非规则明确包含 creator）
-  const hasCreatorRule = rules.some(r => r.ruleType === 'creator')
+  const hasCreatorRule = rules.some((r) => r.ruleType === 'creator')
   if (!hasCreatorRule) {
     userIdsSet.delete(context.startedBy)
   }

@@ -11,6 +11,8 @@ declare namespace Express {
     roleIds?: number[]
     /** 所属部门 ID（数据权限） */
     deptId?: number
+    /** 所属租户 ID（多租户） */
+    tenantId?: number
     /** 有效数据范围：1=全部 2=本部门 3=本级及以下 */
     dataScope?: number
     iat?: number

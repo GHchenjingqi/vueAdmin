@@ -12,37 +12,49 @@ import WorkflowEngine from '../services/WorkflowEngine.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { sendToUser } from '../utils/sseManager.js'
 import { logOperation } from '../utils/logger.js'
+import { createCache, stableKey } from '../utils/cache.js'
+
+// 我的审批列表缓存：键含 userId + 状态 + 分页，TTL 短以保证待办变化可见
+const approvalTaskListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
+  namespace: 'approval-tasks',
+  max: 300,
+  maxAgeMs: 30 * 1000,
+})
 
 /** 我的待办/已办审批列表 */
 export const listMyTasks = async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10, status } = req.query
-    const where = { approverId: req.user.id }
+    const where: any = { approverId: req.user.id }
     // 已办：传入逗号分隔的多个状态（如 approved,rejected）
     if (status) {
       const statusList = String(status).split(',').filter(Boolean)
       where.status = statusList.length > 1 ? { [Op.in]: statusList } : status
     }
 
-    const { rows, count } = await ApprovalTask.findAndCountAll({
-      where,
-      offset: (Number(page) - 1) * Number(pageSize),
-      limit: Number(pageSize),
-      order: [['createdAt', 'DESC']],
-      include: [
-        {
-          model: WorkflowInstance,
-          as: 'instance',
-          attributes: ['id', 'title', 'status', 'currentNodeKey', 'startedBy', 'startedAt'],
-          include: [
-            { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
-            { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
-          ],
-        },
-      ],
+    const cacheKey = stableKey({ userId: req.user.id, where, page: Number(page), pageSize: Number(pageSize) })
+    const result = await approvalTaskListCache.getOrSet(cacheKey, async () => {
+      const { rows, count } = await ApprovalTask.findAndCountAll({
+        where,
+        offset: (Number(page) - 1) * Number(pageSize),
+        limit: Number(pageSize),
+        order: [['createdAt', 'DESC']],
+        include: [
+          {
+            model: WorkflowInstance,
+            as: 'instance',
+            attributes: ['id', 'title', 'status', 'currentNodeKey', 'startedBy', 'startedAt'],
+            include: [
+              { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
+              { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
+            ],
+          },
+        ],
+      })
+      return { rows, total: count, page: Number(page), pageSize: Number(pageSize) }
     })
 
-    res.json({ code: 0, data: { rows, total: count, page: Number(page), pageSize: Number(pageSize) } })
+    res.json({ code: 0, data: result })
   } catch (err) {
     next(err)
   }
@@ -66,12 +78,9 @@ export const approve = async (req, res, next) => {
 
     const instance = await WorkflowInstance.findByPk(task.instanceId)
     if (instance) {
-      if (status === 'rejected') {
-        await instance.update({ status: 'rejected', currentNodeKey: null, finishedAt: new Date() })
-      } else {
-        const engine = new WorkflowEngine()
-        engine.execute(instance).catch(() => {})
-      }
+      // 审批通过/驳回后从被审批节点向下游续跑（不再整图重跑）
+      const engine = new WorkflowEngine()
+      await engine.resumeAfterApproval(instance, task.nodeKey, task.approverId, status)
       if (instance.startedBy) {
         sendToUser(instance.startedBy, 'approval-result', {
           taskId: task.id,

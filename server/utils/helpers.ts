@@ -39,14 +39,14 @@ export function normalizeIds(raw) {
 export function buildTree<T extends { id: number; parentId: number; [key: string]: any }>(
   list: T[],
   parentId = 0,
-  options: { sortKey?: string; toJSON?: boolean } = {}
+  options: { sortKey?: string; toJSON?: boolean } = {},
 ): any[] {
   const { sortKey = 'sort', toJSON = true } = options
 
   return list
-    .filter(item => item.parentId === parentId)
+    .filter((item) => item.parentId === parentId)
     .sort((a, b) => (a[sortKey] || 0) - (b[sortKey] || 0))
-    .map(item => {
+    .map((item) => {
       const children = buildTree(list, item.id, options)
       const node = toJSON && typeof item.toJSON === 'function' ? item.toJSON() : { ...item }
       if (children.length > 0) {
@@ -76,7 +76,7 @@ export function prepareChangeLog(model, newData, fields) {
   const changes = computeDiff(before, after, fields)
   return {
     changes,
-    summary: changes.map(c => `${c.field}: ${c.before ?? '-'} → ${c.after ?? '-'}`).join('; '),
+    summary: changes.map((c) => `${c.field}: ${c.before ?? '-'} → ${c.after ?? '-'}`).join('; '),
   }
 }
 

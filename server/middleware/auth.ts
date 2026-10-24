@@ -23,12 +23,18 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
   const token = authHeader.split(' ')[1]
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload & { id: number; username: string; nickname?: string }
+    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload & {
+      id: number
+      username: string
+      nickname?: string
+      tenantId?: number
+      isPlatformAdmin?: boolean
+    }
     req.user = decoded
 
     // 检查该用户是否已被管理员强制下线
-    if (isUserKicked(decoded.id, decoded.iat)) {
-      removeOnlineUser(decoded.id)
+    if (isUserKicked(decoded.tenantId ?? 1, decoded.id, decoded.iat)) {
+      removeOnlineUser(decoded.tenantId ?? 1, decoded.id)
       res.status(401).json({ code: 401, message: '您的账号已被管理员强制下线，请重新登录', kicked: true })
       return
     }
@@ -37,6 +43,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
     updateUserActivity(decoded.id, ip, req.headers['user-agent'] as string, {
       username: decoded.username,
       nickname: decoded.nickname,
+      tenantId: decoded.tenantId,
     })
     next()
   } catch (err) {

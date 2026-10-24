@@ -27,10 +27,7 @@ export interface ResolvedScope {
  * - 多角色取「最宽松」范围（min），若任一角色为 1=全部 则整体为全部；
  * - 无角色时回退为仅本部门（基于用户自身 deptId）。
  */
-export async function resolveDataScope(
-  userDeptId: number | null,
-  roleIds: number[],
-): Promise<ResolvedScope> {
+export async function resolveDataScope(userDeptId: number | null, roleIds: number[]): Promise<ResolvedScope> {
   const deptId = userDeptId ?? 0
 
   if (!roleIds || roleIds.length === 0) {
@@ -97,21 +94,20 @@ export async function getDescendantDeptIds(rootId: number): Promise<number[]> {
  */
 export function applyDataScopeWhere(
   where: Record<string, unknown>,
-  reqUser: { dataScope?: number; deptId?: number; deptIds?: number[] },
+  reqUser: { dataScope?: number; deptId?: number; deptIds?: number[]; tenantId?: number },
   queryDeptId?: number,
 ): Record<string, unknown> {
   const scope = reqUser.dataScope
+
+  // 租户约束：兜底 -1 防止数据泄漏（属性名，Sequelize 映射为 tenantId 列）
+  where.tenantId = reqUser.tenantId ?? -1
 
   // 未携带 dataScope（旧 token 过渡期）或缺省：视为全部，不约束
   if (scope === undefined || scope === 1) {
     return where
   }
 
-  const allowed = reqUser.deptIds && reqUser.deptIds.length
-    ? reqUser.deptIds
-    : reqUser.deptId
-      ? [reqUser.deptId]
-      : []
+  const allowed = reqUser.deptIds && reqUser.deptIds.length ? reqUser.deptIds : reqUser.deptId ? [reqUser.deptId] : []
 
   let finalIds = allowed
   if (queryDeptId) {
@@ -131,17 +127,10 @@ export function applyDataScopeWhere(
  * - scope=1（全部）或缺失：始终允许；
  * - 否则：目标部门需在允许部门列表内。
  */
-export function isTargetInScope(
-  targetDeptId: number | null | undefined,
-  reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] },
-): boolean {
+export function isTargetInScope(targetDeptId: number | null | undefined, reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }): boolean {
   const scope = reqUser?.dataScope
   if (scope === undefined || scope === 1) return true
-  const allowed = reqUser?.deptIds && reqUser.deptIds.length
-    ? reqUser.deptIds
-    : reqUser?.deptId
-      ? [reqUser.deptId]
-      : []
+  const allowed = reqUser?.deptIds && reqUser.deptIds.length ? reqUser.deptIds : reqUser?.deptId ? [reqUser.deptId] : []
   if (allowed.length === 0) return false
   return targetDeptId != null && allowed.includes(targetDeptId)
 }

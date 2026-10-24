@@ -10,26 +10,29 @@ class KnowledgeTag extends Model<InferAttributes<KnowledgeTag>, InferCreationAtt
   declare readonly updatedAt: CreationOptional<Date>
 }
 
-KnowledgeTag.init({
-  id: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    primaryKey: true,
-    autoIncrement: true,
+KnowledgeTag.init(
+  {
+    id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    name: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      comment: '标签名称',
+    },
+    color: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: '#409EFF',
+      comment: '标签颜色',
+    },
+  } as any,
+  {
+    sequelize,
+    tableName: 'knowledge_tags',
   },
-  name: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    comment: '标签名称',
-  },
-  color: {
-    type: DataTypes.STRING(20),
-    allowNull: false,
-    defaultValue: '#409EFF',
-    comment: '标签颜色',
-  },
-} as any, {
-  sequelize,
-  tableName: 'knowledge_tags',
-})
+)
 
 export default KnowledgeTag

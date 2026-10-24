@@ -3,12 +3,18 @@ import { authMiddleware } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { paginationSchema, idParamSchema } from '../shared/schemas/common.js'
 import {
-  createWorkflowSchema, updateWorkflowSchema,
-  workflowNodeSchema, updateNodeSchema,
-  workflowEdgeSchema, updateEdgeSchema,
-  approverRuleSchema, updateApproverRuleSchema,
-  workflowBindingSchema, triggerWorkflowSchema,
+  createWorkflowSchema,
+  updateWorkflowSchema,
+  workflowNodeSchema,
+  updateNodeSchema,
+  workflowEdgeSchema,
+  updateEdgeSchema,
+  approverRuleSchema,
+  updateApproverRuleSchema,
+  workflowBindingSchema,
+  triggerWorkflowSchema,
   approveTaskSchema,
+  workflowDesignPayloadSchema,
 } from '../shared/schemas/workflow.js'
 import * as workflowController from '../controllers/workflowController.js'
 import * as workflowInstanceController from '../controllers/workflowInstanceController.js'
@@ -37,9 +43,27 @@ router.delete('/workflows/:id/design/nodes/:nodeKey', authMiddleware, workflowCo
 router.post('/workflows/:id/design/edges', authMiddleware, validate(idParamSchema, 'params'), validate(workflowEdgeSchema), workflowController.upsertEdge)
 router.delete('/workflows/:id/design/edges/:sourceKey/:targetKey', authMiddleware, workflowController.deleteEdge)
 
-router.post('/workflows/:id/design/approver-rules/:nodeKey', authMiddleware, validate(idParamSchema, 'params'), validate(approverRuleSchema), workflowController.upsertApproverRule)
+router.post(
+  '/workflows/:id/design/approver-rules/:nodeKey',
+  authMiddleware,
+  validate(idParamSchema, 'params'),
+  validate(approverRuleSchema),
+  workflowController.upsertApproverRule,
+)
 router.put('/workflows/:id/design/approver-rules/:nodeKey', authMiddleware, workflowController.upsertApproverRule)
 router.delete('/workflows/:id/design/approver-rules/:ruleId', authMiddleware, workflowController.deleteApproverRule)
+
+// ==================== 整图批量保存 + 校验 ====================
+
+router.post(
+  '/workflows/:id/design/save',
+  authMiddleware,
+  validate(idParamSchema, 'params'),
+  validate(workflowDesignPayloadSchema),
+  workflowController.saveDesign,
+)
+router.post('/workflows/:id/design/validate', authMiddleware, validate(idParamSchema, 'params'), workflowController.validateDesign)
+router.get('/workflows/:id/design/validate', authMiddleware, validate(idParamSchema, 'params'), workflowController.validateDesign)
 
 // ==================== 流程绑定 ====================
 

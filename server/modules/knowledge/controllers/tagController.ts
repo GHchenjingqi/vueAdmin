@@ -1,11 +1,4 @@
-import {
-  listTags,
-  listTagOptions,
-  getTagById,
-  createTag,
-  updateTag,
-  deleteTag,
-} from '../services/tagService.js'
+import { listTags, listTagOptions, getTagById, createTag, updateTag, deleteTag } from '../services/tagService.js'
 
 export async function list(req: any, res: any, next: any) {
   try {

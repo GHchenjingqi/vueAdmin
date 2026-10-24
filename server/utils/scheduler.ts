@@ -45,10 +45,7 @@ async function startJob(task) {
         await Task.update({ lastResult: result, lastRunAt: new Date() }, { where: { id: task.id } })
         logInfo(`定时任务 [${task.name}] 执行完成: ${result}`)
       } catch (err) {
-        await Task.update(
-          { lastResult: `执行失败: ${err.message}`, lastRunAt: new Date() },
-          { where: { id: task.id } },
-        )
+        await Task.update({ lastResult: `执行失败: ${err.message}`, lastRunAt: new Date() }, { where: { id: task.id } })
         logInfo(`定时任务 [${task.name}] 执行失败: ${err.message}`)
       }
     })
@@ -96,10 +93,7 @@ export async function runTaskNow(taskId) {
     await Task.update({ lastResult: result, lastRunAt: new Date() }, { where: { id: task.id } })
     logInfo(`定时任务 [${task.name}] 手动执行完成: ${result}`)
   } catch (err) {
-    await Task.update(
-      { lastResult: `执行失败: ${err.message}`, lastRunAt: new Date() },
-      { where: { id: task.id } },
-    )
+    await Task.update({ lastResult: `执行失败: ${err.message}`, lastRunAt: new Date() }, { where: { id: task.id } })
     logInfo(`定时任务 [${task.name}] 手动执行失败: ${err.message}`)
   }
 }

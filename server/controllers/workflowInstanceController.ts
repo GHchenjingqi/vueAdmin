@@ -12,6 +12,14 @@ import User from '../models/User.js'
 import WorkflowEngine from '../services/WorkflowEngine.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { logOperation } from '../utils/logger.js'
+import { createCache, stableKey } from '../utils/cache.js'
+
+// 流程实例列表缓存；键含 where + 分页（当前端点未做租户/用户隔离，与现有未隔离行为一致）
+const instanceListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
+  namespace: 'wf-instances',
+  max: 200,
+  maxAgeMs: 30 * 1000,
+})
 
 /** 通过业务绑定触发流程 */
 export const trigger = async (req, res, next) => {
@@ -38,6 +46,8 @@ export const trigger = async (req, res, next) => {
 
     const engine = new WorkflowEngine()
     engine.execute(instance).catch(() => {})
+    // 触发会新增实例，使实例列表缓存失效
+    await instanceListCache.clear()
 
     logOperation(req, '触发流程', `实例ID: ${instance.id}, 流程: ${workflow.name}`)
     res.status(201).json({ code: 0, data: { id: instance.id }, message: '流程已触发' })
@@ -50,23 +60,27 @@ export const trigger = async (req, res, next) => {
 export const listInstances = async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10, status, bindingKey, bindingId } = req.query
-    const where = {}
+    const where: any = {}
     if (status) where.status = status
     if (bindingKey) where.bindingKey = bindingKey
     if (bindingId) where.bindingId = Number(bindingId)
 
-    const { rows, count } = await WorkflowInstance.findAndCountAll({
-      where,
-      offset: (Number(page) - 1) * Number(pageSize),
-      limit: Number(pageSize),
-      order: [['createdAt', 'DESC']],
-      include: [
-        { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
-        { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
-      ],
+    const cacheKey = stableKey({ where, page: Number(page), pageSize: Number(pageSize) })
+    const result = await instanceListCache.getOrSet(cacheKey, async () => {
+      const { rows, count } = await WorkflowInstance.findAndCountAll({
+        where,
+        offset: (Number(page) - 1) * Number(pageSize),
+        limit: Number(pageSize),
+        order: [['createdAt', 'DESC']],
+        include: [
+          { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
+          { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
+        ],
+      })
+      return { rows, total: count, page: Number(page), pageSize: Number(pageSize) }
     })
 
-    res.json({ code: 0, data: { rows, total: count, page: Number(page), pageSize: Number(pageSize) } })
+    res.json({ code: 0, data: result })
   } catch (err) {
     next(err)
   }
@@ -103,7 +117,7 @@ export const retryInstance = async (req, res, next) => {
       throw new AppError(400, '仅失败或终止的实例可以重试')
     }
 
-    await instance.update({ status: 'pending', currentNodeKey: null, output: null })
+    await instance.update({ status: 'pending', currentNodeKey: null, output: null, runtimeState: null })
 
     const engine = new WorkflowEngine()
     engine.execute(instance).catch(() => {})

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { Request, Response } from 'express'
 
 const mockInstanceFindAndCountAll = vi.fn()
 const mockInstanceFindByPk = vi.fn()
@@ -16,19 +17,34 @@ vi.mock('../models/WorkflowInstance.js', () => ({
   },
 }))
 vi.mock('../models/WorkflowInstanceLog.js', () => ({ default: { findAll: (...args: any[]) => mockLogFindAll(...args) } }))
-vi.mock('../models/ApprovalTask.js', () => ({ default: { findAll: (...args: any[]) => mockApprovalFindAll(...args), update: (...args: any[]) => mockApprovalUpdate(...args) } }))
+vi.mock('../models/ApprovalTask.js', () => ({
+  default: { findAll: (...args: any[]) => mockApprovalFindAll(...args), update: (...args: any[]) => mockApprovalUpdate(...args) },
+}))
 vi.mock('../models/Workflow.js', () => ({ default: {} }))
 vi.mock('../models/WorkflowBinding.js', () => ({ default: {} }))
 vi.mock('../models/User.js', () => ({ default: {} }))
-vi.mock('../services/WorkflowEngine.js', () => ({ default: class { execute = vi.fn().mockResolvedValue(undefined) } }))
-vi.mock('../middleware/errorHandler.js', () => ({ AppError: class extends Error { constructor(public status: number, msg: string) { super(msg) } } }))
+vi.mock('../services/WorkflowEngine.js', () => ({
+  default: class {
+    execute = vi.fn().mockResolvedValue(undefined)
+  },
+}))
+vi.mock('../middleware/errorHandler.js', () => ({
+  AppError: class extends Error {
+    constructor(
+      public status: number,
+      msg: string,
+    ) {
+      super(msg)
+    }
+  },
+}))
 vi.mock('../utils/logger.js', () => ({ logOperation: vi.fn() }))
 
 import * as workflowInstanceController from '../controllers/workflowInstanceController.js'
 
 function mockReqRes(query: Record<string, unknown> = {}, params: Record<string, string> = {}, body: Record<string, unknown> = {}) {
   const res: any = { json: vi.fn(), status: vi.fn().mockReturnThis() }
-  return [{ query, params, body, user: { id: 1 } } as never, res as never, vi.fn() as never] as const
+  return [{ query, params, body, user: { id: 1 } } as unknown as Request, res as unknown as Response, vi.fn()] as const
 }
 
 describe('workflowInstanceController', () => {
@@ -77,9 +93,7 @@ describe('workflowInstanceController', () => {
       await workflowInstanceController.getInstanceDetail(req, res, next)
       expect(mockLogFindAll).toHaveBeenCalledWith(expect.objectContaining({ where: { instanceId: 1 }, order: [['id', 'ASC']] }))
       expect(mockApprovalFindAll).toHaveBeenCalledWith(expect.objectContaining({ where: { instanceId: 1 }, order: [['id', 'ASC']] }))
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 0, data: { instance: { id: 1, status: 'approved' }, logs: [], approvals: [] } }),
-      )
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 0, data: { instance: { id: 1, status: 'approved' }, logs: [], approvals: [] } }))
     })
   })
 
@@ -115,10 +129,7 @@ describe('workflowInstanceController', () => {
       const [req, res, next] = mockReqRes({}, { id: '1' })
       await workflowInstanceController.terminateInstance(req, res, next)
       expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: 'terminated' }))
-      expect(mockApprovalUpdate).toHaveBeenCalledWith(
-        { status: 'canceled' },
-        { where: { instanceId: 1, status: 'pending' } },
-      )
+      expect(mockApprovalUpdate).toHaveBeenCalledWith({ status: 'canceled' }, { where: { instanceId: 1, status: 'pending' } })
     })
   })
 })

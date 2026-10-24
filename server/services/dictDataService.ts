@@ -12,14 +12,7 @@ import { getDictOptions } from '../utils/dictCache.js'
 /**
  * 获取字典数据列表
  */
-export async function listDictData(query: {
-  scope?: string
-  type?: string
-  page?: number
-  pageSize?: number
-  dictType?: string
-  keyword?: string
-}) {
+export async function listDictData(query: { scope?: string; type?: string; page?: number; pageSize?: number; dictType?: string; keyword?: string }) {
   const { scope, type, page = 1, pageSize = 20, dictType, keyword } = query
 
   if (scope === 'options') {
@@ -28,20 +21,20 @@ export async function listDictData(query: {
     return items
   }
 
-  const where: Record<string, unknown> = {}
+  const where: any = {}
 
   if (dictType) where.dictType = dictType
   if (keyword) {
-    where[Op.or] = [
-      { label: { [Op.like]: `%${keyword}%` } },
-      { value: { [Op.like]: `%${keyword}%` } },
-    ]
+    where[Op.or] = [{ label: { [Op.like]: `%${keyword}%` } }, { value: { [Op.like]: `%${keyword}%` } }]
   }
 
   const offset = (Number(page) - 1) * Number(pageSize)
   const { rows, count } = await DictData.findAndCountAll({
     where,
-    order: [['sort', 'ASC'], ['id', 'ASC']],
+    order: [
+      ['sort', 'ASC'],
+      ['id', 'ASC'],
+    ],
     offset,
     limit: Number(pageSize),
   })
@@ -61,14 +54,7 @@ export async function getDictDataById(id: number) {
 /**
  * 创建字典数据
  */
-export async function createDictData(data: {
-  dictType: string
-  label: string
-  value: string
-  sort?: number
-  status?: number
-  remark?: string
-}) {
+export async function createDictData(data: { dictType: string; label: string; value: string; sort?: number; status?: number; remark?: string }) {
   const { dictType, label, value, sort, status, remark } = data
   if (!dictType || !label || !value) {
     throw new AppError(400, '字典类型、标签和值不能为空')

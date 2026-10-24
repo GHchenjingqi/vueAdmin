@@ -18,6 +18,16 @@ const LOG_DIR = resolve(__dirname, '../logs')
 const RETENTION_DAYS = 30
 
 // ===== 可注入的 fs 客户端（测试时替换） =====
+/** fileLogger 实际使用的 fs 子集（测试替身按此结构提供即可，无需实现 fs 全部重载） */
+export interface FsClientLike {
+  existsSync: (path: string) => boolean
+  mkdirSync: (path: string, options?: { recursive?: boolean }) => void
+  appendFileSync: (path: string, content: string, encoding: string) => void
+  readdirSync: (path: string) => string[]
+  statSync: (path: string) => { mtimeMs: number }
+  unlinkSync: (path: string) => void
+}
+
 let _fs: typeof _fsReal = _fsReal
 let _statSync = _fs.statSync
 let _unlinkSync = _fs.unlinkSync
@@ -29,15 +39,16 @@ const _cleanState = { cleanedToday: false }
  *
  * 使用方式：
  * ```ts
- * import { setFsClient } from './fileLogger'
+ * import { setFsClient } from './fileLogger.js'
  * setFsClient({ appendFileSync: mockFn, ... })
  * ```
  */
-export function setFsClient(fsClient: Partial<typeof _fs>) {
-  _fs = Object.assign({}, _fsReal, fsClient)
+export function setFsClient(fsClient: FsClientLike) {
+  // 测试替身只需满足 FsClientLike 子集；此处合并回真实 fs 的完整类型
+  _fs = Object.assign({}, _fsReal, fsClient as unknown as Partial<typeof _fsReal>)
   // 同步函数单独维护引用
-  if ('statSync' in fsClient) _statSync = fsClient.statSync!
-  if ('unlinkSync' in fsClient) _unlinkSync = fsClient.unlinkSync!
+  if ('statSync' in fsClient) _statSync = fsClient.statSync as unknown as typeof _fs.statSync
+  if ('unlinkSync' in fsClient) _unlinkSync = fsClient.unlinkSync as unknown as typeof _fs.unlinkSync
 }
 
 /** 恢复原生 fs（测试 cleanup）*/
@@ -124,27 +135,29 @@ function writeLog(level: string, category: string, message: string) {
   }
 }
 
-export function logAccess(
-  method: string,
-  url: string,
-  statusCode: number,
-  durationMs: number,
-  ip: string,
-  userAgent: string | undefined,
-) {
+export function logAccess(method: string, url: string, statusCode: number, durationMs: number, ip: string, userAgent: string | undefined) {
   const msg = `${method} ${url} -> ${statusCode} (${durationMs}ms) | IP: ${ip} | UA: ${(userAgent || '-').substring(0, 120)}`
   writeLog(LEVELS.INFO, 'access', msg)
 }
 
-export function logError(message: string, stack: string | null, reqInfo: string | null) {
+export function logError(message: string, stack?: string | null, reqInfo?: string | null) {
   const reqStr = reqInfo ? ` | ${reqInfo}` : ''
   writeLog(LEVELS.ERROR, 'error', `${message}${reqStr}`)
   if (stack) {
     try {
       const dateStr = getDateStr()
       const logFile = resolve(LOG_DIR, `error-${dateStr}.log`)
-      _fs.appendFileSync(logFile, stack.split('\n').map((l) => `  ${l}`).join('\n') + '\n', 'utf-8')
-    } catch (_) { /* ignore */ }
+      _fs.appendFileSync(
+        logFile,
+        stack
+          .split('\n')
+          .map((l) => `  ${l}`)
+          .join('\n') + '\n',
+        'utf-8',
+      )
+    } catch (_) {
+      /* ignore */
+    }
   }
 }
 

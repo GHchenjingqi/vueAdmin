@@ -1,9 +1,7 @@
 import type { QueryInterface } from 'sequelize'
 
 export async function up(queryInterface: QueryInterface): Promise<void> {
-  const [existing] = await queryInterface.sequelize.query(
-    "SELECT id FROM menus WHERE path = '/workflow' LIMIT 1",
-  )
+  const [existing] = await queryInterface.sequelize.query("SELECT id FROM menus WHERE path = '/workflow' LIMIT 1")
   if ((existing as any[]).length > 0) return
 
   const now = new Date()
@@ -14,7 +12,8 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
       replacements: { name: '流程管理', path: '/workflow', icon: 'Connection', type: 'C', sort: 80, now },
     },
   )
-  const parentId = parentResult[0] as number
+  // MySQL 上 sequelize.query(INSERT) 返回 [insertId, affectedRows]（TS 类型标注为 [undefined, number]，需双重断言）
+  const parentId = parentResult[0] as unknown as number
 
   await queryInterface.bulkInsert('menus', [
     {
@@ -60,7 +59,5 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
 }
 
 export async function down(queryInterface: QueryInterface): Promise<void> {
-  await queryInterface.sequelize.query(
-    "DELETE FROM menus WHERE path IN ('/workflows', '/workflow-instances', '/approval-center', '/workflow')",
-  )
+  await queryInterface.sequelize.query("DELETE FROM menus WHERE path IN ('/workflows', '/workflow-instances', '/approval-center', '/workflow')")
 }

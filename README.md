@@ -8,7 +8,7 @@
 
 Vue Admin 是一个功能完善的全栈后台管理系统，前端使用 Vue 3 + Vite + TypeScript，后端使用 Express + Sequelize ORM + TypeScript。系统开箱即用，自带用户认证（JWT 双 Token 机制 + HttpOnly Cookie）、动态菜单、RBAC 权限、行级数据权限（部门数据隔离）、文件管理、系统设置、字典管理、通知公告、消息推送（SSE 实时推送）、在线用户管理、定时任务调度、服务监控、全局搜索、工作流引擎（审批流 + 可视化设计器 + 版本冻结 + 业务绑定触发）、暗黑模式、水印、密码找回、操作日志、Excel 导出、Swagger API 文档（Redoc）、多语言国际化、AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理）、Web Vitals 性能监控等功能。
 
-项目已实施多项安全加固与工程化优化：SQL 注入修复、SSE 一次性票据认证 + JWT-in-query 泄露修复、CSRF 纵深防御（Origin 校验 + SameSite=Strict）、Zod 共享 Schema 校验、Pinia 状态管理（9 个 Store）、轻量级 i18n 国际化、Composables 组合式函数（含 useSSE）、ProTable 组件拆分、BEM 命名规范、CSS 变量暗黑模式适配、响应式布局、XSS 防护（SVG 清洗）、数据库索引优化、生产环境错误信息脱敏（错误分级：409/400/500）、Helmet 安全头 + trust proxy、请求频率限制（滑动窗口 + Redis 多实例）、Sentry 错误监控 + Web Vitals RUM、Vitest 单元测试（35+ 前端文件 + 24 个后端文件）、E2E 测试（Playwright）、GitHub Actions CI/CD 流水线、Docker 多阶段构建、Kubernetes 部署清单 + 多副本一致性（Redis pub/sub 踢人）。
+项目已实施多项安全加固与工程化优化：SQL 注入修复、SSE 一次性票据认证 + JWT-in-query 泄露修复、CSRF 纵深防御（Origin 校验 + SameSite=Strict）、Zod 共享 Schema 校验、Pinia 状态管理（9 个 Store）、轻量级 i18n 国际化、Composables 组合式函数（含 useSSE）、ProTable 组件拆分、BEM 命名规范、CSS 变量暗黑模式适配、响应式布局、XSS 防护（SVG 清洗）、数据库索引优化、生产环境错误信息脱敏（错误分级：409/400/500）、Helmet 安全头 + trust proxy、请求频率限制（滑动窗口 + Redis 多实例）、Sentry 错误监控 + Web Vitals RUM、Vitest 单元测试（35+ 前端文件 + 24 个后端文件）、E2E 测试（Playwright）、GitHub Actions CI/CD 流水线、Docker 多阶段构建、Kubernetes 部署清单 + 多副本一致性（Redis pub/sub 踢人）。已完成商业化升级基线重构（M0）：AI 代码注入默认关闭且仅限平台超管、服务监控菜单默认隐藏、生产环境禁止自签名证书与自动建库。
 
 ---
 
@@ -241,6 +241,7 @@ const formSchema = [
 | v4.2 | AI 代码生成助手（浮动聊天 + 代码预览 + 多提供商管理） + SSE Composable + Web Vitals |
 | v4.3 | 骨架屏组件 + 性能预算 + Lighthouse CI + GitHub Actions Release + 前后端测试增强 |
 | v4.4 | 工作流引擎（Vue Flow 可视化设计器 + 审批流 + 条件分支 + 版本冻结 + 业务绑定触发 + 审批人规则 + SSE 通知 + 3 测试文件 15 测试用例） |
+| v4.5 | 商业化升级基线重构（M0）：AI 代码注入隔离（`AI_INJECTOR_ENABLED` 默认关闭 + 平台超管守卫）、服务监控菜单隐藏、生产环境自签名证书拦截、生产环境禁止自动建库 |
 
 ---
 
@@ -386,7 +387,8 @@ SERVER_PORT=5173
 JWT_SECRET=vue_admin_secret_key_2024
 ```
 
-> 说明：`bootstrap` 会在启动时自动 `CREATE DATABASE IF NOT EXISTS`（需账号有 CREATE 权限）。  
+> 说明：`bootstrap` 会在启动时自动 `CREATE DATABASE IF NOT EXISTS`（需账号有 CREATE 权限，仅限开发环境）。  
+> 生产环境禁止自动建库，需预先建库，且 `DB_USER` 不得为 root，应使用仅有目标库 CRUD 权限的受限业务账号。  
 > 若自动建库失败，请先手动建库（见下方「MySQL 环境配置」）。
 
 ### 3. 准备 MySQL

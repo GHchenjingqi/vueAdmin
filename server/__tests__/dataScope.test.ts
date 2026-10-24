@@ -89,9 +89,7 @@ describe('dataScope.ts - getDescendantDeptIds', () => {
   })
 
   it('单节点（无子部门）返回自身', async () => {
-    Department.findAll.mockResolvedValueOnce([
-      { id: 5, parentId: 0 },
-    ])
+    Department.findAll.mockResolvedValueOnce([{ id: 5, parentId: 0 }])
     const ids = await getDescendantDeptIds(5)
     expect(ids).toEqual([5])
   })
@@ -120,53 +118,67 @@ describe('dataScope.ts - getDescendantDeptIds', () => {
 })
 
 describe('dataScope.ts - applyDataScopeWhere', () => {
-  it('scope=1 时不约束 WHERE', () => {
+  it('scope=1 时仅注入 tenantId 约束', () => {
     const where: any = { username: { [Op.like]: '%admin%' } }
-    applyDataScopeWhere(where, { dataScope: 1, deptId: 5, deptIds: [5] })
+    applyDataScopeWhere(where, { dataScope: 1, deptId: 5, deptIds: [5], tenantId: 1 })
+    expect(where.tenantId).toBe(1)
     expect(where.deptId).toBeUndefined()
     expect(where.username).toEqual({ [Op.like]: '%admin%' })
   })
 
-  it('scope 缺失（旧 token）时不约束 WHERE', () => {
+  it('scope 缺失（旧 token）时仍注入 tenantId', () => {
     const where: any = { username: { [Op.like]: '%admin%' } }
-    applyDataScopeWhere(where, {})
+    applyDataScopeWhere(where, { tenantId: 1 })
+    expect(where.tenantId).toBe(1)
     expect(where.deptId).toBeUndefined()
+  })
+
+  it('tenantId 缺失时兜底 -1', () => {
+    const where: any = {}
+    applyDataScopeWhere(where, {})
+    expect(where.tenantId).toBe(-1)
   })
 
   it('scope=2 时注入 deptId IN 条件', () => {
     const where: any = {}
-    applyDataScopeWhere(where, { dataScope: 2, deptId: 5, deptIds: [5] })
+    applyDataScopeWhere(where, { dataScope: 2, deptId: 5, deptIds: [5], tenantId: 1 })
+    expect(where.tenantId).toBe(1)
     expect(where.deptId).toEqual({ [Op.in]: [5] })
   })
 
   it('scope=3 时注入所有子部门 deptIds', () => {
     const where: any = {}
-    applyDataScopeWhere(where, { dataScope: 3, deptId: 1, deptIds: [1, 2, 3] })
+    applyDataScopeWhere(where, { dataScope: 3, deptId: 1, deptIds: [1, 2, 3], tenantId: 1 })
+    expect(where.tenantId).toBe(1)
     expect(where.deptId).toEqual({ [Op.in]: [1, 2, 3] })
   })
 
   it('前端指定 deptId 在范围内时取交集（仅该部门）', () => {
     const where: any = {}
-    applyDataScopeWhere(where, { dataScope: 3, deptId: 1, deptIds: [1, 2, 3] }, 2)
+    applyDataScopeWhere(where, { dataScope: 3, deptId: 1, deptIds: [1, 2, 3], tenantId: 1 }, 2)
+    expect(where.tenantId).toBe(1)
     expect(where.deptId).toEqual({ [Op.in]: [2] })
   })
 
   it('前端指定 deptId 不在范围内时返回空集', () => {
     const where: any = {}
-    applyDataScopeWhere(where, { dataScope: 3, deptId: 1, deptIds: [1, 2, 3] }, 99)
+    applyDataScopeWhere(where, { dataScope: 3, deptId: 1, deptIds: [1, 2, 3], tenantId: 1 }, 99)
+    expect(where.tenantId).toBe(1)
     expect(where.id).toEqual({ [Op.eq]: -1 })
     expect(where.deptId).toBeUndefined()
   })
 
   it('允许部门列表为空时返回空集', () => {
     const where: any = {}
-    applyDataScopeWhere(where, { dataScope: 2, deptId: 0, deptIds: [] })
+    applyDataScopeWhere(where, { dataScope: 2, deptId: 0, deptIds: [], tenantId: 1 })
+    expect(where.tenantId).toBe(1)
     expect(where.id).toEqual({ [Op.eq]: -1 })
   })
 
   it('前端指定 deptId 时合并到现有 WHERE（不覆盖其他条件）', () => {
     const where: any = { username: { [Op.like]: '%test%' } }
-    applyDataScopeWhere(where, { dataScope: 2, deptId: 5, deptIds: [5] }, 5)
+    applyDataScopeWhere(where, { dataScope: 2, deptId: 5, deptIds: [5], tenantId: 1 }, 5)
+    expect(where.tenantId).toBe(1)
     expect(where.deptId).toEqual({ [Op.in]: [5] })
     expect(where.username).toEqual({ [Op.like]: '%test%' })
   })

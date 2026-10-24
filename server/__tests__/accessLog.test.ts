@@ -53,14 +53,7 @@ describe('accessLog middleware', () => {
 
     res.end('response body')
 
-    expect(mockLogAccess).toHaveBeenCalledWith(
-      'POST',
-      '/api/login',
-      201,
-      expect.any(Number),
-      '192.168.1.1',
-      'Mozilla/5.0',
-    )
+    expect(mockLogAccess).toHaveBeenCalledWith('POST', '/api/login', 201, expect.any(Number), '192.168.1.1', 'Mozilla/5.0')
     expect(originalEnd).toHaveBeenCalledWith('response body')
   })
 
@@ -82,14 +75,7 @@ describe('accessLog middleware', () => {
 
     res.end('chunk1', 'chunk2')
 
-    expect(mockLogAccess).toHaveBeenCalledWith(
-      'DELETE',
-      '/api/users/1',
-      204,
-      expect.any(Number),
-      '::1',
-      undefined,
-    )
+    expect(mockLogAccess).toHaveBeenCalledWith('DELETE', '/api/users/1', 204, expect.any(Number), '::1', undefined)
     expect(originalEnd).toHaveBeenCalledWith('chunk1', 'chunk2')
   })
 })

@@ -17,11 +17,13 @@ export function registerModuleRoutes(mainRouter: Router) {
     const routePath = resolve(modulesDir, entry.name, 'routes', 'index.ts')
     const routeJsPath = resolve(modulesDir, entry.name, 'routes', 'index.js')
     if (existsSync(routePath) || existsSync(routeJsPath)) {
-      import(`../modules/${entry.name}/routes/index.js`).then(mod => {
-        mainRouter.use(`/knowledge`, mod.default)
-      }).catch(() => {
-        // silent
-      })
+      import(`../modules/${entry.name}/routes/index.js`)
+        .then((mod) => {
+          mainRouter.use(`/knowledge`, mod.default)
+        })
+        .catch(() => {
+          // silent
+        })
     }
   }
 }

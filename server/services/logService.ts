@@ -29,17 +29,14 @@ interface LogQuery {
 /**
  * 构建日志查询 WHERE 条件
  */
-function buildLogWhere(query: LogQuery): Record<string, unknown> {
+function buildLogWhere(query: LogQuery): any {
   const { type, action, keyword, startDate, endDate } = query
-  const where: Record<string, unknown> = {}
+  const where: any = {}
 
   if (type && ['login', 'operation'].includes(type)) where.type = type
   if (action && action.trim()) where.action = { [Op.like]: `%${action.trim()}%` }
   if (keyword && keyword.trim()) {
-    where[Op.or] = [
-      { username: { [Op.like]: `%${keyword.trim()}%` } },
-      { target: { [Op.like]: `%${keyword.trim()}%` } },
-    ]
+    where[Op.or] = [{ username: { [Op.like]: `%${keyword.trim()}%` } }, { target: { [Op.like]: `%${keyword.trim()}%` } }]
   }
   if (startDate && endDate) {
     where.createdAt = { [Op.between]: [new Date(startDate), new Date(`${endDate} 23:59:59`)] }
@@ -61,7 +58,7 @@ export async function exportLogs(query: { type?: string; startDate?: string; end
   }
 
   const logs = await Log.findAll({ where, order: [['createdAt', 'DESC']], limit: 10000 })
-  const data = logs.map(l => ({
+  const data = logs.map((l) => ({
     type: l.type === 'login' ? '登录日志' : '操作日志',
     username: l.username || '',
     action: l.action,
@@ -93,15 +90,18 @@ export async function getLoginFailures(query: { startDate?: string; endDate?: st
   })
 
   const ipStats: Record<string, { ip: string; count: number; lastTime: string; usernames: Set<string> }> = {}
-  failures.forEach(f => {
+  failures.forEach((f) => {
     const ip: string = f.ipAddress || 'unknown'
     if (!ipStats[ip]) ipStats[ip] = { ip, count: 0, lastTime: '', usernames: new Set() }
     ipStats[ip].count++
-    if (!ipStats[ip].lastTime || f.createdAt > ipStats[ip].lastTime) ipStats[ip].lastTime = f.createdAt
+    const createdAt = f.createdAt ? new Date(f.createdAt).getTime() : 0
+    if (!ipStats[ip].lastTime || createdAt > new Date(ipStats[ip].lastTime).getTime()) {
+      ipStats[ip].lastTime = f.createdAt ? new Date(f.createdAt).toISOString() : ''
+    }
     ipStats[ip].usernames.add(f.username)
   })
 
-  const ipList = Object.values(ipStats).map(s => ({
+  const ipList = Object.values(ipStats).map((s) => ({
     ip: s.ip,
     count: s.count,
     usernames: [...s.usernames].join(', '),

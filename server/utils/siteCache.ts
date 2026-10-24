@@ -18,7 +18,7 @@ export function getSiteInfo() {
 
 export async function loadSiteInfo() {
   try {
-    const settings = await Setting.findAll({ where: { optionKey: siteKeys } }) as unknown as Array<{ optionKey: string; optionValue: string }>
+    const settings = (await Setting.findAll({ where: { optionKey: siteKeys } })) as unknown as Array<{ optionKey: string; optionValue: string }>
     const map: Record<string, string> = {}
     settings.forEach((s) => {
       map[s.optionKey] = s.optionValue

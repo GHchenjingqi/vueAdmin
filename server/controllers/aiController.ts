@@ -5,6 +5,7 @@
  */
 
 import type { Request, Response, NextFunction } from 'express'
+import config from '../config/index.js'
 import * as aiAssistantService from '../services/AIAssistant.js'
 import * as codeInjectorService from '../services/CodeInjector.js'
 import { getStats } from '../services/LocalFileRAG.js'
@@ -24,6 +25,7 @@ export const status = async (req: Request, res: Response, next: NextFunction) =>
         apiConfigured: apiCheck.valid,
         message: apiCheck.message,
         knowledgeBase: kbStats,
+        injectorEnabled: config.app.aiAssistantEnabled === true,
       },
     })
   } catch (err) {
@@ -53,12 +55,17 @@ export const chat = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const result = await aiAssistantService.generateCode(message, providerId, model)
-    logOperation(req, 'generate-code', 'ai-assistant', JSON.stringify({
-      prompt: message.substring(0, 100),
-      fileCount: result.files.length,
-      success: result.success,
-      tokens: result.usage?.totalTokens,
-    }))
+    logOperation(
+      req,
+      'generate-code',
+      'ai-assistant',
+      JSON.stringify({
+        prompt: message.substring(0, 100),
+        fileCount: result.files.length,
+        success: result.success,
+        tokens: result.usage?.totalTokens,
+      }),
+    )
 
     if (result.success) {
       res.json({

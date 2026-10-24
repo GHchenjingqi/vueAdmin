@@ -237,6 +237,14 @@ baseRequest.interceptors.response.use(
       error.message = statusMessages[status]
     }
 
+    // 402 配额超限，弹提示
+    if (status === 402) {
+      const quotaData = data?.data as { metric?: string; used?: number; limit?: number } | undefined
+      const msg = quotaData ? `配额已达上限（${quotaData.metric}: ${quotaData.used}/${quotaData.limit}）` : '配额已达上限'
+      ElMessage.warning(msg)
+      return Promise.reject(createAppError(error))
+    }
+
     // 非 401 或登录相关接口，直接拒绝
     if (status !== 401 || (config.url && (config.url === '/auth/login' || config.url === '/auth/token'))) {
       return Promise.reject(createAppError(error))

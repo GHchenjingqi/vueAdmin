@@ -63,7 +63,7 @@ describe('migrator', () => {
   })
 
   it('should have migrations glob pointing to server/migrations', () => {
-    const glob = migrator.options.migrations.glob as string | string[]
+    const glob = (migrator.options.migrations as any).glob as string | string[]
     const globText = Array.isArray(glob) ? glob.join(',') : String(glob)
     expect(globText).toContain('migrations')
     expect(globText).toMatch(/\{ts,js\}|\.ts|\.js/)
@@ -75,11 +75,11 @@ describe('migrator', () => {
 
   it('should have SequelizeMeta storage', () => {
     expect(migrator.options.storage).toBeDefined()
-    expect(migrator.options.storage.modelName).toBe('SequelizeMeta')
+    expect((migrator.options.storage as any).modelName).toBe('SequelizeMeta')
   })
 
   it('should resolve migration with up and down functions', () => {
-    const resolve = migrator.options.migrations.resolve
+    const resolve = (migrator.options.migrations as any).resolve
     const result = resolve({
       name: 'test-migration',
       path: '/fake/path/migration.ts',
@@ -100,8 +100,9 @@ describe('migrator', () => {
 
   it('should call logger.info with string message', () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    migrator.options.logger.info('Migration started')
-    migrator.options.logger.warn('Warning message')
+    const logger: any = migrator.options.logger
+    logger.info('Migration started')
+    logger.warn('Warning message')
     expect(consoleSpy).toHaveBeenCalledWith('[Migration] Warning message')
     consoleSpy.mockRestore()
   })
@@ -113,7 +114,7 @@ describe('seeder', () => {
   })
 
   it('should have migrations glob pointing to server/seeders', () => {
-    const glob = seeder.options.migrations.glob as string | string[]
+    const glob = (seeder.options.migrations as any).glob as string | string[]
     const globText = Array.isArray(glob) ? glob.join(',') : String(glob)
     expect(globText).toContain('seeders')
     expect(globText).toMatch(/\{ts,js\}|\.ts|\.js/)
@@ -121,11 +122,11 @@ describe('seeder', () => {
 
   it('should have SeederMeta storage', () => {
     expect(seeder.options.storage).toBeDefined()
-    expect(seeder.options.storage.modelName).toBe('SeederMeta')
+    expect((seeder.options.storage as any).modelName).toBe('SeederMeta')
   })
 
   it('should resolve seeder with up and down functions', () => {
-    const resolve = seeder.options.migrations.resolve
+    const resolve = (seeder.options.migrations as any).resolve
     const result = resolve({
       name: 'test-seeder',
       path: '/fake/path/seeder.ts',

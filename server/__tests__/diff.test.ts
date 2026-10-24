@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeDiff } from '../utils/diff'
+import { computeDiff } from '../utils/diff.js'
 
 describe('computeDiff', () => {
   it('检测到字段值变化时返回差异', () => {

@@ -16,12 +16,19 @@ function req(opts: any, data?: any): Promise<{ status: number; body: string }> {
 ;(async () => {
   await sequelize.query("UPDATE settings SET optionValue='0' WHERE optionKey='captcha_enabled'")
   try {
-    const login = await req({ host: 'localhost', port, path: '/api/v1/auth/login', method: 'POST', headers: { 'Content-Type': 'application/json' } }, JSON.stringify({ username: 'admin', password: '123456' }))
+    const login = await req(
+      { host: 'localhost', port, path: '/api/v1/auth/login', method: 'POST', headers: { 'Content-Type': 'application/json' } },
+      JSON.stringify({ username: 'admin', password: '123456' }),
+    )
     const token = JSON.parse(login.body).data?.accessToken
     const menus = await req({ host: 'localhost', port, path: '/api/v1/menus/tree', method: 'GET', headers: { Authorization: 'Bearer ' + token } })
     const md = JSON.parse(menus.body)
     const wf = (md.data || []).find((m: any) => m.path === '/workflow')
     console.log('tree status', menus.status, 'workflow present', !!wf, 'children', wf ? wf.children.map((c: any) => c.name).join(',') : '')
-  } catch (e: any) { console.error('ERR', e && e.message) }
-  finally { await sequelize.query("UPDATE settings SET optionValue='1' WHERE optionKey='captcha_enabled'"); await sequelize.close() }
+  } catch (e: any) {
+    console.error('ERR', e && e.message)
+  } finally {
+    await sequelize.query("UPDATE settings SET optionValue='1' WHERE optionKey='captcha_enabled'")
+    await sequelize.close()
+  }
 })()

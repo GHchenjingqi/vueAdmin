@@ -6,6 +6,14 @@ import WorkflowEdge from '../models/WorkflowEdge.js'
 import WorkflowApproverRule from '../models/WorkflowApproverRule.js'
 import WorkflowBinding from '../models/WorkflowBinding.js'
 import { AppError } from '../middleware/errorHandler.js'
+import { createCache, stableKey } from '../utils/cache.js'
+
+// 工作流定义列表缓存；写操作（增删改/启用停用/发布）后整命名空间失效
+const workflowListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
+  namespace: 'workflows',
+  max: 100,
+  maxAgeMs: 2 * 60 * 1000,
+})
 
 export async function listWorkflows(params: { keyword?: string; status?: number | string; page?: number; pageSize?: number }) {
   const { keyword, status } = params
@@ -16,14 +24,16 @@ export async function listWorkflows(params: { keyword?: string; status?: number 
   if (status !== undefined && status !== null && status !== '') where.status = Number(status)
   if (keyword) where.name = { [Op.like]: `%${keyword}%` }
 
-  const { rows, count } = await Workflow.findAndCountAll({
-    where,
-    offset: (pageNum - 1) * pageSizeNum,
-    limit: pageSizeNum,
-    order: [['createdAt', 'DESC']],
+  const cacheKey = stableKey({ where, page: pageNum, pageSize: pageSizeNum })
+  return workflowListCache.getOrSet(cacheKey, async () => {
+    const { rows, count } = await Workflow.findAndCountAll({
+      where,
+      offset: (pageNum - 1) * pageSizeNum,
+      limit: pageSizeNum,
+      order: [['createdAt', 'DESC']],
+    })
+    return { rows, total: count, page: pageNum, pageSize: pageSizeNum }
   })
-
-  return { rows, total: count, page: pageNum, pageSize: pageSizeNum }
 }
 
 export async function getWorkflowById(id: number) {
@@ -46,6 +56,7 @@ export async function createWorkflow(data: { name: string; description?: string;
   })
 
   await workflow.update({ draftVersionId: version.id })
+  await workflowListCache.clear()
 
   return { workflow, version }
 }
@@ -53,6 +64,7 @@ export async function createWorkflow(data: { name: string; description?: string;
 export async function updateWorkflow(id: number, data: { name?: string; description?: string; status?: number }) {
   const workflow = await getWorkflowById(id)
   await workflow.update(data)
+  await workflowListCache.clear()
   return workflow
 }
 
@@ -64,11 +76,13 @@ export async function deleteWorkflow(id: number) {
   await WorkflowVersion.destroy({ where: { workflowId: id } })
   await WorkflowBinding.destroy({ where: { workflowId: id } })
   await workflow.destroy()
+  await workflowListCache.clear()
 }
 
 export async function toggleWorkflow(id: number, enabled: boolean) {
   const workflow = await getWorkflowById(id)
   await workflow.update({ status: enabled ? 1 : 0 })
+  await workflowListCache.clear()
   return workflow
 }
 
@@ -78,12 +92,12 @@ export async function publishWorkflow(id: number, userId: number) {
   if (!draftVersion) throw new AppError(400, '没有草稿版本可发布')
 
   const nodes = await WorkflowNode.findAll({ where: { versionId: draftVersion.id } })
-  const hasStart = nodes.some(n => n.type === 'start')
-  const hasEnd = nodes.some(n => n.type === 'end')
+  const hasStart = nodes.some((n) => n.type === 'start')
+  const hasEnd = nodes.some((n) => n.type === 'end')
   if (!hasStart || !hasEnd) throw new AppError(400, '流程必须包含开始和结束节点')
 
   const edges = await WorkflowEdge.findAll({ where: { versionId: draftVersion.id } })
-  const nodeKeys = new Set(nodes.map(n => n.nodeKey))
+  const nodeKeys = new Set(nodes.map((n) => n.nodeKey))
   for (const edge of edges) {
     if (!nodeKeys.has(edge.sourceNodeKey)) throw new AppError(400, `边引用了不存在的源节点: ${edge.sourceNodeKey}`)
     if (!nodeKeys.has(edge.targetNodeKey)) throw new AppError(400, `边引用了不存在的目标节点: ${edge.targetNodeKey}`)
@@ -104,6 +118,7 @@ export async function publishWorkflow(id: number, userId: number) {
   })
 
   await workflow.update({ draftVersionId: newVersion.id })
+  await workflowListCache.clear()
 
   return { workflow, publishedVersion: draftVersion, newDraftVersion: newVersion }
 }

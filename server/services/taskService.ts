@@ -14,20 +14,14 @@ import { AppError } from '../middleware/errorHandler.js'
 export async function listTasks() {
   const tasks = await Task.findAll({ order: [['id', 'ASC']] })
   const runningIds = getRunningTasks()
-  const data = tasks.map(t => ({ ...t.toJSON(), isRunning: runningIds.includes(t.id) }))
+  const data = tasks.map((t) => ({ ...t.toJSON(), isRunning: runningIds.includes(t.id) }))
   return data
 }
 
 /**
  * 创建定时任务
  */
-export async function createTask(data: {
-  name: string
-  cronExpression: string
-  handler: string
-  status?: number
-  description?: string
-}) {
+export async function createTask(data: { name: string; cronExpression: string; handler: string; status?: number; description?: string }) {
   const { name, cronExpression, handler, status = 1, description } = data
   if (!name || !cronExpression || !handler) {
     throw new AppError(400, '任务名称、Cron表达式和处理函数不能为空')

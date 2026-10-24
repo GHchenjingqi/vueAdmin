@@ -25,6 +25,15 @@ vi.mock('selfsigned', () => ({
   },
 }))
 
+vi.mock('../config/index.js', () => ({
+  default: {
+    app: {
+      useSelfSignedCert: true,
+      nodeEnv: 'development',
+    },
+  },
+}))
+
 describe('generateCert - getOrCreateCert', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -32,11 +41,9 @@ describe('generateCert - getOrCreateCert', () => {
 
   it('证书已存在时从磁盘读取', async () => {
     mocks.existsSync.mockReturnValue(true)
-    mocks.readFileSync
-      .mockReturnValueOnce('private-key-content')
-      .mockReturnValueOnce('cert-content')
+    mocks.readFileSync.mockReturnValueOnce('private-key-content').mockReturnValueOnce('cert-content')
 
-    const { getOrCreateCert } = await import('../utils/generateCert')
+    const { getOrCreateCert } = await import('../utils/generateCert.js')
     const result = await getOrCreateCert()
 
     expect(result.key).toBe('private-key-content')
@@ -54,7 +61,7 @@ describe('generateCert - getOrCreateCert', () => {
       fingerprint: 'abc123',
     })
 
-    const { getOrCreateCert } = await import('../utils/generateCert')
+    const { getOrCreateCert } = await import('../utils/generateCert.js')
     const result = await getOrCreateCert()
 
     expect(result.key).toBe('generated-private-key')
@@ -62,29 +69,19 @@ describe('generateCert - getOrCreateCert', () => {
     expect(mocks.generate).toHaveBeenCalledTimes(1)
     expect(mocks.mkdirSync).toHaveBeenCalledTimes(1)
     expect(mocks.writeFileSync).toHaveBeenCalledTimes(2)
-    expect(mocks.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('server.key'),
-      'generated-private-key',
-      'utf-8',
-    )
-    expect(mocks.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('server.crt'),
-      'generated-cert',
-      'utf-8',
-    )
+    expect(mocks.writeFileSync).toHaveBeenCalledWith(expect.stringContaining('server.key'), 'generated-private-key', 'utf-8')
+    expect(mocks.writeFileSync).toHaveBeenCalledWith(expect.stringContaining('server.crt'), 'generated-cert', 'utf-8')
   })
 
   it('只有 key 文件存在时也生成新证书', async () => {
-    mocks.existsSync
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(false)
+    mocks.existsSync.mockReturnValueOnce(true).mockReturnValueOnce(false)
     mocks.generate.mockResolvedValue({
       private: 'new-private',
       cert: 'new-cert',
       fingerprint: 'def456',
     })
 
-    const { getOrCreateCert } = await import('../utils/generateCert')
+    const { getOrCreateCert } = await import('../utils/generateCert.js')
     const result = await getOrCreateCert()
 
     expect(result.key).toBe('new-private')
@@ -93,16 +90,14 @@ describe('generateCert - getOrCreateCert', () => {
   })
 
   it('只有 cert 文件存在时也生成新证书', async () => {
-    mocks.existsSync
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true)
+    mocks.existsSync.mockReturnValueOnce(false).mockReturnValueOnce(true)
     mocks.generate.mockResolvedValue({
       private: 'new-private-2',
       cert: 'new-cert-2',
       fingerprint: 'ghi789',
     })
 
-    const { getOrCreateCert } = await import('../utils/generateCert')
+    const { getOrCreateCert } = await import('../utils/generateCert.js')
     const result = await getOrCreateCert()
 
     expect(result.key).toBe('new-private-2')
@@ -118,13 +113,10 @@ describe('generateCert - getOrCreateCert', () => {
       fingerprint: 'fp',
     })
 
-    const { getOrCreateCert } = await import('../utils/generateCert')
+    const { getOrCreateCert } = await import('../utils/generateCert.js')
     await getOrCreateCert()
 
-    expect(mocks.mkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('.cert'),
-      { recursive: true },
-    )
+    expect(mocks.mkdirSync).toHaveBeenCalledWith(expect.stringContaining('.cert'), { recursive: true })
   })
 
   it('generate 传递正确的参数', async () => {
@@ -135,7 +127,7 @@ describe('generateCert - getOrCreateCert', () => {
       fingerprint: 'fp',
     })
 
-    const { getOrCreateCert } = await import('../utils/generateCert')
+    const { getOrCreateCert } = await import('../utils/generateCert.js')
     await getOrCreateCert()
 
     const callArgs = mocks.generate.mock.calls[0] as [unknown[], Record<string, unknown>]
@@ -143,7 +135,12 @@ describe('generateCert - getOrCreateCert', () => {
     const options = callArgs[1]
 
     expect(attrs).toEqual([{ name: 'commonName', value: '192.168.12.251' }])
-    expect(options.days).toBe(365)
+    // selfsigned 5.x 起有效期由 notBeforeDate/notAfterDate 控制（旧 days 选项已被忽略）
+    const notBefore = options.notBeforeDate as Date
+    const notAfter = options.notAfterDate as Date
+    expect(notBefore).toBeInstanceOf(Date)
+    expect(notAfter).toBeInstanceOf(Date)
+    expect(notAfter.getTime() - notBefore.getTime()).toBe(365 * 24 * 60 * 60 * 1000)
     expect(options.keySize).toBe(2048)
     expect(options.algorithm).toBe('sha256')
     expect(options.extensions[0].name).toBe('subjectAltName')

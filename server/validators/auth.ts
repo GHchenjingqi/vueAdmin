@@ -19,13 +19,15 @@ export const passwordSchema = z
   .regex(/[^A-Za-z0-9]/, '密码必须包含至少一个特殊字符')
 
 /** 修改密码 */
-export const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1, '原密码不能为空'),
-  newPassword: passwordSchema,
-}).refine(data => data.oldPassword !== data.newPassword, {
-  message: '新密码不能与原密码相同',
-  path: ['newPassword'],
-})
+export const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, '原密码不能为空'),
+    newPassword: passwordSchema,
+  })
+  .refine((data) => data.oldPassword !== data.newPassword, {
+    message: '新密码不能与原密码相同',
+    path: ['newPassword'],
+  })
 
 /** 重置密码（使用 Token） */
 export const resetPasswordSchema = z.object({

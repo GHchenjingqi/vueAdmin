@@ -5,8 +5,8 @@
  * 注入 MemoryRateLimitStore 以隔离 Redis 依赖
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { checkRateLimit, recordAttempt, clearAttempts, setStore } from '../middleware/rateLimiter'
-import { MemoryRateLimitStore } from '../middleware/rateLimitStore'
+import { checkRateLimit, recordAttempt, clearAttempts, setStore } from '../middleware/rateLimiter.js'
+import { MemoryRateLimitStore } from '../middleware/rateLimitStore.js'
 
 const ip = '127.0.0.1'
 const username = 'testuser'

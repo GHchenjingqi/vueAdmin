@@ -22,21 +22,23 @@ export async function getList(query: AiProviderQueryInput = {}) {
   }
 
   if (query.keyword) {
-    where[Op.or] = [
-      { name: { [Op.like]: `%${query.keyword}%` } },
-      { description: { [Op.like]: `%${query.keyword}%` } },
-    ]
+    where[Op.or] = [{ name: { [Op.like]: `%${query.keyword}%` } }, { description: { [Op.like]: `%${query.keyword}%` } }]
   }
 
   const providers = await AiProvider.findAll({
     where,
-    order: [['sort', 'ASC'], ['createdAt', 'DESC']],
+    order: [
+      ['sort', 'ASC'],
+      ['createdAt', 'DESC'],
+    ],
   })
 
   // 过滤敏感字段
-  return providers.map(p => {
+  return providers.map((p) => {
     const data: Record<string, any> = {}
-    PUBLIC_FIELDS.forEach(f => { data[f] = (p as any)[f] })
+    PUBLIC_FIELDS.forEach((f) => {
+      data[f] = (p as any)[f]
+    })
     data.hasApiKey = true
     return data
   })
@@ -48,7 +50,10 @@ export async function getList(query: AiProviderQueryInput = {}) {
 export async function getEnabledList() {
   const providers = await AiProvider.findAll({
     where: { enabled: 1 },
-    order: [['sort', 'ASC'], ['createdAt', 'DESC']],
+    order: [
+      ['sort', 'ASC'],
+      ['createdAt', 'DESC'],
+    ],
     attributes: PUBLIC_FIELDS,
   })
   return providers
@@ -63,7 +68,9 @@ export async function getById(id: number) {
     throw new Error('AI 提供商不存在')
   }
   const data: Record<string, any> = {}
-  PUBLIC_FIELDS.forEach(f => { data[f] = (provider as any)[f] })
+  PUBLIC_FIELDS.forEach((f) => {
+    data[f] = (provider as any)[f]
+  })
   data.hasApiKey = true
   return data
 }
@@ -153,7 +160,10 @@ export async function getFullConfig(id: number) {
 export async function getDefaultProvider() {
   const provider = await AiProvider.findOne({
     where: { enabled: 1 },
-    order: [['sort', 'ASC'], ['createdAt', 'DESC']],
+    order: [
+      ['sort', 'ASC'],
+      ['createdAt', 'DESC'],
+    ],
   })
   return provider
 }

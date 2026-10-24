@@ -24,7 +24,7 @@ describe('mailer', () => {
   it('SMTP_HOST 未配置且无 DB 配置时 getTransporter 返回 null', async () => {
     delete process.env.SMTP_HOST
 
-    const { getTransporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer.js')
 
     const transporter = await getTransporter()
     expect(transporter).toBeNull()
@@ -41,7 +41,7 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { getTransporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer.js')
     const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
@@ -63,13 +63,11 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { getTransporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer.js')
     const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
-    expect(mockCreateTransport).toHaveBeenCalledWith(
-      expect.objectContaining({ port: 587 }),
-    )
+    expect(mockCreateTransport).toHaveBeenCalledWith(expect.objectContaining({ port: 587 }))
   })
 
   it('SMTP_SECURE 为 true 时使用安全连接', async () => {
@@ -79,13 +77,11 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { getTransporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer.js')
     const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
-    expect(mockCreateTransport).toHaveBeenCalledWith(
-      expect.objectContaining({ secure: true }),
-    )
+    expect(mockCreateTransport).toHaveBeenCalledWith(expect.objectContaining({ secure: true }))
   })
 
   it('SMTP_PORT 解析失败时默认使用 587', async () => {
@@ -95,13 +91,11 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { getTransporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer.js')
     const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
-    expect(mockCreateTransport).toHaveBeenCalledWith(
-      expect.objectContaining({ port: 587 }),
-    )
+    expect(mockCreateTransport).toHaveBeenCalledWith(expect.objectContaining({ port: 587 }))
   })
 
   it('SMTP_PORT 为有效数值时正确解析', async () => {
@@ -111,12 +105,10 @@ describe('mailer', () => {
     const mockTransporter = { sendMail: vi.fn() }
     mockCreateTransport.mockReturnValue(mockTransporter)
 
-    const { getTransporter } = await import('../utils/mailer')
+    const { getTransporter } = await import('../utils/mailer.js')
     const transporter = await getTransporter()
 
     expect(transporter).toBe(mockTransporter)
-    expect(mockCreateTransport).toHaveBeenCalledWith(
-      expect.objectContaining({ port: 465 }),
-    )
+    expect(mockCreateTransport).toHaveBeenCalledWith(expect.objectContaining({ port: 465 }))
   })
 })

@@ -72,6 +72,31 @@ export interface ApprovalTask {
   instance?: WorkflowInstance
 }
 
+export interface WorkflowDesignPayload {
+  nodes: {
+    nodeKey: string
+    name: string
+    type: 'start' | 'end' | 'condition' | 'approve' | 'notify'
+    config?: string
+    x?: number
+    y?: number
+  }[]
+  edges: {
+    sourceNodeKey: string
+    targetNodeKey: string
+    sourceHandle?: string | null
+    conditionType?: 'always' | 'expression'
+    conditionExpr?: string
+  }[]
+  rules: {
+    nodeKey: string
+    ruleType: 'creator' | 'direct_leader' | 'dept_manager' | 'role' | 'dept' | 'user'
+    ruleConfig?: string
+    sort?: number
+    name?: string
+  }[]
+}
+
 export const workflowApi = {
   list(params?: Record<string, unknown>, skipCache = false) {
     return request.get<{ rows: Workflow[]; total: number; page: number; pageSize: number }>('/workflows', {
@@ -147,5 +172,17 @@ export const workflowApi = {
   },
   deleteBinding(id: number) {
     return request.delete<null>(`/workflow-bindings/${id}`)
+  },
+  // 事务化整图批量保存（节点 upsert + 边/规则整版本替换，含图合法性校验）
+  saveDesign(id: number, data: WorkflowDesignPayload) {
+    return request.post<{ ok: boolean }>(`/workflows/${id}/design/save`, data)
+  },
+  // 校验候选图（不落库）
+  validateDesign(id: number, data: WorkflowDesignPayload) {
+    return request.post<{ valid: boolean; errors: string[] }>(`/workflows/${id}/design/validate`, data)
+  },
+  // 校验当前草稿版本
+  validateDraft(id: number) {
+    return request.get<{ valid: boolean; errors: string[] }>(`/workflows/${id}/design/validate`)
   },
 }

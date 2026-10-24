@@ -4,15 +4,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockWorkflowFindByPk = vi.fn()
 const mockNodeUpsert = vi.fn()
 const mockNodeDestroy = vi.fn()
+const mockNodeFindOne = vi.fn()
 const mockEdgeUpsert = vi.fn()
 const mockEdgeDestroy = vi.fn()
 const mockRuleUpsert = vi.fn()
 const mockRuleDestroy = vi.fn()
 
 vi.mock('../models/Workflow.js', () => ({ default: { findByPk: (...args: any[]) => mockWorkflowFindByPk(...args) } }))
-vi.mock('../models/WorkflowNode.js', () => ({ default: { upsert: (...args: any[]) => mockNodeUpsert(...args), destroy: (...args: any[]) => mockNodeDestroy(...args) } }))
-vi.mock('../models/WorkflowEdge.js', () => ({ default: { upsert: (...args: any[]) => mockEdgeUpsert(...args), destroy: (...args: any[]) => mockEdgeDestroy(...args) } }))
-vi.mock('../models/WorkflowApproverRule.js', () => ({ default: { upsert: (...args: any[]) => mockRuleUpsert(...args), destroy: (...args: any[]) => mockRuleDestroy(...args) } }))
+vi.mock('../models/WorkflowNode.js', () => ({
+  default: {
+    upsert: (...args: any[]) => mockNodeUpsert(...args),
+    destroy: (...args: any[]) => mockNodeDestroy(...args),
+    findOne: (...args: any[]) => mockNodeFindOne(...args),
+  },
+}))
+vi.mock('../models/WorkflowEdge.js', () => ({
+  default: { upsert: (...args: any[]) => mockEdgeUpsert(...args), destroy: (...args: any[]) => mockEdgeDestroy(...args) },
+}))
+vi.mock('../models/WorkflowApproverRule.js', () => ({
+  default: { upsert: (...args: any[]) => mockRuleUpsert(...args), destroy: (...args: any[]) => mockRuleDestroy(...args) },
+}))
 
 import * as workflowDesignService from '../services/workflowDesignService.js'
 
@@ -21,6 +32,7 @@ describe('workflowDesignService', () => {
     vi.clearAllMocks()
     mockWorkflowFindByPk.mockResolvedValue({ id: 1, draftVersionId: 10 })
     mockNodeUpsert.mockResolvedValue([{}, true])
+    mockNodeFindOne.mockResolvedValue(null)
     mockEdgeUpsert.mockResolvedValue([{}, true])
     mockRuleUpsert.mockResolvedValue([{}, true])
     mockNodeDestroy.mockResolvedValue(undefined)
@@ -31,9 +43,7 @@ describe('workflowDesignService', () => {
   describe('upsertNode', () => {
     it('使用草稿版本 upsert 节点', async () => {
       await workflowDesignService.upsertNode(1, { nodeKey: 'start-1', name: '开始', type: 'start' })
-      expect(mockNodeUpsert).toHaveBeenCalledWith(
-        expect.objectContaining({ workflowId: 1, versionId: 10, nodeKey: 'start-1', type: 'start' }),
-      )
+      expect(mockNodeUpsert).toHaveBeenCalledWith(expect.objectContaining({ workflowId: 1, versionId: 10, nodeKey: 'start-1', type: 'start' }))
     })
 
     it('notify 节点 config 透传', async () => {
@@ -43,9 +53,7 @@ describe('workflowDesignService', () => {
         type: 'notify',
         config: '{"title":"标题"}',
       })
-      expect(mockNodeUpsert).toHaveBeenCalledWith(
-        expect.objectContaining({ config: '{"title":"标题"}' }),
-      )
+      expect(mockNodeUpsert).toHaveBeenCalledWith(expect.objectContaining({ config: '{"title":"标题"}' }))
     })
   })
 
@@ -91,18 +99,14 @@ describe('workflowDesignService', () => {
         targetNodeKey: 'end-1',
         conditionType: 'always',
       })
-      expect(mockEdgeUpsert).toHaveBeenCalledWith(
-        expect.objectContaining({ sourceHandle: null, conditionType: 'always' }),
-      )
+      expect(mockEdgeUpsert).toHaveBeenCalledWith(expect.objectContaining({ sourceHandle: null, conditionType: 'always' }))
     })
   })
 
   describe('deleteEdge', () => {
     it('按 versionId + source + target 删除', async () => {
       await workflowDesignService.deleteEdge(1, 'cond-1', 'end-1')
-      expect(mockEdgeDestroy).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { versionId: 10, sourceNodeKey: 'cond-1', targetNodeKey: 'end-1' } }),
-      )
+      expect(mockEdgeDestroy).toHaveBeenCalledWith(expect.objectContaining({ where: { versionId: 10, sourceNodeKey: 'cond-1', targetNodeKey: 'end-1' } }))
     })
   })
 
@@ -113,16 +117,12 @@ describe('workflowDesignService', () => {
         ruleConfig: '{"userIds":[1]}',
         sort: 0,
       })
-      expect(mockRuleUpsert).toHaveBeenCalledWith(
-        expect.objectContaining({ versionId: 10, nodeKey: 'approve-1', ruleType: 'user', sort: 0 }),
-      )
+      expect(mockRuleUpsert).toHaveBeenCalledWith(expect.objectContaining({ versionId: 10, nodeKey: 'approve-1', ruleType: 'user', sort: 0 }))
     })
 
     it('delete 按 ruleId + versionId 删除', async () => {
       await workflowDesignService.deleteApproverRule(1, 42)
-      expect(mockRuleDestroy).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 42, versionId: 10 } }),
-      )
+      expect(mockRuleDestroy).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 42, versionId: 10 } }))
     })
   })
 })

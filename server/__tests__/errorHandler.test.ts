@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { AppError } from '../middleware/errorHandler.js'
+import type { Request } from 'express'
 
 // Mock fileLogger
 vi.mock('../utils/fileLogger.js', () => ({
@@ -22,7 +23,7 @@ describe('errorHandler middleware', () => {
 
   it('should return original error message in development', () => {
     const err = new Error('Something went wrong')
-    const req = { method: 'GET', originalUrl: '/api/test', ip: '127.0.0.1' }
+    const req = { method: 'GET', originalUrl: '/api/test', ip: '127.0.0.1' } as unknown as Request
     const res: any = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(),
@@ -32,14 +33,12 @@ describe('errorHandler middleware', () => {
     errorHandler(err, req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(500)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 500, message: 'Something went wrong' })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 500, message: 'Something went wrong' }))
   })
 
   it('should return custom status code for AppError', () => {
     const err = new AppError(403, 'Forbidden')
-    const req = { method: 'GET', originalUrl: '/api/admin', ip: '127.0.0.1' }
+    const req = { method: 'GET', originalUrl: '/api/admin', ip: '127.0.0.1' } as unknown as Request
     const res: any = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(),
@@ -49,15 +48,13 @@ describe('errorHandler middleware', () => {
     errorHandler(err, req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(403)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 403, message: 'Forbidden' })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 403, message: 'Forbidden' }))
   })
 
   it('should hide error details in production', () => {
     process.env.NODE_ENV = 'production'
     const err = new Error('Sensitive database error')
-    const req = { method: 'POST', originalUrl: '/api/data', ip: '127.0.0.1' }
+    const req = { method: 'POST', originalUrl: '/api/data', ip: '127.0.0.1' } as unknown as Request
     const res: any = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(),
@@ -67,14 +64,12 @@ describe('errorHandler middleware', () => {
     errorHandler(err, req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(500)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: '服务器内部错误' })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: '服务器内部错误' }))
   })
 
   it('should handle 401 unauthorized', () => {
     const err = new AppError(401, '认证失败')
-    const req = { method: 'GET', originalUrl: '/api/user', ip: '127.0.0.1' }
+    const req = { method: 'GET', originalUrl: '/api/user', ip: '127.0.0.1' } as unknown as Request
     const res: any = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(),
@@ -84,14 +79,12 @@ describe('errorHandler middleware', () => {
     errorHandler(err, req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 401, message: '认证失败' })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 401, message: '认证失败' }))
   })
 
   it('should handle 429 rate limit', () => {
     const err = new AppError(429, '请求过于频繁')
-    const req = { method: 'POST', originalUrl: '/api/auth/login', ip: '127.0.0.1' }
+    const req = { method: 'POST', originalUrl: '/api/auth/login', ip: '127.0.0.1' } as unknown as Request
     const res: any = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(),
@@ -101,8 +94,6 @@ describe('errorHandler middleware', () => {
     errorHandler(err, req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(429)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 429, message: '请求过于频繁' })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 429, message: '请求过于频繁' }))
   })
 })

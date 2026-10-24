@@ -4,17 +4,23 @@ import { AppError } from '../../../middleware/errorHandler.js'
 
 export async function listCategories() {
   const categories = await KnowledgeCategory.findAll({
-    order: [['sort', 'ASC'], ['id', 'ASC']],
+    order: [
+      ['sort', 'ASC'],
+      ['id', 'ASC'],
+    ],
   })
-  return buildTree(categories.map(c => c.toJSON()))
+  return buildTree(categories.map((c) => c.toJSON()))
 }
 
 export async function listCategoryOptions() {
   const categories = await KnowledgeCategory.findAll({
     where: { status: 1 },
-    order: [['sort', 'ASC'], ['id', 'ASC']],
+    order: [
+      ['sort', 'ASC'],
+      ['id', 'ASC'],
+    ],
   })
-  return buildTree(categories.map(c => c.toJSON()))
+  return buildTree(categories.map((c) => c.toJSON()))
 }
 
 export async function getCategoryById(id: number) {
@@ -56,8 +62,8 @@ export async function deleteCategory(id: number) {
 function buildTree(categories: any[]): any[] {
   const map = new Map<number, any>()
   const roots: any[] = []
-  categories.forEach(c => map.set(c.id, { ...c, children: [] }))
-  categories.forEach(c => {
+  categories.forEach((c) => map.set(c.id, { ...c, children: [] }))
+  categories.forEach((c) => {
     const node = map.get(c.id)
     if (c.parentId && map.has(c.parentId)) {
       map.get(c.parentId).children.push(node)

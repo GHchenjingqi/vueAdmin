@@ -3,7 +3,15 @@
  * @module dictTypeController
  */
 
-import { listDictTypes, getDictTypeById, createDictType, updateDictType, deleteDictType, getAllActiveDictTypes, refreshDictCache } from '../services/dictTypeService.js'
+import {
+  listDictTypes,
+  getDictTypeById,
+  createDictType,
+  updateDictType,
+  deleteDictType,
+  getAllActiveDictTypes,
+  refreshDictCache,
+} from '../services/dictTypeService.js'
 
 /**
  * 获取字典类型列表

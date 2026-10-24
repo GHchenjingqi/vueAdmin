@@ -17,7 +17,7 @@ import {
   logAccess,
   cleanOldLogs,
   type FsCalls,
-} from '../utils/fileLogger'
+} from '../utils/fileLogger.js'
 
 describe('fileLogger.ts', () => {
   let calls: FsCalls
@@ -45,9 +45,7 @@ describe('fileLogger.ts', () => {
   it('写入 INFO 级别日志', () => {
     logInfo('测试信息')
 
-    expect(calls.appendFileSync.some(([path, content]) =>
-      path.includes('app-') && content.includes('[INFO]') && content.includes('测试信息')
-    )).toBe(true)
+    expect(calls.appendFileSync.some(([path, content]) => path.includes('app-') && content.includes('[INFO]') && content.includes('测试信息'))).toBe(true)
   })
 
   it('同时输出到控制台', () => {
@@ -75,9 +73,7 @@ describe('fileLogger.ts', () => {
   it('写入 WARN 级别日志', () => {
     logWarn('测试警告')
 
-    expect(calls.appendFileSync.some(([, content]) =>
-      content.includes('[WARN]')
-    )).toBe(true)
+    expect(calls.appendFileSync.some(([, content]) => content.includes('[WARN]'))).toBe(true)
   })
 
   it('同时输出到控制台', () => {
@@ -91,9 +87,7 @@ describe('fileLogger.ts', () => {
   it('写入 ERROR 级别日志', () => {
     logError('测试错误', null, null)
 
-    expect(calls.appendFileSync.some(([path, content]) =>
-      path.includes('error-') && content.includes('[ERROR]')
-    )).toBe(true)
+    expect(calls.appendFileSync.some(([path, content]) => path.includes('error-') && content.includes('[ERROR]'))).toBe(true)
   })
 
   it('写入堆栈信息', () => {
@@ -117,9 +111,7 @@ describe('fileLogger.ts', () => {
   it('写入访问日志', () => {
     logAccess('GET', '/api/users', 200, 45, '127.0.0.1', 'Mozilla/5.0')
 
-    expect(calls.appendFileSync.some(([path, content]) =>
-      path.includes('access-') && content.includes('GET /api/users')
-    )).toBe(true)
+    expect(calls.appendFileSync.some(([path, content]) => path.includes('access-') && content.includes('GET /api/users'))).toBe(true)
   })
 
   it('包含状态码和耗时', () => {
@@ -154,6 +146,7 @@ describe('fileLogger.ts', () => {
     setFsClient({
       appendFileSync: tc.appendFileSync,
       existsSync: tc.existsSync,
+      mkdirSync: () => {},
       readdirSync: () => ['old.log', 'new.log'],
       statSync: (path: string) => {
         calls.statSync.push([path])
@@ -175,6 +168,7 @@ describe('fileLogger.ts', () => {
     setFsClient({
       appendFileSync: tc.appendFileSync,
       existsSync: tc.existsSync,
+      mkdirSync: () => {},
       readdirSync: () => ['test.txt', 'app.log'],
       statSync: () => ({ mtimeMs: Date.now() }),
       unlinkSync: tc.unlinkSync,
@@ -190,7 +184,10 @@ describe('fileLogger.ts', () => {
   it('每天仅执行一次', () => {
     // 必须在测试内自建 calls，beforeEach 的 calls 被 setFsClient 注入过
     const tc = trackingFsClient({
-      appendFileSync: [], readdirSync: [], statSync: [], unlinkSync: [],
+      appendFileSync: [],
+      readdirSync: [],
+      statSync: [],
+      unlinkSync: [],
     })
     setFsClient({ ...tc, existsSync: () => true, readdirSync: tc.readdirSync })
 
@@ -213,7 +210,10 @@ describe('fileLogger.ts', () => {
     const tc = trackingFsClient(calls)
 
     setFsClient({
-      appendFileSync: () => { throw new Error('磁盘已满') },
+      appendFileSync: () => {
+        throw new Error('磁盘已满')
+      },
+      mkdirSync: () => {},
       existsSync: tc.existsSync,
       readdirSync: tc.readdirSync,
       statSync: tc.statSync,
@@ -233,6 +233,7 @@ describe('fileLogger.ts', () => {
     setFsClient({
       appendFileSync: tc.appendFileSync,
       existsSync: () => false,
+      mkdirSync: () => {},
       readdirSync: tc.readdirSync,
       statSync: tc.statSync,
       unlinkSync: tc.unlinkSync,

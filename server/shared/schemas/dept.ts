@@ -29,7 +29,9 @@ export type Department = {
   children?: Department[]
 }
 
-export const departmentSchema: z.ZodType<Department> = z.object({
+// 递归 schema：zod 3.25 对自引用 z.lazy 的推断会退化为全可选 Output，与 Department 不匹配；
+// 此处保留运行时校验逻辑不变，仅以断言钉住对外类型
+export const departmentSchema = z.object({
   id: z.number(),
   name: z.string(),
   parentId: z.number().nullable().optional(),
@@ -39,4 +41,4 @@ export const departmentSchema: z.ZodType<Department> = z.object({
   email: z.string().optional(),
   status: z.number(),
   children: z.lazy(() => z.array(departmentSchema).optional()),
-})
+}) as unknown as z.ZodType<Department>

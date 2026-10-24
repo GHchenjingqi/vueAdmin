@@ -98,7 +98,12 @@ export const knowledgePublicModule: PublicModule = {
           categoryId: req.query.categoryId ? Number(req.query.categoryId) : undefined,
           tagId: req.query.tagId ? Number(req.query.tagId) : undefined,
         })
-        render(res, 'post-list', { pageTitle: '知识库', items: rows, paginationHtml: paginationHtml(base, page, total, PAGE_SIZE) }, { description: '知识库文章列表' })
+        render(
+          res,
+          'post-list',
+          { pageTitle: '知识库', items: rows, paginationHtml: paginationHtml(base, page, total, PAGE_SIZE) },
+          { description: '知识库文章列表' },
+        )
       } catch (err) {
         next(err)
       }

@@ -13,12 +13,7 @@ import { refreshAllDictCache } from '../utils/dictCache.js'
 /**
  * 获取字典类型列表
  */
-export async function listDictTypes(query: {
-  scope?: string
-  page?: number
-  pageSize?: number
-  keyword?: string
-}) {
+export async function listDictTypes(query: { scope?: string; page?: number; pageSize?: number; keyword?: string }) {
   const { scope, page = 1, pageSize = 20, keyword } = query
 
   if (scope === 'all') {
@@ -30,9 +25,7 @@ export async function listDictTypes(query: {
     return types
   }
 
-  const where = keyword
-    ? { [Op.or]: [{ name: { [Op.like]: `%${keyword}%` } }, { type: { [Op.like]: `%${keyword}%` } }] }
-    : {}
+  const where = keyword ? { [Op.or]: [{ name: { [Op.like]: `%${keyword}%` } }, { type: { [Op.like]: `%${keyword}%` } }] } : {}
 
   const offset = (Number(page) - 1) * Number(pageSize)
   const { rows, count } = await DictType.findAndCountAll({
@@ -57,12 +50,7 @@ export async function getDictTypeById(id: number) {
 /**
  * 创建字典类型
  */
-export async function createDictType(data: {
-  name: string
-  type: string
-  status?: number
-  remark?: string
-}) {
+export async function createDictType(data: { name: string; type: string; status?: number; remark?: string }) {
   const { name, type, status, remark } = data
   if (!name || !type) throw new AppError(400, '字典名称和编码不能为空')
 

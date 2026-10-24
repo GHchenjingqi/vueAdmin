@@ -7,18 +7,18 @@
  * - 支持 Sentinel/Cluster 模式（通过 REDIS_URL 配置）
  * - 提供优雅关闭方法 closeRedis()
  */
-import Redis from 'ioredis'
+import { Redis, type Redis as RedisType } from 'ioredis'
 import config from './index.js'
 import { logInfo, logError } from '../utils/fileLogger.js'
 
-let redis: Redis | null = null
+let redis: RedisType | null = null
 let connecting = false
 
 /**
  * 获取 Redis 实例
  * Redis 不可用时返回 null（自动降级到内存限流）
  */
-export function getRedis(): Redis | null {
+export function getRedis(): RedisType | null {
   if (redis) return redis
   if (!config.redis.enabled) return null
   if (connecting) return null // 防止并发创建多个连接
@@ -47,6 +47,10 @@ export function getRedis(): Redis | null {
       logInfo('Redis 连接关闭')
       redis = null
     })
+
+    // lazyConnect 模式下需显式发起连接；否则命令会因 enableOfflineQueue:false 直接被拒。
+    // 连接失败由上方 'error' 处理器记录并降级，此处静默吞掉 promise 拒绝即可。
+    redis.connect().catch(() => {})
 
     return redis
   } catch (err: any) {

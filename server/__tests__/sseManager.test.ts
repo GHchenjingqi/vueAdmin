@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { addClient, sendToUser, broadcast, getOnlineCount } from '../utils/sseManager'
+import { addClient, sendToUser, broadcast, getOnlineCount } from '../utils/sseManager.js'
 
 const mockRes = () => {
   const listeners: Record<string, (...args: unknown[]) => void> = {}

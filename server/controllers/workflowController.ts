@@ -152,6 +152,27 @@ export const deleteApproverRule = async (req, res, next) => {
   }
 }
 
+/** 事务化批量保存设计（含图合法性校验） */
+export const saveDesign = async (req, res, next) => {
+  try {
+    const result = await workflowDesignService.saveDesign(Number(req.params.id), req.body)
+    logOperation(req, '保存工作流设计', `流程ID: ${req.params.id}`)
+    res.json({ code: 0, data: result, message: '保存成功' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** 校验草稿设计合法性（GET 校验已存草稿 / POST 校验候选图） */
+export const validateDesign = async (req, res, next) => {
+  try {
+    const result = await workflowDesignService.validateDesign(Number(req.params.id))
+    res.json({ code: 0, data: result })
+  } catch (err) {
+    next(err)
+  }
+}
+
 /** 创建流程绑定 */
 export const createBinding = async (req, res, next) => {
   try {

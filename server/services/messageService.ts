@@ -63,22 +63,19 @@ export async function listMessages(userId: number, query: MessageQuery) {
 /**
  * 发送消息
  */
-export async function createMessage(data: {
-  fromUserId: number
-  toUserId?: number | null
-  title: string
-  content: string
-  type?: string
-}) {
+export async function createMessage(data: { fromUserId: number; toUserId?: number | null; title: string; content: string; type?: string }) {
   const { fromUserId, toUserId, title, content, type } = data
   if (!title || !content) throw new AppError(400, '标题和内容不能为空')
+  if (type && !['system', 'notice', 'private'].includes(type)) {
+    throw new AppError(400, `非法的消息类型: ${type}（仅支持 system / notice / private）`)
+  }
 
   const message = await Message.create({
     fromUserId,
     toUserId: toUserId || null,
     title,
     content,
-    type: type || 'notice',
+    type: (type || 'notice') as 'system' | 'notice' | 'private',
   })
 
   return message

@@ -60,6 +60,39 @@ export const approveTaskSchema = z.object({
   comment: z.string().max(500).optional(),
 })
 
+// 设计器整图批量保存载荷（事务内校验后写入）
+export const workflowDesignPayloadSchema = z.object({
+  nodes: z.array(
+    z.object({
+      nodeKey: z.string().min(1).max(50),
+      name: z.string().min(1).max(100),
+      type: z.enum(['start', 'end', 'condition', 'approve', 'notify']),
+      config: z.string().max(2000).optional(),
+      x: z.number().int().optional(),
+      y: z.number().int().optional(),
+    }),
+  ),
+  edges: z.array(
+    z.object({
+      sourceNodeKey: z.string().min(1).max(50),
+      targetNodeKey: z.string().min(1).max(50),
+      sourceHandle: z.string().max(20).optional(),
+      conditionType: z.enum(['always', 'expression']).default('always'),
+      conditionExpr: z.string().max(500).optional(),
+    }),
+  ),
+  rules: z.array(
+    z.object({
+      nodeKey: z.string().min(1).max(50),
+      ruleType: z.enum(['creator', 'direct_leader', 'dept_manager', 'role', 'dept', 'user']),
+      ruleConfig: z.string().max(2000).optional(),
+      sort: z.number().int().min(0).default(0),
+      name: z.string().max(100).optional(),
+    }),
+  ),
+})
+export type WorkflowDesignPayload = z.infer<typeof workflowDesignPayloadSchema>
+
 export type CreateWorkflowInput = z.infer<typeof createWorkflowSchema>
 export type UpdateWorkflowInput = z.infer<typeof updateWorkflowSchema>
 export type WorkflowNodeInput = z.infer<typeof workflowNodeSchema>

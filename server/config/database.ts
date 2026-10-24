@@ -15,9 +15,9 @@ const sequelize = new Sequelize(database.name, database.user, database.password,
     idle: 10000,
   },
   define: {
-    timestamps: true,        // 自动添加 createdAt / updatedAt
+    timestamps: true, // 自动添加 createdAt / updatedAt
     underscored: false,
-    freezeTableName: true,   // 禁止表名复数
+    freezeTableName: true, // 禁止表名复数
   },
 })
 

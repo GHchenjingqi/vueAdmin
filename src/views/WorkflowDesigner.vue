@@ -241,7 +241,7 @@ import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 import { ArrowLeft, Delete, Plus, CircleCheckFilled, CircleCloseFilled, Aim, Bell, EditPen } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { workflowApi, type Workflow, type WorkflowNode, type WorkflowEdge, type ApproverRule } from '@/api/workflow'
+import { workflowApi, type Workflow, type WorkflowNode, type WorkflowEdge, type ApproverRule, type WorkflowDesignPayload } from '@/api/workflow'
 import { roleApi, deptApi, userApi } from '@/api'
 import { useI18n } from '@/i18n'
 import WorkflowNodeComp from './workflow/WorkflowNode.vue'
@@ -581,58 +581,49 @@ async function handleSave() {
   saving.value = true
   try {
     flushNotifyConfig()
-    const currentKeys = new Set(flowNodes.value.map((n) => n.id))
-    const currentEdgeIds = new Set(flowEdges.value.map((e) => e.id))
 
-    // 删除已移除的节点（连带边与规则由后端清理）
-    for (const key of loadedNodeKeys.value) {
-      if (!currentKeys.has(key)) await workflowApi.deleteNode(workflowId, key)
+    const payload: WorkflowDesignPayload = {
+      nodes: flowNodes.value.map((n) => ({
+        nodeKey: n.id,
+        name: (n.data?.label as string) || n.id,
+        type: n.type as WorkflowDesignPayload['nodes'][number]['type'],
+        config: n.data?.rawNode?.config || undefined,
+        x: Math.round(n.position.x),
+        y: Math.round(n.position.y),
+      })),
+      edges: flowEdges.value.map((e) => ({
+        sourceNodeKey: e.source,
+        targetNodeKey: e.target,
+        sourceHandle: e.sourceHandle || (e.data?.sourceHandle as string) || undefined,
+        conditionType: (e.data?.conditionType as 'always' | 'expression') || 'always',
+        conditionExpr: e.data?.conditionExpr || undefined,
+      })),
+      rules: [],
     }
-    // 删除已移除的边
-    for (const e of loadedEdges.value) {
-      if (!currentEdgeIds.has(e.id)) await workflowApi.deleteEdge(workflowId, e.source, e.target)
-    }
-    // upsert 节点
-    for (const node of flowNodes.value) {
-      const rawNode = node.data?.rawNode
-      await workflowApi.upsertNode(workflowId, {
-        nodeKey: node.id,
-        name: node.data?.label || node.id,
-        type: (rawNode?.type || 'start') as 'start' | 'end' | 'condition' | 'approve' | 'notify',
-        config: rawNode?.config || undefined,
-        x: Math.round(node.position.x),
-        y: Math.round(node.position.y),
-      })
-    }
-    // upsert 边
-    for (const edge of flowEdges.value) {
-      await workflowApi.upsertEdge(workflowId, {
-        sourceNodeKey: edge.source,
-        targetNodeKey: edge.target,
-        sourceHandle: edge.sourceHandle || (edge.data?.sourceHandle as string) || undefined,
-        conditionType: (edge.data?.conditionType || 'always') as 'always' | 'expression',
-        conditionExpr: edge.data?.conditionExpr || undefined,
-      })
-    }
-    // 审批人规则 diff（新增/更新 + 删除）
-    for (const [nodeKey, current] of rulesByNode.value) {
-      const loaded = loadedRulesByNode.value.get(nodeKey) || []
-      for (const rule of current) {
-        await workflowApi.upsertApproverRule(workflowId, nodeKey, rule)
-      }
-      const currentIds = new Set(current.filter((r) => r.id).map((r) => r.id))
-      for (const rule of loaded) {
-        if (rule.id && !currentIds.has(rule.id)) await workflowApi.deleteApproverRule(workflowId, rule.id)
+    for (const [, rules] of rulesByNode.value) {
+      for (const r of rules) {
+        payload.rules.push({
+          nodeKey: r.nodeKey,
+          ruleType: r.ruleType,
+          ruleConfig: r.ruleConfig || undefined,
+          sort: r.sort ?? 0,
+          name: r.name || undefined,
+        })
       }
     }
 
+    // 整图事务化批量保存（后端会先做图合法性校验）
+    await workflowApi.saveDesign(workflowId, payload)
+
+    // 刷新本地快照，用于「未保存离开」判断
     loadedNodeKeys.value = new Set(flowNodes.value.map((n) => n.id))
     loadedEdges.value = flowEdges.value.map((e) => ({ ...e }))
     loadedRulesByNode.value = new Map(Array.from(rulesByNode.value.entries()).map(([k, v]) => [k, v.map((r) => ({ ...r }))] as [string, ApproverRule[]]))
     dirty.value = false
     ElMessage.success(t('workflow.designer.saveSuccess'))
-  } catch {
-    ElMessage.error(t('workflow.designer.saveFailed'))
+  } catch (err: any) {
+    const msg = err?.response?.data?.message || err?.message || t('workflow.designer.saveFailed')
+    ElMessage.error(msg)
   } finally {
     saving.value = false
   }
