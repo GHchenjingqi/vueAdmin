@@ -7,11 +7,17 @@ import { Request, Response, NextFunction } from 'express'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import config from '../config/index.js'
 import { updateUserActivity, isUserKicked, removeOnlineUser } from '../utils/onlineUsers.js'
+import { tenantContext } from '../modules/tenant/middleware/tenantContext.js'
 
 /**
  * JWT 认证中间件
  * 验证 Bearer Token 并将用户信息注入 req.user
  * 同时检查用户是否已被强制下线（基于 token iat 与被踢时间比较）
+ *
+ * 认证成功后经 tenantContext 建立租户上下文（AsyncLocalStorage）：
+ * 本中间件是路由级中间件，晚于 router.use 注册的全局中间件执行，
+ * 因此租户上下文必须在此处（req.user 就绪后）建立。后续控制器/服务
+ * （含全局 Sequelize scope 钩子）均可通过 getTenantContext() 读取。
  */
 export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization
@@ -45,7 +51,8 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
       nickname: decoded.nickname,
       tenantId: decoded.tenantId,
     })
-    next()
+    // 建立租户上下文并驱动后续链路：控制器、服务与全局 scope 钩子均可见
+    tenantContext(req, res, next)
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       res.status(401).json({ code: 401, message: '认证令牌已过期，请重新登录', expired: true })

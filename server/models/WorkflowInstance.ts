@@ -16,6 +16,8 @@ class WorkflowInstance extends Model<InferAttributes<WorkflowInstance>, InferCre
   declare startedBy: number | null
   declare startedAt: Date | null
   declare finishedAt: Date | null
+  /** 租户ID（M1：由租户 scope 钩子按请求上下文注入，DB 默认 1） */
+  declare tenantId: number | null
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -94,11 +96,16 @@ WorkflowInstance.init(
       allowNull: true,
       comment: '结束时间',
     },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      comment: '租户ID',
+    },
   } as any,
   {
     sequelize,
     tableName: 'workflow_instances',
-    indexes: [{ fields: ['workflowId'] }, { fields: ['status'] }, { fields: ['bindingKey', 'bindingId'] }, { fields: ['startedBy'] }],
+    indexes: [{ fields: ['workflowId'] }, { fields: ['status'] }, { fields: ['bindingKey', 'bindingId'] }, { fields: ['startedBy'] }, { fields: ['tenantId'] }],
   },
 )
 

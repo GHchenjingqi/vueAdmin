@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
-import { tenantContext } from '../modules/tenant/middleware/tenantContext.js'
 import { quotaGuard } from '../modules/billing/middleware/quotaGuard.js'
 import { validate } from '../middleware/validate.js'
 import { paginationSchema, idParamSchema } from '../shared/schemas/common.js'
@@ -262,14 +261,10 @@ router.post('/auth/sse-ticket', authMiddleware, authController.createSseTicket)
  */
 router.get('/site/info', settingController.siteInfo)
 
-// 多租户上下文：所有受 authMiddleware 保护的接口自动注入租户上下文
-router.use((req, _res, next) => {
-  if (req.user) {
-    tenantContext(req, _res, next)
-  } else {
-    next()
-  }
-})
+// 多租户上下文：由 authMiddleware 在认证成功、req.user 就绪后建立
+// （AsyncLocalStorage，见 middleware/auth.ts）。此处不再重复注册——
+// router.use 先于路由级 authMiddleware 执行，当时 req.user 尚未注入，
+// 早期版本放这里等于从未生效。
 
 // ==================== 认证接口 ====================
 

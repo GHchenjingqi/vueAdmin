@@ -58,4 +58,20 @@ describe('stableKey 稳定序列化', () => {
   it('undefined 安全', () => {
     expect(stableKey(undefined)).toBe('{}')
   })
+
+  it('嵌套对象键必须保留（replacer array 坑回归）', () => {
+    // 历史 bug：JSON.stringify 第二参数被当作键名白名单且递归生效，
+    // where 里的 tenantId/status 会被剥掉，导致不同租户/过滤条件撞同一缓存键
+    const key = stableKey({ where: { tenantId: 2, status: 'running' }, page: 1, pageSize: 10 })
+    expect(key).toContain('"tenantId":2')
+    expect(key).toContain('"status":"running"')
+  })
+
+  it('嵌套键顺序不同内容相同 -> 相同 key', () => {
+    expect(stableKey({ where: { a: 1, b: 2 }, page: 1 })).toBe(stableKey({ where: { b: 2, a: 1 }, page: 1 }))
+  })
+
+  it('嵌套内容不同 -> 不同 key（不同租户不撞键）', () => {
+    expect(stableKey({ where: { tenantId: 1 } })).not.toBe(stableKey({ where: { tenantId: 2 } }))
+  })
 })

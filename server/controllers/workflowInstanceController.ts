@@ -13,8 +13,10 @@ import WorkflowEngine from '../services/WorkflowEngine.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { logOperation } from '../utils/logger.js'
 import { createCache, stableKey } from '../utils/cache.js'
+import { applyCurrentTenantScope, currentTenantConstraint } from '../modules/tenant/scope.js'
 
-// 流程实例列表缓存；键含 where + 分页（当前端点未做租户/用户隔离，与现有未隔离行为一致）
+// 流程实例列表缓存；键含 where + 分页 + 租户约束（applyCurrentTenantScope 在键生成前注入，
+// 防止不同租户同一查询共用缓存键导致跨租户泄漏）
 const instanceListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
   namespace: 'wf-instances',
   max: 200,
@@ -64,6 +66,8 @@ export const listInstances = async (req, res, next) => {
     if (status) where.status = status
     if (bindingKey) where.bindingKey = bindingKey
     if (bindingId) where.bindingId = Number(bindingId)
+    // 租户约束必须在缓存键生成前注入：键含租户维度，避免跨租户共用缓存
+    applyCurrentTenantScope(where)
 
     const cacheKey = stableKey({ where, page: Number(page), pageSize: Number(pageSize) })
     const result = await instanceListCache.getOrSet(cacheKey, async () => {
@@ -89,7 +93,10 @@ export const listInstances = async (req, res, next) => {
 /** 实例详情（含节点日志与审批记录） */
 export const getInstanceDetail = async (req, res, next) => {
   try {
-    const instance = await WorkflowInstance.findByPk(Number(req.params.id), {
+    // 租户约束：普通租户仅可读本租户实例；平台超管不约束
+    const tenantWhere = currentTenantConstraint()
+    const instance = await WorkflowInstance.findOne({
+      where: { id: Number(req.params.id), ...tenantWhere },
       include: [
         { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
         { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
@@ -111,7 +118,9 @@ export const getInstanceDetail = async (req, res, next) => {
 /** 重试失败/终止的实例 */
 export const retryInstance = async (req, res, next) => {
   try {
-    const instance = await WorkflowInstance.findByPk(Number(req.params.id))
+    // 租户约束：普通租户仅可操作本租户实例；平台超管不约束
+    const tenantWhere = currentTenantConstraint()
+    const instance = await WorkflowInstance.findOne({ where: { id: Number(req.params.id), ...tenantWhere } })
     if (!instance) throw new AppError(404, '实例不存在')
     if (instance.status !== 'failed' && instance.status !== 'terminated') {
       throw new AppError(400, '仅失败或终止的实例可以重试')
@@ -131,7 +140,9 @@ export const retryInstance = async (req, res, next) => {
 /** 终止实例 */
 export const terminateInstance = async (req, res, next) => {
   try {
-    const instance = await WorkflowInstance.findByPk(Number(req.params.id))
+    // 租户约束：普通租户仅可操作本租户实例；平台超管不约束
+    const tenantWhere = currentTenantConstraint()
+    const instance = await WorkflowInstance.findOne({ where: { id: Number(req.params.id), ...tenantWhere } })
     if (!instance) throw new AppError(404, '实例不存在')
     if (['approved', 'rejected', 'terminated'].includes(instance.status)) {
       throw new AppError(400, '实例已结束，无法终止')

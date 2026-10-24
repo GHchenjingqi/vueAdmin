@@ -13,8 +13,9 @@ import { AppError } from '../middleware/errorHandler.js'
 import { sendToUser } from '../utils/sseManager.js'
 import { logOperation } from '../utils/logger.js'
 import { createCache, stableKey } from '../utils/cache.js'
+import { applyCurrentTenantScope } from '../modules/tenant/scope.js'
 
-// 我的审批列表缓存：键含 userId + 状态 + 分页，TTL 短以保证待办变化可见
+// 我的审批列表缓存：键含 userId + 租户约束 + 状态 + 分页，TTL 短以保证待办变化可见
 const approvalTaskListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
   namespace: 'approval-tasks',
   max: 300,
@@ -31,6 +32,8 @@ export const listMyTasks = async (req, res, next) => {
       const statusList = String(status).split(',').filter(Boolean)
       where.status = statusList.length > 1 ? { [Op.in]: statusList } : status
     }
+    // 租户约束（approverId 归属之外的第二道闸）：必须在缓存键生成前注入
+    applyCurrentTenantScope(where)
 
     const cacheKey = stableKey({ userId: req.user.id, where, page: Number(page), pageSize: Number(pageSize) })
     const result = await approvalTaskListCache.getOrSet(cacheKey, async () => {

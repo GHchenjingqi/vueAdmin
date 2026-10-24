@@ -16,6 +16,7 @@ vi.mock('../config/database.js', () => ({
 }))
 
 import { runInTenant, getTenantContext } from '../modules/tenant/context.js'
+import { currentTenantConstraint, applyCurrentTenantScope } from '../modules/tenant/scope.js'
 
 describe('tenantIsolation', () => {
   describe('AsyncLocalStorage context', () => {
@@ -55,6 +56,47 @@ describe('tenantIsolation', () => {
       runInTenant({ tenantId: null }, () => {
         const ctx = getTenantContext()
         expect(ctx!.tenantId).toBeNull()
+      })
+    })
+  })
+
+  describe('scope 助手（列表/详情接口用）', () => {
+    it('普通租户返回 tenantId 约束', () => {
+      runInTenant({ tenantId: 2, userId: 1 }, () => {
+        expect(currentTenantConstraint()).toEqual({ tenantId: 2 })
+      })
+    })
+
+    it('平台超管（bypass）返回 null（不约束）', () => {
+      runInTenant({ tenantId: 2, userId: 1, bypass: true }, () => {
+        expect(currentTenantConstraint()).toBeNull()
+      })
+    })
+
+    it('无上下文返回 null（定时任务/脚本不约束）', () => {
+      expect(currentTenantConstraint()).toBeNull()
+    })
+
+    it('tenantId 缺失时兜底 -1（不匹配任何行）', () => {
+      runInTenant({ tenantId: null, userId: 1 }, () => {
+        expect(currentTenantConstraint()).toEqual({ tenantId: -1 })
+      })
+    })
+
+    it('applyCurrentTenantScope 原地合并进 where 且保留既有条件', () => {
+      const where: Record<string, any> = { status: 'running' }
+      runInTenant({ tenantId: 2, userId: 1 }, () => {
+        const merged = applyCurrentTenantScope(where)
+        expect(merged).toBe(where)
+        expect(where).toEqual({ status: 'running', tenantId: 2 })
+      })
+    })
+
+    it('applyCurrentTenantScope 在 bypass 时不动 where', () => {
+      const where: Record<string, any> = { status: 'running' }
+      runInTenant({ tenantId: 2, userId: 1, bypass: true }, () => {
+        applyCurrentTenantScope(where)
+        expect(where).toEqual({ status: 'running' })
       })
     })
   })

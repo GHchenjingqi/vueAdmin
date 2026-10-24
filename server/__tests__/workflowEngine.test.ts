@@ -22,13 +22,13 @@ vi.mock('../models/WorkflowInstanceLog.js', () => ({
   default: { create: (...args: any[]) => mockLogCreate(...args), update: (...args: any[]) => mockLogUpdate(...args) },
 }))
 vi.mock('../models/ApprovalTask.js', () => ({
-    default: {
-      create: (...args: any[]) => mockApprovalCreate(...args),
-      bulkCreate: (...args: any[]) => mockApprovalBulkCreate(...args),
-      findAll: (...args: any[]) => mockApprovalFindAll(...args),
-      update: (...args: any[]) => mockApprovalUpdate(...args),
-      count: (...args: any[]) => mockApprovalCount(...args),
-    },
+  default: {
+    create: (...args: any[]) => mockApprovalCreate(...args),
+    bulkCreate: (...args: any[]) => mockApprovalBulkCreate(...args),
+    findAll: (...args: any[]) => mockApprovalFindAll(...args),
+    update: (...args: any[]) => mockApprovalUpdate(...args),
+    count: (...args: any[]) => mockApprovalCount(...args),
+  },
 }))
 vi.mock('../models/Notice.js', () => ({ default: { create: (...args: any[]) => mockNoticeCreate(...args) } }))
 
@@ -289,5 +289,41 @@ describe('WorkflowEngine', () => {
 
     await engine.resumeAfterApproval(instance, 'a', 100, 'approved')
     expect(instance.status).toBe('approved')
+  })
+})
+
+describe('WorkflowEngine - 审批任务租户传递', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockNodeFindAll.mockResolvedValue([
+      { nodeKey: 'start', name: '开始', type: 'start', config: null },
+      { nodeKey: 'approve1', name: '审批', type: 'approve', config: null },
+      { nodeKey: 'end', name: '结束', type: 'end', config: null },
+    ])
+    mockEdgeFindAll.mockResolvedValue([
+      { sourceNodeKey: 'start', targetNodeKey: 'approve1', conditionType: 'always', conditionExpr: null },
+      { sourceNodeKey: 'approve1', targetNodeKey: 'end', conditionType: 'always', conditionExpr: null },
+    ])
+    mockRuleFindAll.mockResolvedValue([{ nodeKey: 'approve1', ruleType: 'user', ruleConfig: '{"userIds":[99]}' }])
+    mockApprovalCount.mockResolvedValue(0)
+  })
+
+  it('bulkCreate 的任务继承实例 tenantId', async () => {
+    const engine = createEngine()
+    const instance = makeInstance({ tenantId: 5 })
+    await engine.execute(instance)
+
+    expect(mockApprovalBulkCreate).toHaveBeenCalledTimes(1)
+    const tasks = (mockApprovalBulkCreate.mock.calls[0] as any)[0]
+    expect(tasks.every((t: any) => t.tenantId === 5)).toBe(true)
+  })
+
+  it('实例无 tenantId 时兜底为 1（与 DB 默认一致）', async () => {
+    const engine = createEngine()
+    const instance = makeInstance()
+    await engine.execute(instance)
+
+    const tasks = (mockApprovalBulkCreate.mock.calls[0] as any)[0]
+    expect(tasks.every((t: any) => t.tenantId === 1)).toBe(true)
   })
 })

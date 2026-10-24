@@ -29,9 +29,29 @@ function isTest(): boolean {
   return process.env.NODE_ENV === 'test'
 }
 
-/** 稳定序列化：对象键排序，避免同一查询因 key 顺序不同产生多份缓存 */
+/**
+ * 稳定序列化：递归排序对象键，保证同一查询无论键顺序都产生同一缓存键。
+ *
+ * 历史坑：早期实现写成 `JSON.stringify(obj, Object.keys(obj).sort())`——
+ * JSON.stringify 的第二参数是**键名白名单（replacer array）且递归生效**，
+ * 会把嵌套对象（如 where: { tenantId, status }）中不在白名单的键全部剥掉，
+ * 导致不同租户/不同过滤条件共用同一缓存键（跨租户泄漏 + 错误结果）。
+ * 因此这里显式深拷贝排序后再序列化，绝不使用 replacer array。
+ */
+function sortDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortDeep)
+  if (value && typeof value === 'object') {
+    const sorted: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      sorted[key] = sortDeep((value as Record<string, unknown>)[key])
+    }
+    return sorted
+  }
+  return value
+}
+
 export function stableKey(obj: unknown): string {
-  return JSON.stringify(obj ?? {}, Object.keys((obj as any) ?? {}).sort())
+  return JSON.stringify(sortDeep(obj ?? {}))
 }
 
 export interface CacheOptions {

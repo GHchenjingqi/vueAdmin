@@ -13,6 +13,8 @@ class ApprovalTask extends Model<InferAttributes<ApprovalTask>, InferCreationAtt
   declare comment: string | null
   declare assignedAt: Date | null
   declare finishedAt: Date | null
+  /** 租户ID（M1：由租户 scope 钩子按请求上下文注入，DB 默认 1） */
+  declare tenantId: number | null
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -76,11 +78,16 @@ ApprovalTask.init(
       allowNull: true,
       comment: '完成时间',
     },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      comment: '租户ID',
+    },
   } as any,
   {
     sequelize,
     tableName: 'approval_tasks',
-    indexes: [{ fields: ['instanceId'] }, { fields: ['approverId', 'status'] }, { fields: ['status'] }],
+    indexes: [{ fields: ['instanceId'] }, { fields: ['approverId', 'status'] }, { fields: ['status'] }, { fields: ['tenantId'] }],
   },
 )
 

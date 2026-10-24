@@ -5,8 +5,10 @@ import WorkflowNode from '../models/WorkflowNode.js'
 import WorkflowEdge from '../models/WorkflowEdge.js'
 import WorkflowApproverRule from '../models/WorkflowApproverRule.js'
 import WorkflowBinding from '../models/WorkflowBinding.js'
+import WorkflowFormField from '../models/WorkflowFormField.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { createCache, stableKey } from '../utils/cache.js'
+import { applyCurrentTenantScope } from '../modules/tenant/scope.js'
 
 // 工作流定义列表缓存；写操作（增删改/启用停用/发布）后整命名空间失效
 const workflowListCache = createCache<{ rows: any[]; total: number; page: number; pageSize: number }>({
@@ -23,6 +25,8 @@ export async function listWorkflows(params: { keyword?: string; status?: number 
   // 空字符串 / null / undefined 视为不筛选（前端 ProTable 默认会带空 status 参数）
   if (status !== undefined && status !== null && status !== '') where.status = Number(status)
   if (keyword) where.name = { [Op.like]: `%${keyword}%` }
+  // 租户约束必须在缓存键生成前注入：键含租户维度，避免跨租户共用缓存
+  applyCurrentTenantScope(where)
 
   const cacheKey = stableKey({ where, page: pageNum, pageSize: pageSizeNum })
   return workflowListCache.getOrSet(cacheKey, async () => {
@@ -134,4 +138,46 @@ export async function getDesign(id: number) {
   ])
 
   return { nodes, edges, rules }
+}
+
+/** 获取工作流的表单字段（业务发起时需要填写的参数定义） */
+export async function getFormFields(workflowId: number) {
+  const workflow = await getWorkflowById(workflowId)
+  const fields = await WorkflowFormField.findAll({
+    where: { workflowId: workflow.id },
+    order: [
+      ['sort', 'ASC'],
+      ['id', 'ASC'],
+    ],
+  })
+  return fields
+}
+
+/**
+ * 整批替换工作流的表单字段（事务内删除旧 + 插入新）。
+ * 用于设计器「表单设计」抽屉保存。
+ */
+export async function setFormFields(workflowId: number, fields: Array<Record<string, unknown>>) {
+  const workflow = await getWorkflowById(workflowId)
+  const { sequelize } = WorkflowFormField
+  await sequelize.transaction(async (t) => {
+    await WorkflowFormField.destroy({ where: { workflowId: workflow.id }, transaction: t })
+    if (fields.length > 0) {
+      await WorkflowFormField.bulkCreate(
+        fields.map((f, idx) => ({
+          workflowId: workflow.id,
+          fieldKey: f.fieldKey,
+          label: f.label,
+          type: f.type,
+          required: f.required ? 1 : 0,
+          options: f.options ?? null,
+          placeholder: f.placeholder ?? null,
+          sort: typeof f.sort === 'number' ? f.sort : idx,
+        })) as any,
+        { transaction: t },
+      )
+    }
+  })
+  await workflowListCache.clear()
+  return getFormFields(workflow.id)
 }

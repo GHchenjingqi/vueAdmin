@@ -8,6 +8,7 @@ import { resolveApprovers } from '../utils/approvalRuleResolver.js'
 import { sendToUser } from '../utils/sseManager.js'
 import { logInfo } from '../utils/fileLogger.js'
 import { loadGraphCached, type Graph } from './workflowGraphCache.js'
+import { fireWorkflowCallback } from './workflowCallbackService.js'
 
 /**
  * 节点级状态机工作流引擎
@@ -95,12 +96,7 @@ export default class WorkflowEngine {
   }
 
   /** 审批通过/驳回后，从被审批节点向下游续跑（不再从 start 重跑） */
-  async resumeAfterApproval(
-    instance: WorkflowInstance,
-    nodeKey: string,
-    approverId: number,
-    decision: 'approved' | 'rejected',
-  ): Promise<void> {
+  async resumeAfterApproval(instance: WorkflowInstance, nodeKey: string, approverId: number, decision: 'approved' | 'rejected'): Promise<void> {
     try {
       const state = parseState(instance)
       if (!state || state.finished) return
@@ -112,10 +108,7 @@ export default class WorkflowEngine {
       if (decision === 'rejected') {
         if (!nodeData.rejected.includes(approverId)) nodeData.rejected.push(approverId)
         // 任一审批人驳回即终止整个实例（如需分支回退可在此扩展）
-        await ApprovalTask.update(
-          { status: 'canceled' },
-          { where: { instanceId: instance.id, status: 'pending', approverId: { [Op.ne]: approverId } } },
-        )
+        await ApprovalTask.update({ status: 'canceled' }, { where: { instanceId: instance.id, status: 'pending', approverId: { [Op.ne]: approverId } } })
         await this.finalize(instance, state, 'rejected')
         return
       }
@@ -149,12 +142,7 @@ export default class WorkflowEngine {
     }
   }
 
-  private async processNode(
-    instance: WorkflowInstance,
-    graph: Graph,
-    state: RuntimeState,
-    nodeKey: string,
-  ): Promise<void> {
+  private async processNode(instance: WorkflowInstance, graph: Graph, state: RuntimeState, nodeKey: string): Promise<void> {
     const node = graph.nodeMap.get(nodeKey)
     if (!node || state.completed.includes(nodeKey)) return
     if (!state.started.includes(nodeKey)) state.started.push(nodeKey)
@@ -233,6 +221,9 @@ export default class WorkflowEngine {
                 approverName: null,
                 assignedAt: new Date(),
                 dueAt: this.computeDueAt(node),
+                // 租户归属显式继承父实例：引擎可能在无请求上下文的后台路径运行
+                // （超时调度/重试），不能依赖 scope 钩子注入
+                tenantId: instance.tenantId ?? 1,
               })),
             )
             // MySQL bulkCreate 不回填自增 id，单独一次查询取回刚插入的任务（含 id）用于通知
@@ -282,13 +273,7 @@ export default class WorkflowEngine {
   }
 
   /** 推进：把 fromKey 加入各下游节点的前驱完成集合，满足 AND-join（入度）条件且未启动时才触发 */
-  private async advance(
-    instance: WorkflowInstance,
-    graph: Graph,
-    state: RuntimeState,
-    fromKey: string,
-    nextKeys: string[],
-  ): Promise<void> {
+  private async advance(instance: WorkflowInstance, graph: Graph, state: RuntimeState, fromKey: string, nextKeys: string[]): Promise<void> {
     for (const target of nextKeys) {
       const pd = state.predecessorsDone[target] || []
       if (!pd.includes(fromKey)) pd.push(fromKey)
@@ -310,6 +295,8 @@ export default class WorkflowEngine {
       finishedAt: new Date(),
     })
     logInfo(`工作流实例 [${instance.id}] 结束，状态: ${status}`)
+    // 实例结束后回调业务系统，完成状态同步（失败不影响流程）
+    await fireWorkflowCallback(instance, status).catch(() => {})
   }
 
   /** 写入 runtimeState 并保存实例指定字段 */

@@ -9,6 +9,8 @@ class Workflow extends Model<InferAttributes<Workflow>, InferCreationAttributes<
   declare draftVersionId: number | null
   declare publishedVersionId: number | null
   declare createdBy: number | null
+  /** 租户ID（M1：由租户 scope 钩子按请求上下文注入，DB 默认 1） */
+  declare tenantId: number | null
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -50,6 +52,11 @@ Workflow.init(
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
       comment: '创建人 ID',
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      comment: '租户ID',
     },
   } as any,
   {
