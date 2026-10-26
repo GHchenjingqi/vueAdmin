@@ -170,26 +170,16 @@ app.use(errorHandler)
 // ---------- 启动服务（数据库迁移、数据迁移、种子数据、前端托管、HTTP 监听）----------
 bootstrap(app)
 
-// ---------- 工作流超时催办调度（默认关闭，需 WORKFLOW_TIMEOUT_CRON=1 启用）----------
-// 动态 import 避免在未启用时硬依赖 node-cron；启用后每 5 分钟扫描一次超时审批任务。
-if (process.env.WORKFLOW_TIMEOUT_CRON === '1') {
-  void (async () => {
-    try {
-      const cron = await import('node-cron')
-      cron.schedule('*/5 * * * *', async () => {
-        try {
-          const { processOverdueTasks } = await import('./services/workflowTimeoutService.js')
-          await processOverdueTasks()
-        } catch (err) {
-          logInfo(`工作流超时任务处理异常: ${(err as Error).message}`)
-        }
-      })
-      logInfo('工作流超时调度已启用')
-    } catch {
-      // node-cron 不可用时静默跳过
-    }
-  })()
-}
+// ---------- 工作流超时催办 / 升级扫描器（始终启用，默认每 60 秒一次）----------
+// 轻量扫描 pending 审批任务：到期前提醒、超时自动通过、超时升级转交。
+void (async () => {
+  try {
+    const { startTimeoutScanner } = await import('./services/workflowTimeoutService.js')
+    startTimeoutScanner(60 * 1000)
+  } catch (err) {
+    logInfo(`工作流超时扫描器启动失败: ${(err as Error).message}`)
+  }
+})()
 
 // ---------- 优雅关闭（处理 SIGTERM/SIGINT）----------
 process.on('SIGTERM', async () => {

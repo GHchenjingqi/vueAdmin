@@ -22,20 +22,36 @@ const approvalTaskListCache = createCache<{ rows: ApprovalTask[]; total: number;
   maxAgeMs: 30 * 1000,
 })
 
-/** 我的待办/已办审批列表 */
+/** 我的待办/已办审批列表（支持流程/关键字/时间范围筛选） */
 export const listMyTasks = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 10, status } = req.query
+    const { page = 1, pageSize = 10, status, keyword, workflowId, timeRange } = req.query
     const where: Record<string, unknown> = { approverId: req.user.id }
     // 已办：传入逗号分隔的多个状态（如 approved,rejected）
     if (status) {
       const statusList = String(status).split(',').filter(Boolean)
       where.status = statusList.length > 1 ? { [Op.in]: statusList } : status
     }
+    // 时间范围：today=今天 assignedAt，week=近7天，overdue=已超 dueAt 且仍 pending
+    if (timeRange === 'today') {
+      const start = new Date()
+      start.setHours(0, 0,0, 0)
+      where.assignedAt = { [Op.gte]: start }
+    } else if (timeRange === 'week') {
+      where.assignedAt = { [Op.gte]: new Date(Date.now() - 7 * 24 * 3600 * 1000) }
+    } else if (timeRange === 'overdue') {
+      where.status = 'pending'
+      where.dueAt = { [Op.lt]: new Date() }
+    }
     // 租户约束（approverId 归属之外的第二道闸）：必须在缓存键生成前注入
     applyCurrentTenantScope(where)
 
-    const cacheKey = stableKey({ userId: req.user.id, where, page: Number(page), pageSize: Number(pageSize) })
+    // 实例级筛选（流程 / 标题关键字）通过 include 实现
+    const instanceWhere: Record<string, unknown> = {}
+    if (workflowId) instanceWhere.workflowId = Number(workflowId)
+    if (keyword) instanceWhere.title = { [Op.like]: `%${String(keyword)}%` }
+
+    const cacheKey = stableKey({ userId: req.user.id, where, instanceWhere, page: Number(page), pageSize: Number(pageSize) })
     const result = await approvalTaskListCache.getOrSet(cacheKey, async () => {
       const { rows, count } = await ApprovalTask.findAndCountAll({
         where,
@@ -47,6 +63,7 @@ export const listMyTasks = async (req, res, next) => {
             model: WorkflowInstance,
             as: 'instance',
             attributes: ['id', 'title', 'status', 'currentNodeKey', 'startedBy', 'startedAt'],
+            where: Object.keys(instanceWhere).length > 0 ? instanceWhere : undefined,
             include: [
               { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
               { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
@@ -58,6 +75,74 @@ export const listMyTasks = async (req, res, next) => {
     })
 
     res.json({ code: 0, data: result })
+  } catch (err) {
+    next(err)
+  }
+}
+
+const TASK_STATUS_LABEL: Record<string, string> = {
+  pending: '待审批',
+  approved: '已通过',
+  rejected: '已驳回',
+  canceled: '已取消',
+}
+
+/** 导出我的审批记录为 CSV（UTF-8 BOM，Excel 可直接打开） */
+export const exportMyTasks = async (req, res, next) => {
+  try {
+    const { status, keyword, workflowId, timeRange } = req.query
+    const where: Record<string, unknown> = { approverId: req.user.id }
+    if (status) {
+      const statusList = String(status).split(',').filter(Boolean)
+      where.status = statusList.length > 1 ? { [Op.in]: statusList } : status
+    }
+    if (timeRange === 'today') {
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      where.assignedAt = { [Op.gte]: start }
+    } else if (timeRange === 'week') {
+      where.assignedAt = { [Op.gte]: new Date(Date.now() - 7 * 24 * 3600 * 1000) }
+    } else if (timeRange === 'overdue') {
+      where.status = 'pending'
+      where.dueAt = { [Op.lt]: new Date() }
+    }
+    applyCurrentTenantScope(where)
+
+    const instanceWhere: Record<string, unknown> = {}
+    if (workflowId) instanceWhere.workflowId = Number(workflowId)
+    if (keyword) instanceWhere.title = { [Op.like]: `%${String(keyword)}%` }
+
+    const rows = await ApprovalTask.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: WorkflowInstance,
+          as: 'instance',
+          attributes: ['id', 'title', 'startedBy'],
+          where: Object.keys(instanceWhere).length > 0 ? instanceWhere : undefined,
+          include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name'] }],
+        },
+      ],
+    })
+
+    const header = ['任务ID', '流程名称', '申请标题', '状态', '审批意见', '分配时间', '完成时间']
+    const esc = (v: unknown): string => {
+      const s = v === null || v === undefined ? '' : String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const lines = [header.join(',')]
+    for (const r of rows as (ApprovalTask & { instance?: { title: string; workflow?: { name: string } } })[]) {
+      lines.push(
+        [r.id, r.instance?.workflow?.name || '', r.instance?.title || '', TASK_STATUS_LABEL[r.status] || r.status, r.comment || '', r.assignedAt || '', r.finishedAt || '']
+          .map(esc)
+          .join(','),
+      )
+    }
+    const csv = '﻿' + lines.join('\r\n')
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="approval-tasks-${Date.now()}.csv"`)
+    res.send(csv)
   } catch (err) {
     next(err)
   }

@@ -33,7 +33,7 @@ export const workflowEdgeSchema = z.object({
 export const updateEdgeSchema = workflowEdgeSchema.partial()
 
 export const approverRuleSchema = z.object({
-  ruleType: z.enum(['creator', 'direct_leader', 'dept_manager', 'role', 'dept', 'user']),
+  ruleType: z.enum(['creator', 'direct_leader', 'dept_manager', 'role', 'dept', 'user', 'field']),
   ruleConfig: z.string().optional(),
   sort: z.number().int().min(0).default(0),
   name: z.string().max(100).optional(),
@@ -49,10 +49,18 @@ export const workflowBindingSchema = z.object({
   callbackUrl: z.string().max(500).optional(),
 })
 
+/** 委托审批：当前用户把自己的待办临时委托给他人 */
+export const delegateWorkflowSchema = z.object({
+  toUserId: z.number().int().positive(),
+  startAt: z.string().optional(),
+  endAt: z.string().optional(),
+  remark: z.string().max(200).optional(),
+})
+
 export const workflowFormFieldSchema = z.object({
   fieldKey: z.string().min(1).max(50),
   label: z.string().min(1).max(100),
-  type: z.enum(['text', 'textarea', 'number', 'select', 'date']),
+  type: z.enum(['text', 'textarea', 'number', 'select', 'date', 'file']),
   required: z.boolean().default(false),
   options: z.string().max(2000).optional(),
   placeholder: z.string().max(200).optional(),
@@ -73,6 +81,9 @@ export const triggerWorkflowSchema = z.object({
 export const approveTaskSchema = z.object({
   status: z.enum(['approved', 'rejected']),
   comment: z.string().max(500).optional(),
+}).refine((d) => d.status !== 'rejected' || (d.comment && d.comment.trim().length > 0), {
+  message: '驳回时必须填写审批意见',
+  path: ['comment'],
 })
 
 // 设计器整图批量保存载荷（事务内校验后写入）
@@ -99,7 +110,7 @@ export const workflowDesignPayloadSchema = z.object({
   rules: z.array(
     z.object({
       nodeKey: z.string().min(1).max(50),
-      ruleType: z.enum(['creator', 'direct_leader', 'dept_manager', 'role', 'dept', 'user']),
+      ruleType: z.enum(['creator', 'direct_leader', 'dept_manager', 'role', 'dept', 'user', 'field']),
       ruleConfig: z.string().max(2000).optional(),
       sort: z.number().int().min(0).default(0),
       name: z.string().max(100).optional(),
@@ -116,3 +127,20 @@ export type ApproverRuleInput = z.infer<typeof approverRuleSchema>
 export type WorkflowBindingInput = z.infer<typeof workflowBindingSchema>
 export type TriggerWorkflowInput = z.infer<typeof triggerWorkflowSchema>
 export type ApproveTaskInput = z.infer<typeof approveTaskSchema>
+
+// ==================== 常用驳回理由（可配置） ====================
+
+export const createRejectReasonSchema = z.object({
+  content: z.string().trim().min(1).max(200),
+  sort: z.number().int().min(0).max(9999).optional(),
+  enabled: z.number().int().min(0).max(1).optional(),
+})
+
+export const updateRejectReasonSchema = z.object({
+  content: z.string().trim().min(1).max(200).optional(),
+  sort: z.number().int().min(0).max(9999).optional(),
+  enabled: z.number().int().min(0).max(1).optional(),
+})
+
+export type CreateRejectReasonInput = z.infer<typeof createRejectReasonSchema>
+export type UpdateRejectReasonInput = z.infer<typeof updateRejectReasonSchema>

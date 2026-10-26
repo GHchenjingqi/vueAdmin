@@ -12,14 +12,19 @@ import {
   approverRuleSchema,
   updateApproverRuleSchema,
   workflowBindingSchema,
+  delegateWorkflowSchema,
   triggerWorkflowSchema,
   approveTaskSchema,
   workflowDesignPayloadSchema,
   workflowFormFieldsPayloadSchema,
+  createRejectReasonSchema,
+  updateRejectReasonSchema,
 } from '../shared/schemas/workflow.js'
 import * as workflowController from '../controllers/workflowController.js'
 import * as workflowInstanceController from '../controllers/workflowInstanceController.js'
 import * as approvalController from '../controllers/approvalController.js'
+import * as delegationController from '../controllers/delegationController.js'
+import * as rejectReasonController from '../controllers/rejectReasonController.js'
 
 const router = Router()
 
@@ -87,13 +92,28 @@ router.post(
 
 router.post('/workflow/trigger', authMiddleware, validate(triggerWorkflowSchema), workflowInstanceController.trigger)
 router.get('/workflow-instances', authMiddleware, workflowInstanceController.listInstances)
+router.get('/workflow-instances/export', authMiddleware, workflowInstanceController.exportInstances)
 router.get('/workflow-instances/:id', authMiddleware, validate(idParamSchema, 'params'), workflowInstanceController.getInstanceDetail)
 router.post('/workflow-instances/:id/retry', authMiddleware, validate(idParamSchema, 'params'), workflowInstanceController.retryInstance)
 router.post('/workflow-instances/:id/terminate', authMiddleware, validate(idParamSchema, 'params'), workflowInstanceController.terminateInstance)
 
 // ==================== 审批 ====================
 
+router.get('/approval-tasks/export', authMiddleware, approvalController.exportMyTasks)
 router.get('/approval-tasks', authMiddleware, approvalController.listMyTasks)
 router.patch('/approval-tasks/:id', authMiddleware, validate(idParamSchema, 'params'), validate(approveTaskSchema), approvalController.approve)
+
+// ==================== 个人委托审批 ====================
+
+router.post('/me/delegation', authMiddleware, validate(delegateWorkflowSchema), delegationController.setDelegation)
+router.get('/me/delegation', authMiddleware, delegationController.listDelegations)
+router.delete('/me/delegation/:id', authMiddleware, validate(idParamSchema, 'params'), delegationController.cancelDelegationById)
+
+// ==================== 常用驳回理由（可配置维护） ====================
+
+router.get('/workflow-reject-reasons', authMiddleware, rejectReasonController.listRejectReasons)
+router.post('/workflow-reject-reasons', authMiddleware, validate(createRejectReasonSchema), rejectReasonController.createRejectReason)
+router.put('/workflow-reject-reasons/:id', authMiddleware, validate(idParamSchema, 'params'), validate(updateRejectReasonSchema), rejectReasonController.updateRejectReason)
+router.delete('/workflow-reject-reasons/:id', authMiddleware, validate(idParamSchema, 'params'), rejectReasonController.deleteRejectReason)
 
 export default router

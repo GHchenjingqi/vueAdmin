@@ -56,6 +56,23 @@
                   style="width: 100%"
                   :placeholder="f.placeholder || ''"
                 />
+                <div v-else-if="f.type === 'file'">
+                  <el-upload
+                    :auto-upload="true"
+                    :show-file-list="true"
+                    :file-list="fileLists[f.fieldKey] || []"
+                    :http-request="(opt: any) => customUpload(opt, f)"
+                  >
+                    <el-button type="primary" :icon="Upload">
+                      {{ t('workflow.applyUpload') }}
+                    </el-button>
+                  </el-upload>
+                  <div v-if="formModel[f.fieldKey]" class="file-link">
+                    <el-link type="primary" :href="String(formModel[f.fieldKey])" target="_blank">
+                      {{ t('workflow.applyUpload') }}: {{ String(formModel[f.fieldKey]) }}
+                    </el-link>
+                  </div>
+                </div>
               </el-form-item>
             </el-form>
             <el-empty v-else :description="t('workflow.applyNoFields')" />
@@ -95,7 +112,9 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Upload } from '@element-plus/icons-vue'
 import { workflowApi, type Workflow, type WorkflowFormField } from '@/api/workflow'
+import { uploadApi } from '@/api/upload'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
@@ -113,6 +132,8 @@ const launchTitle = ref('')
 const submitting = ref(false)
 const formRef = ref<InstanceType<typeof import('element-plus').ElForm> | null>(null)
 const result = ref<{ instanceId: number } | null>(null)
+// 附件字段的已上传文件列表（按 fieldKey 存放），用于 el-upload 展示
+const fileLists = reactive<Record<string, { name: string; url: string }[]>>({})
 
 const formRules = computed(() => {
   const rules: Record<string, unknown[]> = {}
@@ -141,12 +162,31 @@ async function selectWorkflow(wf: Workflow) {
   result.value = null
   launchTitle.value = ''
   Object.keys(formData).forEach((k) => delete formData[k])
+  Object.keys(fileLists).forEach((k) => delete fileLists[k])
   const res = await workflowApi.getFormFields(wf.id)
   fields.value = res.data || []
   // 初始化默认值
   for (const f of fields.value) {
     if (f.type === 'number') formData[f.fieldKey] = null
-    else formData[f.fieldKey] = ''
+    else if (f.type === 'file') {
+      formData[f.fieldKey] = ''
+      fileLists[f.fieldKey] = []
+    } else formData[f.fieldKey] = ''
+  }
+}
+
+/** 自定义上传：调用 /upload 接口，成功后把返回 url 写入表单模型 */
+async function customUpload(options: { file: File; onSuccess: (d: unknown) => void; onError: (e: unknown) => void }, f: WorkflowFormField): Promise<void> {
+  try {
+    const res = await uploadApi.upload(options.file, 'workflow')
+    const url = (res.data as { url: string }).url
+    formData[f.fieldKey] = url
+    fileLists[f.fieldKey] = [{ name: options.file.name, url }]
+    options.onSuccess(res.data)
+    ElMessage.success(t('workflow.applyUpload') + t('common.success'))
+  } catch {
+    options.onError(new Error('upload failed'))
+    ElMessage.error(t('workflow.operationFailed'))
   }
 }
 
@@ -242,6 +282,11 @@ onMounted(fetchWorkflows)
     display: flex;
     justify-content: flex-end;
     margin-top: 12px;
+  }
+  .file-link {
+    margin-top: 6px;
+    font-size: 12px;
+    word-break: break-all;
   }
 }
 </style>

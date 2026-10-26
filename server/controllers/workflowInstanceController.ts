@@ -157,3 +157,64 @@ export const terminateInstance = async (req, res, next) => {
     next(err)
   }
 }
+
+const INSTANCE_STATUS_LABEL: Record<string, string> = {
+  pending: '待处理',
+  running: '运行中',
+  partial: '审批中',
+  approved: '已通过',
+  rejected: '已驳回',
+  terminated: '已终止',
+  failed: '失败',
+}
+
+/** 导出实例列表为 CSV（UTF-8 BOM，Excel 可直接打开） */
+export const exportInstances = async (req, res, next) => {
+  try {
+    const { status, bindingKey, bindingId } = req.query
+    const where: Record<string, unknown> = {}
+    if (status) where.status = status
+    if (bindingKey) where.bindingKey = bindingKey
+    if (bindingId) where.bindingId = Number(bindingId)
+    applyCurrentTenantScope(where)
+
+    const rows = await WorkflowInstance.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      include: [
+        { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
+        { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
+      ],
+    })
+
+    const header = ['实例ID', '流程名称', '发起人', '标题', '状态', '创建时间', '结束时间']
+    const escapeCsv = (v: unknown): string => {
+      const s = v === null || v === undefined ? '' : String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const lines = [header.join(',')]
+    for (const r of rows) {
+      const starter = (r as WorkflowInstance & { starter?: { nickname?: string; username: string } }).starter
+      lines.push(
+        [
+          r.id,
+          (r as WorkflowInstance & { workflow?: { name: string } }).workflow?.name || '',
+          starter ? starter.nickname || starter.username : '',
+          r.title || '',
+          INSTANCE_STATUS_LABEL[r.status] || r.status,
+          r.createdAt ? new Date(r.createdAt).toISOString() : '',
+          r.finishedAt ? new Date(r.finishedAt).toISOString() : '',
+        ]
+          .map(escapeCsv)
+          .join(','),
+      )
+    }
+    const csv = '﻿' + lines.join('\r\n')
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="workflow-instances-${Date.now()}.csv"`)
+    res.send(csv)
+  } catch (err) {
+    next(err)
+  }
+}

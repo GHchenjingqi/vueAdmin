@@ -5,6 +5,7 @@ import ApprovalTask from '../models/ApprovalTask.js'
 import type WorkflowNode from '../models/WorkflowNode.js'
 import { evaluateCondition } from '../utils/workflowExpression.js'
 import { resolveApprovers } from '../utils/approvalRuleResolver.js'
+import { resolveDelegation } from '../services/workflowDelegationService.js'
 import { sendToUser } from '../utils/sseManager.js'
 import { logInfo } from '../utils/fileLogger.js'
 import { errMessage } from '../utils/errMessage.js'
@@ -184,25 +185,37 @@ export default class WorkflowEngine {
           break
 
         case 'notify': {
-          await this.createNotice(node)
+          await this.createNotice(node, instance, state.context)
           nextKeys = outEdges.map((e) => e.targetNodeKey)
           break
         }
 
         case 'approve': {
           const nodeRules = graph.rulesByNode.get(nodeKey) || []
+          const nodeConfig = node.config ? JSON.parse(node.config) : {}
+
+          // 自动通过：满足阈值/条件表达式时跳过人工审批，直接通过（如金额 < 5000）
+          if (nodeConfig.autoApproveExpr && evaluateCondition(nodeConfig.autoApproveExpr, state.context as Record<string, unknown>)) {
+            await this.autoApproveNode(instance, graph, state, nodeKey, log, outEdges.map((e) => e.targetNodeKey))
+            await this.commit(instance, state, {})
+            return
+          }
+
           if (nodeRules.length === 0) {
             nextKeys = outEdges.map((e) => e.targetNodeKey)
             break
           }
           const approverIds = await resolveApprovers(
             nodeRules.map((r) => ({ ruleType: r.ruleType, ruleConfig: r.ruleConfig })),
-            { startedBy: instance.startedBy || 0 },
+            { startedBy: instance.startedBy || 0, input: state.context },
           )
           if (approverIds.length === 0) {
             nextKeys = outEdges.map((e) => e.targetNodeKey)
             break
           }
+
+          // 委托转交：将处于有效委托期的审批人替换为被委托人
+          const effective = await this.applyDelegation(approverIds)
 
           // 去重：已存在 pending 任务则不再重复派单
           const existing = await ApprovalTask.findAll({ where: { instanceId: instance.id, nodeKey, status: 'pending' } })
@@ -210,18 +223,19 @@ export default class WorkflowEngine {
           const nd: ApproverNodeState = state.nodeData[nodeKey] || { approvers: [], approved: [], rejected: [], waiting: false }
 
           // N+1 优化：逐审批人串行 create 改为一次性 bulkCreate（去重后仅插入缺失者）
-          const toCreate = approverIds.filter((aid) => !existingIds.has(aid))
+          const toCreate = effective.filter((e) => !existingIds.has(e.approverId))
           if (toCreate.length > 0) {
             await ApprovalTask.bulkCreate(
-              toCreate.map((aid) => ({
+              toCreate.map((e) => ({
                 instanceId: instance.id,
                 nodeKey,
                 title: instance.title || '审批',
                 status: 'pending' as const,
-                approverId: aid,
+                approverId: e.approverId,
                 approverName: null,
                 assignedAt: new Date(),
                 dueAt: this.computeDueAt(node),
+                delegatedFrom: e.delegatedFrom ?? null,
                 // 租户归属显式继承父实例：引擎可能在无请求上下文的后台路径运行
                 // （超时调度/重试），不能依赖 scope 钩子注入
                 tenantId: instance.tenantId ?? 1,
@@ -229,24 +243,27 @@ export default class WorkflowEngine {
             )
             // MySQL bulkCreate 不回填自增 id，单独一次查询取回刚插入的任务（含 id）用于通知
             const created = await ApprovalTask.findAll({
-              where: { instanceId: instance.id, nodeKey, approverId: { [Op.in]: toCreate } },
+              where: { instanceId: instance.id, nodeKey, approverId: { [Op.in]: toCreate.map((e) => e.approverId) } },
             })
+            const summary = this.buildFormSummary(instance, state.context)
             for (const task of created) {
               sendToUser(task.approverId, 'approval', {
                 taskId: task.id,
                 instanceId: instance.id,
                 title: instance.title,
-                message: '您有一个新的审批任务',
+                message: `您有一个新的审批任务${summary ? '：' + summary : ''}`,
               })
             }
           }
-          // 审批人集合 = 已存在 + 本次新派（保持顺序稳定）
-          nd.approvers = Array.from(new Set([...nd.approvers, ...approverIds]))
+          // 审批人集合 = 已存在 + 本次新派（保持顺序稳定，使用委托后的实际处理人）
+          nd.approvers = Array.from(new Set([...nd.approvers, ...effective.map((e) => e.approverId)]))
           state.nodeData[nodeKey] = nd
 
-          await log.update({ status: 'success', output: JSON.stringify({ approverIds, waiting: true }), finishedAt: new Date(), duration: 0 })
+          await log.update({ status: 'success', output: JSON.stringify({ approverIds: effective.map((e) => e.approverId), waiting: true }), finishedAt: new Date(), duration: 0 })
           // 等待审批：不标记完成，实例进入等待态
           await this.commit(instance, state, { status: 'partial' as InstanceStatus })
+          // 抄送知会（知情不参与审批）
+          await this.notifyCc(node, instance, state.context)
           return
         }
       }
@@ -307,22 +324,129 @@ export default class WorkflowEngine {
     await instance.save()
   }
 
-  private async createNotice(node: WorkflowNode): Promise<void> {
+  private async createNotice(node: WorkflowNode, instance: WorkflowInstance, context: Record<string, unknown>): Promise<void> {
     try {
       const config = node.config ? JSON.parse(node.config) : {}
+      const title = this.renderTemplate(config.title || '系统通知', context)
+      const content = this.renderTemplate(config.content || '您有一条工作流通知', context)
       const { default: Notice } = await import('../models/Notice.js')
       await Notice.create({
-        title: config.title || '系统通知',
-        content: config.content || '您有一条工作流通知',
+        title,
+        content,
         type: 'notice',
         status: 'published',
         publisherId: 0,
         publisherName: '系统',
         publishTime: new Date(),
       })
+      // 通知节点同时按抄送列表实时推送
+      await this.notifyCc(node, instance, context)
     } catch {
       // 通知发送失败不影响流程推进
     }
+  }
+
+  /** 将模板中的 {{fieldKey}} 替换为表单上下文对应值 */
+  private renderTemplate(template: string, context: Record<string, unknown>): string {
+    if (!template) return template
+    return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => {
+      const value = context[key]
+      if (value === undefined || value === null) return ''
+      return String(value)
+    })
+  }
+
+  /** 委托转交：将处于有效委托期的审批人替换为被委托人 */
+  private async applyDelegation(approverIds: number[]): Promise<{ approverId: number; delegatedFrom?: number }[]> {
+    const result: { approverId: number; delegatedFrom?: number }[] = []
+    for (const id of approverIds) {
+      const delegatee = await resolveDelegation(id)
+      if (delegatee && delegatee !== id) {
+        result.push({ approverId: delegatee, delegatedFrom: id })
+      } else {
+        result.push({ approverId: id })
+      }
+    }
+    return result
+  }
+
+  /** 自动通过节点：满足阈值条件时跳过人工审批，直接通过并续跑 */
+  private async autoApproveNode(
+    instance: WorkflowInstance,
+    graph: Graph,
+    state: RuntimeState,
+    nodeKey: string,
+    log: WorkflowInstanceLog,
+    nextKeys: string[],
+  ): Promise<void> {
+    const nd: ApproverNodeState = state.nodeData[nodeKey] || { approvers: [], approved: [], rejected: [], waiting: false }
+    nd.approvers = [instance.startedBy || 0]
+    nd.approved = [instance.startedBy || 0]
+    nd.waiting = false
+    state.nodeData[nodeKey] = nd
+
+    // 写入一条自动通过的审批轨迹，便于追溯
+    await ApprovalTask.create({
+      instanceId: instance.id,
+      nodeKey,
+      title: instance.title || '审批',
+      status: 'approved',
+      approverId: instance.startedBy || 0,
+      approverName: '系统',
+      comment: '系统自动通过（满足自动通过条件）',
+      assignedAt: new Date(),
+      finishedAt: new Date(),
+      tenantId: instance.tenantId ?? 1,
+    })
+
+    await log.update({ status: 'success', output: JSON.stringify({ autoApproved: true }), finishedAt: new Date(), duration: 0 })
+    await this.completeNode(instance, graph, state, nodeKey, log, nextKeys)
+    await this.advance(instance, graph, state, nodeKey, nextKeys)
+  }
+
+  /** 抄送知会：把待办/通知同步给抄送人（知情不参与审批），失败不影响主流程 */
+  private async notifyCc(node: WorkflowNode, instance: WorkflowInstance, context: Record<string, unknown>): Promise<void> {
+    try {
+      const config = node.config ? JSON.parse(node.config) : {}
+      const ccUserIds: number[] = config.ccUserIds || []
+      if (ccUserIds.length === 0) return
+      const summary = this.buildFormSummary(instance, context)
+      for (const uid of ccUserIds) {
+        sendToUser(uid, 'workflow-cc', {
+          instanceId: instance.id,
+          title: instance.title,
+          message: `【抄送】${instance.title || '工作流'}${summary ? '：' + summary : ''}`,
+        })
+      }
+      await WorkflowInstanceLog.create({
+        instanceId: instance.id,
+        nodeKey: node.nodeKey,
+        nodeName: node.name,
+        nodeType: 'cc',
+        status: 'success',
+        input: JSON.stringify(context),
+        output: JSON.stringify({ ccUserIds }),
+        startedAt: new Date(),
+        finishedAt: new Date(),
+      })
+    } catch {
+      // 抄送失败不影响主流程
+    }
+  }
+
+  /** 构建审批通知的表单上下文摘要（取前几个字段，便于审批人一眼判断） */
+  private buildFormSummary(instance: WorkflowInstance, context: Record<string, unknown>): string {
+    const parts: string[] = []
+    const title = instance.title || ''
+    if (title) parts.push(title)
+    const keys = Object.keys(context || {})
+      .filter((k) => k !== 'title')
+      .slice(0, 3)
+    for (const k of keys) {
+      const v = context[k]
+      if (v !== undefined && v !== null && v !== '') parts.push(`${k}:${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    }
+    return parts.join(' ').slice(0, 120)
   }
 
   private computeDueAt(node: WorkflowNode): Date | null {

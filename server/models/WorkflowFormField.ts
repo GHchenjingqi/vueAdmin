@@ -43,7 +43,7 @@ WorkflowFormField.init(
       comment: '字段显示名称',
     },
     type: {
-      type: DataTypes.ENUM('text', 'textarea', 'number', 'select', 'date'),
+      type: DataTypes.ENUM('text', 'textarea', 'number', 'select', 'date', 'file'),
       allowNull: false,
       defaultValue: 'text',
       comment: '字段类型',

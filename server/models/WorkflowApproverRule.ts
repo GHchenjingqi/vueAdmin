@@ -38,7 +38,7 @@ WorkflowApproverRule.init(
       comment: '所属审批节点 key',
     },
     ruleType: {
-      type: DataTypes.ENUM('creator', 'direct_leader', 'dept_manager', 'role', 'dept', 'user'),
+      type: DataTypes.ENUM('creator', 'direct_leader', 'dept_manager', 'role', 'dept', 'user', 'field'),
       allowNull: false,
       comment: '审批人规则类型',
     },

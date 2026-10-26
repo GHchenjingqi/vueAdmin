@@ -34,7 +34,7 @@ export interface WorkflowEdge {
 export interface ApproverRule {
   id?: number
   nodeKey: string
-  ruleType: 'creator' | 'direct_leader' | 'dept_manager' | 'role' | 'dept' | 'user'
+  ruleType: 'creator' | 'direct_leader' | 'dept_manager' | 'role' | 'dept' | 'user' | 'field'
   ruleConfig?: string
   sort: number
   name?: string
@@ -45,7 +45,7 @@ export interface WorkflowFormField {
   workflowId?: number
   fieldKey: string
   label: string
-  type: 'text' | 'textarea' | 'number' | 'select' | 'date'
+  type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'file'
   required?: number | boolean
   options?: string | null
   placeholder?: string | null
@@ -102,11 +102,21 @@ export interface WorkflowDesignPayload {
   }[]
   rules: {
     nodeKey: string
-    ruleType: 'creator' | 'direct_leader' | 'dept_manager' | 'role' | 'dept' | 'user'
+    ruleType: 'creator' | 'direct_leader' | 'dept_manager' | 'role' | 'dept' | 'user' | 'field'
     ruleConfig?: string
     sort?: number
     name?: string
   }[]
+}
+
+export interface WorkflowRejectReason {
+  id: number
+  content: string
+  sort: number
+  enabled: number
+  createdBy: number | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 export const workflowApi = {
@@ -203,5 +213,39 @@ export const workflowApi = {
   // 校验当前草稿版本
   validateDraft(id: number) {
     return request.get<{ valid: boolean; errors: string[] }>(`/workflows/${id}/design/validate`)
+  },
+  // 个人委托审批
+  setDelegation(data: { toUserId: number; startAt?: string; endAt?: string; remark?: string }) {
+    return request.post<unknown>('/me/delegation', data)
+  },
+  listDelegations() {
+    return request.get<
+      { id: number; fromUserId: number; toUserId: number; toUserName: string; startAt: string; endAt: string | null; remark: string | null; status: number }[] &
+        unknown
+    >('/me/delegation')
+  },
+  cancelDelegation(id: number) {
+    return request.delete<null>(`/me/delegation/${id}`)
+  },
+  // 导出实例为 CSV
+  exportInstances(params?: Record<string, unknown>) {
+    return request.get<Blob>('/workflow-instances/export', { params, responseType: 'blob' })
+  },
+  // 导出我的审批记录为 CSV
+  exportMyTasks(params?: Record<string, unknown>) {
+    return request.get<Blob>('/approval-tasks/export', { params, responseType: 'blob' })
+  },
+  // 常用驳回理由（可配置）
+  listRejectReasons() {
+    return request.get<WorkflowRejectReason[]>('/workflow-reject-reasons')
+  },
+  createRejectReason(data: { content: string; sort?: number; enabled?: number }) {
+    return request.post<WorkflowRejectReason>('/workflow-reject-reasons', data)
+  },
+  updateRejectReason(id: number, data: { content?: string; sort?: number; enabled?: number }) {
+    return request.put<WorkflowRejectReason>(`/workflow-reject-reasons/${id}`, data)
+  },
+  deleteRejectReason(id: number) {
+    return request.delete<null>(`/workflow-reject-reasons/${id}`)
   },
 }

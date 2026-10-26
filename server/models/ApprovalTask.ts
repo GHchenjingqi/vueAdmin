@@ -11,6 +11,12 @@ class ApprovalTask extends Model<InferAttributes<ApprovalTask>, InferCreationAtt
   declare approverName: string | null
   declare dueAt: Date | null
   declare comment: string | null
+  /** 已催办时间（超时提醒已发送） */
+  declare remindedAt: Date | null
+  /** 是否已升级转交（超时自动转交上级/指定人） */
+  declare escalated: CreationOptional<number>
+  /** 被委托人原始审批人（委托产生时记录，便于追溯） */
+  declare delegatedFrom: number | null
   declare assignedAt: Date | null
   declare finishedAt: Date | null
   /** 租户ID（M1：由租户 scope 钩子按请求上下文注入，DB 默认 1） */
@@ -67,6 +73,22 @@ ApprovalTask.init(
       type: DataTypes.STRING(500),
       allowNull: true,
       comment: '审批意见',
+    },
+    remindedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: '已催办时间',
+    },
+    escalated: {
+      type: DataTypes.TINYINT,
+      allowNull: false,
+      defaultValue: 0,
+      comment: '是否已升级转交: 0=否 1=是',
+    },
+    delegatedFrom: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      comment: '被委托人原始审批人 ID',
     },
     assignedAt: {
       type: DataTypes.DATE,

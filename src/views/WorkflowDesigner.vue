@@ -94,6 +94,18 @@
                   @update:model-value="markDirty"
                 />
               </el-form-item>
+              <el-form-item :label="t('workflow.designer.cc')">
+                <el-select
+                  v-model="notifyConfig.ccUserIds"
+                  multiple
+                  size="small"
+                  collapse-tags
+                  :placeholder="t('workflow.designer.ccPlaceholder')"
+                  @change="markDirty"
+                >
+                  <el-option v-for="u in users" :key="u.id" :label="u.nickname || u.username" :value="u.id" />
+                </el-select>
+              </el-form-item>
             </template>
 
             <template v-if="selectedNode.type === 'approve'">
@@ -109,6 +121,28 @@
                     <el-option :label="t('workflow.designer.byRole')" value="role" />
                     <el-option :label="t('workflow.designer.byDept')" value="dept" />
                     <el-option :label="t('workflow.designer.byUser')" value="user" />
+                    <el-option :label="t('workflow.designer.byField')" value="field" />
+                  </el-select>
+                  <el-select
+                    v-if="rule.ruleType === 'field'"
+                    :model-value="getRuleStr(rule, 'fieldKey')"
+                    size="small"
+                    filterable
+                    :placeholder="t('workflow.designer.fieldKey')"
+                    style="width: 130px"
+                    @update:model-value="(v) => updateRuleStr(idx, 'fieldKey', v)"
+                  >
+                    <el-option v-for="f in formFieldOptions" :key="f.fieldKey" :label="`${f.label} (${f.fieldKey})`" :value="f.fieldKey" />
+                  </el-select>
+                  <el-select
+                    v-if="rule.ruleType === 'field'"
+                    :model-value="getRuleStr(rule, 'resolve')"
+                    size="small"
+                    style="width: 110px"
+                    @update:model-value="(v) => updateRuleStr(idx, 'resolve', v)"
+                  >
+                    <el-option :label="t('workflow.designer.resolveId')" value="id" />
+                    <el-option :label="t('workflow.designer.resolveUsername')" value="username" />
                   </el-select>
                   <el-select
                     v-if="rule.ruleType === 'role'"
@@ -146,6 +180,68 @@
                   {{ t('workflow.designer.addRule') }}
                 </el-button>
               </div>
+
+              <div class="approve-advanced">
+                <div class="section-title">
+                  {{ t('workflow.designer.autoApprove') }}
+                </div>
+                <el-form-item :label="t('workflow.designer.autoApproveExpr')">
+                  <el-input
+                    v-model="approveConfig.autoApproveExpr"
+                    :placeholder="t('workflow.designer.autoApproveExprPlaceholder')"
+                    @update:model-value="markDirty"
+                  />
+                </el-form-item>
+                <el-form-item :label="t('workflow.designer.cc')">
+                  <el-select
+                    v-model="approveConfig.ccUserIds"
+                    multiple
+                    size="small"
+                    collapse-tags
+                    :placeholder="t('workflow.designer.ccPlaceholder')"
+                    @change="markDirty"
+                  >
+                    <el-option v-for="u in users" :key="u.id" :label="u.nickname || u.username" :value="u.id" />
+                  </el-select>
+                </el-form-item>
+
+                <div class="section-title">
+                  {{ t('workflow.designer.timeout') }}
+                </div>
+                <el-form-item :label="t('workflow.designer.remindHours')">
+                  <el-input-number v-model="approveConfig.remindHours" :min="0" :controls="false" @change="markDirty" />
+                </el-form-item>
+                <el-form-item :label="t('workflow.designer.timeoutHours')">
+                  <el-input-number v-model="approveConfig.timeoutHours" :min="0" :controls="false" @change="markDirty" />
+                </el-form-item>
+                <el-form-item :label="t('workflow.designer.timeoutAction')">
+                  <el-select v-model="approveConfig.timeoutAction" size="small" @change="markDirty">
+                    <el-option :label="t('workflow.designer.timeoutActionNone')" value="" />
+                    <el-option :label="t('workflow.designer.timeoutActionAuto')" value="auto_approve" />
+                  </el-select>
+                </el-form-item>
+                <template v-if="approveConfig.timeoutAction !== 'auto_approve'">
+                  <el-form-item :label="t('workflow.designer.escalateTo')">
+                    <el-select v-model="approveConfig.escalateToType" size="small" @change="markDirty">
+                      <el-option :label="t('workflow.designer.escalateNone')" value="" />
+                      <el-option :label="t('workflow.designer.escalateLeader')" value="leader" />
+                      <el-option :label="t('workflow.designer.escalateUser')" value="user" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item v-if="approveConfig.escalateToType === 'user'" :label="t('workflow.designer.escalateUser')">
+                    <el-select
+                      v-model="approveConfig.escalateToUserIds"
+                      multiple
+                      size="small"
+                      collapse-tags
+                      :placeholder="t('workflow.designer.ccPlaceholder')"
+                      @change="markDirty"
+                    >
+                      <el-option v-for="u in users" :key="u.id" :label="u.nickname || u.username" :value="u.id" />
+                    </el-select>
+                  </el-form-item>
+                </template>
+              </div>
             </template>
 
             <template v-if="selectedNode.type === 'condition'">
@@ -182,7 +278,7 @@
               {{ t('common.delete') }}
             </el-button>
           </div>
-          <el-form label-width="80px" size="small">
+          <el-form label-width="92px" size="small">
             <el-form-item :label="t('workflow.designer.source')">
               <el-tag size="small">
                 {{ selectedEdge.source }}
@@ -318,6 +414,7 @@ import {
   type WorkflowFormField,
 } from '@/api/workflow'
 import { roleApi, deptApi, userApi } from '@/api'
+import { getErrorMessage } from '@/utils/errors'
 import { useI18n } from '@/i18n'
 import WorkflowNodeComp from './workflow/WorkflowNode.vue'
 
@@ -391,9 +488,23 @@ const publishing = ref(false)
 const dirty = ref(false)
 const selectedNode = ref<FlowNode | null>(null)
 const selectedEdge = ref<FlowEdge | null>(null)
-const notifyConfig = reactive({ title: '', content: '' })
+const notifyConfig = reactive({ title: '', content: '', ccUserIds: [] as number[] })
 const approverRules = ref<ApproverRule[]>([])
 const conditionEdges = ref<ConditionEdgeItem[]>([])
+
+// 审批节点高级配置（自动通过 / 抄送 / 超时与升级），保存时序列化进节点 config
+const approveConfig = reactive({
+  autoApproveExpr: '',
+  ccUserIds: [] as number[],
+  remindHours: null as number | null,
+  timeoutHours: null as number | null,
+  timeoutAction: '' as '' | 'auto_approve',
+  escalateToType: '' as '' | 'leader' | 'user',
+  escalateToUserIds: [] as number[],
+})
+
+// 设计器节点配置区可用的表单字段（供 field 审批人规则选择字段）
+const formFieldOptions = ref<WorkflowFormField[]>([])
 
 // ==================== 表单设计（业务发起参数定义） ====================
 const formDrawerVisible = ref(false)
@@ -546,27 +657,47 @@ function onNodeClick({ node }: NodeMouseEvent) {
 }
 
 function onEdgeClick({ edge }: EdgeMouseEvent) {
-  flushNotifyConfig()
+  flushNodeConfig()
   selectedNode.value = null
   selectedEdge.value = edge as unknown as FlowEdge
 }
 
 function onPaneClick() {
-  flushNotifyConfig()
+  flushNodeConfig()
   selectedNode.value = null
   selectedEdge.value = null
 }
 
-function flushNotifyConfig() {
+function flushNodeConfig() {
   const node = selectedNode.value
-  if (node && node.type === 'notify' && node.data?.rawNode) {
-    node.data.rawNode.config = JSON.stringify({ title: notifyConfig.title, content: notifyConfig.content })
+  if (!node || !node.data?.rawNode) return
+  if (node.type === 'notify') {
+    node.data.rawNode.config = JSON.stringify({
+      title: notifyConfig.title,
+      content: notifyConfig.content,
+      ccUserIds: notifyConfig.ccUserIds || [],
+    })
+    node.data = { ...node.data }
+  } else if (node.type === 'approve') {
+    const cfg: Record<string, unknown> = {}
+    if (approveConfig.autoApproveExpr) cfg.autoApproveExpr = approveConfig.autoApproveExpr
+    if (approveConfig.ccUserIds?.length) cfg.ccUserIds = approveConfig.ccUserIds
+    if (typeof approveConfig.remindHours === 'number' && approveConfig.remindHours > 0) cfg.remindHours = approveConfig.remindHours
+    if (typeof approveConfig.timeoutHours === 'number' && approveConfig.timeoutHours > 0) cfg.timeoutHours = approveConfig.timeoutHours
+    if (approveConfig.timeoutAction) cfg.timeoutAction = approveConfig.timeoutAction
+    if (approveConfig.timeoutAction !== 'auto_approve' && approveConfig.escalateToType) {
+      cfg.escalateTo = {
+        type: approveConfig.escalateToType,
+        userIds: approveConfig.escalateToType === 'user' ? approveConfig.escalateToUserIds : undefined,
+      }
+    }
+    node.data.rawNode.config = JSON.stringify(cfg)
     node.data = { ...node.data }
   }
 }
 
 function selectNode(node: FlowNode) {
-  flushNotifyConfig()
+  flushNodeConfig()
   selectedEdge.value = null
   selectedNode.value = node
   resetLocalConfig()
@@ -575,9 +706,18 @@ function selectNode(node: FlowNode) {
     const cfg = JSON.parse(raw.config)
     notifyConfig.title = cfg.title || ''
     notifyConfig.content = cfg.content || ''
+    notifyConfig.ccUserIds = cfg.ccUserIds || []
   }
   if (node.type === 'approve') {
     approverRules.value = rulesByNode.value.get(node.id) || []
+    const cfg = raw?.config ? JSON.parse(raw.config) : {}
+    approveConfig.autoApproveExpr = cfg.autoApproveExpr || ''
+    approveConfig.ccUserIds = cfg.ccUserIds || []
+    approveConfig.remindHours = typeof cfg.remindHours === 'number' && cfg.remindHours > 0 ? cfg.remindHours : null
+    approveConfig.timeoutHours = typeof cfg.timeoutHours === 'number' && cfg.timeoutHours > 0 ? cfg.timeoutHours : null
+    approveConfig.timeoutAction = cfg.timeoutAction || ''
+    approveConfig.escalateToType = cfg.escalateTo?.type || ''
+    approveConfig.escalateToUserIds = cfg.escalateTo?.userIds || []
   }
   if (node.type === 'condition') loadConditionEdges(node.id)
 }
@@ -585,6 +725,14 @@ function selectNode(node: FlowNode) {
 function resetLocalConfig() {
   notifyConfig.title = ''
   notifyConfig.content = ''
+  notifyConfig.ccUserIds = []
+  approveConfig.autoApproveExpr = ''
+  approveConfig.ccUserIds = []
+  approveConfig.remindHours = null
+  approveConfig.timeoutHours = null
+  approveConfig.timeoutAction = ''
+  approveConfig.escalateToType = ''
+  approveConfig.escalateToUserIds = []
   approverRules.value = []
   conditionEdges.value = []
 }
@@ -629,6 +777,8 @@ function defaultRuleConfig(type: ApproverRule['ruleType']): Record<string, unkno
       return { deptIds: [] }
     case 'user':
       return { userIds: [] }
+    case 'field':
+      return { fieldKey: '', resolve: 'id' }
     default:
       return {}
   }
@@ -639,10 +789,23 @@ function getRuleConfig(rule: ApproverRule, key: string): number[] {
   return config[key] || []
 }
 
+function getRuleStr(rule: ApproverRule, key: string): string {
+  const config = rule.ruleConfig ? JSON.parse(rule.ruleConfig) : {}
+  return config[key] || ''
+}
+
 function updateRuleConfig(idx: number, key: string, values: number[]) {
   const rule = approverRules.value[idx]
   const config = rule.ruleConfig ? JSON.parse(rule.ruleConfig) : {}
   config[key] = values
+  rule.ruleConfig = JSON.stringify(config)
+  syncRulesToMap()
+}
+
+function updateRuleStr(idx: number, key: string, value: string) {
+  const rule = approverRules.value[idx]
+  const config = rule.ruleConfig ? JSON.parse(rule.ruleConfig) : {}
+  config[key] = value
   rule.ruleConfig = JSON.stringify(config)
   syncRulesToMap()
 }
@@ -721,7 +884,7 @@ function removeEdgeFromGraph(edge: FlowEdge) {
 async function handleSave() {
   saving.value = true
   try {
-    flushNotifyConfig()
+    flushNodeConfig()
 
     const payload: WorkflowDesignPayload = {
       nodes: flowNodes.value.map((n) => ({
@@ -762,9 +925,8 @@ async function handleSave() {
     loadedRulesByNode.value = new Map(Array.from(rulesByNode.value.entries()).map(([k, v]) => [k, v.map((r) => ({ ...r }))] as [string, ApproverRule[]]))
     dirty.value = false
     ElMessage.success(t('workflow.designer.saveSuccess'))
-  } catch (err: any) {
-    const msg = err?.response?.data?.message || err?.message || t('workflow.designer.saveFailed')
-    ElMessage.error(msg)
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err) || t('workflow.designer.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -859,6 +1021,9 @@ onMounted(async () => {
   })
   userApi.list({ page: 1, pageSize: 200 }).then((r) => {
     users.value = r.data?.rows || []
+  })
+  workflowApi.getFormFields(workflowId).then((r) => {
+    formFieldOptions.value = r.data || []
   })
 
   if (!workflowId || isNaN(workflowId)) {
