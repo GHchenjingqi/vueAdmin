@@ -53,6 +53,15 @@ export default tseslint.config(
     },
   },
   {
+    // Node 脚本目录使用 Node 全局变量（process/console 等）
+    files: ['scripts/**/*.js', 'scripts/**/*.mjs', '*.config.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
     files: ['*.vue', 'src/**/*.vue'],
     languageOptions: {
       parserOptions: {
@@ -64,6 +73,11 @@ export default tseslint.config(
     rules: {
       // Vue 组件名允许多单词（关闭强制多单词限制）
       'vue/multi-word-component-names': 'off',
+      // 与 prettier 冲突的模板格式规则关闭（pre-commit 的 prettier --write 会合并属性行，
+      // 保留此规则会导致 eslint --fix 与 prettier 互相拉锯、产生大量无效 diff）
+      'vue/max-attributes-per-line': 'off',
+      'vue/singleline-html-element-content-newline': 'off',
+      'vue/html-self-closing': 'off',
       // 允许使用 any（但给出警告）
       '@typescript-eslint/no-explicit-any': 'warn',
       // 关闭基础 no-unused-vars，使用 ts 版本

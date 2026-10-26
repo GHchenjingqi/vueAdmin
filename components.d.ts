@@ -97,6 +97,7 @@ declare module 'vue' {
     ProformItem: typeof import('./src/components/ProForm/ProformItem.vue')['default']
     ProFormMoney: typeof import('./src/components/ProForm/ProFormMoney.vue')['default']
     ProTable: typeof import('./src/components/ProTable/index.vue')['default']
+    QuotaBar: typeof import('./src/components/QuotaBar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SearchBar: typeof import('./src/components/SearchBar.vue')['default']
