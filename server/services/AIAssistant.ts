@@ -6,6 +6,7 @@
  */
 
 import OpenAI from 'openai'
+import config from '../config/index.js'
 import { retrieveByCategory } from './LocalFileRAG.js'
 import * as aiProviderService from './AiProviderService.js'
 import type { RetrievalResult } from './LocalFileRAG.js'
@@ -218,11 +219,16 @@ function parseAIResponse(response: string): GenerationResult {
  * @param providerId - 可选，指定 AI 提供商 ID
  * @param model - 可选，指定模型，默认使用提供商的 defaultModel
  */
-export async function generateCode(
-  userPrompt: string,
-  providerId?: number,
-  model?: string,
-): Promise<GenerationResult> {
+export async function generateCode(userPrompt: string, providerId?: number, model?: string): Promise<GenerationResult> {
+  if (config.app.aiAssistantEnabled !== true) {
+    return {
+      success: false,
+      prompt: userPrompt,
+      explanation: '',
+      files: [],
+      error: 'AI 代码注入已被禁用',
+    }
+  }
   if (!userPrompt || userPrompt.trim().length < 1) {
     return {
       success: false,
@@ -290,10 +296,10 @@ export async function generateCode(
  */
 export async function chat(
   userMessage: string,
-  history: Array<{ role: 'user' | 'assistant', content: string }> = [],
+  history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
   providerId?: number,
   model?: string,
-): Promise<{ success: boolean, content: string, error?: string }> {
+): Promise<{ success: boolean; content: string; error?: string }> {
   try {
     const { client, model: defaultModel } = await getClientConfig(providerId)
     const selectedModel = model || defaultModel
@@ -325,7 +331,7 @@ export async function chat(
 /**
  * 检查 API 配置是否有效
  */
-export async function checkConfig(): Promise<{ valid: boolean, message: string }> {
+export async function checkConfig(): Promise<{ valid: boolean; message: string }> {
   try {
     const defaultProvider = await aiProviderService.getDefaultProvider()
     if (defaultProvider) {

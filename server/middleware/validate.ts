@@ -16,7 +16,7 @@ export function validate(schema: ZodType, target: ValidationTarget = 'body') {
       next()
     } catch (err) {
       if (err instanceof ZodError) {
-        const message = err.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
+        const message = err.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')
         next(Object.assign(new Error(message), { statusCode: 400 }))
       } else {
         next(err)

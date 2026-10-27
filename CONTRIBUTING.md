@@ -9,7 +9,7 @@
 - **Node.js**: 20+
 - **MySQL**: 8.0+
 - **Redis**: 7+
-- **pnpm** (推荐) 或 npm
+- **npm**（本仓库使用 npm + package-lock.json）
 
 ### 快速开始
 
@@ -17,10 +17,12 @@
 # 安装依赖
 npm run install:all
 
-# 复制环境变量
+# 复制环境变量（根目录 + 后端）
 cp .env.example .env.development
+cp .env.example server/.env
+# 按需修改 DB_* / JWT_SECRET / ALLOWED_ORIGINS
 
-# 启动开发服务器
+# 启动开发服务器（Express 内嵌 Vite HMR，默认 https://localhost:5173）
 npm run dev
 ```
 
@@ -28,7 +30,7 @@ npm run dev
 
 ```bash
 # 启动数据库和 Redis
-docker compose up -d db redis
+docker compose up -d mysql redis
 
 # 启动开发服务器
 npm run dev
@@ -111,7 +113,7 @@ npm run test:coverage
 
 API 文档使用 Swagger/OpenAPI 规范。
 
-开发时访问: `http://localhost:3000/api-docs`
+开发时访问: `https://localhost:5173/api/docs`
 
 ## 性能基准测试
 

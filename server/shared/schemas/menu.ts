@@ -37,7 +37,9 @@ export type Menu = {
   children?: Menu[]
 }
 
-export const menuSchema: z.ZodType<Menu> = z.object({
+// 递归 schema：zod 3.25 对自引用 z.lazy 的推断会退化为全可选 Output，与 Menu 不匹配；
+// 此处保留运行时校验逻辑不变，仅以断言钉住对外类型
+export const menuSchema = z.object({
   id: z.number(),
   name: z.string(),
   type: z.enum(['M', 'C', 'F']),
@@ -51,7 +53,7 @@ export const menuSchema: z.ZodType<Menu> = z.object({
   keepAlive: z.boolean().optional(),
   status: z.number().optional(),
   children: z.lazy(() => z.array(menuSchema).optional()),
-})
+}) as unknown as z.ZodType<Menu>
 
 export type CreateMenuInput = z.infer<typeof createMenuSchema>
 export type UpdateMenuInput = z.infer<typeof updateMenuSchema>

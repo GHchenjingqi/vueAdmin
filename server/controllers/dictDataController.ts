@@ -11,9 +11,16 @@ import { listDictData, getDictDataById, createDictData, updateDictData, deleteDi
  */
 export const list = async (req, res, next) => {
   try {
-    const data = await listDictData(req.query as Record<string, unknown> as {
-      scope?: string; type?: string; page?: number; pageSize?: number; dictType?: string; keyword?: string
-    })
+    const data = await listDictData(
+      req.query as Record<string, unknown> as {
+        scope?: string
+        type?: string
+        page?: number
+        pageSize?: number
+        dictType?: string
+        keyword?: string
+      },
+    )
     res.json({ code: 0, data })
   } catch (err) {
     next(err)

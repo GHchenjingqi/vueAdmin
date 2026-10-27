@@ -44,14 +44,7 @@ export const captcha = async (_req: Request, res: Response, next: NextFunction) 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, password, captchaKey, captchaText, rememberMe } = req.body
-    const result = await authService.login(
-      username,
-      password,
-      req.ip,
-      req,
-      { key: captchaKey, text: captchaText },
-      rememberMe,
-    )
+    const result = await authService.login(username, password, req.ip, { headers: req.headers as Record<string, string | undefined>, ip: req.ip }, { key: captchaKey, text: captchaText }, rememberMe)
 
     const { _refreshToken, _rtExpires, ...responseData } = result as any
 

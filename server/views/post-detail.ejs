@@ -1,0 +1,28 @@
+<article class="post-detail">
+  <h1><%= pageTitle %></h1>
+  <div class="post-meta">
+    <% if (category) { %>
+      <span class="category"><%= category.name %></span>
+    <% } %>
+    <span class="author"><%= post.author %></span>
+    <span class="date"><%= post.publishTime %></span>
+  </div>
+  <% if (post.tags && post.tags.length) { %>
+    <div class="post-tags">
+      <% post.tags.forEach(function(tag) { %>
+        <span class="tag"><%= tag.name %></span>
+      <% }); %>
+    </div>
+  <% } %>
+  <div class="post-body">
+    <%- postBodyHtml %>
+  </div>
+  <nav class="post-nav">
+    <% if (prev) { %>
+      <a href="<%= prev.url %>" class="prev">&larr; <%= prev.title %></a>
+    <% } %>
+    <% if (next) { %>
+      <a href="<%= next.url %>" class="next"><%= next.title %> &rarr;</a>
+    <% } %>
+  </nav>
+</article>

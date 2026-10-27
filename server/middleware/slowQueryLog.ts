@@ -14,9 +14,7 @@ import { logWarn } from '../utils/fileLogger.js'
 
 const DEFAULT_THRESHOLD_MS = 1000
 
-export function slowQueryLogMiddleware(
-  thresholdMs: number = DEFAULT_THRESHOLD_MS
-): (req: Request, res: Response, next: NextFunction) => void {
+export function slowQueryLogMiddleware(thresholdMs: number = DEFAULT_THRESHOLD_MS): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction): void => {
     const start = Date.now()
 
@@ -24,9 +22,7 @@ export function slowQueryLogMiddleware(
     res.on('finish', () => {
       const duration = Date.now() - start
       if (duration > thresholdMs) {
-        logWarn(
-          `[SLOW] ${req.method} ${req.originalUrl} ${duration}ms - ${res.statusCode}`
-        )
+        logWarn(`[SLOW] ${req.method} ${req.originalUrl} ${duration}ms - ${res.statusCode}`)
       }
     })
 

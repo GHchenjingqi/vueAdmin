@@ -116,7 +116,7 @@ describe('userService.ts', () => {
 
       vi.mocked(User.findAndCountAll).mockResolvedValueOnce({
         rows: mockUsers as any,
-        count: 2,
+        count: 2 as any,
       })
 
       const result = await listUsers({}, 1, 10)
@@ -133,7 +133,7 @@ describe('userService.ts', () => {
     })
 
     it('第 2 页 offset 正确', async () => {
-      vi.mocked(User.findAndCountAll).mockResolvedValueOnce({ rows: [], count: 0 })
+      vi.mocked(User.findAndCountAll).mockResolvedValueOnce({ rows: [], count: 0 } as any)
 
       await listUsers({}, 2, 20)
 
@@ -146,7 +146,7 @@ describe('userService.ts', () => {
     })
 
     it('带查询条件', async () => {
-      vi.mocked(User.findAndCountAll).mockResolvedValueOnce({ rows: [], count: 0 })
+      vi.mocked(User.findAndCountAll).mockResolvedValueOnce({ rows: [], count: 0 } as any)
 
       await listUsers({ username: 'admin' }, 1, 10)
 
@@ -188,6 +188,10 @@ describe('userService.ts', () => {
           username: 'newuser',
           password: 'Test123!',
           nickname: '新用户',
+          email: 'newuser@example.com',
+          phone: '13800138000',
+          status: 1,
+          deptId: 1,
         },
         { id: 1, username: 'admin' },
       )
@@ -198,12 +202,7 @@ describe('userService.ts', () => {
     it('用户名已存在抛出错误', async () => {
       vi.mocked(User.findOne).mockResolvedValueOnce({ id: 1 } as any)
 
-      await expect(
-        createUser(
-          { username: 'existing', password: 'Test123!', nickname: 'test' },
-          { id: 1, username: 'admin' },
-        ),
-      ).rejects.toThrow('用户名已存在')
+      await expect(createUser({ username: 'existing', password: 'Test123!', nickname: 'test', email: 'existing@example.com', phone: '13800138000', status: 1, deptId: 1 }, { id: 1, username: 'admin' })).rejects.toThrow('用户名已存在')
     })
   })
 

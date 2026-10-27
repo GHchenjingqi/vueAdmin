@@ -7,8 +7,15 @@ import type { Notice } from '@/types/api'
 
 export const noticeApi = {
   /** 获取通知列表 */
-  list(params: ListQueryParams & { type?: string }) {
+  list(params: ListQueryParams & { type?: string; status?: string; view?: string }) {
     return request.get<PaginatedData<Notice>>('/notices', { params })
+  },
+
+  /** 获取当前用户通知（含已读状态） */
+  listUser() {
+    return request.get<{ items: Notice[]; unread: number }>('/notices', {
+      params: { view: 'user' },
+    })
   },
 
   /** 获取单个通知 */
@@ -43,6 +50,6 @@ export const noticeApi = {
 
   /** 获取未读通知数 */
   getUnreadCount() {
-    return request.get<{ count: number }>('/notices/unread/count')
+    return request.get<{ count?: number; total?: number }>('/notices/unread/count')
   },
 }

@@ -12,6 +12,18 @@ import UserRole from '../models/UserRole.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { buildTree } from '../utils/helpers.js'
 
+/** 菜单类型合法值（与 DB ENUM('M','C','F') 一致）；缺省按 DB 默认值 'M' 处理 */
+const MENU_TYPES = ['M', 'C', 'F'] as const
+type MenuType = (typeof MENU_TYPES)[number]
+
+function normalizeMenuType(type?: string | null): MenuType {
+  if (type === undefined || type === null || type === '') return 'M'
+  if (!MENU_TYPES.includes(type as MenuType)) {
+    throw new AppError(400, `非法的菜单类型: ${type}（仅支持 M=菜单 / C=目录 / F=按钮）`)
+  }
+  return type as MenuType
+}
+
 /**
  * 获取用户角色 ID 列表
  */
@@ -20,7 +32,7 @@ async function getUserRoleIds(userId: number): Promise<number[]> {
     where: { userId },
     attributes: ['roleId'],
   })
-  return userRoles.map(ur => ur.roleId)
+  return userRoles.map((ur) => ur.roleId)
 }
 
 /**
@@ -36,7 +48,7 @@ async function hasAdminRole(roleIds: number[]): Promise<boolean> {
  * 递归收集所有父级菜单 ID
  */
 function collectParentIds(allMenus: Array<{ id: number; parentId: number }>, ids: Set<number>): void {
-  const menuMap = new Map(allMenus.map(m => [m.id, m]))
+  const menuMap = new Map(allMenus.map((m) => [m.id, m]))
   for (const id of [...ids]) {
     let currentId = id
     while (currentId) {
@@ -53,13 +65,13 @@ function collectParentIds(allMenus: Array<{ id: number; parentId: number }>, ids
  */
 function removeEmptyDirs(tree: any[]): any[] {
   return tree
-    .map(node => {
+    .map((node) => {
       if (node.children && node.children.length > 0) {
         node.children = removeEmptyDirs(node.children)
       }
       return node
     })
-    .filter(node => {
+    .filter((node) => {
       if (node.type === 'C' && (!node.children || node.children.length === 0)) {
         return false
       }
@@ -74,10 +86,12 @@ async function getChildIds(id: number): Promise<number[]> {
   const allMenus = await Menu.findAll({ attributes: ['id', 'parentId'], order: [['id', 'ASC']] })
   const ids: number[] = []
   const collect = (parentId: number): void => {
-    allMenus.filter(m => m.parentId === parentId).forEach(m => {
-      ids.push(m.id)
-      collect(m.id)
-    })
+    allMenus
+      .filter((m) => m.parentId === parentId)
+      .forEach((m) => {
+        ids.push(m.id)
+        collect(m.id)
+      })
   }
   collect(Number(id))
   return ids
@@ -111,7 +125,7 @@ export async function listMenus(scope: string | undefined, userId?: number) {
       where: { roleId: { [Op.in]: roleIds } },
       attributes: ['menuId'],
     })
-    const menuIds = new Set(roleMenus.map(rm => rm.menuId))
+    const menuIds = new Set(roleMenus.map((rm) => rm.menuId))
     if (menuIds.size === 0) return []
 
     const allPossibleMenus = await Menu.findAll({
@@ -175,7 +189,7 @@ export async function createMenu(data: {
     throw new AppError(400, '按钮类型必须填写权限标识')
   }
 
-  const menu = await Menu.create({ parentId, name, path, component, icon, sort, type, permission, status, hidden })
+  const menu = await Menu.create({ parentId, name, path, component, icon, sort, type: normalizeMenuType(type), permission, status, hidden })
   return { id: menu.id }
 }
 
@@ -210,7 +224,7 @@ export async function updateMenu(
     }
   }
 
-  await menu.update({ parentId: safeParentId, name, path, component, icon, sort, type, permission, status, hidden })
+  await menu.update({ parentId: safeParentId, name, path, component, icon, sort, type: normalizeMenuType(type), permission, status, hidden })
 }
 
 /**

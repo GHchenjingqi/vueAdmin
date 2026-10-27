@@ -20,11 +20,7 @@ describe('authMiddleware', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    validToken = jwt.sign(
-      { id: 1, username: 'admin', nickname: '管理员' },
-      config.jwt.secret,
-      { expiresIn: '1h' }
-    )
+    validToken = jwt.sign({ id: 1, username: 'admin', nickname: '管理员' }, config.jwt.secret, { expiresIn: '1h' })
   })
 
   it('should reject request without Authorization header', () => {
@@ -38,9 +34,7 @@ describe('authMiddleware', () => {
     authMiddleware(req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 401, message: '未提供认证令牌' })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 401, message: '未提供认证令牌' }))
     expect(next).not.toHaveBeenCalled()
   })
 
@@ -69,17 +63,11 @@ describe('authMiddleware', () => {
     authMiddleware(req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 401, message: '无效的认证令牌' })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 401, message: '无效的认证令牌' }))
   })
 
   it('should reject expired token', () => {
-    const expiredToken = jwt.sign(
-      { id: 1, username: 'admin' },
-      config.jwt.secret,
-      { expiresIn: '0s' }
-    )
+    const expiredToken = jwt.sign({ id: 1, username: 'admin' }, config.jwt.secret, { expiresIn: '0s' })
     const req: any = { headers: { authorization: `Bearer ${expiredToken}` } }
     const res: any = {
       status: vi.fn().mockReturnThis(),
@@ -90,9 +78,7 @@ describe('authMiddleware', () => {
     authMiddleware(req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 401, expired: true })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 401, expired: true }))
   })
 
   it('should pass valid token and call next', () => {
@@ -125,9 +111,7 @@ describe('authMiddleware', () => {
     authMiddleware(req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 401, kicked: true })
-    )
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 401, kicked: true }))
     expect(next).not.toHaveBeenCalled()
   })
 })

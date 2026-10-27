@@ -14,7 +14,7 @@ vi.mock('../utils/fileLogger.js', () => ({
   logInfo: vi.fn(),
 }))
 
-import { getDictOptions, loadDictOptions, refreshAllDictCache, refreshDictCache, getCachedDictTypes } from '../utils/dictCache'
+import { getDictOptions, loadDictOptions, refreshAllDictCache, refreshDictCache, getCachedDictTypes } from '../utils/dictCache.js'
 
 describe('dictCache', () => {
   beforeEach(() => {
@@ -42,9 +42,7 @@ describe('dictCache', () => {
     })
 
     it('缓存命中时不查询数据库', async () => {
-      mockFindAll.mockResolvedValueOnce([
-        { label: '男', value: '1', sort: 1 },
-      ])
+      mockFindAll.mockResolvedValueOnce([{ label: '男', value: '1', sort: 1 }])
 
       await getDictOptions('gender')
       await getDictOptions('gender')

@@ -11,6 +11,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { setAccessToken, getAccessToken } from '@/utils/request'
 import type { User } from '@/types/api'
+import { useNotificationStore } from './notificationStore'
 
 export const useUserStore = defineStore('user', () => {
   // ==================== State ====================
@@ -58,6 +59,11 @@ export const useUserStore = defineStore('user', () => {
     setAccessToken(null)
     clearUserFromStorage()
     passwordResetRequired.value = false
+    try {
+      useNotificationStore().reset()
+    } catch {
+      // pinia may not be ready in rare bootstrap paths
+    }
   }
 
   /**

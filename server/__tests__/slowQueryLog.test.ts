@@ -2,7 +2,7 @@
 /**
  * slowQueryLog 中间件单元测试
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
 
 const mockLogWarn = vi.fn()
@@ -52,9 +52,7 @@ describe('slowQueryLogMiddleware', () => {
     vi.advanceTimersByTime(1500)
     res.emit('finish')
 
-    expect(mockLogWarn).toHaveBeenCalledWith(
-      '[SLOW] GET /api/slow 1500ms - 200',
-    )
+    expect(mockLogWarn).toHaveBeenCalledWith('[SLOW] GET /api/slow 1500ms - 200')
   })
 
   it('should not log when duration is under threshold', () => {
@@ -82,9 +80,7 @@ describe('slowQueryLogMiddleware', () => {
     vi.advanceTimersByTime(600)
     res.emit('finish')
 
-    expect(mockLogWarn).toHaveBeenCalledWith(
-      '[SLOW] PUT /api/update 600ms - 200',
-    )
+    expect(mockLogWarn).toHaveBeenCalledWith('[SLOW] PUT /api/update 600ms - 200')
   })
 
   it('should not log when duration equals threshold', () => {

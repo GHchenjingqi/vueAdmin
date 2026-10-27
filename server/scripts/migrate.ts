@@ -9,10 +9,14 @@
  *   tsx scripts/migrate.ts status    # 查看迁移状态
  */
 import { migrator, seeder } from '../utils/migrator.js'
+import { ensureDatabaseExists } from '../utils/ensureDatabase.js'
+import sequelize from '../config/database.js'
 
 const command = process.argv[2]
 
 async function main() {
+  await ensureDatabaseExists()
+  await sequelize.authenticate()
   switch (command) {
     case 'up':
       await migrator.up()
@@ -31,7 +35,7 @@ async function main() {
       console.log('✅ 种子数据已回滚')
       break
     case 'reset':
-      await migrator.down({ to: 0 })
+      await migrator.down({ to: 0 as const })
       await migrator.up()
       await seeder.up()
       console.log('✅ 数据库已完全重置')
@@ -42,7 +46,7 @@ async function main() {
       console.log(`📊 迁移状态: 已执行 ${executed.length}, 待执行 ${pending.length}`)
       if (executed.length > 0) {
         console.log('  已执行:')
-        executed.forEach(m => console.log(`    - ${m.name}`))
+        executed.forEach((m) => console.log(`    - ${m.name}`))
       }
       break
     default:

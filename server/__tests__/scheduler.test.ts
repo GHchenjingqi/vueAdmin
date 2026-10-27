@@ -48,12 +48,7 @@ vi.mock('../utils/fileLogger.js', () => ({
   logInfo: vi.fn(),
 }))
 
-import {
-  initScheduler,
-  reloadTask,
-  runTaskNow,
-  getRunningTasks,
-} from '../utils/scheduler'
+import { initScheduler, reloadTask, runTaskNow, getRunningTasks } from '../utils/scheduler.js'
 
 describe('scheduler', () => {
   beforeEach(() => {
@@ -87,9 +82,7 @@ describe('scheduler', () => {
     })
 
     it('cron 表达式无效时不调度', async () => {
-      mockTaskFindAll.mockResolvedValueOnce([
-        { id: 1, name: 'invalid', status: 1, cronExpression: 'invalid', handler: 'cleanupLogs' },
-      ])
+      mockTaskFindAll.mockResolvedValueOnce([{ id: 1, name: 'invalid', status: 1, cronExpression: 'invalid', handler: 'cleanupLogs' }])
       mockValidate.mockReturnValue(false)
 
       await initScheduler()
@@ -109,7 +102,11 @@ describe('scheduler', () => {
   describe('reloadTask', () => {
     it('任务启用时启动调度', async () => {
       mockTaskFindByPk.mockResolvedValueOnce({
-        id: 1, name: 'cleanup', status: 1, cronExpression: '0 0 * * *', handler: 'cleanupLogs',
+        id: 1,
+        name: 'cleanup',
+        status: 1,
+        cronExpression: '0 0 * * *',
+        handler: 'cleanupLogs',
       })
       mockValidate.mockReturnValue(true)
 
@@ -120,7 +117,11 @@ describe('scheduler', () => {
 
     it('任务禁用时停止调度', async () => {
       mockTaskFindByPk.mockResolvedValueOnce({
-        id: 1, name: 'cleanup', status: 0, cronExpression: '0 0 * * *', handler: 'cleanupLogs',
+        id: 1,
+        name: 'cleanup',
+        status: 0,
+        cronExpression: '0 0 * * *',
+        handler: 'cleanupLogs',
       })
 
       await reloadTask(1)
@@ -140,42 +141,39 @@ describe('scheduler', () => {
   describe('runTaskNow', () => {
     it('执行已知 handler 的任务', async () => {
       mockTaskFindByPk.mockResolvedValueOnce({
-        id: 1, name: 'heartbeat', handler: 'heartbeat',
+        id: 1,
+        name: 'heartbeat',
+        handler: 'heartbeat',
       })
 
       await runTaskNow(1)
 
-      expect(mockTaskUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ lastResult: '心跳检测正常' }),
-        { where: { id: 1 } },
-      )
+      expect(mockTaskUpdate).toHaveBeenCalledWith(expect.objectContaining({ lastResult: '心跳检测正常' }), { where: { id: 1 } })
     })
 
     it('未知 handler 时记录错误', async () => {
       mockTaskFindByPk.mockResolvedValueOnce({
-        id: 1, name: 'unknown', handler: 'noSuchHandler',
+        id: 1,
+        name: 'unknown',
+        handler: 'noSuchHandler',
       })
 
       await runTaskNow(1)
 
-      expect(mockTaskUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ lastResult: '未知的处理函数' }),
-        { where: { id: 1 } },
-      )
+      expect(mockTaskUpdate).toHaveBeenCalledWith(expect.objectContaining({ lastResult: '未知的处理函数' }), { where: { id: 1 } })
     })
 
     it('handler 执行失败时记录错误', async () => {
       mockLogDestroy.mockRejectedValueOnce(new Error('DB error'))
       mockTaskFindByPk.mockResolvedValueOnce({
-        id: 1, name: 'cleanup', handler: 'cleanupLogs',
+        id: 1,
+        name: 'cleanup',
+        handler: 'cleanupLogs',
       })
 
       await runTaskNow(1)
 
-      expect(mockTaskUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ lastResult: expect.stringContaining('执行失败') }),
-        { where: { id: 1 } },
-      )
+      expect(mockTaskUpdate).toHaveBeenCalledWith(expect.objectContaining({ lastResult: expect.stringContaining('执行失败') }), { where: { id: 1 } })
     })
 
     it('任务不存在时直接返回', async () => {

@@ -140,23 +140,40 @@ interface TokenPayload {
   deptId: number
   /** 解析后的有效数据范围：1=全部 2=本部门 3=本级及以下 */
   dataScope: number
+  /** 租户ID */
+  tenantId: number
+  /** 是否为平台超管 */
+  isPlatformAdmin: boolean
 }
 
 /**
  * 构造 JWT 载荷：补全部门 ID 与数据范围。
  * 多角色取最宽松范围；旧 token 缺省字段不会进入此路径（新签发均带齐）。
  */
-async function buildTokenPayload(user: { id: number; username: string; nickname: string; deptId?: number | null }): Promise<TokenPayload> {
+async function buildTokenPayload(user: { id: number; username: string; nickname: string; deptId?: number | null; tenantId?: number }): Promise<TokenPayload> {
   const userRoles = await UserRole.findAll({ where: { userId: user.id }, attributes: ['roleId'] })
   const roleIds = [...new Set(userRoles.map((ur) => ur.roleId))]
   const { dataScope, deptId } = await resolveDataScope(user.deptId ?? null, roleIds)
+
+  // 判断平台超管：username === 'admin' 或拥有 platform_admin 角色
+  const isPlatformAdmin = user.username === 'admin' || (await isPlatformAdminByRole(roleIds))
+
   return {
     id: user.id,
     username: user.username,
     nickname: user.nickname || '',
     deptId,
     dataScope,
+    tenantId: user.tenantId ?? 1,
+    isPlatformAdmin,
   }
+}
+
+async function isPlatformAdminByRole(roleIds: number[]): Promise<boolean> {
+  if (roleIds.length === 0) return false
+  const adminRole = await Role.findOne({ where: { code: 'platform_admin' } })
+  if (!adminRole) return false
+  return roleIds.includes(adminRole.id)
 }
 
 function signAccessToken(payload: TokenPayload): string {
@@ -196,9 +213,7 @@ async function getUserRolesAndPermissions(userId: number): Promise<{ roles: stri
   if (menuIds.length === 0) return { roles: roleCodes, permissions: [] }
 
   const menus = await Menu.findAll({ where: { id: { [Op.in]: menuIds } }, attributes: ['type', 'permission'] })
-  const permissions = menus
-    .filter((m) => m.type === 'F' && m.permission)
-    .map((m) => m.permission as string)
+  const permissions = menus.filter((m) => m.type === 'F' && m.permission).map((m) => m.permission as string)
 
   return { roles: roleCodes, permissions: [...new Set(permissions)] }
 }
@@ -247,7 +262,7 @@ export async function login(
 
   // 检查账号是否被锁定
   if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
-    const remaining = Math.ceil((new Date(user.lockedUntil) - new Date()) / 1000)
+    const remaining = Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 1000)
     throw new AppError(423, `账号已被锁定，请 ${remaining} 秒后再试`)
   }
 
@@ -256,18 +271,12 @@ export async function login(
   if (!isPasswordValid) {
     await recordAttempt(ip, username)
 
-    const [affected] = await User.update(
-      { loginAttempts: sequelize.literal('loginAttempts + 1') },
-      { where: { id: user.id } },
-    )
+    const [affected] = await User.update({ loginAttempts: sequelize.literal('loginAttempts + 1') }, { where: { id: user.id } })
 
     if (affected > 0) {
       const updated = await User.findByPk(user.id, { attributes: ['loginAttempts'] })
       if (updated && updated.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-        await User.update(
-          { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION), loginAttempts: 0 },
-          { where: { id: user.id } },
-        )
+        await User.update({ lockedUntil: new Date(Date.now() + LOCKOUT_DURATION), loginAttempts: 0 }, { where: { id: user.id } })
         logLoginFailure(username, '密码错误次数过多，账号已锁定', req)
         throw new AppError(423, `密码错误次数过多，账号已锁定 ${LOCKOUT_DURATION / 60000} 分钟`)
       }
@@ -286,7 +295,7 @@ export async function login(
   // 登录成功，重置失败计数和速率限制
   await User.update({ loginAttempts: 0, lockedUntil: null }, { where: { id: user.id } })
   await clearAttempts(ip, username)
-  clearKickRecord(user.id)
+  clearKickRecord(user.tenantId ?? 1, user.id)
 
   // 清理旧 refresh token
   await RefreshToken.destroy({ where: { userId: user.id } })
@@ -367,14 +376,14 @@ export async function refresh(token: string): Promise<RefreshResult> {
   // 如果 token 已被撤销，检查是否在宽限期内（多标签页兼容）
   if (record.revoked) {
     const now = new Date()
-    if (record.revokedAt && (now.getTime() - new Date(record.revokedAt).getTime()) < REFRESH_GRACE_PERIOD) {
+    if (record.revokedAt && now.getTime() - new Date(record.revokedAt).getTime() < REFRESH_GRACE_PERIOD) {
       const latestValid = await RefreshToken.findOne({
         where: { userId: record.userId, revoked: 0, purpose: 'auth' },
         order: [['id', 'DESC']],
       })
       if (latestValid) {
         const user = await User.findByPk(record.userId, {
-          attributes: ['id', 'username', 'nickname', 'deptId', 'status', 'passwordResetRequired'],
+          attributes: ['id', 'username', 'nickname', 'deptId', 'tenantId', 'status', 'passwordResetRequired'],
         })
         if (user && user.status === 1) {
           return {
@@ -388,7 +397,7 @@ export async function refresh(token: string): Promise<RefreshResult> {
   }
 
   const user = await User.findByPk(record.userId, {
-    attributes: ['id', 'username', 'nickname', 'deptId', 'status', 'passwordResetRequired'],
+    attributes: ['id', 'username', 'nickname', 'deptId', 'tenantId', 'status', 'passwordResetRequired'],
   })
 
   if (!user || user.status !== 1) {
@@ -397,7 +406,7 @@ export async function refresh(token: string): Promise<RefreshResult> {
   }
 
   // 检查是否已被管理员强制下线
-  if (isUserKicked(user.id, Math.floor(new Date(record.createdAt).getTime() / 1000))) {
+  if (isUserKicked(user.tenantId ?? 1, user.id, Math.floor(new Date(record.createdAt).getTime() / 1000))) {
     await record.update({ revoked: 1, revokedAt: new Date() })
     await RefreshToken.destroy({ where: { userId: user.id } })
     throw new AppError(401, '您的账号已被管理员强制下线，请重新登录')
@@ -444,10 +453,7 @@ export async function logout(refreshToken: string | undefined): Promise<void> {
  */
 export async function getProfile(userId: number) {
   const user = await User.findByPk(userId, {
-    attributes: [
-      'id', 'username', 'nickname', 'email', 'phone', 'avatar',
-      'bio', 'status', 'deptId', 'passwordResetRequired', 'createdAt', 'updatedAt',
-    ],
+    attributes: ['id', 'username', 'nickname', 'email', 'phone', 'avatar', 'bio', 'status', 'deptId', 'passwordResetRequired', 'createdAt', 'updatedAt'],
   })
   if (!user) {
     throw new AppError(404, '用户不存在')
@@ -513,9 +519,12 @@ export async function forgotPassword(email: string, baseUrl: string): Promise<vo
 
   // 尝试发送邮件（失败不阻塞）
   try {
-    const { default: transporter } = await import('../utils/mailer.js')
+    const { getTransporter, getSenderName } = await import('../utils/mailer.js')
+    const transporter = await getTransporter()
     if (transporter) {
+      const senderName = await getSenderName()
       await transporter.sendMail({
+        from: `"${senderName}" <${email}>`,
         to: email,
         subject: '密码重置',
         html: `<p>请点击以下链接重置密码（15分钟内有效）：</p>

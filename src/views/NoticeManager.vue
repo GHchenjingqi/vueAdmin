@@ -89,7 +89,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { noticeApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'
@@ -109,6 +109,8 @@ const MdEditor = defineAsyncComponent(async () => {
 })
 
 const { t, locale } = useI18n()
+
+const formDialogRef = ref<InstanceType<typeof FormDialog> | null>(null)
 
 const searchFields = computed(() => [
   { prop: 'keyword', label: t('common.keyword'), type: 'input', placeholder: t('notice.inputKeyword') },
@@ -218,7 +220,9 @@ const openDialog = (row?: Record<string, unknown>) => {
 const handleSubmit = async () => {
   submitLoading.value = true
   try {
-    const payload: Partial<Notice> = { ...form }
+    // 从 ProForm 实例获取实际表单数据（v-model:form 无法同步到 reactive 对象）
+    const dialogRef = formDialogRef.value as { proFormRef?: { getFormData?: () => Record<string, unknown> } } | null
+    const payload: Partial<Notice> = (dialogRef?.proFormRef?.getFormData?.() || { ...form }) as Partial<Notice>
     if (isEdit.value && form.id) {
       await noticeApi.update(form.id, payload)
       ElMessage.success(t('common.updateSuccess'))
@@ -228,6 +232,17 @@ const handleSubmit = async () => {
     }
     dialogVisible.value = false
     fetchList()
+    // 发布成功时触发桌面通知
+    if (payload.status === 'published') {
+      const typeLabel = payload.type === 'announcement' ? '公告' : '通知'
+      ElNotification({
+        title: `新${typeLabel}`,
+        message: payload.title || '',
+        type: 'info',
+        duration: 4500,
+        position: 'top-right',
+      })
+    }
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err) || t('common.operationFailed'))
   } finally {
@@ -241,6 +256,14 @@ const handlePublish = async (row: Record<string, unknown>) => {
     await noticeApi.update(id, { ...row, status: 'published', publishTime: new Date().toISOString() })
     ElMessage.success(t('notice.published'))
     fetchList()
+    const typeLabel = row.type === 'announcement' ? '公告' : '通知'
+    ElNotification({
+      title: `新${typeLabel}`,
+      message: (row.title as string) || '',
+      type: 'info',
+      duration: 4500,
+      position: 'top-right',
+    })
   } catch (err: unknown) {
     ElMessage.error(t('notice.publishFailed') + ': ' + getErrorMessage(err))
   }

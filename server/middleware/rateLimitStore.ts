@@ -64,7 +64,7 @@ export class MemoryRateLimitStore implements RateLimitStore {
 }
 
 // ---- Redis 实现（多实例共享） ----
-import type Redis from 'ioredis'
+import type { Redis } from 'ioredis'
 
 export class RedisRateLimitStore implements RateLimitStore {
   constructor(private redis: Redis) {}

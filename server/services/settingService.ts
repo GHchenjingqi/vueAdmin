@@ -45,7 +45,9 @@ export function getSitePublicInfo() {
 export async function listSettings() {
   const settings = await Setting.findAll({ order: [['id', 'ASC']] })
   const map: Record<string, unknown> = {}
-  settings.forEach(s => { map[s.optionKey] = parseValue(s.optionValue) })
+  settings.forEach((s) => {
+    map[s.optionKey] = parseValue(s.optionValue)
+  })
   return map
 }
 

@@ -105,14 +105,19 @@ function getDiskInfo(): DiskInfo[] {
     try {
       rawOutput = execSync(cmd, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'] })
       if (rawOutput?.trim()) break
-    } catch { /* 尝试下一个方法 */ }
+    } catch {
+      /* 尝试下一个方法 */
+    }
   }
 
   if (!rawOutput?.trim()) return disks
 
   const lines = rawOutput.trim().split('\n').slice(1)
   for (const line of lines) {
-    const parts = line.trim().split(',').map(s => s.replace(/^"|"$/g, '').trim())
+    const parts = line
+      .trim()
+      .split(',')
+      .map((s) => s.replace(/^"|"$/g, '').trim())
     if (parts.length < 3) continue
 
     let caption: string
@@ -135,9 +140,9 @@ function getDiskInfo(): DiskInfo[] {
     const used = Number(size - freeSpace)
     disks.push({
       caption,
-      total: Math.round(Number(size) / 1024 / 1024 / 1024 * 100) / 100,
-      used: Math.round(used / 1024 / 1024 / 1024 * 100) / 100,
-      free: Math.round(Number(freeSpace) / 1024 / 1024 / 1024 * 100) / 100,
+      total: Math.round((Number(size) / 1024 / 1024 / 1024) * 100) / 100,
+      used: Math.round((used / 1024 / 1024 / 1024) * 100) / 100,
+      free: Math.round((Number(freeSpace) / 1024 / 1024 / 1024) * 100) / 100,
       usagePercent: Math.round((used / Number(size)) * 100 * 100) / 100,
     })
   }

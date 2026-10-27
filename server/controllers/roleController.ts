@@ -61,8 +61,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { changes, summary, name } = await roleService.updateRole(Number(req.params.id), req.body)
-    logOperation(req, '更新角色', `ID: ${req.params.id} 名称: ${name}`,
-      JSON.stringify({ changes, summary }))
+    logOperation(req, '更新角色', `ID: ${req.params.id} 名称: ${name}`, JSON.stringify({ changes, summary }))
     res.json({ code: 0, message: '更新成功' })
   } catch (err) {
     next(err)

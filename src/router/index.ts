@@ -17,6 +17,7 @@ export const savedPath: string = window.location.pathname
 const routes = [
   {
     path: '/',
+    redirect: '/dashboard',
     name: 'Layout',
     component: Layout,
     meta: { requiresAuth: true },
@@ -32,6 +33,12 @@ const routes = [
         name: 'AiProviders',
         component: () => import('@/views/AiProviderManager.vue'),
         meta: { title: 'AI 提供商管理' },
+      },
+      {
+        path: 'workflows/:id/design',
+        name: 'WorkflowDesigner',
+        component: () => import('@/views/WorkflowDesigner.vue'),
+        meta: { title: '流程设计' },
       },
     ],
   },
@@ -76,6 +83,8 @@ router.beforeEach((to, _from, next) => {
   const passwordResetRequired = userStore.passwordResetRequired
 
   if (to.meta.requiresAuth && !isLoggedIn) {
+    next({ path: '/login' })
+  } else if (to.name === 'NotFound' && !isLoggedIn) {
     next({ path: '/login' })
   } else if (to.path === '/login' && isLoggedIn) {
     const currentPath: string = to.path

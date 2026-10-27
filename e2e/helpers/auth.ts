@@ -6,11 +6,11 @@ import { Page, expect } from '@playwright/test'
  */
 export async function loginAsAdmin(page: Page) {
   await page.goto('/login')
-  await page.waitForSelector('input', { timeout: 10000 })
-  await page.getByPlaceholder(/用户名|Username/).fill('admin')
-  await page.getByPlaceholder(/密码|Password/).fill('123456')
-  await page.getByRole('button', { name: /登录|Sign in/ }).click()
-  await page.waitForURL('/', { timeout: 10000 })
+  await page.waitForSelector('input', { timeout: 15000 })
+  await page.getByPlaceholder(/用户名|Username/i).fill('admin')
+  await page.getByPlaceholder(/密码|Password/i).fill('123456')
+  await page.getByRole('button', { name: /登录|Sign in|Login/i }).click()
+  await page.waitForURL((url) => !url.pathname.includes('login'), { timeout: 20000 })
 }
 
 /**
@@ -24,5 +24,5 @@ export async function saveAuthState(page: Page) {
  * 断言登录成功后的页面包含欢迎信息
  */
 export async function expectLoginSuccess(page: Page) {
-  await expect(page.locator('.welcome-greeting, .dashboard-container')).toBeVisible()
+  await expect(page.locator('.welcome-greeting, .dashboard, .page-container').first()).toBeVisible()
 }

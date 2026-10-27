@@ -172,7 +172,67 @@
         </el-card>
       </el-col>
     </el-row>
-    <!-- 操作按钮-->
+
+    <!-- 邮箱配置 -->
+    <el-row :gutter="20">
+      <el-col :span="24">
+        <el-card shadow="never" class="settings-card">
+          <template #header>
+            <div class="q-title">
+              {{ t('settings.emailConfig') }}
+            </div>
+          </template>
+          <el-form :model="form" label-width="120px" label-position="right">
+            <el-row :gutter="40">
+              <el-col :span="12">
+                <el-form-item :label="t('settings.enableEmail')">
+                  <el-switch v-model="form.smtp_enabled" :active-text="t('settings.open')" :inactive-text="t('settings.close')" />
+                </el-form-item>
+                <div class="form-tip" style="margin-left: 120px; margin-top: -14px; margin-bottom: 18px">
+                  {{ t('settings.emailEnableTip') }}
+                </div>
+              </el-col>
+            </el-row>
+            <el-row :gutter="40">
+              <el-col :span="12">
+                <el-form-item :label="t('settings.smtpHost')" prop="smtp_host">
+                  <el-input v-model="form.smtp_host" :placeholder="t('settings.inputSmtpHost')" :disabled="!form.smtp_enabled" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="t('settings.smtpPort')" prop="smtp_port">
+                  <el-input-number v-model="form.smtp_port" :min="1" :max="65535" :disabled="!form.smtp_enabled" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="40">
+              <el-col :span="12">
+                <el-form-item :label="t('settings.smtpSecure')">
+                  <el-switch v-model="form.smtp_secure" :active-text="t('settings.ssl')" :inactive-text="t('settings.tls')" :disabled="!form.smtp_enabled" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="t('settings.senderName')" prop="smtp_sender_name">
+                  <el-input v-model="form.smtp_sender_name" :placeholder="t('settings.inputSenderName')" :disabled="!form.smtp_enabled" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="40">
+              <el-col :span="12">
+                <el-form-item :label="t('settings.smtpUser')" prop="smtp_user">
+                  <el-input v-model="form.smtp_user" :placeholder="t('settings.inputSmtpUser')" :disabled="!form.smtp_enabled" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="t('settings.smtpPass')" prop="smtp_pass">
+                  <el-input v-model="form.smtp_pass" type="password" show-password :placeholder="t('settings.inputSmtpPass')" :disabled="!form.smtp_enabled" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-form>
+        </el-card>
+      </el-col>
+    </el-row>
     <div class="settings-actions">
       <el-button type="primary" :loading="saving" :icon="Check" size="large" @click="handleSave">
         {{ t('settings.saveSettings') }}
@@ -256,7 +316,7 @@ import { uploadApi } from '@/api'
 
 const { t } = useI18n()
 
-const boolKeys = ['captcha_enabled', 'image_compress', 'watermark_enabled']
+const boolKeys = ['captcha_enabled', 'image_compress', 'watermark_enabled', 'smtp_enabled', 'smtp_secure']
 
 const formRef = ref<InstanceType<typeof import('element-plus').ElForm> | null>(null)
 const saving = ref(false)
@@ -276,6 +336,13 @@ let form = reactive({
   image_compress: false,
   watermark_enabled: false,
   watermark_text: '',
+  smtp_enabled: false,
+  smtp_host: '',
+  smtp_port: 465,
+  smtp_secure: true,
+  smtp_user: '',
+  smtp_pass: '',
+  smtp_sender_name: 'Vue Admin',
 })
 
 const rules = {

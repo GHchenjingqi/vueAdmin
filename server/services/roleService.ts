@@ -75,7 +75,7 @@ export async function createRole(data: {
   const role = await Role.create({ name, code, sort, status, dataScope, remark })
 
   if (menuIds && menuIds.length > 0) {
-    await RoleMenu.bulkCreate(menuIds.map(menuId => ({ roleId: role.id, menuId })))
+    await RoleMenu.bulkCreate(menuIds.map((menuId) => ({ roleId: role.id, menuId })))
   }
 
   return { id: role.id, name }
@@ -109,7 +109,7 @@ export async function updateRole(
   if (menuIds !== undefined) {
     await RoleMenu.destroy({ where: { roleId } })
     if (menuIds.length > 0) {
-      await RoleMenu.bulkCreate(menuIds.map(menuId => ({ roleId, menuId })))
+      await RoleMenu.bulkCreate(menuIds.map((menuId) => ({ roleId, menuId })))
     }
   }
 

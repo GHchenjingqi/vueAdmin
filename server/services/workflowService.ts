@@ -1,0 +1,194 @@
+import { Op } from 'sequelize'
+import Workflow from '../models/Workflow.js'
+import WorkflowVersion from '../models/WorkflowVersion.js'
+import WorkflowNode from '../models/WorkflowNode.js'
+import WorkflowEdge from '../models/WorkflowEdge.js'
+import WorkflowApproverRule from '../models/WorkflowApproverRule.js'
+import WorkflowBinding from '../models/WorkflowBinding.js'
+import WorkflowFormField from '../models/WorkflowFormField.js'
+import { AppError } from '../middleware/errorHandler.js'
+import { createCache, stableKey } from '../utils/cache.js'
+import { applyCurrentTenantScope } from '../modules/tenant/scope.js'
+
+// 工作流定义列表缓存；写操作（增删改/启用停用/发布）后整命名空间失效
+const workflowListCache = createCache<{ rows: Workflow[]; total: number; page: number; pageSize: number }>({
+  namespace: 'workflows',
+  max: 100,
+  maxAgeMs: 2 * 60 * 1000,
+})
+
+export async function listWorkflows(params: { keyword?: string; status?: number | string; page?: number; pageSize?: number }) {
+  const { keyword, status } = params
+  const pageNum = Number(params.page) || 1
+  const pageSizeNum = Number(params.pageSize) || 10
+  const where: Record<string, unknown> = {}
+  // 空字符串 / null / undefined 视为不筛选（前端 ProTable 默认会带空 status 参数）
+  if (status !== undefined && status !== null && status !== '') where.status = Number(status)
+  if (keyword) where.name = { [Op.like]: `%${keyword}%` }
+  // 租户约束必须在缓存键生成前注入：键含租户维度，避免跨租户共用缓存
+  applyCurrentTenantScope(where)
+
+  const cacheKey = stableKey({ where, page: pageNum, pageSize: pageSizeNum })
+  return workflowListCache.getOrSet(cacheKey, async () => {
+    const { rows, count } = await Workflow.findAndCountAll({
+      where,
+      offset: (pageNum - 1) * pageSizeNum,
+      limit: pageSizeNum,
+      order: [['createdAt', 'DESC']],
+    })
+    return { rows, total: count, page: pageNum, pageSize: pageSizeNum }
+  })
+}
+
+export async function getWorkflowById(id: number) {
+  const workflow = await Workflow.findByPk(id)
+  if (!workflow) throw new AppError(404, '流程不存在')
+  return workflow
+}
+
+export async function createWorkflow(data: { name: string; description?: string; createdBy?: number }) {
+  const workflow = await Workflow.create({
+    name: data.name,
+    description: data.description || null,
+    createdBy: data.createdBy || null,
+  })
+
+  const version = await WorkflowVersion.create({
+    workflowId: workflow.id,
+    versionNo: 1,
+    status: 'draft',
+  })
+
+  await workflow.update({ draftVersionId: version.id })
+  await workflowListCache.clear()
+
+  return { workflow, version }
+}
+
+export async function updateWorkflow(id: number, data: { name?: string; description?: string; status?: number }) {
+  const workflow = await getWorkflowById(id)
+  await workflow.update(data)
+  await workflowListCache.clear()
+  return workflow
+}
+
+export async function deleteWorkflow(id: number) {
+  const workflow = await getWorkflowById(id)
+  await WorkflowNode.destroy({ where: { workflowId: id } })
+  await WorkflowEdge.destroy({ where: { workflowId: id } })
+  await WorkflowApproverRule.destroy({ where: { workflowId: id } })
+  await WorkflowVersion.destroy({ where: { workflowId: id } })
+  await WorkflowBinding.destroy({ where: { workflowId: id } })
+  await workflow.destroy()
+  await workflowListCache.clear()
+}
+
+export async function toggleWorkflow(id: number, enabled: boolean) {
+  const workflow = await getWorkflowById(id)
+  await workflow.update({ status: enabled ? 1 : 0 })
+  await workflowListCache.clear()
+  return workflow
+}
+
+export async function publishWorkflow(id: number, userId: number) {
+  const workflow = await getWorkflowById(id)
+  const draftVersion = await WorkflowVersion.findByPk(workflow.draftVersionId)
+  if (!draftVersion) throw new AppError(400, '没有草稿版本可发布')
+
+  const nodes = await WorkflowNode.findAll({ where: { versionId: draftVersion.id } })
+  const hasStart = nodes.some((n) => n.type === 'start')
+  const hasEnd = nodes.some((n) => n.type === 'end')
+  if (!hasStart || !hasEnd) throw new AppError(400, '流程必须包含开始和结束节点')
+
+  const edges = await WorkflowEdge.findAll({ where: { versionId: draftVersion.id } })
+  const nodeKeys = new Set(nodes.map((n) => n.nodeKey))
+  for (const edge of edges) {
+    if (!nodeKeys.has(edge.sourceNodeKey)) throw new AppError(400, `边引用了不存在的源节点: ${edge.sourceNodeKey}`)
+    if (!nodeKeys.has(edge.targetNodeKey)) throw new AppError(400, `边引用了不存在的目标节点: ${edge.targetNodeKey}`)
+  }
+
+  await draftVersion.update({
+    status: 'published',
+    publishedAt: new Date(),
+    publishedBy: userId,
+  })
+
+  await workflow.update({ publishedVersionId: draftVersion.id })
+
+  const newVersion = await WorkflowVersion.create({
+    workflowId: id,
+    versionNo: draftVersion.versionNo + 1,
+    status: 'draft',
+  })
+
+  await workflow.update({ draftVersionId: newVersion.id })
+  await workflowListCache.clear()
+
+  return { workflow, publishedVersion: draftVersion, newDraftVersion: newVersion }
+}
+
+export async function getDesign(id: number) {
+  const workflow = await getWorkflowById(id)
+  if (!workflow.draftVersionId) throw new AppError(400, '没有草稿版本')
+
+  const [nodes, edges, rules] = await Promise.all([
+    WorkflowNode.findAll({ where: { versionId: workflow.draftVersionId }, order: [['id', 'ASC']] }),
+    WorkflowEdge.findAll({ where: { versionId: workflow.draftVersionId }, order: [['id', 'ASC']] }),
+    WorkflowApproverRule.findAll({ where: { versionId: workflow.draftVersionId }, order: [['sort', 'ASC']] }),
+  ])
+
+  return { nodes, edges, rules }
+}
+
+/** 获取工作流的表单字段（业务发起时需要填写的参数定义） */
+export async function getFormFields(workflowId: number) {
+  const workflow = await getWorkflowById(workflowId)
+  const fields = await WorkflowFormField.findAll({
+    where: { workflowId: workflow.id },
+    order: [
+      ['sort', 'ASC'],
+      ['id', 'ASC'],
+    ],
+  })
+  return fields
+}
+
+/** 表单字段保存入参（设计器「表单设计」抽屉提交） */
+export interface FormFieldInput {
+  fieldKey: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'select' | 'date'
+  required?: boolean | number
+  options?: string | null
+  placeholder?: string | null
+  sort?: number
+}
+
+/**
+ * 整批替换工作流的表单字段（事务内删除旧 + 插入新）。
+ * 用于设计器「表单设计」抽屉保存。
+ */
+export async function setFormFields(workflowId: number, fields: FormFieldInput[]) {
+  const workflow = await getWorkflowById(workflowId)
+  const { sequelize } = WorkflowFormField
+  await sequelize.transaction(async (t) => {
+    await WorkflowFormField.destroy({ where: { workflowId: workflow.id }, transaction: t })
+    if (fields.length > 0) {
+      await WorkflowFormField.bulkCreate(
+        fields.map((f, idx) => ({
+          workflowId: workflow.id,
+          fieldKey: f.fieldKey,
+          label: f.label,
+          type: f.type,
+          required: f.required ? 1 : 0,
+          options: f.options ?? null,
+          placeholder: f.placeholder ?? null,
+          sort: typeof f.sort === 'number' ? f.sort : idx,
+        })),
+        { transaction: t },
+      )
+    }
+  })
+  await workflowListCache.clear()
+  return getFormFields(workflow.id)
+}

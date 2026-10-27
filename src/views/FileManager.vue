@@ -146,8 +146,8 @@ const filteredFiles = computed(() => {
   return result
 })
 
-const onQuery = () => {
-  // 前端筛选，无需请求后端
+const onQuery = (params: { searchParams?: Record<string, unknown> }): void => {
+  if (params.searchParams) Object.assign(searchParams, params.searchParams)
 }
 
 const columns = computed(() => [

@@ -1,0 +1,6 @@
+interface:
+  display_name: "vue-admin Env Setup"
+  short_description: "Bootstrap MySQL + migrate + dev start"
+  default_prompt: "Use $vue-admin-env-setup to rebuild my local vue-admin environment and fix MySQL create/migrate/seed failures."
+policy:
+  allow_implicit_invocation: true

@@ -75,11 +75,7 @@ async function migrateUsersColumns(): Promise<void> {
     'loginAttempts',
     "ALTER TABLE users ADD COLUMN loginAttempts INT NOT NULL DEFAULT 0 COMMENT '连续登录失败次数' AFTER passwordResetRequired",
   )
-  await addColumnIfMissing(
-    'users',
-    'lockedUntil',
-    "ALTER TABLE users ADD COLUMN lockedUntil DATETIME NULL COMMENT '账号锁定截止时间' AFTER loginAttempts",
-  )
+  await addColumnIfMissing('users', 'lockedUntil', "ALTER TABLE users ADD COLUMN lockedUntil DATETIME NULL COMMENT '账号锁定截止时间' AFTER loginAttempts")
 }
 
 async function migrateRefreshTokensColumns(): Promise<void> {
@@ -145,9 +141,7 @@ async function migrateMenusTypeAndPermission(): Promise<void> {
     const needsEnumChange = typeCol && !/C/.test(typeCol.Type) && !/F/.test(typeCol.Type)
 
     if (needsEnumChange) {
-      await sequelize.query(
-        "ALTER TABLE menus MODIFY COLUMN type ENUM('D','M','C','F') NOT NULL DEFAULT 'M' COMMENT '类型: M=菜单, C=目录, F=按钮'",
-      )
+      await sequelize.query("ALTER TABLE menus MODIFY COLUMN type ENUM('D','M','C','F') NOT NULL DEFAULT 'M' COMMENT '类型: M=菜单, C=目录, F=按钮'")
       logInfo('menus.type 已临时扩展为 ENUM(D,M,C,F)')
     }
 
@@ -157,9 +151,7 @@ async function migrateMenusTypeAndPermission(): Promise<void> {
     }
 
     if (needsEnumChange) {
-      await sequelize.query(
-        "ALTER TABLE menus MODIFY COLUMN type ENUM('M','C','F') NOT NULL DEFAULT 'M' COMMENT '类型: M=菜单, C=目录, F=按钮'",
-      )
+      await sequelize.query("ALTER TABLE menus MODIFY COLUMN type ENUM('M','C','F') NOT NULL DEFAULT 'M' COMMENT '类型: M=菜单, C=目录, F=按钮'")
       logInfo('menus.type 已收缩为 ENUM(M,C,F)')
     }
 
@@ -186,9 +178,7 @@ async function migrateRoleMenusId(): Promise<void> {
 async function migratePasswords(): Promise<void> {
   try {
     const bcrypt = await import('bcryptjs')
-    const [users] = (await sequelize.query(
-      "SELECT id, password FROM users WHERE password NOT LIKE '$2a$%' AND password NOT LIKE '$2b$%'",
-    )) as any
+    const [users] = (await sequelize.query("SELECT id, password FROM users WHERE password NOT LIKE '$2a$%' AND password NOT LIKE '$2b$%'")) as any
     if (users.length > 0) {
       const saltRounds = 10
       for (const u of users) {

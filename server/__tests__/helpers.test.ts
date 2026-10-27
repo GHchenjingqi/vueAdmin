@@ -3,7 +3,7 @@
  * 覆盖：normalizeIds、buildTree、prepareChangeLog
  */
 import { describe, it, expect } from 'vitest'
-import { normalizeIds, buildTree, prepareChangeLog } from '../utils/helpers'
+import { normalizeIds, buildTree, prepareChangeLog } from '../utils/helpers.js'
 
 describe('helpers.ts', () => {
   describe('normalizeIds', () => {
@@ -73,9 +73,7 @@ describe('helpers.ts', () => {
     })
 
     it('无 sort 字段时默认 0', () => {
-      const list = [
-        { id: 1, parentId: 0, name: 'item' },
-      ]
+      const list = [{ id: 1, parentId: 0, name: 'item' }]
 
       const tree = buildTree(list)
 
@@ -104,9 +102,7 @@ describe('helpers.ts', () => {
     })
 
     it('toJSON=false 时直接复制对象', () => {
-      const list = [
-        { id: 1, parentId: 0, name: 'node' },
-      ]
+      const list = [{ id: 1, parentId: 0, name: 'node' }]
 
       const tree = buildTree(list, 0, { toJSON: false })
 
@@ -131,8 +127,8 @@ describe('helpers.ts', () => {
       const { changes, summary } = prepareChangeLog(model, newData, ['name', 'email', 'status'])
 
       expect(changes).toHaveLength(2)
-      expect(changes.find(c => c.field === 'name')).toEqual({ field: 'name', before: 'old', after: 'new' })
-      expect(changes.find(c => c.field === 'status')).toEqual({ field: 'status', before: 1, after: 2 })
+      expect(changes.find((c) => c.field === 'name')).toEqual({ field: 'name', before: 'old', after: 'new' })
+      expect(changes.find((c) => c.field === 'status')).toEqual({ field: 'status', before: 1, after: 2 })
       expect(summary).toContain('name: old → new')
       expect(summary).toContain('status: 1 → 2')
     })

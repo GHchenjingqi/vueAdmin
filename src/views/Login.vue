@@ -392,8 +392,8 @@ onMounted(() => {
 /* ========== 左上角品牌标识 ========== */
 .brand-header {
   position: absolute;
-  top: 20px;
-  left: 24px;
+  top: 40px;
+  left: 40px;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -418,18 +418,19 @@ onMounted(() => {
 }
 
 .brand-header .brand-title {
-  font-size: 18px;
+  font-size: 28px;
   font-weight: 700;
   margin: 0;
-  color: var(--text-primary, #303133);
+  color: #ffffff;
   text-shadow: none;
   line-height: 1.2;
 }
 
 .brand-header .brand-desc {
-  font-size: 12px;
+  font-size: 16px;
   opacity: 0.65;
   margin: 0;
+  color: #f9fcff;
   line-height: 1.2;
 }
 

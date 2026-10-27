@@ -196,8 +196,15 @@ async function fetchUsers(): Promise<void> {
   }
 }
 
-function onQuery({ pagination: newPagination }: { pagination: { pageNum: number; pageSize: number; total: number } }): void {
+function onQuery({
+  pagination: newPagination,
+  searchParams: newSearchParams,
+}: {
+  pagination: { pageNum: number; pageSize: number; total: number }
+  searchParams?: Record<string, unknown>
+}): void {
   Object.assign(pagination, newPagination)
+  if (newSearchParams) Object.assign(searchParams, newSearchParams)
   fetchUsers()
 }
 
@@ -258,7 +265,8 @@ async function handleResetPassword(row: Record<string, unknown>): Promise<void> 
       type: 'warning',
     })
     const res = await userApi.changePassword(rowId, { reset: true, password: '' })
-    ElMessage.success(res.message || t('user.pwdResetSuccess'))
+    const pwd = (res.data as unknown as { password?: string } | undefined)?.password || '123456'
+    ElMessage.success(t('user.pwdResetTo', { password: pwd }))
   } catch (err: unknown) {
     if (err !== 'cancel') {
       ElMessage.error(t('user.resetPwdFailed') + ': ' + getErrorMessage(err))
@@ -350,11 +358,12 @@ async function fetchDeptOptions(): Promise<void> {
 
 async function fetchRoleOptions(): Promise<void> {
   try {
-    const res = await roleApi.list({ scope: 'all' })
-    const options = (res.data?.rows || []).map((r: { name: string; id: number }) => ({ label: r.name, value: r.id }))
+    const res = await roleApi.getAll()
+    const rows = Array.isArray(res.data) ? res.data : (res.data as { rows?: { name: string; id: number }[] } | undefined)?.rows || []
+    const options = rows.map((r: { name: string; id: number }) => ({ label: r.name, value: r.id }))
     userFormDialogRef.value?.setRoleOptions(options)
-  } catch {
-    // 角色选项加载失败不影响主流程
+  } catch (err) {
+    console.error('获取角色选项失败:', err)
   }
 }
 

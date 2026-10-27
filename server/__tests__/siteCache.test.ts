@@ -10,7 +10,7 @@ vi.mock('../models/Setting.js', () => ({
   },
 }))
 
-import { getSiteInfo, loadSiteInfo, refreshSiteInfo, injectSiteInfo } from '../utils/siteCache'
+import { getSiteInfo, loadSiteInfo, refreshSiteInfo, injectSiteInfo } from '../utils/siteCache.js'
 
 describe('siteCache', () => {
   beforeEach(() => {
@@ -76,9 +76,7 @@ describe('siteCache', () => {
 
   describe('refreshSiteInfo', () => {
     it('更新指定 key 的缓存值', async () => {
-      mockFindAll.mockResolvedValueOnce([
-        { optionKey: 'site_title', optionValue: 'Old Title' },
-      ])
+      mockFindAll.mockResolvedValueOnce([{ optionKey: 'site_title', optionValue: 'Old Title' }])
       await loadSiteInfo()
 
       refreshSiteInfo('site_title', 'New Title')
@@ -100,9 +98,7 @@ describe('siteCache', () => {
 
   describe('injectSiteInfo', () => {
     it('替换 HTML 中的占位符', async () => {
-      mockFindAll.mockResolvedValueOnce([
-        { optionKey: 'site_title', optionValue: 'My App' },
-      ])
+      mockFindAll.mockResolvedValueOnce([{ optionKey: 'site_title', optionValue: 'My App' }])
       await loadSiteInfo()
 
       const html = '<html><head><title><!--SITE_TITLE--></title></head><body></body></html>'

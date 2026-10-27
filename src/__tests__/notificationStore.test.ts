@@ -3,25 +3,32 @@
  * 覆盖：通知/消息状态管理、SSE 事件处理、乐观更新
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+const elNotificationMock = vi.fn()
+vi.mock('element-plus', () => ({
+  ElNotification: (...args: unknown[]) => elNotificationMock(...args),
+}))
 import { setActivePinia, createPinia } from 'pinia'
 
-// Mock API
 vi.mock('@/api/notice', () => ({
   noticeApi: {
     list: vi.fn(() => Promise.resolve({ data: { rows: [], total: 0 } })),
-    getUnreadCount: vi.fn(() => Promise.resolve({ data: { count: 0 } })),
+    listUser: vi.fn(() => Promise.resolve({ data: { items: [], unread: 0 } })),
+    getUnreadCount: vi.fn(() => Promise.resolve({ data: { count: 0, total: 0 } })),
     markRead: vi.fn(() => Promise.resolve()),
+    markAllRead: vi.fn(() => Promise.resolve()),
   },
 }))
 
 vi.mock('@/api/message', () => ({
   messageApi: {
-    list: vi.fn(() => Promise.resolve({ data: { rows: [], total: 0 } })),
+    list: vi.fn(() => Promise.resolve({ data: { rows: [], total: 0, unreadCount: 0 } })),
+    getUnreadCount: vi.fn(() => Promise.resolve({ data: { count: 0 } })),
     markRead: vi.fn(() => Promise.resolve()),
+    markAllRead: vi.fn(() => Promise.resolve()),
   },
 }))
 
-// Mock useSSE
 const mockSSE = {
   connected: { value: false },
   on: vi.fn(),
@@ -35,19 +42,19 @@ vi.mock('@/composables/useSSE', () => ({
 
 import { useNotificationStore } from '../stores/notificationStore'
 import { noticeApi } from '@/api/notice'
+import { messageApi } from '@/api/message'
 
 describe('notificationStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    elNotificationMock.mockClear()
     mockSSE.connected.value = false
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
-
-  // ==================== State ====================
 
   describe('初始状态', () => {
     it('notices 为空数组', () => {
@@ -77,8 +84,6 @@ describe('notificationStore', () => {
     })
   })
 
-  // ==================== Getters ====================
-
   describe('totalUnread', () => {
     it('计算通知 + 消息的总未读数', () => {
       const store = useNotificationStore()
@@ -106,19 +111,17 @@ describe('notificationStore', () => {
     })
   })
 
-  // ==================== Actions ====================
-
   describe('fetchNotices', () => {
     it('成功获取通知列表', async () => {
       const mockNotices = [
         { id: 1, title: '通知1', read: false },
         { id: 2, title: '通知2', read: true },
       ]
-      vi.mocked(noticeApi.list).mockResolvedValueOnce({
-        data: { rows: mockNotices, total: 2 },
+      vi.mocked(noticeApi.listUser).mockResolvedValueOnce({
+        data: { items: mockNotices, unread: 1 },
       } as any)
       vi.mocked(noticeApi.getUnreadCount).mockResolvedValueOnce({
-        data: { count: 1 },
+        data: { count: 1, total: 1 },
       } as any)
 
       const store = useNotificationStore()
@@ -130,16 +133,40 @@ describe('notificationStore', () => {
     })
 
     it('获取失败时保持旧数据', async () => {
-      vi.mocked(noticeApi.list).mockRejectedValueOnce(new Error('网络错误'))
+      vi.mocked(noticeApi.listUser).mockRejectedValueOnce(new Error('网络错误'))
 
       const store = useNotificationStore()
       store.notices = [{ id: 99, title: '旧通知' } as any]
       await store.fetchNotices()
 
-      // 保持旧数据
       expect(store.notices).toHaveLength(1)
       expect(store.notices[0].id).toBe(99)
       expect(store.loading).toBe(false)
+    })
+  })
+
+  describe('fetchMessages', () => {
+    it('使用后端 unreadCount / getUnreadCount', async () => {
+      vi.mocked(messageApi.list).mockResolvedValueOnce({
+        data: {
+          rows: [
+            { id: 1, title: 'm1', isRead: false },
+            { id: 2, title: 'm2', isRead: true },
+          ],
+          total: 2,
+          unreadCount: 3,
+        },
+      } as any)
+      vi.mocked(messageApi.getUnreadCount).mockResolvedValueOnce({
+        data: { count: 3 },
+      } as any)
+
+      const store = useNotificationStore()
+      await store.fetchMessages()
+
+      expect(store.messages).toHaveLength(2)
+      expect(store.messages[0].read).toBe(false)
+      expect(store.unreadMessageCount).toBe(3)
     })
   })
 
@@ -176,11 +203,23 @@ describe('notificationStore', () => {
       store.notices = [{ id: 1, title: '未读', read: false }] as any
       store.unreadNoticeCount = 1
 
-      // 不应抛出异常
       await expect(store.markNoticeRead(1)).resolves.toBeUndefined()
-
-      // 本地状态已更新
       expect(store.notices[0].read).toBe(true)
+    })
+  })
+
+  describe('markMessageRead', () => {
+    it('兼容 isRead 字段并减少未读数', async () => {
+      const store = useNotificationStore()
+      store.messages = [{ id: 1, title: '未读', isRead: false }] as any
+      store.unreadMessageCount = 1
+
+      await store.markMessageRead(1)
+
+      expect(store.messages[0].isRead).toBe(true)
+      expect(store.messages[0].read).toBe(true)
+      expect(store.unreadMessageCount).toBe(0)
+      expect(messageApi.markRead).toHaveBeenCalledWith(1)
     })
   })
 
@@ -218,8 +257,6 @@ describe('notificationStore', () => {
     })
   })
 
-  // ==================== SSE 事件处理 ====================
-
   describe('SSE 事件注册', () => {
     it('注册 notice-published 事件处理器', () => {
       useNotificationStore()
@@ -238,31 +275,34 @@ describe('notificationStore', () => {
 
     it('notice-published 事件增加未读数并插入通知', () => {
       const store = useNotificationStore()
-
-      // 获取 notice-published 回调
       const call = mockSSE.on.mock.calls.find((c) => c[0] === 'notice-published')
       const handler = call?.[1] as (payload: any) => void
 
-      handler({ notice: { id: 10, title: '新通知' } })
+      handler({ notice: { id: 10, title: '新通知', content: '这是内容摘要' } })
 
       expect(store.notices).toHaveLength(1)
       expect(store.notices[0].id).toBe(10)
       expect(store.unreadNoticeCount).toBe(1)
+      expect(elNotificationMock).toHaveBeenCalled()
+      expect(elNotificationMock.mock.calls[0][0].title).toContain('通知')
+      expect(elNotificationMock.mock.calls[0][0].message).toContain('新通知')
     })
 
     it('connected 事件触发 fetchNotices 和 fetchMessages', async () => {
-      vi.mocked(noticeApi.list).mockResolvedValueOnce({ data: { rows: [] } } as any)
-      vi.mocked(noticeApi.getUnreadCount).mockResolvedValueOnce({ data: { count: 0 } } as any)
+      vi.mocked(noticeApi.listUser).mockResolvedValueOnce({ data: { items: [], unread: 0 } } as any)
+      vi.mocked(noticeApi.getUnreadCount).mockResolvedValueOnce({ data: { count: 0, total: 0 } } as any)
+      vi.mocked(messageApi.list).mockResolvedValueOnce({ data: { rows: [], total: 0, unreadCount: 0 } } as any)
+      vi.mocked(messageApi.getUnreadCount).mockResolvedValueOnce({ data: { count: 0 } } as any)
 
       useNotificationStore()
-
       const call = mockSSE.on.mock.calls.find((c) => c[0] === 'connected')
       const handler = call?.[1] as () => void
 
       handler()
       await new Promise((resolve) => setTimeout(resolve, 10))
 
-      expect(noticeApi.list).toHaveBeenCalled()
+      expect(noticeApi.listUser).toHaveBeenCalled()
+      expect(messageApi.list).toHaveBeenCalled()
     })
   })
 })

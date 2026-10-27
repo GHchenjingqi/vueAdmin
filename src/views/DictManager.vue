@@ -234,8 +234,9 @@ const fetchTypes = async (): Promise<void> => {
   }
 }
 
-const onTypeQuery = ({ pagination }: { pagination: Record<string, number> }): void => {
+const onTypeQuery = ({ pagination, searchParams }: { pagination: Record<string, number>; searchParams?: Record<string, unknown> }): void => {
   Object.assign(typePagination, pagination)
+  if (searchParams) Object.assign(typeSearchParams, searchParams)
   fetchTypes()
 }
 

@@ -111,7 +111,15 @@
                         </el-icon>
                         <span>{{ t('ai.generatedFiles', { count: msg.files.length }) }}</span>
                       </div>
-                      <el-button type="primary" size="small" plain :loading="applyingAll" :disabled="applyingAll" @click="applyAllFiles(msg.files)">
+                      <el-button
+                        v-if="apiStatus.injectorEnabled"
+                        type="primary"
+                        size="small"
+                        plain
+                        :loading="applyingAll"
+                        :disabled="applyingAll"
+                        @click="applyAllFiles(msg.files)"
+                      >
                         <el-icon :size="14" style="margin-right: 4px">
                           <Upload />
                         </el-icon>
@@ -148,6 +156,7 @@
                               {{ t('ai.copy') }}
                             </el-button>
                             <el-button
+                              v-if="apiStatus.injectorEnabled"
                               size="small"
                               text
                               type="primary"
@@ -446,6 +455,7 @@ const apiStatus = reactive<AIStatus>({
     categories: {},
     lastUpdated: '',
   },
+  injectorEnabled: false,
 })
 
 const quickHints = computed(() => [t('ai.generateArticle'), t('ai.generateTag'), t('ai.generateNotice'), t('ai.generateKnowledge')])

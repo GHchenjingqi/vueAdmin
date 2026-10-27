@@ -30,7 +30,7 @@ interface KnowledgeIndex {
   files: KnowledgeIndexEntry[]
 }
 
-interface RetrievalResult {
+export interface RetrievalResult {
   path: string
   title: string
   content: string
@@ -39,7 +39,7 @@ interface RetrievalResult {
   keywords: string[]
 }
 
-interface RetrievalOptions {
+export interface RetrievalOptions {
   topK: number
   minScore: number
   includeContent: boolean
@@ -47,20 +47,129 @@ interface RetrievalOptions {
 
 // 中英文停用词
 const STOP_WORDS = new Set([
-  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-  'should', 'may', 'might', 'must', 'can', 'could', 'in', 'on', 'at',
-  'to', 'for', 'of', 'with', 'by', 'from', 'as', 'into', 'through',
-  'during', 'before', 'after', 'above', 'below', 'between', 'under',
-  'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either',
-  'neither', 'each', 'every', 'all', 'any', 'few', 'more', 'most',
-  'other', 'some', 'such', 'no', 'only', 'own', 'same', 'than', 'too',
-  'very', 'just', 'now', 'here', 'there', 'when', 'where', 'why', 'how',
-  '这个', '那个', '可以', '需要', '一个', '所有', '每个', '某些',
-  '如果', '因为', '所以', '但是', '而且', '或者', '然后', '虽然',
-  '什么', '怎么', '哪', '为什么', '什么时候', '在', '的', '是',
-  '了', '吗', '呢', '吧', '啊', '哦', '嗯', '这', '那', '和',
-  '与', '对', '把', '被', '让', '从', '到', '向', '关于', '对于',
+  'the',
+  'a',
+  'an',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'been',
+  'being',
+  'have',
+  'has',
+  'had',
+  'do',
+  'does',
+  'did',
+  'will',
+  'would',
+  'shall',
+  'should',
+  'may',
+  'might',
+  'must',
+  'can',
+  'could',
+  'in',
+  'on',
+  'at',
+  'to',
+  'for',
+  'of',
+  'with',
+  'by',
+  'from',
+  'as',
+  'into',
+  'through',
+  'during',
+  'before',
+  'after',
+  'above',
+  'below',
+  'between',
+  'under',
+  'and',
+  'but',
+  'or',
+  'nor',
+  'not',
+  'so',
+  'yet',
+  'both',
+  'either',
+  'neither',
+  'each',
+  'every',
+  'all',
+  'any',
+  'few',
+  'more',
+  'most',
+  'other',
+  'some',
+  'such',
+  'no',
+  'only',
+  'own',
+  'same',
+  'than',
+  'too',
+  'very',
+  'just',
+  'now',
+  'here',
+  'there',
+  'when',
+  'where',
+  'why',
+  'how',
+  '这个',
+  '那个',
+  '可以',
+  '需要',
+  '一个',
+  '所有',
+  '每个',
+  '某些',
+  '如果',
+  '因为',
+  '所以',
+  '但是',
+  '而且',
+  '或者',
+  '然后',
+  '虽然',
+  '什么',
+  '怎么',
+  '哪',
+  '为什么',
+  '什么时候',
+  '在',
+  '的',
+  '是',
+  '了',
+  '吗',
+  '呢',
+  '吧',
+  '啊',
+  '哦',
+  '嗯',
+  '这',
+  '那',
+  '和',
+  '与',
+  '对',
+  '把',
+  '被',
+  '让',
+  '从',
+  '到',
+  '向',
+  '关于',
+  '对于',
 ])
 
 /**
@@ -88,20 +197,17 @@ function tokenize(text: string): string[] {
   }
 
   // 过滤停用词和单字符
-  return tokens.filter(t => t.length > 1 && !STOP_WORDS.has(t))
+  return tokens.filter((t) => t.length > 1 && !STOP_WORDS.has(t))
 }
 
 /**
  * 计算文档与查询的匹配分数
  * 使用关键词匹配 + Jaccard 相似度
  */
-function calculateScore(
-  queryTokens: string[],
-  entry: KnowledgeIndexEntry,
-): number {
+function calculateScore(queryTokens: string[], entry: KnowledgeIndexEntry): number {
   if (queryTokens.length === 0) return 0
 
-  const docKeywords = entry.keywords.map(k => k.toLowerCase())
+  const docKeywords = entry.keywords.map((k) => k.toLowerCase())
 
   // 1. 关键词匹配计数
   let matchCount = 0
@@ -129,7 +235,7 @@ function calculateScore(
   // 2. Jaccard 相似度
   const querySet = new Set(queryTokens)
   const docSet = new Set(docKeywords)
-  const intersection = new Set([...querySet].filter(x => docSet.has(x)))
+  const intersection = new Set([...querySet].filter((x) => docSet.has(x)))
   const union = new Set([...querySet, ...docSet])
   const jaccard = union.size > 0 ? intersection.size / union.size : 0
 
@@ -179,11 +285,7 @@ function loadIndex(): KnowledgeIndex | null {
  * @param options - 检索选项
  * @returns 按相关度排序的文档列表
  */
-export function retrieve(
-  query: string,
-  topK: number = 5,
-  options: Partial<RetrievalOptions> = {},
-): RetrievalResult[] {
+export function retrieve(query: string, topK: number = 5, options: Partial<RetrievalOptions> = {}): RetrievalResult[] {
   const { minScore = 0, includeContent = true } = options
 
   const index = loadIndex()
@@ -196,7 +298,7 @@ export function retrieve(
 
   // 计算每个文档的分数
   const scored: RetrievalResult[] = index.files
-    .map(entry => {
+    .map((entry) => {
       const score = calculateScore(queryTokens, entry)
       return {
         path: entry.path,
@@ -207,7 +309,7 @@ export function retrieve(
         keywords: entry.keywords,
       }
     })
-    .filter(r => r.score >= minScore)
+    .filter((r) => r.score >= minScore)
 
   // 按分数降序排序
   scored.sort((a, b) => b.score - a.score)
@@ -222,11 +324,7 @@ export function retrieve(
  * @param category - 类别：'specs' | 'templates' | 'references' | 'all'
  * @param topK - 返回数量
  */
-export function retrieveByCategory(
-  query: string,
-  category: 'specs' | 'templates' | 'references' | 'all' = 'all',
-  topK: number = 5,
-): RetrievalResult[] {
+export function retrieveByCategory(query: string, category: 'specs' | 'templates' | 'references' | 'all' = 'all', topK: number = 5): RetrievalResult[] {
   const results = retrieve(query, Math.max(topK * 3, 15), { includeContent: true })
 
   if (category === 'all') {
@@ -242,7 +340,7 @@ export function retrieveByCategory(
   const prefix = categoryPrefix[category]
   if (!prefix) return results.slice(0, topK)
 
-  return results.filter(r => r.path.startsWith(prefix)).slice(0, topK)
+  return results.filter((r) => r.path.startsWith(prefix)).slice(0, topK)
 }
 
 /**

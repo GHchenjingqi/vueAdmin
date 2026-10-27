@@ -273,8 +273,15 @@ const fetchLogs = async (): Promise<void> => {
   }
 }
 
-const onQuery = ({ pagination: newPagination }: { pagination: { pageNum: number; pageSize: number } }): void => {
+const onQuery = ({
+  pagination: newPagination,
+  searchParams: newSearchParams,
+}: {
+  pagination: { pageNum: number; pageSize: number }
+  searchParams?: Record<string, unknown>
+}): void => {
   Object.assign(pagination, newPagination)
+  if (newSearchParams) Object.assign(searchParams, newSearchParams)
   fetchLogs()
 }
 

@@ -1,40 +1,72 @@
 <template>
   <div class="notification-center">
-    <el-popover placement="bottom" :width="380" trigger="click" :visible="noticePopoverVisible" popper-class="notice-popover" @show="fetchNoticeList">
+    <el-popover placement="bottom" :width="420" trigger="click" :visible="popoverVisible" popper-class="notice-popover" @show="handlePopoverShow">
       <template #reference>
-        <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="notice-badge">
-          <el-icon :size="18" class="notice-icon" @click="noticePopoverVisible = !noticePopoverVisible">
+        <el-badge :value="totalUnread" :hidden="totalUnread === 0" class="notice-badge">
+          <el-icon :size="18" class="notice-icon" @click="popoverVisible = !popoverVisible">
             <Bell />
           </el-icon>
         </el-badge>
       </template>
+
       <div class="notice-header">
         <span class="notice-title">{{ t('notification.title') }}</span>
-        <el-button v-if="unreadCount > 0" type="primary" link size="small" @click="handleMarkAllRead">
+        <el-button v-if="totalUnread > 0" type="primary" link size="small" @click="handleMarkAllRead">
           {{ t('notification.readAll') }}
         </el-button>
       </div>
-      <el-divider style="margin: 4px 0" />
-      <div v-loading="noticeLoading" class="notice-list">
-        <div v-if="noticeItems.length === 0" class="notice-empty">
-          {{ t('notification.noNotices') }}
-        </div>
-        <div v-for="item in noticeItems" :key="item.id" class="notice-item" :class="{ unread: !item.read }" @click="handleNoticeClick(item)">
-          <div class="notice-item-left">
-            <el-tag :type="item.type === 'notice' ? 'primary' : 'warning'" size="small" class="notice-type-tag">
-              {{ item.type === 'notice' ? t('notification.notice') : t('notification.announcement') }}
-            </el-tag>
-            <span class="notice-item-title">{{ item.title }}</span>
+
+      <el-tabs v-model="activeTab" class="notice-tabs">
+        <el-tab-pane :label="noticeTabLabel" name="notice">
+          <div v-loading="notificationStore.loading" class="notice-list">
+            <div v-if="noticeItems.length === 0" class="notice-empty">
+              {{ t('notification.noNotices') }}
+            </div>
+            <div v-for="item in noticeItems" :key="`notice-${item.id}`" class="notice-item" :class="{ unread: !item.read }" @click="handleNoticeClick(item)">
+              <div class="notice-item-left">
+                <el-tag :type="item.type === 'notice' ? 'primary' : 'warning'" size="small" class="notice-type-tag">
+                  {{ item.type === 'notice' ? t('notification.notice') : t('notification.announcement') }}
+                </el-tag>
+                <span class="notice-item-title">{{ item.title }}</span>
+              </div>
+              <div class="notice-item-right">
+                <span v-if="!item.read" class="notice-dot" />
+                <span class="notice-time">{{ formatTime(item.publishTime) }}</span>
+              </div>
+            </div>
           </div>
-          <div class="notice-item-right">
-            <span v-if="!item.read" class="notice-dot" />
-            <span class="notice-time">{{ formatTime(item.publishTime) }}</span>
+        </el-tab-pane>
+
+        <el-tab-pane :label="messageTabLabel" name="message">
+          <div class="notice-list">
+            <div v-if="messageItems.length === 0" class="notice-empty">
+              {{ t('notification.noMessages') }}
+            </div>
+            <div
+              v-for="item in messageItems"
+              :key="`message-${item.id}`"
+              class="notice-item"
+              :class="{ unread: !isMessageRead(item) }"
+              @click="handleMessageClick(item)"
+            >
+              <div class="notice-item-left">
+                <el-tag :type="messageTypeTag(item.type)" size="small" class="notice-type-tag">
+                  {{ messageTypeLabel(item.type) }}
+                </el-tag>
+                <span class="notice-item-title">{{ item.title }}</span>
+              </div>
+              <div class="notice-item-right">
+                <span v-if="!isMessageRead(item)" class="notice-dot" />
+                <span class="notice-time">{{ formatTime(item.createdAt || item.sendTime) }}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </el-tab-pane>
+      </el-tabs>
+
       <el-divider style="margin: 4px 0" />
       <div class="notice-footer">
-        <el-button type="primary" link size="small" @click="goToNoticeManager">
+        <el-button type="primary" link size="small" @click="goToMore">
           {{ t('notification.viewMore') }}
         </el-button>
       </div>
@@ -60,6 +92,36 @@
         <el-empty v-else-if="!noticeDetailLoading" :description="t('notification.noContent')" />
       </div>
     </el-dialog>
+
+    <el-dialog
+      v-model="messageDetailVisible"
+      :title="messageDetail?.title || t('message.messageDetail')"
+      width="600px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <el-descriptions v-if="messageDetail" :column="1" border>
+        <el-descriptions-item :label="t('common.type')">
+          <el-tag :type="messageTypeTag(messageDetail.type)" size="small">
+            {{ messageTypeLabel(messageDetail.type) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('message.sender')">
+          <span v-if="messageDetail.fromUser">{{ messageDetail.fromUser.nickname || messageDetail.fromUser.username }}</span>
+          <el-tag v-else type="info" size="small">
+            {{ t('message.system') }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('message.time')">
+          {{ formatAbsoluteTime(messageDetail.createdAt || messageDetail.sendTime) }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('message.content')">
+          <div style="white-space: pre-wrap; line-height: 1.8">
+            {{ messageDetail.content }}
+          </div>
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
   </div>
 </template>
 
@@ -68,19 +130,17 @@ import { ElMessage } from 'element-plus'
 import { defineAsyncComponent } from 'vue'
 import { Bell } from '@element-plus/icons-vue'
 import { noticeApi } from '@/api'
+import { messageApi } from '@/api/message'
 import { performLogout } from '@/utils/request'
-import { useSSE } from '@/composables/useSSE'
 import { useNotificationStore } from '@/stores'
 import { useI18n } from '@/i18n'
-import type { Notice } from '@/types/api'
+import type { Message, Notice } from '@/types/api'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
 const { t } = useI18n()
 const emit = defineEmits<{ unreadChange: [count: number] }>()
 
-// MdPreview 仅在打开通知详情对话框时渲染，懒加载避免把 md-editor chunk 拉入首屏
-// setupMdEditor（含 highlight/katex/mermaid/echarts）同样动态导入，确保不进首屏静态图
 const MdPreview = defineAsyncComponent(async () => {
   const { setupMdEditor } = await import('@/utils/mdEditorSetup')
   await import('md-editor-v3/lib/style.css')
@@ -88,60 +148,74 @@ const MdPreview = defineAsyncComponent(async () => {
   const mod = await import('md-editor-v3')
   return mod.MdPreview
 })
-const noticePopoverVisible = ref(false)
-const unreadCount = ref(0)
-const noticeItems = ref<Notice[]>([])
-const noticeLoading = ref(false)
+
+const popoverVisible = ref(false)
+const activeTab = ref<'notice' | 'message'>('notice')
 const noticeDetailVisible = ref(false)
 const noticeDetail = ref<Notice | null>(null)
 const noticeDetailLoading = ref(false)
+const messageDetailVisible = ref(false)
+const messageDetail = ref<Message | null>(null)
 
-// SSE 连接管理（委托给 useSSE composable，自动指数退避重连 + 心跳）
-const sse = useSSE({
-  url: '/api/v1/notices/sse',
-  heartbeatInterval: 30_000,
-  reconnect: { initialDelay: 3_000, maxDelay: 30_000, multiplier: 1.5 },
+const totalUnread = computed(() => notificationStore.totalUnread)
+const noticeItems = computed(() => notificationStore.notices)
+const messageItems = computed(() => notificationStore.messages)
+
+const noticeTabLabel = computed(() => {
+  const count = notificationStore.unreadNoticeCount
+  return count > 0 ? `${t('notification.notice')} (${count})` : t('notification.notice')
 })
 
-const fetchUnreadCount = async (): Promise<void> => {
-  try {
-    const res = await noticeApi.list({ page: 1, pageSize: 1 })
-    unreadCount.value = res.data?.total || 0
-    emit('unreadChange', unreadCount.value)
-    // 同步到 notificationStore
-    notificationStore.fetchNotices()
-  } catch {
-    // 忽略
-  }
+const messageTabLabel = computed(() => {
+  const count = notificationStore.unreadMessageCount
+  return count > 0 ? `${t('notification.message')} (${count})` : t('notification.message')
+})
+
+watch(
+  totalUnread,
+  (count) => {
+    emit('unreadChange', count)
+  },
+  { immediate: true },
+)
+
+function isMessageRead(message: Message): boolean {
+  if (typeof message.isRead === 'boolean') return message.isRead
+  if (typeof message.read === 'boolean') return message.read
+  return false
 }
 
-const fetchNoticeList = async (): Promise<void> => {
-  noticeLoading.value = true
-  try {
-    const res = await noticeApi.list({ page: 1, pageSize: 10 })
-    noticeItems.value = res.data?.rows || []
-    // 从通知详情中提取未读数
-    emit('unreadChange', unreadCount.value)
-  } catch {
-    // 忽略
-  } finally {
-    noticeLoading.value = false
+function messageTypeTag(type?: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' | undefined {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
+    system: 'info',
+    notice: 'warning',
+    private: 'success',
   }
+  return type ? map[type] : undefined
 }
 
-const handleNoticeClick = async (item: Notice): Promise<void> => {
-  noticePopoverVisible.value = false
+function messageTypeLabel(type?: string): string {
+  const map: Record<string, string> = {
+    system: t('message.systemMessage'),
+    notice: t('message.announcement'),
+    private: t('message.privateMessage'),
+  }
+  return type ? map[type] || type : t('message.systemMessage')
+}
+
+async function handlePopoverShow(): Promise<void> {
+  await Promise.all([notificationStore.fetchNotices(), notificationStore.fetchMessages()])
+}
+
+async function handleNoticeClick(item: Notice): Promise<void> {
+  popoverVisible.value = false
   noticeDetailLoading.value = true
   noticeDetailVisible.value = true
   try {
     const res = await noticeApi.getById(item.id)
     noticeDetail.value = res.data
     if (!item.read) {
-      await noticeApi.markRead(item.id)
-      item.read = true
-      unreadCount.value = Math.max(0, unreadCount.value - 1)
-      emit('unreadChange', unreadCount.value)
-      notificationStore.markNoticeRead(item.id)
+      await notificationStore.markNoticeRead(item.id)
     }
   } catch {
     ElMessage.error(t('notification.fetchFailed'))
@@ -151,20 +225,43 @@ const handleNoticeClick = async (item: Notice): Promise<void> => {
   }
 }
 
-const handleMarkAllRead = async (): Promise<void> => {
-  try {
-    // 使用批量标记接口
-    const ids = noticeItems.value.filter((n) => !n.read).map((n) => n.id)
-    if (ids.length === 0) {
-      ElMessage.info(t('notification.noUnread'))
-      return
+async function handleMessageClick(item: Message): Promise<void> {
+  popoverVisible.value = false
+  messageDetail.value = item
+  messageDetailVisible.value = true
+  if (!isMessageRead(item)) {
+    try {
+      await notificationStore.markMessageRead(item.id)
+      item.isRead = true
+      item.read = true
+    } catch {
+      // ignore
     }
-    await Promise.all(ids.map((id) => noticeApi.markRead(id)))
-    noticeItems.value.forEach((i) => {
-      i.read = true
-    })
-    unreadCount.value = 0
-    emit('unreadChange', unreadCount.value)
+  } else {
+    try {
+      const res = await messageApi.getById(item.id)
+      messageDetail.value = res.data || item
+    } catch {
+      // keep list item content
+    }
+  }
+}
+
+async function handleMarkAllRead(): Promise<void> {
+  try {
+    if (activeTab.value === 'notice') {
+      if (notificationStore.unreadNoticeCount === 0) {
+        ElMessage.info(t('notification.noUnread'))
+        return
+      }
+      await notificationStore.markAllNoticesRead()
+    } else {
+      if (notificationStore.unreadMessageCount === 0) {
+        ElMessage.info(t('notification.noUnreadMessages'))
+        return
+      }
+      await notificationStore.markAllMessagesRead()
+    }
     ElMessage.success(t('notification.markAllReadSuccess'))
   } catch (err: unknown) {
     const error = err as { message?: string }
@@ -172,12 +269,12 @@ const handleMarkAllRead = async (): Promise<void> => {
   }
 }
 
-const goToNoticeManager = (): void => {
-  noticePopoverVisible.value = false
-  router.push('/notices')
+function goToMore(): void {
+  popoverVisible.value = false
+  router.push(activeTab.value === 'notice' ? '/notices' : '/messages')
 }
 
-const formatTime = (time?: string): string => {
+function formatTime(time?: string): string {
   if (!time) return ''
   const d = new Date(time)
   const now = new Date()
@@ -188,42 +285,28 @@ const formatTime = (time?: string): string => {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-// 注册 SSE 事件处理器
-sse.on('connected', () => {
-  fetchUnreadCount()
-})
+function formatAbsoluteTime(time?: string): string {
+  if (!time) return '-'
+  return new Date(time).toLocaleString()
+}
 
-sse.on('notice-published', () => {
-  fetchUnreadCount()
-  if (noticePopoverVisible.value) {
-    fetchNoticeList()
-  }
-})
-
-sse.on('notice-removed', () => {
-  fetchUnreadCount()
-  if (noticePopoverVisible.value) {
-    fetchNoticeList()
-  }
-})
-
-// 被管理员强制下线
-sse.on('kicked', (payload) => {
-  let msg = t('notification.forceOfflineMessage')
-  if (payload && typeof payload === 'object' && 'reason' in payload) {
-    msg = String((payload as { reason?: string }).reason || msg)
-  }
-  sse.disconnect()
-  performLogout(msg)
-})
+let offKicked: (() => void) | undefined
 
 onMounted(() => {
-  fetchUnreadCount()
-  sse.connect()
+  notificationStore.connectSSE()
+  notificationStore.refreshUnreadCounts()
+  offKicked = notificationStore.onSSE('kicked', (payload) => {
+    let msg = t('notification.forceOfflineMessage')
+    if (payload && typeof payload === 'object' && 'reason' in payload) {
+      msg = String((payload as { reason?: string }).reason || msg)
+    }
+    notificationStore.disconnectSSE()
+    performLogout(msg)
+  })
 })
 
 onUnmounted(() => {
-  sse.disconnect()
+  offKicked?.()
 })
 </script>
 
@@ -259,6 +342,10 @@ onUnmounted(() => {
   font-weight: 500;
   font-size: 15px;
   color: var(--text-primary);
+}
+
+.notice-tabs {
+  margin-top: 4px;
 }
 
 .notice-list {
@@ -363,7 +450,6 @@ onUnmounted(() => {
 }
 </style>
 
-<!-- Popover 弹窗被 teleport 到 body，需要非 scoped 全局样式兼容深色模式 -->
 <style lang="scss">
 .notice-popover {
   background-color: var(--card-bg) !important;

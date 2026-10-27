@@ -153,10 +153,10 @@ export const useThemeStore = defineStore(
       root.style.setProperty('--el-color-primary', color)
 
       // 衍生色：light 系列（越浅数字越大）
-      for (let i = 1; i <= 9; i++) {
-        const lightColor = adjustColorBrightness(color, i * 12)
-        root.style.setProperty(`--el-color-primary-light-${i}`, lightColor)
-      }
+      // for (let i = 1; i <= 9; i++) {
+      //   const lightColor = adjustColorBrightness(color, i * 12)
+      //   root.style.setProperty(`--el-color-primary-light-${i}`, lightColor)
+      // }
       // 更亮的衍生色用于 hover 背景
       root.style.setProperty('--mainColor-light', adjustColorBrightness(color, 20))
       root.style.setProperty('--mainColor-lighter', adjustColorBrightness(color, 40))

@@ -139,7 +139,7 @@ export default defineConfig({
     // 覆盖 Vite 在 HTTPS 模式下注入的默认 CSP，允许当前源的 WebSocket 连接
     headers: {
       'Content-Security-Policy':
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:24678 ws://127.0.0.1:24678 wss://*:* ws://*:*; img-src 'self' data: blob:; font-src 'self' data:;",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; connect-src 'self' ws://localhost:24678 ws://127.0.0.1:24678 wss://*:* ws://*:*; img-src 'self' data: blob:; font-src 'self' data:;",
     },
     // 开发环境代理：将 /api 请求转发到后端（后端在 5173）
     proxy: {

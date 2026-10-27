@@ -1,0 +1,12 @@
+<div class="widget-latest-posts">
+  <h3>最新文章</h3>
+  <ul>
+    <% if (items && items.length) { %>
+      <% items.forEach(function(item) { %>
+        <li><a href="<%= item.url %>"><%= item.title %></a></li>
+      <% }); %>
+    <% } else { %>
+      <li>暂无文章</li>
+    <% } %>
+  </ul>
+</div>

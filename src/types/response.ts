@@ -15,6 +15,8 @@ export interface ApiResponse<T = unknown> {
 export interface PaginatedData<T> {
   rows: T[]
   total: number
+  /** 可选：列表接口附带的未读数 */
+  unreadCount?: number
 }
 
 /** 分页响应 */

@@ -22,11 +22,12 @@ const __dirname = dirname(__filename)
  */
 export const migrator = new Umzug({
   migrations: {
-    glob: resolve(__dirname, '../migrations/*.ts'),
+    // dist 下为 .js，tsx 源码运行为 .ts
+    glob: resolve(__dirname, '../migrations/*.{ts,js}').replace(/\\/g, '/'),
     resolve: ({ name, path, context }) => {
       const fileUrl = pathToFileURL(path!).href
       return {
-        name,
+        name: name.replace(/\.(ts|js)$/, ''),
         up: async () => {
           const migration = await import(fileUrl)
           await migration.up(context)
@@ -44,6 +45,7 @@ export const migrator = new Umzug({
     modelName: 'SequelizeMeta',
   }),
   logger: {
+    debug: (msg) => console.debug(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     info: (msg) => logInfo(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     warn: (msg) => console.warn(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     error: (msg) => logError(`[Migration] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
@@ -56,11 +58,12 @@ export const migrator = new Umzug({
  */
 export const seeder = new Umzug({
   migrations: {
-    glob: resolve(__dirname, '../seeders/*.ts'),
+    // dist 下为 .js，tsx 源码运行为 .ts
+    glob: resolve(__dirname, '../seeders/*.{ts,js}').replace(/\\/g, '/'),
     resolve: ({ name, path, context }) => {
       const fileUrl = pathToFileURL(path!).href
       return {
-        name,
+        name: name.replace(/\.(ts|js)$/, ''),
         up: async () => {
           const seed = await import(fileUrl)
           await seed.up(context)
@@ -78,6 +81,7 @@ export const seeder = new Umzug({
     modelName: 'SeederMeta',
   }),
   logger: {
+    debug: (msg) => console.debug(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     info: (msg) => logInfo(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     warn: (msg) => console.warn(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),
     error: (msg) => logError(`[Seeder] ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`),

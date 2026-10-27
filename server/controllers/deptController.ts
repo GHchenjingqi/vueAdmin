@@ -53,8 +53,7 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
   try {
     const id = Number(req.params.id)
     const result = await updateDept(id, req.body)
-    logOperation(req, '更新部门', `ID: ${id} 名称: ${result.name}`,
-      JSON.stringify({ changes: result.changes, summary: result.summary }))
+    logOperation(req, '更新部门', `ID: ${id} 名称: ${result.name}`, JSON.stringify({ changes: result.changes, summary: result.summary }))
     res.json({ code: 0, message: '更新成功' })
   } catch (err) {
     next(err)

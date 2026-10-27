@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
+import { quotaGuard } from '../modules/billing/middleware/quotaGuard.js'
 import { validate } from '../middleware/validate.js'
 import { paginationSchema, idParamSchema } from '../shared/schemas/common.js'
 import { loginSchema, changePasswordSchema, resetPasswordSchema } from '../shared/schemas/auth.js'
@@ -22,7 +23,11 @@ import * as messageController from '../controllers/messageController.js'
 import * as taskController from '../controllers/taskController.js'
 import * as onlineUserController from '../controllers/onlineUserController.js'
 import * as serverController from '../controllers/serverController.js'
+import config from '../config/index.js'
 import aiRoutes from './ai.routes.js'
+import knowledgeRoutes from '../modules/knowledge/routes/index.js'
+// ==================== 工作流管理 ====================
+import workflowRoutes from './workflowRoutes.js'
 
 const router = Router()
 
@@ -256,6 +261,11 @@ router.post('/auth/sse-ticket', authMiddleware, authController.createSseTicket)
  */
 router.get('/site/info', settingController.siteInfo)
 
+// 多租户上下文：由 authMiddleware 在认证成功、req.user 就绪后建立
+// （AsyncLocalStorage，见 middleware/auth.ts）。此处不再重复注册——
+// router.use 先于路由级 authMiddleware 执行，当时 req.user 尚未注入，
+// 早期版本放这里等于从未生效。
+
 // ==================== 认证接口 ====================
 
 /**
@@ -488,7 +498,7 @@ router.get('/users/:id', authMiddleware, validate(idParamSchema, 'params'), user
  *       201:
  *         description: 创建成功
  */
-router.post('/users', authMiddleware, validate(createUserSchema), userController.create)
+router.post('/users', authMiddleware, quotaGuard('users'), validate(createUserSchema), userController.create)
 
 /**
  * @openapi
@@ -1076,19 +1086,24 @@ router.delete('/dict/data/:id', authMiddleware, dictDataController.remove)
  *       401:
  *         description: 票据无效或已过期
  */
-router.get('/notices/sse', (req, res, next) => {
-  const { consumeSseTicket } = authController
-  const ticket = req.query.ticket
-  if (!ticket || typeof ticket !== 'string') {
-    return res.status(401).json({ code: 401, message: '缺少 SSE 连接票据' })
-  }
-  const userInfo = consumeSseTicket(ticket)
-  if (!userInfo) {
-    return res.status(401).json({ code: 401, message: 'SSE 连接票据无效或已过期' })
-  }
-  req.user = userInfo
-  next()
-}, noticeController.sse)
+router.get(
+  '/notices/sse',
+  (req, res, next) => {
+    const { consumeSseTicket } = authController
+    const ticket = req.query.ticket
+    if (!ticket || typeof ticket !== 'string') {
+      return res.status(401).json({ code: 401, message: '缺少 SSE 连接票据' })
+    }
+    const userInfo = consumeSseTicket(ticket)
+    if (!userInfo) {
+      return res.status(401).json({ code: 401, message: 'SSE 连接票据无效或已过期' })
+    }
+    // 票据结构为 { userId, username, nickname }，需映射为 Express req.user 约定的 { id, ... }
+    req.user = { id: userInfo.userId, username: userInfo.username, nickname: userInfo.nickname }
+    next()
+  },
+  noticeController.sse,
+)
 
 /**
  * @openapi
@@ -1387,7 +1402,7 @@ router.get('/upload/files', authMiddleware, uploadController.listFiles)
  *       201:
  *         description: 上传成功，返回文件信息
  */
-router.post('/upload', authMiddleware, uploadController.uploadFile)
+router.post('/upload', authMiddleware, quotaGuard('files'), uploadController.uploadFile)
 
 /**
  * @openapi
@@ -1924,6 +1939,8 @@ router.get('/online-users', authMiddleware, onlineUserController.list)
 router.delete('/online-users/:userId/session', authMiddleware, onlineUserController.kick)
 
 // ==================== 服务监控 ====================
+// M0 platformOnly: 此路由在 M1 接入 tenantContext 后正式拦截，普通租户不可见
+// 前端菜单已通过 hidden=1 隐藏
 
 /**
  * @openapi
@@ -1939,6 +1956,14 @@ router.delete('/online-users/:userId/session', authMiddleware, onlineUserControl
 router.get('/server/stats', authMiddleware, serverController.getStats)
 
 // ==================== AI 助手 ====================
-router.use(aiRoutes)
+if (config.app.aiAssistantEnabled !== false) {
+  router.use(aiRoutes)
+}
+router.use(workflowRoutes)
+router.use('/knowledge', knowledgeRoutes)
+
+// ==================== 计费与配额 ====================
+import billingRoutes from '../modules/billing/routes/billingRoutes.js'
+router.use(billingRoutes)
 
 export default router

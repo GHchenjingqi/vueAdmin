@@ -11,6 +11,7 @@ import multer from 'multer'
 import { AppError } from '../middleware/errorHandler.js'
 import { validateUploadFiles } from '../middleware/uploadValidator.js'
 import { listUploadedFiles, deleteUploadedFile } from '../services/uploadService.js'
+import { incrUsage } from '../modules/billing/services/usageService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -48,10 +49,7 @@ function toUrl(relativePath: string) {
   return '/uploads/' + relativePath.replace(/\\/g, '/')
 }
 
-const BLOCKED_EXTENSIONS = [
-  '.exe', '.bat', '.cmd', '.sh', '.msi', '.reg', '.vbs', '.ps1',
-  '.jar', '.dll', '.scr', '.com', '.pif', '.vb', '.wsf', '.hta',
-]
+const BLOCKED_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.msi', '.reg', '.vbs', '.ps1', '.jar', '.dll', '.scr', '.com', '.pif', '.vb', '.wsf', '.hta']
 
 const fileFilter = (_req: unknown, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const ext = extname(file.originalname).toLowerCase()
@@ -124,6 +122,8 @@ export const uploadFile = async (req, res, next) => {
           mimetype: f.mimetype,
         }
       })
+      const tenantId = req.user?.tenantId
+      if (tenantId) incrUsage(tenantId, 'files', files.length).catch(() => {})
       return res.json({ code: 0, data: files, message: `成功上传 ${files.length} 个文件` })
     })
   }
@@ -140,6 +140,8 @@ export const uploadFile = async (req, res, next) => {
       return next(e)
     }
     const relPath = relative(UPLOAD_DIR, req.file.path)
+    const tenantId = req.user?.tenantId
+    if (tenantId) incrUsage(tenantId, 'files').catch(() => {})
     res.json({
       code: 0,
       data: {

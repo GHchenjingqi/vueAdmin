@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url'
 import * as userService from '../services/userService.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { logOperation } from '../utils/logger.js'
+import { incrUsage } from '../modules/billing/services/usageService.js'
 
 /**
  * 获取用户列表（分页搜索）
@@ -19,12 +20,7 @@ import { logOperation } from '../utils/logger.js'
 export const list = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page = 1, pageSize = 10 } = req.query
-    const result = await userService.listUsers(
-      req.query as any,
-      Number(page),
-      Number(pageSize),
-      req.user,
-    )
+    const result = await userService.listUsers(req.query as any, Number(page), Number(pageSize), req.user)
     res.json({ code: 0, data: result })
   } catch (err) {
     next(err)
@@ -51,8 +47,9 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
 export const create = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await userService.createUser(req.body, req.user!)
-    logOperation(req, '创建用户', `ID: ${result.id} 用户名 ${req.body.username}`,
-      JSON.stringify({ id: result.id, ...req.body }))
+    logOperation(req, '创建用户', `ID: ${result.id} 用户名 ${req.body.username}`, JSON.stringify({ id: result.id, ...req.body }))
+    const tenantId = req.user!.tenantId
+    if (tenantId) incrUsage(tenantId, 'users').catch(() => {})
     res.status(201).json({ code: 0, data: result, message: '创建成功' })
   } catch (err) {
     next(err)
@@ -66,8 +63,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { changes, summary } = await userService.updateUser(Number(req.params.id), req.body, req.user!)
-    logOperation(req, '更新用户', `ID: ${req.params.id} 用户名 ${req.body.username}`,
-      JSON.stringify({ changes, summary }))
+    logOperation(req, '更新用户', `ID: ${req.params.id} 用户名 ${req.body.username}`, JSON.stringify({ changes, summary }))
     res.json({ code: 0, message: '更新成功' })
   } catch (err) {
     next(err)
@@ -81,8 +77,7 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
 export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await userService.changePassword(Number(req.params.id), req.body)
-    logOperation(req, '重置密码', `ID: ${req.params.id}`,
-      JSON.stringify({ id: req.params.id }))
+    logOperation(req, '重置密码', `ID: ${req.params.id}`, JSON.stringify({ id: req.params.id }))
     res.json({ code: 0, data: result, message: result.password ? '密码已重置' : '密码修改成功' })
   } catch (err) {
     next(err)

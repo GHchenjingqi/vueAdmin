@@ -11,13 +11,10 @@
       :pagination="pagination"
       :show-index="false"
       :show-selection="false"
-      :show-pagination="false"
+      :show-pagination="true"
       @query="onQuery"
     >
       <template #header-buttons>
-        <el-button type="primary" :icon="EditPen" v-permission="['sys:msg:send']" @click="handleCreate">
-          {{ t('message.sendMessage') }}
-        </el-button>
         <el-button :icon="Select" @click="handleReadAll">
           {{ t('message.readAll') }}
         </el-button>
@@ -30,13 +27,13 @@
       </template>
 
       <template #column-isRead="{ row }">
-        <el-tag :type="row.isRead ? 'success' : 'warning'" size="small">
-          {{ row.isRead ? t('message.read') : t('message.unread') }}
+        <el-tag :type="isRead(row as Message) ? 'success' : 'warning'" size="small">
+          {{ isRead(row as Message) ? t('message.read') : t('message.unread') }}
         </el-tag>
       </template>
 
       <template #column-title="{ row }">
-        <span :style="{ fontWeight: row.isRead ? 'normal' : 'bold' }">{{ row.title }}</span>
+        <span :style="{ fontWeight: isRead(row as Message) ? 'normal' : 'bold' }">{{ (row as Message).title }}</span>
       </template>
 
       <template #column-fromUser="{ row }">
@@ -47,86 +44,48 @@
       </template>
 
       <template #column-createdAt="{ row }">
-        {{ formatTime(row.createdAt) }}
+        {{ formatTime(row.createdAt || row.sendTime) }}
       </template>
 
       <template #column-actions="{ row }">
-        <el-button type="primary" link size="small" @click="handleView(row)">
+        <el-button type="primary" link size="small" @click="handleView(row as Message)">
           {{ t('common.view') }}
         </el-button>
-        <el-button type="danger" link size="small" @click="handleDelete(row)">
+        <el-button type="danger" link size="small" @click="handleDelete(row as Message)">
           {{ t('common.delete') }}
         </el-button>
       </template>
     </ProTable>
 
-    <el-dialog v-model="dialogVisible" :title="isView ? t('message.messageDetail') : t('message.sendMessage')" width="600px" destroy-on-close>
-      <template v-if="isView">
-        <el-descriptions :column="1" border>
-          <el-descriptions-item :label="t('message.content')">
-            {{ currentMessage.title }}
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('common.type')">
-            <el-tag :type="typeTag(currentMessage.type)" size="small">
-              {{ typeLabel(currentMessage.type) }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('message.sender')">
-            <span v-if="currentMessage.fromUser">{{ currentMessage.fromUser.nickname || currentMessage.fromUser.username }}</span>
-            <el-tag v-else type="info" size="small">
-              {{ t('message.system') }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('message.time')">
-            {{ formatTime(currentMessage.createdAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('message.content')">
-            <div style="white-space: pre-wrap; line-height: 1.8">
-              {{ currentMessage.content }}
-            </div>
-          </el-descriptions-item>
-        </el-descriptions>
-      </template>
-      <template v-else>
-        <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
-          <el-form-item :label="t('message.messageType')" prop="type">
-            <el-radio-group v-model="form.type">
-              <el-radio value="notice">
-                {{ t('message.announcement') }}
-              </el-radio>
-              <el-radio value="system">
-                {{ t('message.systemMessage') }}
-              </el-radio>
-              <el-radio value="private">
-                {{ t('message.privateMessage') }}
-              </el-radio>
-            </el-radio-group>
-          </el-form-item>
-          <el-form-item v-if="form.type === 'private'" :label="t('message.recipient')" prop="toUserId">
-            <el-select v-model="form.toUserId" :placeholder="t('message.selectRecipient')" filterable clearable style="width: 100%">
-              <el-option v-for="user in userList" :key="user.id" :label="`${user.nickname || user.username} (${user.username})`" :value="user.id" />
-            </el-select>
-          </el-form-item>
-          <el-form-item :label="t('notice.title')" prop="title">
-            <el-input v-model="form.title" :placeholder="t('message.inputTitle')" />
-          </el-form-item>
-          <el-form-item :label="t('message.content')" prop="content">
-            <el-input v-model="form.content" type="textarea" :rows="5" :placeholder="t('message.inputContent')" />
-          </el-form-item>
-        </el-form>
-      </template>
+    <el-dialog v-model="dialogVisible" :title="t('message.messageDetail')" width="600px" destroy-on-close>
+      <el-descriptions :column="1" border>
+        <el-descriptions-item :label="t('notice.title')">
+          {{ currentMessage.title }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('common.type')">
+          <el-tag :type="typeTag(currentMessage.type)" size="small">
+            {{ typeLabel(currentMessage.type) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('message.sender')">
+          <span v-if="currentMessage.fromUser">{{ currentMessage.fromUser.nickname || currentMessage.fromUser.username }}</span>
+          <el-tag v-else type="info" size="small">
+            {{ t('message.system') }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('message.time')">
+          {{ formatTime(currentMessage.createdAt || currentMessage.sendTime) }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('message.content')">
+          <div style="white-space: pre-wrap; line-height: 1.8">
+            {{ currentMessage.content }}
+          </div>
+        </el-descriptions-item>
+      </el-descriptions>
       <template #footer>
-        <el-button v-if="isView" @click="dialogVisible = false">
+        <el-button @click="dialogVisible = false">
           {{ t('common.close') }}
         </el-button>
-        <template v-else>
-          <el-button @click="dialogVisible = false">
-            {{ t('common.cancel') }}
-          </el-button>
-          <el-button type="primary" :loading="submitting" @click="handleSubmit">
-            {{ t('message.send') }}
-          </el-button>
-        </template>
       </template>
     </el-dialog>
   </div>
@@ -134,44 +93,19 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { EditPen, Select } from '@element-plus/icons-vue'
+import { Select } from '@element-plus/icons-vue'
 import ProTable from '@/components/ProTable/index.vue'
-import request from '@/utils/request'
+import { messageApi } from '@/api/message'
+import { useNotificationStore } from '@/stores'
 import { useI18n } from '@/i18n'
+import type { Message } from '@/types/api'
 
 const { t } = useI18n()
-
-interface MessageUser {
-  id: number
-  username: string
-  nickname?: string
-}
-
-interface MessageRecord {
-  id: number
-  title: string
-  type: string
-  content: string
-  isRead: boolean
-  fromUser?: MessageUser | null
-  createdAt: string
-  [key: string]: unknown
-}
-
-interface SendForm {
-  type: string
-  toUserId: number | null
-  title: string
-  content: string
-}
+const notificationStore = useNotificationStore()
 
 const dialogVisible = ref(false)
-const isView = ref(false)
-const submitting = ref(false)
-const formRef = ref()
-const currentMessage = ref<MessageRecord>({} as MessageRecord)
-const userList = ref<MessageUser[]>([])
-const messages = ref<MessageRecord[]>([])
+const currentMessage = ref<Message>({} as Message)
+const messages = ref<Message[]>([])
 const loading = ref(false)
 const pagination = reactive({ pageNum: 1, pageSize: 10, total: 0 })
 
@@ -204,18 +138,6 @@ const searchParams = reactive({
   isRead: '',
 })
 
-let form = reactive<SendForm>({
-  type: 'notice',
-  toUserId: null,
-  title: '',
-  content: '',
-})
-
-const rules = {
-  title: [{ required: true, message: t('message.inputTitle'), trigger: 'blur' }],
-  content: [{ required: true, message: t('message.inputContent'), trigger: 'blur' }],
-}
-
 const columns = computed(() => [
   { prop: 'id', label: 'ID', width: 70 },
   { prop: 'type', label: t('common.type'), width: 100 },
@@ -227,22 +149,36 @@ const columns = computed(() => [
 ])
 
 const typeTagMap: Record<string, string> = { system: 'info', notice: 'warning', private: 'success' }
-const typeLabelMap: Record<string, string> = { system: t('message.systemMessage'), notice: t('message.announcement'), private: t('message.privateMessage') }
 
-function typeTag(type: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' | undefined {
+function typeTag(type?: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' | undefined {
+  if (!type) return undefined
   return (typeTagMap[type] as 'success' | 'warning' | 'info' | 'primary' | 'danger') || undefined
 }
 
-function typeLabel(type: string): string {
-  return typeLabelMap[type] || type
+function typeLabel(type?: string): string {
+  if (!type) return ''
+  const map: Record<string, string> = {
+    system: t('message.systemMessage'),
+    notice: t('message.announcement'),
+    private: t('message.privateMessage'),
+  }
+  return map[type] || type
 }
 
-function formatTime(time: string | number | Date): string {
+function isRead(row: Message): boolean {
+  if (typeof row.isRead === 'boolean') return row.isRead
+  if (typeof row.read === 'boolean') return row.read
+  return false
+}
+
+function formatTime(time?: string | number | Date): string {
   if (!time) return ''
   return new Date(time).toLocaleString()
 }
 
-function onQuery(): void {
+function onQuery(params: { searchParams?: Record<string, unknown>; pagination?: Record<string, unknown> }): void {
+  if (params.searchParams) Object.assign(searchParams, params.searchParams)
+  if (params.pagination) Object.assign(pagination, params.pagination)
   fetchMessages()
 }
 
@@ -252,40 +188,31 @@ async function fetchMessages(): Promise<void> {
     const params: Record<string, unknown> = { page: pagination.pageNum, pageSize: pagination.pageSize }
     if (searchParams.type) params.type = searchParams.type
     if (searchParams.isRead !== '') params.isRead = searchParams.isRead
-    const res = await request.get<{ rows: MessageRecord[]; total: number }>('/messages', { params })
-    messages.value = res.data.rows || []
-    pagination.total = res.data.total || 0
+    const res = await messageApi.list(params)
+    messages.value = (res.data?.rows || []).map((item) => {
+      const read = typeof item.isRead === 'boolean' ? item.isRead : !!item.read
+      return { ...item, isRead: read, read }
+    })
+    pagination.total = res.data?.total || 0
+    if (typeof res.data?.unreadCount === 'number') {
+      notificationStore.unreadMessageCount = res.data.unreadCount
+    } else {
+      await notificationStore.refreshUnreadCounts()
+    }
   } catch {
-    // 消息列表获取失败，使用空列表
     messages.value = []
   } finally {
     loading.value = false
   }
 }
 
-async function handleCreate(): Promise<void> {
-  isView.value = false
-  form.type = 'notice'
-  form.toUserId = null
-  form.title = ''
-  form.content = ''
-  try {
-    const res = await request.get<{ rows: MessageUser[] }>('/users', { params: { page: 1, pageSize: 999 } })
-    userList.value = res.data.rows || []
-  } catch {
-    // 用户列表获取失败，不影响发送消息弹窗打开
-  }
-  dialogVisible.value = true
-}
-
-async function handleView(row: Record<string, unknown>): Promise<void> {
-  isView.value = true
-  const msg = row as MessageRecord
-  currentMessage.value = msg
-  if (!msg.isRead) {
+async function handleView(row: Message): Promise<void> {
+  currentMessage.value = row
+  if (!isRead(row)) {
     try {
-      await request.patch(`/messages/${msg.id}`, { isRead: true })
-      msg.isRead = true
+      await notificationStore.markMessageRead(row.id)
+      row.isRead = true
+      row.read = true
       fetchMessages()
     } catch {
       // 标记已读失败，不影响查看消息
@@ -294,26 +221,10 @@ async function handleView(row: Record<string, unknown>): Promise<void> {
   dialogVisible.value = true
 }
 
-async function handleSubmit(): Promise<void> {
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-  submitting.value = true
-  try {
-    await request.post('/messages', { ...form })
-    ElMessage.success(t('message.sendSuccess'))
-    dialogVisible.value = false
-    fetchMessages()
-  } catch {
-    // 发送消息失败，错误已由拦截器提示
-  } finally {
-    submitting.value = false
-  }
-}
-
 async function handleReadAll(): Promise<void> {
   try {
     await ElMessageBox.confirm(t('message.readAllConfirm'), t('common.tip'))
-    await request.patch('/messages', { readAll: true })
+    await notificationStore.markAllMessagesRead()
     ElMessage.success(t('message.readAllSuccess'))
     fetchMessages()
   } catch {
@@ -321,13 +232,13 @@ async function handleReadAll(): Promise<void> {
   }
 }
 
-async function handleDelete(row: Record<string, unknown>): Promise<void> {
+async function handleDelete(row: Message): Promise<void> {
   try {
-    const messageId = (row as MessageRecord).id
     await ElMessageBox.confirm(t('message.deleteConfirm'), t('common.tip'), { type: 'warning' })
-    await request.delete(`/messages/${messageId}`)
+    await messageApi.delete(row.id)
     ElMessage.success(t('message.deleteSuccess'))
     fetchMessages()
+    await notificationStore.refreshUnreadCounts()
   } catch {
     // 用户取消删除
   }

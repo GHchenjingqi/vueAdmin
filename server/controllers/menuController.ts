@@ -22,6 +22,31 @@ export const list = async (req, res, next) => {
 }
 
 /**
+ * 获取侧边栏菜单树（权限过滤）
+ */
+export const tree = async (req, res, next) => {
+  try {
+    const userId = req.user?.id
+    const data = await listMenus('tree', userId)
+    res.json({ code: 0, data })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * 获取菜单选项树（下拉用）
+ */
+export const options = async (req, res, next) => {
+  try {
+    const data = await listMenus('options')
+    res.json({ code: 0, data })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
  * 获取单个菜单
  */
 export const getById = async (req, res, next) => {

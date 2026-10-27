@@ -65,6 +65,9 @@ const form = ref({
   roleIds: [] as number[],
 })
 
+const deptOptions = ref<{ label: string; value: number }[]>([])
+const roleOptions = ref<{ label: string; value: number }[]>([])
+
 const formSchema = computed(() => [
   { prop: 'username', label: t('user.username'), type: 'input', placeholder: t('user.inputUsername'), required: true },
   { prop: 'nickname', label: t('user.nickname'), type: 'input', placeholder: t('user.inputNickname') },
@@ -83,7 +86,7 @@ const formSchema = computed(() => [
     type: 'select',
     placeholder: t('user.selectDept'),
     clearable: true,
-    options: [] as { label: string; value: number }[],
+    options: () => deptOptions.value,
   },
   {
     prop: 'roleIds',
@@ -92,7 +95,7 @@ const formSchema = computed(() => [
     placeholder: t('user.selectRole'),
     multiple: true,
     clearable: true,
-    options: [] as { label: string; value: number }[],
+    options: () => roleOptions.value,
   },
   {
     prop: 'status',
@@ -106,18 +109,12 @@ const formSchema = computed(() => [
 
 /** 设置部门选项 */
 function setDeptOptions(options: { label: string; value: number }[]): void {
-  const schema = formSchema.value.find((s) => s.prop === 'deptId')
-  if (schema) {
-    schema.options = options
-  }
+  deptOptions.value = options
 }
 
 /** 设置角色选项 */
 function setRoleOptions(options: { label: string; value: number }[]): void {
-  const schema = formSchema.value.find((s) => s.prop === 'roleIds')
-  if (schema) {
-    schema.options = options
-  }
+  roleOptions.value = options
 }
 
 defineExpose({ setDeptOptions, setRoleOptions })

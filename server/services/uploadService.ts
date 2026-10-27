@@ -24,14 +24,17 @@ function toUrl(relativePath: string): string {
 /**
  * 递归扫描目录
  */
-function scanDir(dirPath: string, files: Array<{
-  id: string
-  url: string
-  name: string
-  size: number
-  mtime: Date
-  ext: string
-}>): void {
+function scanDir(
+  dirPath: string,
+  files: Array<{
+    id: string
+    url: string
+    name: string
+    size: number
+    mtime: Date
+    ext: string
+  }>,
+): void {
   const entries = readdirSync(dirPath)
   for (const entry of entries) {
     const fullPath = resolve(dirPath, entry)

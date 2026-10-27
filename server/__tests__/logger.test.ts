@@ -10,7 +10,7 @@ vi.mock('../models/Log.js', () => ({
   },
 }))
 
-import { logLogin, logLoginFailure, logOperation } from '../utils/logger'
+import { logLogin, logLoginFailure, logOperation } from '../utils/logger.js'
 
 describe('logger', () => {
   beforeEach(() => {
@@ -65,9 +65,7 @@ describe('logger', () => {
 
       await logLoginFailure('', '密码错误', req)
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ username: '未知' }),
-      )
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ username: '未知' }))
     })
 
     it('空原因默认显示密码错误', async () => {
@@ -75,9 +73,7 @@ describe('logger', () => {
 
       await logLoginFailure('admin', '', req)
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ details: '密码错误' }),
-      )
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ details: '密码错误' }))
     })
 
     it('req 为 undefined 时正常处理', async () => {

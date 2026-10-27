@@ -260,6 +260,7 @@ const clearableTypes = [
   'textarea',
   'password',
   'select',
+  'tree-select',
   'date',
   'dates',
   'datetime',
@@ -412,7 +413,7 @@ const resolvedPlaceholder = computed(() => {
   const schemaPlaceholder = resolveMaybeGetter(props.item.placeholder) as string | undefined
   if (schemaPlaceholder) return schemaPlaceholder
   if (mergedComponentProps.value.placeholder) return mergedComponentProps.value.placeholder as string
-  if (['select', 'date', 'datetime', 'daterange', 'datetimerange', 'monthrange', 'time', 'timerange'].includes(resolvedType.value)) {
+  if (['select', 'tree-select', 'date', 'datetime', 'daterange', 'datetimerange', 'monthrange', 'time', 'timerange'].includes(resolvedType.value)) {
     return '请选择' + (props.item.label || '')
   }
   return '请输入' + (props.item.label || '')

@@ -39,6 +39,7 @@ export interface AIStatus {
     categories: Record<string, number>
     lastUpdated: string
   }
+  injectorEnabled?: boolean
 }
 
 /** AI 提供商 */

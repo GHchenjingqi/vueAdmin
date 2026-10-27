@@ -84,7 +84,38 @@ const { t, locale } = useI18n()
 interface MenuOption {
   id: number
   name: string
+  disabled?: boolean
   children?: MenuOption[]
+}
+
+function findMenuNode(nodes: Menu[], id: number): Menu | null {
+  for (const node of nodes) {
+    if (node.id === id) return node
+    if (node.children?.length) {
+      const found = findMenuNode(node.children, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function collectMenuIds(node: Menu, acc: Set<number>): void {
+  acc.add(node.id)
+  node.children?.forEach((child) => collectMenuIds(child, acc))
+}
+
+/** Build parent tree options; disable buttons and current node descendants. */
+function mapParentOptions(nodes: Menu[], disabledIds: Set<number>): MenuOption[] {
+  return nodes.map((node) => {
+    const children = node.children?.length ? mapParentOptions(node.children, disabledIds) : undefined
+    return {
+      id: node.id,
+      name: node.name,
+      // Buttons cannot host children; editing also cannot move under self/descendants.
+      disabled: node.type === 'F' || disabledIds.has(node.id),
+      children,
+    }
+  })
 }
 
 const loading = ref(false)
@@ -145,8 +176,8 @@ const filteredMenuTree = computed<Menu[]>(() => {
   return filterTree(menuTree.value, searchParams.keyword, searchParams.type, searchParams.status)
 })
 
-const onQuery = (_params?: Record<string, unknown>): void => {
-  // 前端过滤
+const onQuery = (params: { searchParams?: Record<string, unknown> }): void => {
+  if (params.searchParams) Object.assign(searchParams, params.searchParams)
 }
 
 const columns = computed(() => [
@@ -231,10 +262,17 @@ const formSchema = computed(() => [
     label: t('menu.parentMenu'),
     type: 'tree-select',
     placeholder: t('menu.topMenu'),
-    props: { filterable: true, clearable: true },
+    // checkStrictly: allow selecting non-leaf (e.g. secondary) menus as parent.
+    props: {
+      filterable: true,
+      clearable: true,
+      checkStrictly: true,
+      defaultExpandAll: true,
+    },
     optionLabel: 'name',
     optionValue: 'id',
-    treeProps: { children: 'children' },
+    optionDisabled: 'disabled',
+    treeProps: { children: 'children', disabled: 'disabled' },
     options: () => optionTree.value,
   },
   { prop: 'name', label: t('menu.menuName'), type: 'input', placeholder: t('menu.inputMenuName'), required: true },
@@ -317,7 +355,26 @@ const fetchMenus = async (): Promise<void> => {
 const fetchOptions = async (): Promise<void> => {
   try {
     const res = await menuApi.list()
-    optionTree.value = [{ id: 0, name: t('menu.topMenu'), children: res.data }]
+    const menus = (res.data || []) as Menu[]
+    const disabledIds = new Set<number>()
+
+    // When editing, prevent selecting self or any descendant as parent.
+    if (isEdit.value && currentId.value != null) {
+      const current = findMenuNode(menus, currentId.value)
+      if (current) {
+        collectMenuIds(current, disabledIds)
+      } else {
+        disabledIds.add(currentId.value)
+      }
+    }
+
+    optionTree.value = [
+      {
+        id: 0,
+        name: t('menu.topMenu'),
+        children: mapParentOptions(menus, disabledIds),
+      },
+    ]
   } catch (err: unknown) {
     ElMessage.error(t('menu.fetchOptionsFailed') + ': ' + getErrorMessage(err))
   }

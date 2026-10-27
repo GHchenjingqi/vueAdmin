@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(10),
+  pageSize: z.coerce.number().int().positive().max(1000).default(10),
   keyword: z.string().optional(),
   status: z.coerce.number().int().min(0).max(1).optional(),
   startDate: z.string().optional(),

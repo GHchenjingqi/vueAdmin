@@ -1,0 +1,251 @@
+import request from '@/utils/request'
+
+export interface Workflow {
+  id: number
+  name: string
+  description: string | null
+  status: number
+  draftVersionId: number | null
+  publishedVersionId: number | null
+  createdBy: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WorkflowNode {
+  id?: number
+  nodeKey: string
+  name: string
+  type: 'start' | 'end' | 'condition' | 'approve' | 'notify'
+  config?: string
+  x?: number
+  y?: number
+}
+
+export interface WorkflowEdge {
+  id?: number
+  sourceNodeKey: string
+  targetNodeKey: string
+  sourceHandle?: string | null
+  conditionType: 'always' | 'expression'
+  conditionExpr?: string
+}
+
+export interface ApproverRule {
+  id?: number
+  nodeKey: string
+  ruleType: 'creator' | 'direct_leader' | 'dept_manager' | 'role' | 'dept' | 'user' | 'field'
+  ruleConfig?: string
+  sort: number
+  name?: string
+}
+
+export interface WorkflowFormField {
+  id?: number
+  workflowId?: number
+  fieldKey: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'file'
+  required?: number | boolean
+  options?: string | null
+  placeholder?: string | null
+  sort?: number
+}
+
+export interface WorkflowInstance {
+  id: number
+  workflowId: number
+  versionId: number
+  bindingKey: string | null
+  bindingId: number | null
+  title: string | null
+  status: string
+  currentNodeKey: string | null
+  startedBy: number | null
+  startedAt: string | null
+  finishedAt: string | null
+  createdAt: string
+  workflow?: { id: number; name: string }
+  starter?: { id: number; username: string; nickname?: string }
+}
+
+export interface ApprovalTask {
+  id: number
+  instanceId: number
+  nodeKey: string
+  title: string | null
+  status: string
+  approverId: number | null
+  approverName: string | null
+  comment: string | null
+  assignedAt: string | null
+  finishedAt: string | null
+  createdAt: string
+  instance?: WorkflowInstance
+}
+
+export interface WorkflowDesignPayload {
+  nodes: {
+    nodeKey: string
+    name: string
+    type: 'start' | 'end' | 'condition' | 'approve' | 'notify'
+    config?: string
+    x?: number
+    y?: number
+  }[]
+  edges: {
+    sourceNodeKey: string
+    targetNodeKey: string
+    sourceHandle?: string | null
+    conditionType?: 'always' | 'expression'
+    conditionExpr?: string
+  }[]
+  rules: {
+    nodeKey: string
+    ruleType: 'creator' | 'direct_leader' | 'dept_manager' | 'role' | 'dept' | 'user' | 'field'
+    ruleConfig?: string
+    sort?: number
+    name?: string
+  }[]
+}
+
+export interface WorkflowRejectReason {
+  id: number
+  content: string
+  sort: number
+  enabled: number
+  createdBy: number | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export const workflowApi = {
+  list(params?: Record<string, unknown>, skipCache = false) {
+    return request.get<{ rows: Workflow[]; total: number; page: number; pageSize: number }>('/workflows', {
+      params,
+      ...(skipCache ? { skipCache: true } : {}),
+    } as Record<string, unknown>)
+  },
+  getById(id: number) {
+    return request.get<Workflow>(`/workflows/${id}`)
+  },
+  create(data: { name: string; description?: string }) {
+    return request.post<Workflow>('/workflows', data)
+  },
+  update(id: number, data: Partial<Workflow>) {
+    return request.put<Workflow>(`/workflows/${id}`, data)
+  },
+  delete(id: number) {
+    return request.delete<null>(`/workflows/${id}`)
+  },
+  toggle(id: number, enabled: boolean) {
+    return request.post<Workflow>(`/workflows/${id}/toggle`, { enabled })
+  },
+  publish(id: number) {
+    return request.post<{ workflow: Workflow; publishedVersion: unknown; newDraftVersion: unknown }>(`/workflows/${id}/publish`)
+  },
+  getDesign(id: number) {
+    return request.get<{ nodes: WorkflowNode[]; edges: WorkflowEdge[]; rules: ApproverRule[] }>(`/workflows/${id}/design`)
+  },
+  upsertNode(workflowId: number, data: WorkflowNode) {
+    return request.post<WorkflowNode>(`/workflows/${workflowId}/design/nodes`, data)
+  },
+  deleteNode(workflowId: number, nodeKey: string) {
+    return request.delete<null>(`/workflows/${workflowId}/design/nodes/${nodeKey}`)
+  },
+  upsertEdge(workflowId: number, data: WorkflowEdge) {
+    return request.post<WorkflowEdge>(`/workflows/${workflowId}/design/edges`, data)
+  },
+  deleteEdge(workflowId: number, sourceKey: string, targetKey: string) {
+    return request.delete<null>(`/workflows/${workflowId}/design/edges/${sourceKey}/${targetKey}`)
+  },
+  upsertApproverRule(workflowId: number, nodeKey: string, data: ApproverRule) {
+    return request.post<ApproverRule>(`/workflows/${workflowId}/design/approver-rules/${nodeKey}`, data)
+  },
+  deleteApproverRule(workflowId: number, ruleId: number) {
+    return request.delete<null>(`/workflows/${workflowId}/design/approver-rules/${ruleId}`)
+  },
+  getInstances(params?: Record<string, unknown>) {
+    return request.get<{ rows: WorkflowInstance[]; total: number; page: number; pageSize: number }>('/workflow-instances', { params })
+  },
+  getInstanceDetail(id: number) {
+    return request.get<{ instance: WorkflowInstance; logs: unknown[]; approvals: ApprovalTask[] }>(`/workflow-instances/${id}`)
+  },
+  retryInstance(id: number) {
+    return request.post<null>(`/workflow-instances/${id}/retry`)
+  },
+  terminateInstance(id: number) {
+    return request.post<null>(`/workflow-instances/${id}/terminate`)
+  },
+  trigger(data: { bindingKey: string; bindingId: number; input?: unknown; title?: string }) {
+    return request.post<WorkflowInstance>('/workflow/trigger', data)
+  },
+  getApprovalTasks(params?: Record<string, unknown>) {
+    return request.get<{ rows: ApprovalTask[]; total: number; page: number; pageSize: number }>('/approval-tasks', { params })
+  },
+  approveTask(id: number, status: 'approved' | 'rejected', comment?: string) {
+    return request.patch<null>(`/approval-tasks/${id}`, { status, comment })
+  },
+  getBindings() {
+    return request.get<unknown[]>('/workflow-bindings')
+  },
+  createBinding(data: { workflowId: number; bindingKey: string; entityName?: string; formKey?: string; callbackUrl?: string }) {
+    return request.post<unknown>('/workflow-bindings', data)
+  },
+  deleteBinding(id: number) {
+    return request.delete<null>(`/workflow-bindings/${id}`)
+  },
+  // 工作流表单字段（业务发起参数定义）
+  getFormFields(id: number) {
+    return request.get<WorkflowFormField[]>(`/workflows/${id}/form-fields`)
+  },
+  saveFormFields(id: number, fields: WorkflowFormField[]) {
+    return request.post<WorkflowFormField[]>(`/workflows/${id}/form-fields`, { fields })
+  },
+  // 事务化整图批量保存（节点 upsert + 边/规则整版本替换，含图合法性校验）
+  saveDesign(id: number, data: WorkflowDesignPayload) {
+    return request.post<{ ok: boolean }>(`/workflows/${id}/design/save`, data)
+  },
+  // 校验候选图（不落库）
+  validateDesign(id: number, data: WorkflowDesignPayload) {
+    return request.post<{ valid: boolean; errors: string[] }>(`/workflows/${id}/design/validate`, data)
+  },
+  // 校验当前草稿版本
+  validateDraft(id: number) {
+    return request.get<{ valid: boolean; errors: string[] }>(`/workflows/${id}/design/validate`)
+  },
+  // 个人委托审批
+  setDelegation(data: { toUserId: number; startAt?: string; endAt?: string; remark?: string }) {
+    return request.post<unknown>('/me/delegation', data)
+  },
+  listDelegations() {
+    return request.get<
+      { id: number; fromUserId: number; toUserId: number; toUserName: string; startAt: string; endAt: string | null; remark: string | null; status: number }[] &
+        unknown
+    >('/me/delegation')
+  },
+  cancelDelegation(id: number) {
+    return request.delete<null>(`/me/delegation/${id}`)
+  },
+  // 导出实例为 CSV
+  exportInstances(params?: Record<string, unknown>) {
+    return request.get<Blob>('/workflow-instances/export', { params, responseType: 'blob' })
+  },
+  // 导出我的审批记录为 CSV
+  exportMyTasks(params?: Record<string, unknown>) {
+    return request.get<Blob>('/approval-tasks/export', { params, responseType: 'blob' })
+  },
+  // 常用驳回理由（可配置）
+  listRejectReasons() {
+    return request.get<WorkflowRejectReason[]>('/workflow-reject-reasons')
+  },
+  createRejectReason(data: { content: string; sort?: number; enabled?: number }) {
+    return request.post<WorkflowRejectReason>('/workflow-reject-reasons', data)
+  },
+  updateRejectReason(id: number, data: { content?: string; sort?: number; enabled?: number }) {
+    return request.put<WorkflowRejectReason>(`/workflow-reject-reasons/${id}`, data)
+  },
+  deleteRejectReason(id: number) {
+    return request.delete<null>(`/workflow-reject-reasons/${id}`)
+  },
+}

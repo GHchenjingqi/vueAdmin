@@ -48,7 +48,7 @@ export const create = async (req, res, next) => {
 export const update = async (req, res, next) => {
   try {
     const result = await markMessageRead(Number(req.params.id), req.body.isRead)
-    if (result.markedRead) {
+    if ('markedRead' in result) {
       return res.json({ code: 0, message: '已标记为已读' })
     }
     res.json({ code: 0, data: result })

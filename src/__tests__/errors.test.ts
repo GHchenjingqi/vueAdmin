@@ -11,15 +11,7 @@
  * 补充后可消除 error.ts 的覆盖率假阴性。
  */
 import { describe, it, expect } from 'vitest'
-import {
-  AppError,
-  createAppError,
-  getErrorMessage,
-  isUserCancel,
-  isNetworkError,
-  isAuthError,
-  isValidationError,
-} from '../utils/errors'
+import { AppError, createAppError, getErrorMessage, isUserCancel, isNetworkError, isAuthError, isValidationError } from '../utils/errors'
 
 describe('errors.ts - AppError', () => {
   it('默认 code 为 UNKNOWN', () => {

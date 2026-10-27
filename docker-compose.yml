@@ -2,6 +2,8 @@ version: '3.8'
 
 services:
   # -------------------- MySQL 数据库 --------------------
+  # 注意: 官方镜像禁止 MYSQL_USER=root；默认业务用户 vue_admin
+  # init.sql 仅在数据卷首次创建时执行；表结构由应用 Umzug 迁移负责
   mysql:
     image: mysql:8.0
     container_name: vue-admin-mysql
@@ -9,7 +11,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: ${DB_NAME:-vue_admin}
-      MYSQL_USER: ${DB_USER:-root}
+      MYSQL_USER: ${MYSQL_USER:-vue_admin}
       MYSQL_PASSWORD: ${DB_PASSWORD:-root}
       TZ: Asia/Shanghai
     ports:
@@ -18,7 +20,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./server/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,10 +58,12 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: ${DB_NAME:-vue_admin}
-      DB_USER: ${DB_USER:-root}
+      DB_USER: ${DB_USER:-vue_admin}
       DB_PASSWORD: ${DB_PASSWORD:-root}
-      SERVER_PORT: ${SERVER_PORT:-3000}
-      JWT_SECRET: ${JWT_SECRET:-vue_admin_secret_key_2024}
+      SERVER_PORT: 3000
+      # 容器内固定 3000；宿主机映射见 ports（SERVER_HOST_PORT）
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost:3000,http://localhost:3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CAPTCHA_ENABLED: ${CAPTCHA_ENABLED:-true}
       UPLOAD_MAX_SIZE: ${UPLOAD_MAX_SIZE:-10}
@@ -68,7 +72,7 @@ services:
       REDIS_ENABLED: 'true'
       REDIS_URL: redis://redis:6379
     ports:
-      - '${SERVER_PORT:-3000}:3000'
+      - '${SERVER_HOST_PORT:-3000}:3000'
     volumes:
       - uploads_data:/app/server/uploads
       - logs_data:/app/server/logs

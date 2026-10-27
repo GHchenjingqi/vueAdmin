@@ -4,7 +4,7 @@
  * 职责：封装全局搜索的业务逻辑
  */
 
-import { Op } from 'sequelize'
+import { Op, QueryTypes } from 'sequelize'
 import User from '../models/User.js'
 import Department from '../models/Department.js'
 import Role from '../models/Role.js'
@@ -38,22 +38,22 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
   const kw = `%${keyword.trim()}%`
   const results: SearchResultModule[] = []
 
-  const userMenus = await sequelize.query(
+  const userMenus = (await sequelize.query(
     `SELECT m.id, m.name, m.path FROM menus m
      JOIN role_menus rm ON rm.menuId = m.id
      JOIN user_roles ur ON ur.roleId = rm.roleId
      WHERE ur.userId = ? AND m.type IN ('M') AND m.status = 1
      GROUP BY m.id`,
-    { replacements: [userId], type: sequelize.QueryTypes.SELECT }
-  ) as Array<{ id: number; name: string; path: string }>
+    { replacements: [userId], type: QueryTypes.SELECT },
+  )) as unknown as Array<{ id: number; name: string; path: string }>
 
-  const menuPaths = userMenus.map(m => m.path)
-  const menuNames = userMenus.map(m => m.name.toLowerCase())
+  const menuPaths = userMenus.map((m) => m.path)
+  const menuNames = userMenus.map((m) => m.name.toLowerCase())
 
-  const canSearchUsers = menuPaths.some(p => p?.startsWith('/users')) || menuNames.some(n => n.includes('用户'))
-  const canSearchDepts = menuPaths.some(p => p?.startsWith('/departments')) || menuNames.some(n => n.includes('部门'))
-  const canSearchRoles = menuPaths.some(p => p?.startsWith('/roles')) || menuNames.some(n => n.includes('角色'))
-  const canSearchMenus = menuPaths.some(p => p?.startsWith('/menus')) || menuNames.some(n => n.includes('菜单'))
+  const canSearchUsers = menuPaths.some((p) => p?.startsWith('/users')) || menuNames.some((n) => n.includes('用户'))
+  const canSearchDepts = menuPaths.some((p) => p?.startsWith('/departments')) || menuNames.some((n) => n.includes('部门'))
+  const canSearchRoles = menuPaths.some((p) => p?.startsWith('/roles')) || menuNames.some((n) => n.includes('角色'))
+  const canSearchMenus = menuPaths.some((p) => p?.startsWith('/menus')) || menuNames.some((n) => n.includes('菜单'))
 
   const searches: Promise<void>[] = []
 
@@ -61,21 +61,17 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
     searches.push(
       User.findAll({
         where: {
-          [Op.or]: [
-            { username: { [Op.like]: kw } },
-            { email: { [Op.like]: kw } },
-            { phone: { [Op.like]: kw } },
-          ],
+          [Op.or]: [{ username: { [Op.like]: kw } }, { email: { [Op.like]: kw } }, { phone: { [Op.like]: kw } }],
         },
         attributes: ['id', 'username', 'email', 'phone', 'status'],
         limit: 10,
-      }).then(users => {
+      }).then((users) => {
         if (users.length > 0) {
           results.push({
             module: '用户管理',
             icon: 'User',
             path: '/users',
-            items: users.map(u => ({
+            items: users.map((u) => ({
               id: u.id,
               label: u.username,
               description: `${u.email || '-'} ${u.phone || '-'}`,
@@ -84,7 +80,7 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
             })),
           })
         }
-      })
+      }),
     )
   }
 
@@ -94,13 +90,13 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
         where: { name: { [Op.like]: kw } },
         attributes: ['id', 'name', 'leader', 'status'],
         limit: 10,
-      }).then(depts => {
+      }).then((depts) => {
         if (depts.length > 0) {
           results.push({
             module: '部门管理',
             icon: 'OfficeBuilding',
             path: '/departments',
-            items: depts.map(d => ({
+            items: depts.map((d) => ({
               id: d.id,
               label: d.name,
               description: d.leader ? `负责人: ${d.leader}` : '',
@@ -109,7 +105,7 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
             })),
           })
         }
-      })
+      }),
     )
   }
 
@@ -119,13 +115,13 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
         where: { name: { [Op.like]: kw } },
         attributes: ['id', 'name', 'code', 'status'],
         limit: 10,
-      }).then(roles => {
+      }).then((roles) => {
         if (roles.length > 0) {
           results.push({
             module: '角色管理',
             icon: 'Avatar',
             path: '/roles',
-            items: roles.map(r => ({
+            items: roles.map((r) => ({
               id: r.id,
               label: r.name,
               description: r.code,
@@ -134,7 +130,7 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
             })),
           })
         }
-      })
+      }),
     )
   }
 
@@ -147,13 +143,13 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
         },
         attributes: ['id', 'name', 'path', 'icon', 'type'],
         limit: 10,
-      }).then(menus => {
+      }).then((menus) => {
         if (menus.length > 0) {
           results.push({
             module: '菜单管理',
             icon: 'Menu',
             path: '/menus',
-            items: menus.map(m => ({
+            items: menus.map((m) => ({
               id: m.id,
               label: m.name,
               description: m.path || '-',
@@ -162,19 +158,17 @@ export async function globalSearch(keyword: string, userId: number): Promise<Sea
             })),
           })
         }
-      })
+      }),
     )
   }
 
-  const matchedMenus = userMenus.filter(m =>
-    m.name.toLowerCase().includes(keyword.trim().toLowerCase())
-  )
+  const matchedMenus = userMenus.filter((m) => m.name.toLowerCase().includes(keyword.trim().toLowerCase()))
   if (matchedMenus.length > 0) {
     results.push({
       module: '功能菜单',
       icon: 'Link',
       path: '',
-      items: matchedMenus.map(m => ({
+      items: matchedMenus.map((m) => ({
         id: m.id,
         label: m.name,
         description: m.path || '-',

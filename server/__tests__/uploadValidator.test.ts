@@ -6,11 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import {
-  validateUploadFile,
-  validateUploadFiles,
-  type UploadCategory,
-} from '../middleware/uploadValidator.js'
+import { validateUploadFile, validateUploadFiles, type UploadCategory } from '../middleware/uploadValidator.js'
 
 let tmpDir: string
 beforeEach(() => {
@@ -20,11 +16,7 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true })
 })
 
-function makeFile(
-  name: string,
-  content: Buffer,
-  sizeOverride?: number,
-): { originalname: string; size: number; path: string } {
+function makeFile(name: string, content: Buffer, sizeOverride?: number): { originalname: string; size: number; path: string } {
   const p = join(tmpDir, name)
   writeFileSync(p, content)
   return { originalname: name, size: sizeOverride ?? content.length, path: p }
@@ -33,9 +25,7 @@ function makeFile(
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 const GIF = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00, 0x00])
 const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
-const WEBP = Buffer.from([
-  0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
-])
+const WEBP = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50])
 const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'utf8')
 const FAKE = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07])
 const PDF = Buffer.from('%PDF-1.4 sample content for test', 'utf8')

@@ -33,18 +33,7 @@ const ALLOWED: Record<UploadCategory, CategoryRule> = {
   },
   document: {
     label: '文档',
-    extensions: [
-      '.pdf',
-      '.doc',
-      '.docx',
-      '.xls',
-      '.xlsx',
-      '.ppt',
-      '.pptx',
-      '.txt',
-      '.md',
-      '.csv',
-    ],
+    extensions: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.csv'],
     maxSize: 20 * 1024 * 1024, // 20MB
   },
   archive: {
@@ -115,27 +104,17 @@ const ALLOWED_EXTENSIONS = Object.values(ALLOWED)
  * 校验单个已上传文件对象（来自 multer 的 req.file / req.files[i]）。
  * 校验失败抛出 AppError，不负责清理磁盘文件。
  */
-export function validateUploadFile(file: {
-  originalname: string
-  size: number
-  path: string
-}): void {
+export function validateUploadFile(file: { originalname: string; size: number; path: string }): void {
   const ext = extname(file.originalname).toLowerCase()
 
   const category = EXT_CATEGORY[ext]
   if (!category) {
-    throw new AppError(
-      400,
-      `不支持的文件类型 ${ext || '(无扩展名)'}，允许的类型：${ALLOWED_EXTENSIONS}`,
-    )
+    throw new AppError(400, `不支持的文件类型 ${ext || '(无扩展名)'}，允许的类型：${ALLOWED_EXTENSIONS}`)
   }
 
   const rule = ALLOWED[category]
   if (file.size > rule.maxSize) {
-    throw new AppError(
-      400,
-      `${rule.label}文件大小不能超过 ${formatSize(rule.maxSize)}，当前文件 ${formatSize(file.size)}`,
-    )
+    throw new AppError(400, `${rule.label}文件大小不能超过 ${formatSize(rule.maxSize)}，当前文件 ${formatSize(file.size)}`)
   }
 
   // 图片额外做魔数校验（文档/压缩包按扩展名+大小即可，避免误伤合法文件）
@@ -169,11 +148,7 @@ export function validateUploadFiles(req: {
   file?: { originalname: string; size: number; path: string } | null
   files?: Array<{ originalname: string; size: number; path: string }> | null
 }): void {
-  const files = req.files?.length
-    ? req.files
-    : req.file
-      ? [req.file]
-      : []
+  const files = req.files?.length ? req.files : req.file ? [req.file] : []
 
   if (files.length === 0) return // 无文件交给控制器处理（缺文件 400）
 
@@ -191,11 +166,7 @@ export function validateUploadFiles(req: {
  * Express 中间件形态（适用于把 multer 前置到路由层时使用）。
  * 若保留控制器内调用 multer 的现状，请直接用 validateUploadFiles(req)。
  */
-export function uploadValidator(
-  req: any,
-  _res: any,
-  next: (err?: unknown) => void,
-): void {
+export function uploadValidator(req: any, _res: any, next: (err?: unknown) => void): void {
   try {
     validateUploadFiles(req)
     next()
