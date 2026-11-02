@@ -56,6 +56,9 @@
           @node-click="onNodeClick"
           @edge-click="onEdgeClick"
           @pane-click="onPaneClick"
+          @node-context-menu="onNodeContextMenu"
+          @edge-context-menu="onEdgeContextMenu"
+          @pane-context-menu="onPaneContextMenu"
           @connect="onConnect"
         >
           <Background />
@@ -73,7 +76,7 @@
               {{ t('common.delete') }}
             </el-button>
           </div>
-          <el-form label-width="80px" size="small">
+          <el-form label-width="130px" size="small">
             <el-form-item :label="t('workflow.designer.name')">
               <el-input :model-value="selectedNode.data?.label" @update:model-value="updateNodeName($event)" />
             </el-form-item>
@@ -278,7 +281,7 @@
               {{ t('common.delete') }}
             </el-button>
           </div>
-          <el-form label-width="92px" size="small">
+          <el-form label-width="130px" size="small">
             <el-form-item :label="t('workflow.designer.source')">
               <el-tag size="small">
                 {{ selectedEdge.source }}
@@ -309,6 +312,16 @@
             <EditPen />
           </el-icon>
           <p>{{ t('workflow.designer.emptyTip') }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右键菜单：删除节点 / 删除连线 -->
+    <div v-if="contextMenu.visible" class="ctx-mask" @click="hideContextMenu" @contextmenu.prevent="hideContextMenu">
+      <div class="ctx-menu" :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }" @click.stop>
+        <div class="ctx-item ctx-danger" @click="deleteFromContextMenu">
+          <el-icon><Delete /></el-icon>
+          <span>{{ contextMenu.nodeId ? t('workflow.designer.deleteNode') : t('workflow.designer.deleteEdge') }}</span>
         </div>
       </div>
     </div>
@@ -381,7 +394,7 @@
 
 <script setup lang="ts">
 import { onBeforeRouteLeave } from 'vue-router'
-import { markRaw } from 'vue'
+import { markRaw, nextTick } from 'vue'
 import {
   VueFlow,
   useVueFlow,
@@ -394,6 +407,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   addEdge,
+  MarkerType,
 } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -447,6 +461,7 @@ interface FlowEdge {
   source: string
   target: string
   type?: string
+  markerEnd?: string
   data?: FlowEdgeData
   label?: string
   sourceHandle?: string | null
@@ -470,7 +485,7 @@ const roles = ref<{ id: number; name: string }[]>([])
 const departments = ref<{ id: number; name: string }[]>([])
 const users = ref<{ id: number; nickname?: string; username: string }[]>([])
 
-const { screenToFlowCoordinate } = useVueFlow()
+const { screenToFlowCoordinate, addNodes, removeNodes, removeEdges, findNode, fitView } = useVueFlow()
 
 const nodeTypesMap: NodeTypesObject = {
   start: markRaw(WorkflowNodeComp),
@@ -488,6 +503,9 @@ const publishing = ref(false)
 const dirty = ref(false)
 const selectedNode = ref<FlowNode | null>(null)
 const selectedEdge = ref<FlowEdge | null>(null)
+
+// 右键上下文菜单：记录弹出位置与目标节点/连线
+const contextMenu = reactive({ visible: false, x: 0, y: 0, nodeId: '' as string, edgeId: '' as string })
 const notifyConfig = reactive({ title: '', content: '', ccUserIds: [] as number[] })
 const approverRules = ref<ApproverRule[]>([])
 const conditionEdges = ref<ConditionEdgeItem[]>([])
@@ -600,8 +618,14 @@ function onDragStart(event: DragEvent, type: string) {
 }
 
 function addNodeByType(type: string) {
-  const position = { x: 120 + Math.random() * 120, y: 80 + Math.random() * 120 }
+  // 按已有节点数量纵向排布，避免每次新增都散落随机位置导致画布乱序
+  const offset = flowNodes.value.length
+  const position = { x: 260, y: 60 + offset * 110 }
   addNode(type, position)
+  // 新增后将画布自适应，确保新节点始终可见且整体布局整洁
+  nextTick(() => {
+    setTimeout(() => fitView({ padding: 0.2 }), 60)
+  })
 }
 
 function onDrop(event: DragEvent) {
@@ -620,8 +644,9 @@ function addNode(type: string, position: { x: number; y: number }) {
     position,
     data: { label, rawNode: { nodeKey: nodeId, type: type as WorkflowNode['type'], name: label } },
   }
-  flowNodes.value.push(node)
-  selectNode(node)
+  addNodes([node])
+  // 选中 store 中真实创建的节点，保证后续配置修改能正确回写
+  selectNode((findNode(nodeId) as unknown as FlowNode) || node)
   markDirty()
 }
 
@@ -645,6 +670,7 @@ function onConnect(connection: Connection) {
     ...connection,
     id: `${connection.source}-${connection.sourceHandle || 'out'}-${connection.target}`,
     type: 'smoothstep',
+    markerEnd: MarkerType.ArrowClosed,
     data: { sourceHandle: connection.sourceHandle, conditionType: 'always' },
   }
   flowEdges.value = addEdge(edge, flowEdges.value as unknown as never[]) as FlowEdge[]
@@ -653,19 +679,67 @@ function onConnect(connection: Connection) {
 }
 
 function onNodeClick({ node }: NodeMouseEvent) {
+  hideContextMenu()
   selectNode(node as unknown as FlowNode)
 }
 
 function onEdgeClick({ edge }: EdgeMouseEvent) {
+  hideContextMenu()
   flushNodeConfig()
   selectedNode.value = null
   selectedEdge.value = edge as unknown as FlowEdge
 }
 
 function onPaneClick() {
+  hideContextMenu()
   flushNodeConfig()
   selectedNode.value = null
   selectedEdge.value = null
+}
+
+function onNodeContextMenu({ event, node }: NodeMouseEvent) {
+  const mouseEvent = event as MouseEvent
+  mouseEvent.preventDefault()
+  showContextMenu(mouseEvent.clientX, mouseEvent.clientY, (node as unknown as FlowNode).id, '')
+}
+
+function onEdgeContextMenu({ event, edge }: EdgeMouseEvent) {
+  const mouseEvent = event as MouseEvent
+  mouseEvent.preventDefault()
+  showContextMenu(mouseEvent.clientX, mouseEvent.clientY, '', (edge as unknown as FlowEdge).id)
+}
+
+function onPaneContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  hideContextMenu()
+}
+
+function showContextMenu(x: number, y: number, nodeId: string, edgeId: string) {
+  contextMenu.x = x
+  contextMenu.y = y
+  contextMenu.nodeId = nodeId
+  contextMenu.edgeId = edgeId
+  contextMenu.visible = true
+}
+
+function hideContextMenu() {
+  contextMenu.visible = false
+}
+
+async function deleteFromContextMenu() {
+  const nodeId = contextMenu.nodeId
+  const edgeId = contextMenu.edgeId
+  hideContextMenu()
+  if (nodeId) {
+    const node = (findNode(nodeId) as unknown as FlowNode) || null
+    if (!node) return
+    selectedNode.value = node
+    await removeSelectedNode()
+  } else if (edgeId) {
+    const edge = flowEdges.value.find((e) => e.id === edgeId)
+    if (edge) removeEdgeFromGraph(edge)
+    selectedEdge.value = null
+  }
 }
 
 function flushNodeConfig() {
@@ -857,9 +931,9 @@ async function removeSelectedNode() {
   if (!node) return
   await ElMessageBox.confirm(t('workflow.designer.deleteNodeConfirm', { name: node.data?.label || node.id }), t('common.tip'), { type: 'warning' })
   const nodeId = node.id
-  flowEdges.value = flowEdges.value.filter((e) => e.source !== nodeId && e.target !== nodeId)
-  flowNodes.value = flowNodes.value.filter((n) => n.id !== nodeId)
   rulesByNode.value.delete(nodeId)
+  // 直接调用 VueFlow store 删除节点及其关联连线，removeNodes 触发的变更事件会同步回 flowNodes/flowEdges
+  removeNodes(nodeId, true)
   selectedNode.value = null
   markDirty()
 }
@@ -876,7 +950,7 @@ function removeSelectedEdge() {
 }
 
 function removeEdgeFromGraph(edge: FlowEdge) {
-  flowEdges.value = flowEdges.value.filter((e) => e.id !== edge.id)
+  removeEdges(edge.id)
   if (selectedNode.value?.type === 'condition') loadConditionEdges(selectedNode.value.id)
   markDirty()
 }
@@ -979,6 +1053,7 @@ async function loadDesign() {
     target: e.targetNodeKey,
     sourceHandle: e.sourceHandle || null,
     type: 'smoothstep',
+    markerEnd: MarkerType.ArrowClosed,
     data: { sourceHandle: e.sourceHandle, conditionType: e.conditionType, conditionExpr: e.conditionExpr },
     label: e.conditionType === 'expression' ? e.conditionExpr || '' : '',
   }))
@@ -1136,6 +1211,7 @@ onMounted(async () => {
     font-size: 12px;
     font-weight: 600;
     margin: 12px 0 8px;
+    padding-left: 130px;
     color: var(--el-text-color-secondary);
   }
   .empty-tip {
@@ -1165,5 +1241,40 @@ onMounted(async () => {
       white-space: nowrap;
     }
   }
+}
+
+.node-config-panel :deep(.el-form-item__label) {
+  white-space: nowrap;
+}
+
+.ctx-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+}
+.ctx-menu {
+  position: absolute;
+  min-width: 120px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  box-shadow: var(--el-box-shadow-light);
+  padding: 4px;
+  font-size: 13px;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover {
+    background: var(--el-fill-color-light);
+  }
+}
+.ctx-danger {
+  color: var(--el-color-danger);
 }
 </style>

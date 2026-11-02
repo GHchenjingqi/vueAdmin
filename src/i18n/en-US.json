@@ -1151,6 +1151,8 @@
       "conditionEmptyTip": "Drag from this node to downstream nodes (true/false branch)",
       "conditionExpr": "expr: amount > 1000",
       "deleteNodeConfirm": "Delete node \"{name}\"? Related edges will be removed.",
+      "deleteNode": "Delete node",
+      "deleteEdge": "Delete edge",
       "invalidId": "Invalid workflow ID",
       "loadFailed": "Load failed",
       "saveSuccess": "Saved",

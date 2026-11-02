@@ -1151,6 +1151,8 @@
       "conditionEmptyTip": "从该节点拖出连线到下游节点（真/假分支）",
       "conditionExpr": "表达式: amount > 1000",
       "deleteNodeConfirm": "确认删除节点「{name}」？相关连线一并删除。",
+      "deleteNode": "删除节点",
+      "deleteEdge": "删除连线",
       "invalidId": "无效的流程 ID",
       "loadFailed": "加载失败",
       "saveSuccess": "保存成功",
