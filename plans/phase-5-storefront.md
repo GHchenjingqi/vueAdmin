@@ -14,8 +14,8 @@
 
 | 步骤 | 内容 | 状态 |
 |------|------|------|
-| 1 | Storefront 公开模块骨架 + 站点上下文 + 商品浏览接口 | 本轮交付 |
-| 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | 后续 |
+| 1 | Storefront 公开模块骨架 + 站点上下文 + 商品浏览接口 | ✅ 已完成 |
+| 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | 后续 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | 后续 |
 | 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 后续 |

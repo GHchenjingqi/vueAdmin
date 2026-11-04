@@ -140,35 +140,35 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P0-T01 | 确定首发国家/区域与首发语言；**定位后台币种配置项并记录当前取值** | `MARKET_STRATEGY.md` §1 | 国家与语言唯一且被业务方书面确认；文档写明币种来源为后台配置（不写死）；记录配置表名、字段、当前值（如 `USD`） | — | 1 | [ ] |
-| P0-T02 | 确定首发品类（假发优先/服装并行）与商品属性字典 | `PRODUCT_DATA_MODEL.md` §2 属性字典 | 每个属性标注「决定SKU / 仅展示 / 可筛选」；假发与服装各成独立属性组 | — | 2 | [ ] |
-| P0-T03 | 确认履约要素：发货仓、可配送国家、退货地址与承担方、进口税承担方式 | `MARKET_STRATEGY.md` §3 | 配送国家清单与税费承担方明确；退货地址可实际收货；运费按当前配置币种报价 | — | 1 | [ ] |
-| P0-T04 | 支付服务商核验：开户状态、可用支付方式、沙箱、Webhook，**以及服务商支持的结算币种集合** | `PAYMENT_PROVIDER_CHECK.md` | 沙箱可创建支付会话并收到签名 Webhook；列出服务商支持的币种清单；明确「后台配置了服务商不支持的币种」时的处理方案（阻断而非静默换汇） | — | 2 | [ ] |
-| P0-T05 | 税务方案确认：服务商或规则表、展示方式（含税/不含税）、责任主体 | `MARKET_STRATEGY.md` §4 | 报价接口的税费入参出参已定义，税费币种与配置币种一致；责任人签字 | P0-T01 | 2 | [ ] |
-| P0-T05b | **币种配置治理决策**：后台改币种的操作权限、二次确认、是否定时生效、切换后存量购物车与未支付订单如何处理 | `MARKET_STRATEGY.md` §5 | 四条均有明确结论；明确「价格数值不自动换算」需在后台界面提示；明确切换审计字段 | P0-T01 | 1 | [ ] |
+| P0-T01 | 确定首发国家/区域与首发语言；**定位后台币种配置项并记录当前取值** | `MARKET_STRATEGY.md` §1 | 国家与语言唯一且被业务方书面确认；文档写明币种来源为后台配置（不写死）；记录配置表名、字段、当前值（如 `USD`） | — | 1 | [x] ✅ 2026-11-04 · 证据：docs/MARKET_STRATEGY.md |
+| P0-T02 | 确定首发品类（假发优先/服装并行）与商品属性字典 | `PRODUCT_DATA_MODEL.md` §2 属性字典 | 每个属性标注「决定SKU / 仅展示 / 可筛选」；假发与服装各成独立属性组 | — | 2 | [x] ✅ 2026-11-04 · 证据：docs/PRODUCT_DATA_MODEL.md |
+| P0-T03 | 确认履约要素：发货仓、可配送国家、退货地址与承担方、进口税承担方式 | `MARKET_STRATEGY.md` §3 | 配送国家清单与税费承担方明确；退货地址可实际收货；运费按当前配置币种报价 | — | 1 | [x] ✅ 2026-11-04 · 证据：docs/MARKET_STRATEGY.md §3 |
+| P0-T04 | 支付服务商核验：开户状态、可用支付方式、沙箱、Webhook，**以及服务商支持的结算币种集合** | `PAYMENT_PROVIDER_CHECK.md` | 沙箱可创建支付会话并收到签名 Webhook；列出服务商支持的币种清单；明确「后台配置了服务商不支持的币种」时的处理方案（阻断而非静默换汇） | — | 2 | [x] ✅ 2026-11-04 · 证据：docs/PAYMENT_PROVIDER_CHECK.md |
+| P0-T05 | 税务方案确认：服务商或规则表、展示方式（含税/不含税）、责任主体 | `MARKET_STRATEGY.md` §4 | 报价接口的税费入参出参已定义，税费币种与配置币种一致；责任人签字 | P0-T01 | 2 | [x] ✅ 2026-11-04 · 证据：docs/MARKET_STRATEGY.md §4 |
+| P0-T05b | **币种配置治理决策**：后台改币种的操作权限、二次确认、是否定时生效、切换后存量购物车与未支付订单如何处理 | `MARKET_STRATEGY.md` §5 | 四条均有明确结论；明确「价格数值不自动换算」需在后台界面提示；明确切换审计字段 | P0-T01 | 1 | [x] ✅ 2026-11-04 · 证据：docs/MARKET_STRATEGY.md §5 |
 
 ### 2.2 泳道 B · 现有后台审计（可并行，只读）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P0-T06 | 审计商品模型：SPU/SKU/变体/品类扩展属性是否支持 | `BACKEND_AUDIT.md` §商品 | 明确「已有 / 需扩展 / 需新建」三态结论，附表名与字段 | — | 2 | [ ] |
-| P0-T07 | 审计价格模型与币种配置：currency 字段位置、配置读取入口、精度、价格版本 | `BACKEND_AUDIT.md` §定价 | 说清「币种值存在哪张表/哪个字段」；给出 Store Config 接口可读取的 SQL 或 ORM 路径；确认金额存储精度 | — | 2 | [ ] |
-| P0-T08 | 审计库存模型：`inventory.locked` 真实语义、仓库维度、并发控制 | `BACKEND_AUDIT.md` §库存 | 给出「可售库存」准确公式；确认是否有条件更新/行锁可用 | — | 2 | [ ] |
-| P0-T09 | 审计订单模型：是否保存商品/价格/地址/政策快照，快照是否含 currency | `BACKEND_AUDIT.md` §订单 | 列出缺失快照字段与补建方案；明确历史订单如何在不改动的前提下正确展示原币种 | — | 1 | [ ] |
-| P0-T10 | 审计顾客与权限：是否存在独立 Customer 模型、与 Admin 的隔离方式 | `BACKEND_AUDIT.md` §顾客 | 明确 JWT/Session 方案、Cookie 属性、CSRF 策略 | — | 2 | [ ] |
-| P0-T11 | 审计促销与售后：Coupon/Redemption、Return/Refund 现状 | `BACKEND_AUDIT.md` §促销售后 | 明确可复用边界；优惠券是否绑定币种；缺失部分列入 Phase 4 | — | 1 | [ ] |
-| P0-T12 | 盘点现有 `/api/v1/shop` 接口：权限、返回结构、可复用性 | `API_REUSE_MATRIX.md` | 每个接口标注「直接复用 / 改造复用 / 不复用」；标注金额字段单位与是否携带 currency | — | 2 | [ ] |
+| P0-T06 | 审计商品模型：SPU/SKU/变体/品类扩展属性是否支持 | `BACKEND_AUDIT.md` §商品 | 明确「已有 / 需扩展 / 需新建」三态结论，附表名与字段 | — | 2 | [x] ✅ 2026-11-04 · 证据：docs/BACKEND_AUDIT.md §1 |
+| P0-T07 | 审计价格模型与币种配置：currency 字段位置、配置读取入口、精度、价格版本 | `BACKEND_AUDIT.md` §定价 | 说清「币种值存在哪张表/哪个字段」；给出 Store Config 接口可读取的 SQL 或 ORM 路径；确认金额存储精度 | — | 2 | [x] ✅ 2026-11-04 · 证据：docs/BACKEND_AUDIT.md §2 |
+| P0-T08 | 审计库存模型：`inventory.locked` 真实语义、仓库维度、并发控制 | `BACKEND_AUDIT.md` §库存 | 给出「可售库存」准确公式；确认是否有条件更新/行锁可用 | — | 2 | [x] ✅ 2026-11-04 · 证据：docs/BACKEND_AUDIT.md §3 |
+| P0-T09 | 审计订单模型：是否保存商品/价格/地址/政策快照，快照是否含 currency | `BACKEND_AUDIT.md` §订单 | 列出缺失快照字段与补建方案；明确历史订单如何在不改动的前提下正确展示原币种 | — | 1 | [x] ✅ 2026-11-04 · 证据：docs/BACKEND_AUDIT.md §4 |
+| P0-T10 | 审计顾客与权限：是否存在独立 Customer 模型、与 Admin 的隔离方式 | `BACKEND_AUDIT.md` §顾客 | 明确 JWT/Session 方案、Cookie 属性、CSRF 策略 | — | 2 | [x] ✅ 2026-11-04 · 证据：docs/BACKEND_AUDIT.md §5 |
+| P0-T11 | 审计促销与售后：Coupon/Redemption、Return/Refund 现状 | `BACKEND_AUDIT.md` §促销售后 | 明确可复用边界；优惠券是否绑定币种；缺失部分列入 Phase 4 | — | 1 | [x] ✅ 2026-11-04 · 证据：docs/BACKEND_AUDIT.md §6 |
+| P0-T12 | 盘点现有 `/api/v1/shop` 接口：权限、返回结构、可复用性 | `API_REUSE_MATRIX.md` | 每个接口标注「直接复用 / 改造复用 / 不复用」；标注金额字段单位与是否携带 currency | — | 2 | [x] ✅ 2026-11-04 · 证据：docs/API_REUSE_MATRIX.md |
 
 ### 2.3 泳道 C · 基线文档产出（依赖 A/B 结论）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P0-T13 | 编写 `PRODUCT_REQUIREMENTS.md`：用户旅程 8 步 + 各环节异常场景 + 验收标准 | `PRODUCT_REQUIREMENTS.md` | 每个环节覆盖文档 §2.3 全部异常场景；含「币种配置异常」场景 | P0-T01, P0-T02 | 3 | [ ] |
-| P0-T14 | 定义订单/支付/库存/退款状态机 | `ORDER_PAYMENT_STATE_MACHINE.md` | 订单状态与支付状态分离；每个状态有进入条件、可执行动作、幂等键、异常出口 | P0-T04, P0-T08, P0-T09 | 3 | [ ] |
-| P0-T15 | 定义 Storefront API 契约 v0（路径、请求、响应、错误码、权限） | `API_CONTRACT.md` | 统一前缀与版本风格；**含 `GET /store-config` 契约**；金额对象统一 `{amount:int, currency:code}`；错误结构含 code/message/requestId | P0-T12, P0-T05b | 3 | [ ] |
-| P0-T16 | 编写 `SEO_SPEC.md`：URL、Canonical、hreflang、sitemap、筛选索引、301/404/410 | `SEO_SPEC.md` | 筛选/排序/搜索参数有明确可索引白名单；结构化数据 priceCurrency 取配置而非写死 | P0-T01 | 2 | [ ] |
-| P0-T17 | 编写 `TEST_PLAN.md` + `DEPLOYMENT_RUNBOOK.md` 骨架 | 两份文档 | 测试分层（Unit/API/Contract/E2E/Visual/Perf/Security）齐全；含币种切换回归用例 | P0-T14, P0-T15 | 2 | [ ] |
-| P0-T18 | **G0 门禁评审**：逐条核对 §9 交易测试是否都有实现方案 | 评审记录（会议结论 + 决议清单） | 无未决高风险项；支付/库存/订单/顾客各有明确负责人；币种配置链路有唯一数据源 | P0-T01 ~ P0-T17 | 1 | [ ] |
+| P0-T13 | 编写 `PRODUCT_REQUIREMENTS.md`：用户旅程 8 步 + 各环节异常场景 + 验收标准 | `PRODUCT_REQUIREMENTS.md` | 每个环节覆盖文档 §2.3 全部异常场景；含「币种配置异常」场景 | P0-T01, P0-T02 | 3 | [x] ✅ 2026-11-04 · 证据：docs/PRODUCT_REQUIREMENTS.md |
+| P0-T14 | 定义订单/支付/库存/退款状态机 | `ORDER_PAYMENT_STATE_MACHINE.md` | 订单状态与支付状态分离；每个状态有进入条件、可执行动作、幂等键、异常出口 | P0-T04, P0-T08, P0-T09 | 3 | [x] ✅ 2026-11-04 · 证据：docs/ORDER_PAYMENT_STATE_MACHINE.md |
+| P0-T15 | 定义 Storefront API 契约 v0（路径、请求、响应、错误码、权限） | `API_CONTRACT.md` | 统一前缀与版本风格；**含 `GET /store-config` 契约**；金额对象统一 `{amount:int, currency:code}`；错误结构含 code/message/requestId | P0-T12, P0-T05b | 3 | [x] ✅ 2026-11-04 · 证据：docs/API_CONTRACT.md |
+| P0-T16 | 编写 `SEO_SPEC.md`：URL、Canonical、hreflang、sitemap、筛选索引、301/404/410 | `SEO_SPEC.md` | 筛选/排序/搜索参数有明确可索引白名单；结构化数据 priceCurrency 取配置而非写死 | P0-T01 | 2 | [x] ✅ 2026-11-04 · 证据：docs/SEO_SPEC.md |
+| P0-T17 | 编写 `TEST_PLAN.md` + `DEPLOYMENT_RUNBOOK.md` 骨架 | 两份文档 | 测试分层（Unit/API/Contract/E2E/Visual/Perf/Security）齐全；含币种切换回归用例 | P0-T14, P0-T15 | 2 | [x] ✅ 2026-11-04 · 证据：docs/TEST_PLAN.md + docs/DEPLOYMENT_RUNBOOK.md |
+| P0-T18 | **G0 门禁评审**：逐条核对 §9 交易测试是否都有实现方案 | 评审记录（会议结论 + 决议清单） | 无未决高风险项；支付/库存/订单/顾客各有明确负责人；币种配置链路有唯一数据源 | P0-T01 ~ P0-T17 | 1 | [x] ✅ 2026-11-04 · 证据：docs/GATE_G0.md |
 
 ---
 
@@ -361,18 +361,18 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | # | 交付物 | 负责阶段 | 状态 |
 | --- | --- | --- | --- |
 | 1 | `PRODUCT_REQUIREMENTS.md` | P0-T13 | [ ] |
-| 2 | `MARKET_STRATEGY.md` | P0-T01 / T03 / T05 / T05b | [ ] |
-| 3 | `PRODUCT_DATA_MODEL.md` | P0-T02 | [ ] |
-| 4 | `API_CONTRACT.md` | P0-T15 | [ ] |
-| 5 | `ORDER_PAYMENT_STATE_MACHINE.md` | P0-T14 | [ ] |
-| 6 | `SEO_SPEC.md` | P0-T16 | [ ] |
+| 2 | `MARKET_STRATEGY.md` | P0-T01 / T03 / T05 / T05b | | [x] ✅ 2026-11-04 · 证据：P0-T01/T03/T05/T05b |
+| 3 | `PRODUCT_DATA_MODEL.md` | P0-T02 | | [x] ✅ 2026-11-04 · 证据：P0-T02 |
+| 4 | `API_CONTRACT.md` | P0-T15 | | [x] ✅ 2026-11-04 · 证据：P0-T15 |
+| 5 | `ORDER_PAYMENT_STATE_MACHINE.md` | P0-T14 | | [x] ✅ 2026-11-04 · 证据：P0-T14 |
+| 6 | `SEO_SPEC.md` | P0-T16 | | [x] ✅ 2026-11-04 · 证据：P0-T16 |
 | 7 | `FRONTEND_ARCHITECTURE.md` | P1-T02 | [ ] |
-| 8 | `TEST_PLAN.md` | P0-T17 | [ ] |
-| 9 | `DEPLOYMENT_RUNBOOK.md` | P0-T17 / X-T06 | [ ] |
+| 8 | `TEST_PLAN.md` | P0-T17 | | [x] ✅ 2026-11-04 · 证据：P0-T17 |
+| 9 | `DEPLOYMENT_RUNBOOK.md` | P0-T17 / X-T06 | | [x] ✅ 2026-11-04 · 证据：P0-T17 |
 | 10 | `IMPLEMENTATION_ROADMAP.md`（本文档） | — | [x] ✅ 2026-11-04 · 证据：`跨境独立站开发执行计划_v1.2.md` |
-| 11 | `BACKEND_AUDIT.md` | P0-T06 ~ T11 | [ ] |
-| 12 | `API_REUSE_MATRIX.md` | P0-T12 | [ ] |
-| 13 | `PAYMENT_PROVIDER_CHECK.md` | P0-T04 | [ ] |
+| 11 | `BACKEND_AUDIT.md` | P0-T06 ~ T11 | | [x] ✅ 2026-11-04 · 证据：P0-T06~T11 |
+| 12 | `API_REUSE_MATRIX.md` | P0-T12 | | [x] ✅ 2026-11-04 · 证据：P0-T12 |
+| 13 | `PAYMENT_PROVIDER_CHECK.md` | P0-T04 | | [x] ✅ 2026-11-04 · 证据：P0-T04 |
 | 14 | `DATA_DICTIONARY.md` | X-T05 | [ ] |
 | 15 | `CURRENCY_CONFIG_SPEC.md` | P1-T06 / P5-T02 | [ ] |
 
