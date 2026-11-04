@@ -17,6 +17,7 @@ import config from './config/index.js'
 import { createPublicApp } from './public/index.js'
 import { registerPublicModule } from './public/registry.js'
 import { knowledgePublicModule } from './modules/knowledge/public.js'
+import storefrontRoutes from './modules/storefront/routes/index.js'
 import { logInfo } from './utils/fileLogger.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -152,6 +153,11 @@ app.use('/uploads', express.static(uploadsDir))
 
 // ---------- API 路由（优先匹配）----------
 app.use('/api/v1', apiRoutes)
+
+// ---------- Storefront 公开接口（免 admin 鉴权，独立站 C 端）----------
+// 独立前缀 /api/storefront/v1，与 /api/v1/shop 后台接口隔离；站点 + 租户上下文
+// 由模块内 siteContext 中间件建立（不经过 authMiddleware）。
+app.use('/api/storefront/v1', storefrontRoutes)
 
 // ---------- 对外站（匿名可读、SEO 友好、EJS 服务端渲染）----------
 // 通过 PUBLIC_PATH 配置挂载路径，便于后续拆分到独立子域（如 www.）；默认 /site，避免与 admin SPA 根路径冲突

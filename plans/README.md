@@ -63,8 +63,11 @@ server/routes/index.ts          # 追加 router.use('/api/v1/shop', shopRoutes)
 | 2 | 上架发布审批流 + 合规卡点 + 渠道管理 | 2–3 周 | 接 VueFlow 审批流、合规校验、渠道/店铺、发布到渠道 | ✅ 已完成 |
 | 3 | 库存/仓配 + 订单履约最小闭环 | 3–4 周 | 多仓库存中心、手工建单、1 个物流对接 | ✅ 已完成 |
 | 4 | 营销中心 + 数据参谋 | 持续 | 折扣/券、销售/利润/汇率损益报表 | ✅ 已完成 |
+| 5 | Storefront 公开接口层（独立站 C 端地基） | 持续 | `/api/storefront/v1` 免鉴权只读、站点上下文、商品浏览字段裁剪 | 🚧 第 1 步已交付 |
 
-> 每个阶段对应一个独立文档：`phase-0-foundation.md` / `phase-1-product-center.md` / `phase-2-publish-workflow.md` / `phase-3-inventory-fulfillment.md` / `phase-4-marketing-analytics.md`
+> 每个阶段对应一个独立文档：`phase-0-foundation.md` / `phase-1-product-center.md` / `phase-2-publish-workflow.md` / `phase-3-inventory-fulfillment.md` / `phase-4-marketing-analytics.md` / `phase-5-storefront.md`
+>
+> 阶段 5 依据 `shops/mds/独立站前端架构与功能设计.md`；C 端 Nuxt 3 前端工程另起目录，不在本仓库 admin 内。
 
 ---
 
