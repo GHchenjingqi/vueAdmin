@@ -32,3 +32,8 @@ bundle-report/
 
 # Playwright 联调截图产物
 e2e-artifacts/
+
+# 独立站前端（Nuxt 3，shops/）构建与依赖产物（源码另议是否入库）
+shops/.nuxt/
+shops/.output/
+shops/node_modules/
