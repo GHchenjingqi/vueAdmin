@@ -1,4 +1,4 @@
-import { Op } from 'sequelize'
+import { Op, Sequelize } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import type { StorefrontProductQuery } from '../../../shared/schemas/storefront.js'
 import { getTenantContext } from '../../tenant/context.js'
@@ -92,7 +92,7 @@ function localized(value: Record<string, string> | null | undefined, lang: strin
   return value[lang] ?? value['en-US'] ?? value['zh-CN'] ?? Object.values(value)[0] ?? ''
 }
 
-/** 生成式 SEO slug：{id}-{kebab(title)}。spus 暂无 slug 列，见 plans/phase-5 第 2 步 */
+/** 生成式 SEO slug：{id}-{kebab(title)}。spus.slug 为空时的兜底（阶段 5 第 2 步） */
 function makeSlug(id: number, title: string): string {
   const kebab = title
     .toLowerCase()
@@ -101,6 +101,20 @@ function makeSlug(id: number, title: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)
   return `${id}-${kebab || 'product'}`
+}
+
+/** 展示用 slug：优先真实列，缺失时回退生成式 */
+function displaySlug(spu: { id: number; slug: string | null; name: Record<string, string> | null }, lang: string): string {
+  return spu.slug || makeSlug(spu.id, localized(spu.name, lang))
+}
+
+/** LIKE 转义，防止 % _ \ 与单引号破坏 JSON_SEARCH 入参 */
+function escapeLike(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/'/g, "''")
 }
 
 function parseSlugId(slug: string): number | undefined {
@@ -144,8 +158,8 @@ export async function listCategories(lang = 'en-US'): Promise<StorefrontCategory
 /**
  * 商品分页列表
  *
- * keyword 目前在 JS 层过滤：name/description 是 MySQL JSON 列，中文以 Unicode 转义存储，
- * 直接 LIKE 匹配不到；后续应改为 JSON_SEARCH / 全文索引（见 plans/phase-5 第 2 步）。
+ * keyword 通过 JSON_SEARCH 推入 SQL 过滤：name/description 是 MySQL JSON 列，
+ * 用 LOWER(CAST(... AS JSON)) 配合小写搜索词实现大小写不敏感的子串匹配（JSON_SEARCH 本身大小写敏感）。
  */
 export async function listProducts(
   params: StorefrontProductQuery = {},
@@ -165,13 +179,18 @@ export async function listProducts(
 
   const base = publicWhere()
   const categoryId = positiveInt(params.categoryId, 0)
-  const where = categoryId > 0 ? { ...base, categoryId } : base
-  let rows = await ShopSpu.findAll({ where, order: [['id', 'DESC']] })
+  const where: Record<string | symbol, unknown> = categoryId > 0 ? { ...base, categoryId } : { ...base }
 
-  const keyword = typeof params.keyword === 'string' ? params.keyword.trim().toLowerCase() : undefined
+  // keyword 推入 SQL：JSON_SEARCH 大小写敏感，两侧均 LOWER 以保证不敏感
+  const keyword = typeof params.keyword === 'string' ? params.keyword.trim() : ''
   if (keyword) {
-    rows = rows.filter((spu) => `${localized(spu.name, lang)} ${localized(spu.description, lang)}`.toLowerCase().includes(keyword))
+    const kw = escapeLike(keyword.toLowerCase())
+    where[Op.and] = Sequelize.literal(
+      `(JSON_SEARCH(LOWER(CAST(name AS JSON)),'all','%${kw}%') IS NOT NULL OR JSON_SEARCH(LOWER(CAST(description AS JSON)),'all','%${kw}%') IS NOT NULL)`,
+    )
   }
+
+  const rows = await ShopSpu.findAll({ where, order: [['id', 'DESC']] })
 
   const total = rows.length
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize)
@@ -209,7 +228,7 @@ export async function listProducts(
     const values = priceBySpu.get(spu.id) ?? []
     return {
       id: spu.id,
-      slug: makeSlug(spu.id, title),
+      slug: displaySlug(spu, lang),
       title,
       cover: spu.cover,
       images: spu.images ?? [],
@@ -232,11 +251,19 @@ export async function getProductBySlug(
   const lang = normalizeLang(defaults.lang)
   const base = publicWhere()
 
-  const id = parseSlugId(slug)
-  let spu = id !== undefined ? await ShopSpu.findOne({ where: { ...base, id } }) : null
-  if (!spu) {
-    const rows = await ShopSpu.findAll({ where: base })
-    spu = rows.find((row) => makeSlug(row.id, localized(row.name, lang)) === slug) ?? null
+  // 解析优先级：纯数字 → 按 id；否则先按真实 slug 列；最后兜底旧生成式 slug（兼容历史 URL）
+  let spu: ShopSpu | null = null
+  if (/^\d+$/.test(slug)) {
+    spu = await ShopSpu.findOne({ where: { ...base, id: Number(slug) } })
+  } else {
+    spu = await ShopSpu.findOne({ where: { ...base, slug } })
+    if (!spu) {
+      const id = parseSlugId(slug)
+      if (id !== undefined) {
+        const byId = await ShopSpu.findOne({ where: { ...base, id } })
+        if (byId && makeSlug(byId.id, localized(byId.name, lang)) === slug) spu = byId
+      }
+    }
   }
   if (!spu) throw new AppError(404, '商品不存在')
 
@@ -277,7 +304,7 @@ export async function getProductBySlug(
   const description = localized(spu.description, lang)
   return {
     id: spu.id,
-    slug: makeSlug(spu.id, title),
+    slug: displaySlug(spu, lang),
     title,
     description,
     cover: spu.cover,

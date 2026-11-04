@@ -12,6 +12,7 @@ class ShopSpu extends Model<InferAttributes<ShopSpu>, InferCreationAttributes<Sh
   declare description: Record<string, string> | null
   declare cover: string | null
   declare images: string[] | null
+  declare slug: string | null
   declare status: CreationOptional<SpuStatus>
   declare tenantId: number
 
@@ -55,6 +56,11 @@ ShopSpu.init(
       type: DataTypes.JSON,
       allowNull: true,
       comment: '图集 URL 列表',
+    },
+    slug: {
+      type: DataTypes.STRING(200),
+      allowNull: true,
+      comment: 'SEO slug（后台可编辑，留空则由前台生成式 slug 兜底）',
     },
     status: {
       type: DataTypes.ENUM('draft', 'review', 'rejected', 'listed', 'published', 'unlisted', 'archived'),

@@ -114,6 +114,13 @@ export const createSpuSchema = z.object({
   description: i18nTextSchema.nullable().optional(),
   cover: z.string().max(500).nullable().optional(),
   images: z.array(z.string().max(500)).nullable().optional(),
+  /** SEO slug：小写字母/数字与连字符，留空则由前台生成式 slug 兜底（阶段 5 第 2 步） */
+  slug: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'slug 须为小写字母、数字与连字符，且不能以连字符开头/结尾')
+    .optional(),
 })
 export type CreateSpuInput = z.infer<typeof createSpuSchema>
 

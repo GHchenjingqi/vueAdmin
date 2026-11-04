@@ -153,7 +153,7 @@ describe('阶段5：Storefront 商品详情', () => {
       expect(byId.variants[0]).toMatchObject({ id: publishedSkuId, price: 129.9, available: 50, inStock: true })
       expect(byId.seo.title).toBe(publishedKeyword)
 
-      const bySlug = await catalogService.getProductBySlug(`${publishedSpuId}-body-wave-wig`)
+      const bySlug = await catalogService.getProductBySlug(byId.slug)
       expect(bySlug.id).toBe(publishedSpuId)
     })
   })
@@ -216,6 +216,101 @@ describe('阶段5：类目树 / 汇率快照 / 租户隔离', () => {
       const result = await catalogService.listProducts({ keyword: publishedKeyword })
       expect(result.total).toBe(0)
       await expect(catalogService.getProductBySlug(String(publishedSpuId))).rejects.toThrow('商品不存在')
+    })
+  })
+})
+
+describe('阶段5 第2步：slug 列 + 后台可编辑 + JSON_SEARCH', () => {
+  it('后台可编辑 slug：C 端返回真实 slug 且可按 slug 直接查到', async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const category = await categoryService.createCategory({
+        parentId: 0,
+        name: { 'en-US': 'SlugCat ' + uniq(), 'zh-CN': 'slug类目' },
+        level: 1,
+        sort: 0,
+      })
+      const brand = await brandService.createBrand({ name: 'SlugBrand ' + uniq() })
+      const warehouse = await warehouseService.createWarehouse({ name: 'SlugWH ' + uniq(), type: 'overseas', country: 'US' })
+      const customSlug = 'custom-slug-' + uniq().toLowerCase()
+      const spu = await spuService.createSpu({
+        categoryId: category.id,
+        brandId: brand.id,
+        name: { 'en-US': 'Slugged Wig ' + uniq(), 'zh-CN': '带slug假发' },
+        slug: customSlug,
+      })
+      const sku = await skuService.createSku({
+        spuId: spu.id,
+        code: 'SKU' + uniq(),
+        originCountry: 'CN',
+        hsCode: '67041100',
+        declaredValue: 10,
+      })
+      await inventoryService.adjust(sku.id, warehouse.id, 10)
+      await spuService.changeSpuStatus(spu.id, 'submit')
+      await spuService.changeSpuStatus(spu.id, 'list')
+      await spuService.changeSpuStatus(spu.id, 'publish')
+
+      const list = await catalogService.listProducts({ keyword: 'Slugged' })
+      const item = list.list.find((x) => x.id === spu.id)
+      expect(item).toBeDefined()
+      expect(item?.slug).toBe(customSlug)
+
+      const detail = await catalogService.getProductBySlug(customSlug)
+      expect(detail.id).toBe(spu.id)
+      expect(detail.slug).toBe(customSlug)
+    })
+  })
+
+  it('未设置 slug 时回退生成式 slug（兼容旧链接）', async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const category = await categoryService.createCategory({
+        parentId: 0,
+        name: { 'en-US': 'FallbackCat ' + uniq() },
+        level: 1,
+        sort: 0,
+      })
+      const spu = await spuService.createSpu({
+        categoryId: category.id,
+        name: { 'en-US': 'Fallback Wig ' + uniq() },
+      })
+      await skuService.createSku({ spuId: spu.id, code: 'SKU' + uniq(), originCountry: 'CN', hsCode: '67041100', declaredValue: 10 })
+      await spuService.changeSpuStatus(spu.id, 'submit')
+      await spuService.changeSpuStatus(spu.id, 'list')
+      await spuService.changeSpuStatus(spu.id, 'publish')
+
+      const detail = await catalogService.getProductBySlug(String(spu.id))
+      expect(detail.slug.startsWith(`${spu.id}-`)).toBe(true)
+    })
+  })
+
+  it('JSON_SEARCH 全文检索：子串大小写不敏感命中，乱码不命中', async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const hit = await catalogService.listProducts({ keyword: 'slugged' })
+      expect(hit.list.some((x) => x.slug.startsWith('custom-slug-'))).toBe(true)
+
+      const miss = await catalogService.listProducts({ keyword: 'zzz-no-such-product-zzz' })
+      expect(miss.total).toBe(0)
+    })
+  })
+
+  it('slug 租户内唯一：重复 slug 报 409', async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const category = await categoryService.createCategory({
+        parentId: 0,
+        name: { 'en-US': 'DupCat ' + uniq() },
+        level: 1,
+        sort: 0,
+      })
+      const dup = 'dup-slug-' + uniq().toLowerCase()
+      await spuService.createSpu({ categoryId: category.id, name: { 'en-US': 'Dup A ' + uniq() }, slug: dup })
+      await expect(
+        spuService.createSpu({ categoryId: category.id, name: { 'en-US': 'Dup B ' + uniq() }, slug: dup }),
+      ).rejects.toThrow()
+      // 不同租户允许相同 slug
+      await runInTenant({ tenantId: 999 }, async () => {
+        const c2 = await categoryService.createCategory({ parentId: 0, name: { 'en-US': 'DupCat2 ' + uniq() }, level: 1, sort: 0 })
+        await expect(spuService.createSpu({ categoryId: c2.id, name: { 'en-US': 'Dup C ' + uniq() }, slug: dup })).resolves.toBeDefined()
+      })
     })
   })
 })

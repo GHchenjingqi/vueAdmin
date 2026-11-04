@@ -15,6 +15,15 @@ import WorkflowEngine from '../../../services/WorkflowEngine.js'
 /** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
 const tid = (): number => getTenantContext()?.tenantId ?? 1
 
+/** slug 租户内唯一：重复则抛 409（阶段 5 第 2 步） */
+async function ensureUniqueSlug(slug: string | undefined | null, tenantId: number, excludeId?: number): Promise<void> {
+  if (!slug) return
+  const where: Record<string, unknown> = { tenantId, slug }
+  if (excludeId !== undefined) where.id = { [Op.ne]: excludeId }
+  const existing = await ShopSpu.findOne({ where })
+  if (existing) throw new AppError(409, `slug "${slug}" 已被占用`)
+}
+
 export async function listSpus(params: { page?: number; pageSize?: number; keyword?: string; categoryId?: number; status?: SpuStatus }) {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 20
@@ -50,7 +59,9 @@ export async function getSpuDetail(id: number) {
 }
 
 export async function createSpu(input: CreateSpuInput): Promise<ShopSpu> {
-  return ShopSpu.create({ ...input, tenantId: getTenantContext()?.tenantId ?? 1 } as never)
+  const tenantId = tid()
+  await ensureUniqueSlug(input.slug, tenantId)
+  return ShopSpu.create({ ...input, tenantId } as never)
 }
 
 export async function updateSpu(id: number, input: UpdateSpuInput): Promise<ShopSpu> {
@@ -58,6 +69,9 @@ export async function updateSpu(id: number, input: UpdateSpuInput): Promise<Shop
   // 仅草稿/驳回态可编辑基础信息
   if (!['draft', 'rejected'].includes(row.status)) {
     throw new AppError(400, `当前状态 ${row.status} 不允许编辑，请先下架或撤回`)
+  }
+  if (input.slug !== undefined && input.slug !== row.slug) {
+    await ensureUniqueSlug(input.slug, tid(), id)
   }
   await row.update(input as never)
   return row
