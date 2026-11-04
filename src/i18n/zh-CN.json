@@ -967,7 +967,31 @@
     "workflows": "工作流管理",
     "workflowInstances": "运行实例",
     "approvalCenter": "审批中心",
-    "workflowApply": "发起申请"
+    "workflowApply": "发起申请",
+    "shop": "商城",
+    "shopDashboard": "商城仪表盘"
+  },
+  "shop": {
+    "dashboard": {
+      "greeting": "商城运营中台",
+      "subtitle": "跨境商城一站式运营管理：商品、渠道、库存、订单与数据",
+      "serviceStatus": "商城服务状态",
+      "statusOnline": "运行中",
+      "statusOffline": "不可用",
+      "checkTime": "检查时间",
+      "modulesTitle": "能力模块",
+      "ready": "已上线",
+      "planned": "规划中"
+    },
+    "modules": {
+      "product": "商品中心",
+      "category": "类目管理",
+      "channel": "渠道店铺",
+      "inventory": "库存中心",
+      "order": "订单履约",
+      "marketing": "营销中心",
+      "analytics": "数据参谋"
+    }
   },
   "errorPage": {
     "notFoundTitle": "抱歉，您访问的页面不存在",

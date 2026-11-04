@@ -967,7 +967,31 @@
     "workflows": "Workflows",
     "workflowInstances": "Instances",
     "approvalCenter": "Approval Center",
-    "workflowApply": "Launch"
+    "workflowApply": "Launch",
+    "shop": "Shop",
+    "shopDashboard": "Shop Dashboard"
+  },
+  "shop": {
+    "dashboard": {
+      "greeting": "Shop Operations Hub",
+      "subtitle": "One-stop cross-border commerce operations: products, channels, inventory, orders and analytics",
+      "serviceStatus": "Shop service status",
+      "statusOnline": "Running",
+      "statusOffline": "Unavailable",
+      "checkTime": "Checked at",
+      "modulesTitle": "Capability modules",
+      "ready": "Live",
+      "planned": "Planned"
+    },
+    "modules": {
+      "product": "Products",
+      "category": "Categories",
+      "channel": "Channels",
+      "inventory": "Inventory",
+      "order": "Orders",
+      "marketing": "Marketing",
+      "analytics": "Analytics"
+    }
   },
   "errorPage": {
     "notFoundTitle": "Sorry, the page you visited does not exist",
