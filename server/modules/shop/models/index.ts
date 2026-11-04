@@ -32,3 +32,9 @@ export { default as ShopCoupon } from './ShopCoupon.js'
 // 阶段 5 步骤 3：C 端顾客（与 admin users 隔离，独立 JWT）
 export { default as ShopCustomer } from './ShopCustomer.js'
 export { default as ShopCustomerAddress } from './ShopCustomerAddress.js'
+
+// 阶段 5 步骤 4：购物车 / 库存预占 / 支付单据（复用 shop 模型层，不建第二套后端）
+export { default as ShopCart } from './ShopCart.js'
+export { default as ShopCartItem } from './ShopCartItem.js'
+export { default as ShopInventoryReservation } from './ShopInventoryReservation.js'
+export { default as ShopOrderPayment } from './ShopOrderPayment.js'

@@ -66,3 +66,67 @@ export const storefrontRateQuerySchema = z
     }, z.string().length(3).optional()),
   })
   .passthrough()
+
+// ————————————————————————————————————————————————
+// 阶段 5 步骤 4：购物车 / 结算报价 / 建单 / 支付（公开接口，.passthrough() 容忍多余字段）
+// ————————————————————————————————————————————————
+
+const iso3 = z
+  .string()
+  .transform((v) => v.trim().toUpperCase())
+  .refine((v) => /^[A-Z]{3}$/.test(v), '币种需为 ISO 4217 三位代码')
+
+const cartLineInput = z.object({
+  skuId: z.number().int().positive('skuId 必须为正整数'),
+  qty: z.number().int().min(1, '数量至少为 1').max(9999),
+})
+
+/** POST /cart/items —— 加入 / 更新购物车 */
+export const cartAddSchema = z
+  .object({
+    skuId: z.number().int().positive('skuId 必须为正整数'),
+    qty: z.number().int().min(1, '数量至少为 1').max(9999),
+  })
+  .passthrough()
+
+/** PATCH /cart/items/:id —— 改数量 */
+export const cartUpdateSchema = z
+  .object({
+    qty: z.number().int().min(1, '数量至少为 1').max(9999),
+  })
+  .passthrough()
+
+/** POST /checkout/quote —— 服务端重算报价（忽略前端传入总价） */
+export const quoteSchema = z
+  .object({
+    cartToken: z.string().min(1).max(64).optional(),
+    items: z.array(cartLineInput).max(100).optional(),
+    shippingAddress: z.record(z.unknown()).optional(),
+  })
+  .passthrough()
+
+/** POST /orders —— 建单（幂等键 + 快照 + 库存预占） */
+export const createOrderSchema = z
+  .object({
+    idempotencyKey: z.string().min(1).max(64).optional(),
+    email: z.string().email('邮箱格式不正确').max(255).optional(),
+    shippingAddress: z.record(z.unknown()).optional(),
+    note: z.string().max(500).optional(),
+    cartToken: z.string().min(1).max(64).optional(),
+    items: z.array(cartLineInput).max(100).optional(),
+    customerId: z.number().int().positive().optional(),
+  })
+  .passthrough()
+
+/** POST /payments/session —— 创建支付会话 */
+export const createPaymentSessionSchema = z
+  .object({
+    orderId: z.number().int().positive('orderId 必须为正整数'),
+  })
+  .passthrough()
+
+export type CartAddInput = z.infer<typeof cartAddSchema>
+export type CartUpdateInput = z.infer<typeof cartUpdateSchema>
+export type QuoteInput = z.infer<typeof quoteSchema>
+export type CreateOrderInput = z.infer<typeof createOrderSchema>
+export type CreatePaymentSessionInput = z.infer<typeof createPaymentSessionSchema>

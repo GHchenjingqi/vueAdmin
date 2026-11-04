@@ -9,6 +9,9 @@ import {
 import * as catalogController from '../controllers/catalogController.js'
 import { siteContext } from '../middleware/siteContext.js'
 import authRouter from './auth.js'
+import cartRouter from './cart.js'
+import checkoutRouter from './checkout.js'
+import paymentRouter from './payment.js'
 
 /**
  * Storefront 公开接口路由
@@ -29,5 +32,8 @@ router.get('/products/:slug', validate(storefrontSlugParamSchema, 'params'), cat
 router.get('/rates/snapshot', validate(storefrontRateQuerySchema, 'query'), catalogController.rates)
 
 router.use('/auth', authRouter)
+router.use('/cart', cartRouter)
+router.use('/checkout', checkoutRouter)
+router.use('/payments', paymentRouter)
 
 export default router

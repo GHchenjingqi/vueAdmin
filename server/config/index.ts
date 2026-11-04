@@ -65,6 +65,20 @@ const config = {
     enabled: process.env.REDIS_ENABLED === 'true',
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
+  payment: {
+    // 仅 mock 实现；接 Stripe/PayPal 时在此扩展 provider 与密钥
+    provider: process.env.PAYMENT_PROVIDER || 'mock',
+    // Webhook 验签密钥（mock 用 HMAC-SHA256 对原始 body 签名）
+    webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET || 'storefront_mock_webhook_secret',
+  },
+  checkout: {
+    // 运费 / 税费为占位规则，待 P3-T05 / P3-T06 接入真实 Provider 后替换；
+    // 金额一律「分」，税率传 0..1 小数（如 0.08 = 8%）。
+    taxRate: Number(process.env.STORE_TAX_RATE ?? 0),
+    shippingCents: Number(process.env.STORE_SHIPPING_CENTS ?? 0),
+    // 库存预占 TTL（分钟），过期未支付由 sweeper 释放
+    reservationTtlMinutes: Number(process.env.STORE_RESERVATION_TTL ?? 30),
+  },
 }
 
 // P0 级别：生产环境必须设置 JWT_SECRET，否则拒绝启动

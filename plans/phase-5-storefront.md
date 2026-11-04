@@ -17,7 +17,7 @@
 | 1 | Storefront 公开模块骨架 + 站点上下文 + 商品浏览接口 | ✅ 已完成 |
 | 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
-| 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | 后续 |
+| 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | ✅ 已完成 |
 | 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 后续 |
 | 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 后续 |
 | 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | 后续 |
@@ -106,6 +106,40 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 
 ### 3.4 验证
 - 后端 `tsc --noEmit` 通过；`vitest run` 全量 397 用例通过（新增顾客注册/登录/me/跨租户隔离/JWT 隔离 5 例）。
+
+---
+
+## 第 4 步：购物车 / 结算 / 建单 / 支付 / Webhook（本轮）
+
+> 复用 shop 模型与服务层（inventoryService / priceService），**不建第二套后端**；storefront 仅做薄编排层。
+
+### 4.1 模型与迁移
+- 迁移 `000040` 给 `orders` 增补结算列（`paymentStatus` / `email` / `shippingAddress` / `note` / `*Cents` 金额 / `couponCode` / `accessToken` / `idempotencyKey` / `reservationId` / `policySnapshot` / `paidAt` / `closedAt` / `cancelledReason`）与 `order_items` 快照列（`title` / `spec` / `unitAmountCents` / `lineTotalCents` / `currency`）；
+- 迁移 `000042` `carts` / `cart_items`；`000043` `inventory_reservations`（TTL + 状态机）；`000044` `order_payments`。
+- 模型层 `server/modules/shop/models/` 注册 `ShopCart` / `ShopCartItem` / `ShopInventoryReservation` / `ShopOrderPayment`，并扩展 `ShopOrder` / `ShopOrderItem` 的 000040 列。**金额一律整数「分」（BIGINT）**。
+
+### 4.2 购物车（`storefront/services/cartService.ts`）
+- 游客以不可枚举随机 token 标识（`X-Cart-Token` / httpOnly cookie），登录顾客自动归属 `customerId`；
+- 加购按购物车币种快照单价（仅展示），明细行唯一（tenantId, cartId, skuId）。
+
+### 4.3 结算报价（`quoteService.ts`）
+- **服务端重算**：忽略前端总价；按站点配置币种（`siteContext` 注入的 `site.defaultCurrency`）取 `product_prices`；逐项校验可售 + 可用库存；
+- 购物车币种与配置不一致返回 `CURRENCY_CHANGED`（409）；
+- 运费 / 税费为占位规则（`config.checkout`，待 P3-T05/T06 接入真实 Provider）；返回 `version` + `expiresAt`。
+
+### 4.4 建单 + 库存预占（`checkoutService.ts` + `reservationService.ts`）
+- **幂等**：`idempotencyKey` 重复返回首单（unique 约束兜底）；
+- **服务端重算**：先 `createQuote` 重算，绝不信任前端金额；
+- **库存预占**：建单即 `occupy` 锁库存 + 写 `inventory_reservations`（TTL），支付失败 / 取消由补偿路径释放（`releaseExpiredReservations` 供 sweeper）；
+- **快照**：商品标题 / 规格 / 单价（分）/ 地址 / 政策固化进订单，历史订单不受后台币种切换影响；返回 `accessToken`（防枚举）。
+
+### 4.5 支付会话 + Webhook（`paymentService.ts`）
+- 创建会话金额 / 币种取自订单快照；
+- Webhook：原始 body HMAC-SHA256 验签 → `provider+providerRef` 去重 → 幂等更新；验签失败 / 重复投递均无副作用；回调币种与快照不一致以订单快照为准并告警。
+
+### 4.6 验证
+- `npm run typecheck` 通过；`vitest run` 全量 407 用例通过（新增 10 例：购物车 / 报价重算 / 币种切换 / 库存拦截 / 建单幂等 / 预占 / 支付 Webhook 验签·成功·去重·错签）。
+- 提交一并纳入迁移 `000040` / `000042` / `000043` / `000044`（均已 apply 到 DB）。
 
 ---
 
