@@ -28,3 +28,7 @@ export { default as ShopOrderShipment } from './ShopOrderShipment.js'
 // 阶段 4：营销中心 / 数据参谋
 export { default as ShopPromotion } from './ShopPromotion.js'
 export { default as ShopCoupon } from './ShopCoupon.js'
+
+// 阶段 5 步骤 3：C 端顾客（与 admin users 隔离，独立 JWT）
+export { default as ShopCustomer } from './ShopCustomer.js'
+export { default as ShopCustomerAddress } from './ShopCustomerAddress.js'

@@ -16,7 +16,7 @@
 |------|------|------|
 | 1 | Storefront 公开模块骨架 + 站点上下文 + 商品浏览接口 | ✅ 已完成 |
 | 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
-| 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | 后续 |
+| 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | 后续 |
 | 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 后续 |
 | 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 后续 |
@@ -81,6 +81,31 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 - HTTP 冒烟：不带 token 直接 `GET /api/storefront/v1/health` 与 `/products` 返回 200；
   `draft` 商品不出现在列表；详情不出现 `tenantId`。
 - 无需迁移：`npm run migrate:status` 数量不变。
+
+---
+
+## 第 3 步：C 端顾客模型与独立 JWT（本轮）
+
+### 3.1 数据模型（迁移 `20261104_000041_create-customers.ts`）
+- `customers`：`tenantId / email(租户内唯一) / passwordHash(bcrypt) / nickname / status(active|blocked)`
+- `customer_addresses`：地址簿（步骤 5 顾客账户使用，本步仅建表）
+
+### 3.2 认证链路（复用 shop 模型层，不建第二套后端）
+- `customerService`：`registerCustomer` / `authenticateCustomer` / `getCustomerById`；
+  密码 `bcryptjs` 哈希（SALT_ROUNDS=10）；JWT 使用**独立 secret** `config.jwt.customerSecret`，
+  payload 带 `type:'customer'`，与 admin JWT 彻底隔离。
+- storefront 路由 `/api/storefront/v1/auth`：`POST /register`、`POST /login`（站点上下文定租户，公开）、
+  `GET /me`（需 `customerAuth` 中间件）。
+- `customerAuth`：Bearer 解析 + `type` 校验，失败统一 401。
+
+### 3.3 硬约束
+1. 顾客与 admin `users` 完全隔离（独立表、独立 JWT secret）。
+2. 注册/登录邮箱同一租户唯一；错误密码统一 `401 邮箱或密码错误`，不暴露账号是否存在。
+3. 禁用账号 `403`；返回体裁剪，绝不携带 `passwordHash`。
+4. 租户隔离由 service 层显式 `where:{tenantId}` 保证（与全局钩子脱钩）。
+
+### 3.4 验证
+- 后端 `tsc --noEmit` 通过；`vitest run` 全量 397 用例通过（新增顾客注册/登录/me/跨租户隔离/JWT 隔离 5 例）。
 
 ---
 

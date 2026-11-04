@@ -57,6 +57,8 @@ const config = {
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'vue_admin_secret_key_2024',
+    // 与 admin JWT 完全隔离的独立密钥，避免顾客令牌被误用于后台接口
+    customerSecret: process.env.JWT_CUSTOMER_SECRET || 'storefront_customer_secret_key_2024',
     expiresIn: '7d',
   },
   redis: {

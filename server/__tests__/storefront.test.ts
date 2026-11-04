@@ -314,3 +314,85 @@ describe('阶段5 第2步：slug 列 + 后台可编辑 + JSON_SEARCH', () => {
     })
   })
 })
+
+describe('阶段5：Storefront 顾客认证（步骤 3）', () => {
+  it('register 成功返回顾客与 JWT，且不泄漏密码哈希', async () => {
+    const customerService = await import('../modules/shop/services/customerService.js')
+    await runInTenant({ tenantId: TID }, async () => {
+      const email = `cust-${uniq()}@example.com`
+      const { customer, token } = await customerService.registerCustomer({
+        tenantId: TID, email, password: 'secret1234', nickname: 'Ada',
+      })
+      expect(customer.email).toBe(email)
+      expect(customer.nickname).toBe('Ada')
+      expect(JSON.stringify(customer)).not.toContain('passwordHash')
+      expect(token.split('.')).toHaveLength(3)
+    })
+  })
+
+  it('重复邮箱注册返回 409', async () => {
+    const customerService = await import('../modules/shop/services/customerService.js')
+    await runInTenant({ tenantId: TID }, async () => {
+      const email = `dup-${uniq()}@example.com`
+      await customerService.registerCustomer({ tenantId: TID, email, password: 'secret1234' })
+      await expect(
+        customerService.registerCustomer({ tenantId: TID, email, password: 'secret1234' }),
+      ).rejects.toThrow(/已注册/)
+    })
+  })
+
+  it('login 成功；错误密码 401；禁用账号 403', async () => {
+    const customerService = await import('../modules/shop/services/customerService.js')
+    const { ShopCustomer } = await import('../modules/shop/models/index.js')
+    await runInTenant({ tenantId: TID }, async () => {
+      const email = `login-${uniq()}@example.com`
+      await customerService.registerCustomer({ tenantId: TID, email, password: 'secret1234' })
+
+      const ok = await customerService.authenticateCustomer({ tenantId: TID, email, password: 'secret1234' })
+      expect(ok.token.split('.')).toHaveLength(3)
+
+      await expect(
+        customerService.authenticateCustomer({ tenantId: TID, email, password: 'wrongpass' }),
+      ).rejects.toThrow(/邮箱或密码错误/)
+
+      await ShopCustomer.update({ status: 'blocked' }, { where: { tenantId: TID, email } })
+      await expect(
+        customerService.authenticateCustomer({ tenantId: TID, email, password: 'secret1234' }),
+      ).rejects.toThrow(/禁用/)
+    })
+  })
+
+  it('顾客数据跨租户隔离', async () => {
+    const customerService = await import('../modules/shop/services/customerService.js')
+    await runInTenant({ tenantId: TID }, async () => {
+      const email = `iso-${uniq()}@example.com`
+      const { customer } = await customerService.registerCustomer({ tenantId: TID, email, password: 'secret1234' })
+      await runInTenant({ tenantId: 999 }, async () => {
+        await expect(customerService.getCustomerById(999, customer.id)).rejects.toThrow(/顾客不存在/)
+      })
+    })
+  })
+
+  it('customerAuth 中间件解析顾客 JWT；拒绝 admin 令牌', async () => {
+    const customerService = await import('../modules/shop/services/customerService.js')
+    const { customerAuth } = await import('../modules/storefront/middleware/customerAuth.js')
+    const jwt = (await import('jsonwebtoken')).default
+    const config = (await import('../config/index.js')).default
+    await runInTenant({ tenantId: TID }, async () => {
+      const email = `mw-${uniq()}@example.com`
+      const { customer, token } = await customerService.registerCustomer({ tenantId: TID, email, password: 'secret1234' })
+
+      const req: any = { headers: { authorization: `Bearer ${token}` } }
+      const nextOk = (err?: unknown) => { if (err) throw err }
+      customerAuth(req, {} as any, nextOk as any)
+      expect(req.customer?.customerId).toBe(customer.id)
+      expect(req.customer?.tenantId).toBe(TID)
+
+      // admin 令牌使用不同 secret，且 type 不匹配，应被拒绝
+      const adminToken = jwt.sign({ id: 1, username: 'admin', type: 'admin' }, config.jwt.secret)
+      const reqBad: any = { headers: { authorization: `Bearer ${adminToken}` } }
+      const rejectNext = (err?: unknown) => { if (err) throw err }
+      expect(() => customerAuth(reqBad, {} as any, rejectNext as any)).toThrow()
+    })
+  })
+})
