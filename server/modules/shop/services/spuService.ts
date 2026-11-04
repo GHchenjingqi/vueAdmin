@@ -3,12 +3,16 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { ShopSpu, ShopSku } from '../models/index.js'
 import type { CreateSpuInput, SpuStatus, StatusAction, UpdateSpuInput } from '../../../shared/schemas/shop.js'
 import { spuStatusTransitions, statusActionTarget } from '../../../shared/schemas/shop.js'
+import { getTenantContext } from '../../../modules/tenant/context.js'
 import * as skuService from './skuService.js'
+
+/** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
+const tid = (): number => getTenantContext()?.tenantId ?? 1
 
 export async function listSpus(params: { page?: number; pageSize?: number; keyword?: string; categoryId?: number; status?: SpuStatus }) {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 20
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = { tenantId: tid() }
   if (params.categoryId) where.categoryId = params.categoryId
   if (params.status) where.status = params.status
   // 多语言标题关键字：JSON 列序列化后 like
@@ -23,7 +27,7 @@ export async function listSpus(params: { page?: number; pageSize?: number; keywo
 }
 
 export async function getSpuById(id: number): Promise<ShopSpu> {
-  const row = await ShopSpu.findByPk(id)
+  const row = await ShopSpu.findOne({ where: { id, tenantId: tid() } })
   if (!row) throw new AppError(404, '商品不存在')
   return row
 }
@@ -31,13 +35,13 @@ export async function getSpuById(id: number): Promise<ShopSpu> {
 /** SPU 详情（含 SKU 与状态机可执行动作） */
 export async function getSpuDetail(id: number) {
   const spu = await getSpuById(id)
-  const skus = await ShopSku.findAll({ where: { spuId: id }, order: [['id', 'ASC']] })
+  const skus = await ShopSku.findAll({ where: { spuId: id, tenantId: tid() }, order: [['id', 'ASC']] })
   const allowedActions = spuStatusTransitions[spu.status]
   return { spu, skus, allowedActions }
 }
 
 export async function createSpu(input: CreateSpuInput): Promise<ShopSpu> {
-  return ShopSpu.create(input as never)
+  return ShopSpu.create({ ...input, tenantId: getTenantContext()?.tenantId ?? 1 } as never)
 }
 
 export async function updateSpu(id: number, input: UpdateSpuInput): Promise<ShopSpu> {
@@ -66,7 +70,7 @@ export async function changeSpuStatus(id: number, action: StatusAction, reason?:
   }
   // 上架/发布前合规卡点：每个 SKU 必须有 originCountry + hsCode（跨境红线）
   if (['listed', 'published'].includes(target)) {
-    const skus = await ShopSku.findAll({ where: { spuId: id } })
+    const skus = await ShopSku.findAll({ where: { spuId: id, tenantId: tid() } })
     if (skus.length === 0) throw new AppError(400, 'SPU 下没有 SKU，无法上架/发布')
     const missing = skus.filter((s) => !s.originCountry || !s.hsCode)
     if (missing.length > 0) {
@@ -84,6 +88,6 @@ export async function deleteSpu(id: number): Promise<void> {
   if (row.status !== 'draft' && row.status !== 'archived') {
     throw new AppError(400, '仅草稿或已归档商品可删除')
   }
-  await ShopSku.destroy({ where: { spuId: id } })
+  await ShopSku.destroy({ where: { spuId: id, tenantId: tid() } })
   await row.destroy()
 }

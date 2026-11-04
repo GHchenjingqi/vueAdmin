@@ -2,6 +2,10 @@ import { Op } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { ShopCategory } from '../models/index.js'
 import type { CreateCategoryInput, UpdateCategoryInput } from '../../../shared/schemas/shop.js'
+import { getTenantContext } from '../../../modules/tenant/context.js'
+
+/** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
+const tid = (): number => getTenantContext()?.tenantId ?? 1
 
 export interface CategoryTreeItem {
   id: number
@@ -35,12 +39,12 @@ function buildTree(items: ShopCategory[]): CategoryTreeItem[] {
 
 /** 类目树（全量，前端懒展开） */
 export async function getCategoryTree(): Promise<CategoryTreeItem[]> {
-  const rows = await ShopCategory.findAll({ order: [['sort', 'ASC'], ['id', 'ASC']] })
+  const rows = await ShopCategory.findAll({ where: { tenantId: tid() }, order: [['sort', 'ASC'], ['id', 'ASC']] })
   return buildTree(rows)
 }
 
 export async function getCategoryById(id: number): Promise<ShopCategory> {
-  const row = await ShopCategory.findByPk(id)
+  const row = await ShopCategory.findOne({ where: { id, tenantId: tid() } })
   if (!row) throw new AppError(404, '类目不存在')
   return row
 }
@@ -51,7 +55,7 @@ export async function createCategory(input: CreateCategoryInput): Promise<ShopCa
     // 子类目层级 = 父层级 + 1，最大 5 级
     input.level = Math.min(parent.level + 1, 5)
   }
-  return ShopCategory.create(input as never)
+  return ShopCategory.create({ ...input, tenantId: getTenantContext()?.tenantId ?? 1 } as never)
 }
 
 export async function updateCategory(id: number, input: UpdateCategoryInput): Promise<ShopCategory> {
@@ -62,7 +66,7 @@ export async function updateCategory(id: number, input: UpdateCategoryInput): Pr
     if (input.parentId > 0) {
       const descendants: number[] = []
       const collect = async (pid: number): Promise<void> => {
-        const children = await ShopCategory.findAll({ where: { parentId: pid }, attributes: ['id'] })
+        const children = await ShopCategory.findAll({ where: { parentId: pid, tenantId: tid() }, attributes: ['id'] })
         for (const c of children) {
           descendants.push(c.id)
           await collect(c.id)
@@ -78,14 +82,14 @@ export async function updateCategory(id: number, input: UpdateCategoryInput): Pr
 
 export async function deleteCategory(id: number): Promise<void> {
   const row = await getCategoryById(id)
-  const hasChildren = await ShopCategory.count({ where: { parentId: id } })
+  const hasChildren = await ShopCategory.count({ where: { parentId: id, tenantId: tid() } })
   if (hasChildren > 0) throw new AppError(400, '存在子类目，无法删除')
   await row.destroy()
 }
 
 /** 类目选项（下拉用，取名称的 zh-CN 或首个语言） */
 export async function getCategoryOptions(): Promise<Array<{ id: number; name: string; parentId: number }>> {
-  const rows = await ShopCategory.findAll({ order: [['sort', 'ASC'], ['id', 'ASC']], attributes: ['id', 'parentId', 'name'] })
+  const rows = await ShopCategory.findAll({ where: { tenantId: tid() }, order: [['sort', 'ASC'], ['id', 'ASC']], attributes: ['id', 'parentId', 'name'] })
   return rows.map((r) => ({
     id: r.id,
     parentId: r.parentId,
@@ -96,7 +100,7 @@ export async function getCategoryOptions(): Promise<Array<{ id: number; name: st
 /** 关键字过滤（多语言 name 任一语言命中） */
 export async function searchCategories(keyword: string): Promise<CategoryTreeItem[]> {
   const rows = await ShopCategory.findAll({
-    where: { name: { [Op.like]: `%${keyword}%` } } as never,
+    where: { name: { [Op.like]: `%${keyword}%` }, tenantId: tid() } as never,
     order: [['sort', 'ASC'], ['id', 'ASC']],
   })
   return buildTree(rows)

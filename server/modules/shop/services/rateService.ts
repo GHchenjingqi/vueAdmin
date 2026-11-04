@@ -2,6 +2,10 @@ import { Op } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { ShopRateSnapshot } from '../models/index.js'
 import type { RateSnapshotInput } from '../../../shared/schemas/shop.js'
+import { getTenantContext } from '../../../modules/tenant/context.js'
+
+/** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
+const tid = (): number => getTenantContext()?.tenantId ?? 1
 
 /** 写入/更新某日快照（同租户同基准币同日期唯一） */
 export async function saveRateSnapshot(input: RateSnapshotInput) {
@@ -10,6 +14,7 @@ export async function saveRateSnapshot(input: RateSnapshotInput) {
       baseCurrency: input.baseCurrency.toUpperCase(),
       rates: input.rates,
       rateDate: input.rateDate,
+      tenantId: getTenantContext()?.tenantId ?? 1,
     } as never,
     { returning: true },
   )
@@ -18,7 +23,7 @@ export async function saveRateSnapshot(input: RateSnapshotInput) {
 
 /** 按日期取快照（就近向前取：无当日则取该日之前最近一条） */
 export async function getSnapshot(baseCurrency: string, date?: string) {
-  const where: Record<string, unknown> = { baseCurrency: baseCurrency.toUpperCase() }
+  const where: Record<string, unknown> = { baseCurrency: baseCurrency.toUpperCase(), tenantId: tid() }
   if (date) where.rateDate = { [Op.lte]: date }
   const row = await ShopRateSnapshot.findOne({ where, order: [['rateDate', 'DESC']] })
   if (!row) throw new AppError(404, date ? `没有 ${date} 及之前的 ${baseCurrency} 汇率快照` : `没有 ${baseCurrency} 汇率快照`)
@@ -29,6 +34,7 @@ export async function listSnapshots(params: { page?: number; pageSize?: number }
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 20
   const { rows, count } = await ShopRateSnapshot.findAndCountAll({
+    where: { tenantId: tid() },
     order: [['rateDate', 'DESC']],
     offset: (page - 1) * pageSize,
     limit: pageSize,
