@@ -205,6 +205,9 @@ export interface Sku {
 }
 
 export const skuApi = {
+  list(params?: { page?: number; pageSize?: number; keyword?: string }) {
+    return request.get<Paged<Sku>>('/shop/skus', { params })
+  },
   listBySpu(spuId: number) {
     return request.get<Sku[]>(`/shop/spus/${spuId}/skus`)
   },
@@ -279,5 +282,408 @@ export const rateApi = {
   },
   save(data: { baseCurrency?: string; rates: Record<string, number>; rateDate: string }) {
     return request.put<RateSnapshot>('/shop/rates/snapshot', data)
+  },
+}
+
+// ==================== 阶段 2：渠道 ====================
+
+export type ChannelType = 'amazon' | 'shopify' | 'tiktok' | 'shopee' | 'independent'
+
+export interface Channel {
+  id: number
+  name: string
+  type: ChannelType
+  status: string
+  config: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChannelOption {
+  id: number
+  name: string
+  type: ChannelType
+}
+
+export const channelApi = {
+  list(params?: { page?: number; pageSize?: number }) {
+    return request.get<Paged<Channel>>('/shop/channels', { params })
+  },
+  options() {
+    return request.get<ChannelOption[]>('/shop/channels/options')
+  },
+  detail(id: number) {
+    return request.get<Channel>(`/shop/channels/${id}`)
+  },
+  create(data: { name: string; type: ChannelType; status?: string; config?: Record<string, unknown> | null }) {
+    return request.post<Channel>('/shop/channels', data)
+  },
+  update(id: number, data: Partial<{ name: string; type: ChannelType; status?: string; config?: Record<string, unknown> | null }>) {
+    return request.put<Channel>(`/shop/channels/${id}`, data)
+  },
+  remove(id: number) {
+    return request.delete<null>(`/shop/channels/${id}`)
+  },
+}
+
+// ==================== 阶段 2：店铺 ====================
+
+export interface ShopStore {
+  id: number
+  channelId: number
+  name: string
+  status: string
+  externalShopId: string | null
+  config: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ShopOption {
+  id: number
+  channelId: number
+  name: string
+}
+
+export const shopStoreApi = {
+  list(params?: { page?: number; pageSize?: number; channelId?: number }) {
+    return request.get<Paged<ShopStore>>('/shop/shops', { params })
+  },
+  options(params?: { channelId?: number }) {
+    return request.get<ShopOption[]>('/shop/shops/options', { params })
+  },
+  detail(id: number) {
+    return request.get<ShopStore>(`/shop/shops/${id}`)
+  },
+  create(data: { channelId: number; name: string; status?: string; externalShopId?: string | null; config?: Record<string, unknown> | null }) {
+    return request.post<ShopStore>('/shop/shops', data)
+  },
+  update(
+    id: number,
+    data: Partial<{ channelId: number; name: string; status?: string; externalShopId?: string | null; config?: Record<string, unknown> | null }>,
+  ) {
+    return request.put<ShopStore>(`/shop/shops/${id}`, data)
+  },
+  remove(id: number) {
+    return request.delete<null>(`/shop/shops/${id}`)
+  },
+}
+
+// ==================== 阶段 2：渠道商品 ====================
+
+export interface ChannelProduct {
+  id: number
+  channelId: number
+  shopId: number
+  spuId: number
+  skuId: number | null
+  externalId: string | null
+  status: 'listed' | 'published'
+  createdAt: string
+}
+
+export const channelProductApi = {
+  list(params?: { page?: number; pageSize?: number; channelId?: number; spuId?: number }) {
+    return request.get<Paged<ChannelProduct>>('/shop/channel-products', { params })
+  },
+  publish(data: { channelId: number; shopId: number; spuId: number; skuId?: number | null }) {
+    return request.post<ChannelProduct>('/shop/channel-products', data)
+  },
+}
+
+// ==================== 阶段 2：提交发布（工作流） ====================
+
+export interface SubmitPublishResult {
+  spuId: number
+  status: ShopStatus
+  instanceId: number | null
+}
+
+export const publishApi = {
+  submitForPublish(spuId: number) {
+    return request.post<SubmitPublishResult>(`/shop/spus/${spuId}/submit-for-publish`)
+  },
+}
+
+// ==================== 阶段 3：仓库 ====================
+
+export type WarehouseType = 'bonded' | 'overseas' | 'direct'
+
+export interface Warehouse {
+  id: number
+  name: string
+  type: WarehouseType
+  country: string
+  address: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WarehouseOption {
+  id: number
+  name: string
+  type: WarehouseType
+}
+
+export const warehouseApi = {
+  list(params?: { page?: number; pageSize?: number; type?: WarehouseType }) {
+    return request.get<Paged<Warehouse>>('/shop/warehouses', { params })
+  },
+  options() {
+    return request.get<WarehouseOption[]>('/shop/warehouses/options')
+  },
+  detail(id: number) {
+    return request.get<Warehouse>(`/shop/warehouses/${id}`)
+  },
+  create(data: { name: string; type: WarehouseType; country?: string; address?: string | null }) {
+    return request.post<Warehouse>('/shop/warehouses', data)
+  },
+  update(id: number, data: Partial<{ name: string; type: WarehouseType; country?: string; address?: string | null }>) {
+    return request.put<Warehouse>(`/shop/warehouses/${id}`, data)
+  },
+  remove(id: number) {
+    return request.delete<null>(`/shop/warehouses/${id}`)
+  },
+}
+
+// ==================== 阶段 3：库存 ====================
+
+export interface Inventory {
+  id: number
+  skuId: number
+  warehouseId: number
+  quantity: number
+  locked: number
+  updatedAt: string
+}
+
+export interface InventoryLog {
+  id: number
+  skuId: number
+  warehouseId: number
+  delta: number
+  type: 'in' | 'out' | 'lock' | 'unlock'
+  reason: string | null
+  createdAt: string
+}
+
+export const inventoryApi = {
+  list(params?: { page?: number; pageSize?: number; skuId?: number; warehouseId?: number }) {
+    return request.get<Paged<Inventory>>('/shop/inventory', { params })
+  },
+  logs(params?: { page?: number; pageSize?: number; skuId?: number; warehouseId?: number }) {
+    return request.get<Paged<InventoryLog>>('/shop/inventory/logs', { params })
+  },
+  adjust(data: { skuId: number; warehouseId: number; delta: number; reason?: string }) {
+    return request.post<Inventory>('/shop/inventory/adjust', data)
+  },
+}
+
+// ==================== 阶段 3：订单 ====================
+
+export type OrderStatus = 'created' | 'paid' | 'fulfilled' | 'shipped' | 'done' | 'cancelled'
+
+export interface OrderBuyer {
+  name?: string
+  country?: string
+  email?: string
+  phone?: string
+  address?: string
+}
+
+export interface Order {
+  id: number
+  orderNo: string
+  channelId: number
+  shopId: number
+  buyer: OrderBuyer
+  currency: string
+  amount: number
+  status: OrderStatus
+  paidAt: string | null
+  shippedAt: string | null
+  cancelledAt: string | null
+  createdAt: string
+}
+
+export interface OrderItem {
+  id: number
+  orderId: number
+  skuId: number
+  qty: number
+  price: number
+}
+
+export interface OrderShipment {
+  id: number
+  orderId: number
+  carrier: string
+  trackingNo: string | null
+  customsNo: string | null
+  status: string
+  createdAt: string
+}
+
+export interface OrderDetail {
+  order: Order
+  items: OrderItem[]
+  shipments: OrderShipment[]
+}
+
+export const orderApi = {
+  list(params?: { page?: number; pageSize?: number; channelId?: number; status?: OrderStatus }) {
+    return request.get<Paged<Order>>('/shop/orders', { params })
+  },
+  detail(id: number) {
+    return request.get<OrderDetail>(`/shop/orders/${id}`)
+  },
+  create(data: { channelId: number; shopId: number; buyer: OrderBuyer; currency: string; items: { skuId: number; qty: number; price: number }[] }) {
+    return request.post<Order>('/shop/orders', data)
+  },
+  markPaid(id: number) {
+    return request.post<Order>(`/shop/orders/${id}/pay`)
+  },
+  ship(id: number, data?: { carrier?: string; trackingNo?: string }) {
+    return request.post<Order>(`/shop/orders/${id}/ship`, data ?? {})
+  },
+  cancel(id: number) {
+    return request.post<Order>(`/shop/orders/${id}/cancel`)
+  },
+}
+
+// ==================== 阶段 4：营销 ====================
+
+export type PromotionType = 'discount' | 'full_reduce'
+export type PromotionScope = 'sku' | 'spu' | 'category' | 'all'
+
+export interface Promotion {
+  id: number
+  name: I18nText
+  type: PromotionType
+  scope: PromotionScope
+  rule: Record<string, unknown>
+  startAt: string
+  endAt: string
+  createdAt: string
+}
+
+export interface Coupon {
+  id: number
+  code: string
+  type: 'fixed' | 'percent'
+  value: number
+  currency: string
+  validFrom: string
+  validTo: string
+  usedCount: number
+  totalCount: number | null
+  createdAt: string
+}
+
+export const marketingApi = {
+  listPromotions(params?: { page?: number; pageSize?: number; type?: PromotionType }) {
+    return request.get<Paged<Promotion>>('/shop/promotions', { params })
+  },
+  getPromotion(id: number) {
+    return request.get<Promotion>(`/shop/promotions/${id}`)
+  },
+  createPromotion(data: { name: I18nText; type: PromotionType; scope: PromotionScope; rule: Record<string, unknown>; startAt: string; endAt: string }) {
+    return request.post<Promotion>('/shop/promotions', data)
+  },
+  updatePromotion(id: number, data: Partial<Omit<Promotion, 'id' | 'createdAt'>>) {
+    return request.put<Promotion>(`/shop/promotions/${id}`, data)
+  },
+  removePromotion(id: number) {
+    return request.delete<null>(`/shop/promotions/${id}`)
+  },
+  listCoupons(params?: { page?: number; pageSize?: number }) {
+    return request.get<Paged<Coupon>>('/shop/coupons', { params })
+  },
+  getCoupon(id: number) {
+    return request.get<Coupon>(`/shop/coupons/${id}`)
+  },
+  createCoupon(data: {
+    code: string
+    type: 'fixed' | 'percent'
+    value: number
+    currency: string
+    validFrom: string
+    validTo: string
+    totalCount?: number | null
+  }) {
+    return request.post<Coupon>('/shop/coupons', data)
+  },
+  updateCoupon(id: number, data: Partial<Omit<Coupon, 'id' | 'createdAt'>>) {
+    return request.put<Coupon>(`/shop/coupons/${id}`, data)
+  },
+  removeCoupon(id: number) {
+    return request.delete<null>(`/shop/coupons/${id}`)
+  },
+}
+
+// ==================== 阶段 4：数据参谋 ====================
+
+export type AnalyticsDimension = 'day' | 'month' | 'channel' | 'category'
+
+export interface AnalyticsQuery {
+  dimension?: AnalyticsDimension
+  startAt?: string
+  endAt?: string
+  channelId?: number
+}
+
+export interface SalesRow {
+  key: string
+  amountByCurrency: Record<string, number>
+  usdTotal: number
+  orderCount: number
+  itemQty: number
+}
+
+export interface SalesReport {
+  dimension: AnalyticsDimension
+  rows: SalesRow[]
+}
+
+export interface ProfitPoint {
+  key: string
+  revenueUSD: number
+  costUSD: number
+  profitUSD: number
+  fxGainLoss: number
+}
+
+export interface ProfitReport {
+  summary: {
+    revenueUSD: number
+    costUSD: number
+    grossProfitUSD: number
+    fxGainLossUSD: number
+  }
+  series: ProfitPoint[]
+}
+
+export interface TurnoverRow {
+  skuId: number
+  outQty: number
+  avgStock: number
+  dailyOut: number
+  turnoverDays: number
+}
+
+export interface TurnoverReport {
+  periodDays: number
+  rows: TurnoverRow[]
+}
+
+export const analyticsApi = {
+  sales(query?: AnalyticsQuery) {
+    return request.get<SalesReport>('/shop/analytics/sales', { params: query })
+  },
+  profit(query?: AnalyticsQuery) {
+    return request.get<ProfitReport>('/shop/analytics/profit', { params: query })
+  },
+  turnover(query?: AnalyticsQuery) {
+    return request.get<TurnoverReport>('/shop/analytics/turnover', { params: query })
   },
 }

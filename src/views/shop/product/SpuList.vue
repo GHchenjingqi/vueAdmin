@@ -41,12 +41,20 @@
           <el-button v-for="act in statusActionsFor(row.status)" :key="act.action" :type="act.type" link size="small" @click="handleStatusAction(row, act)">
             {{ t(act.labelKey) }}
           </el-button>
+          <el-button v-if="row.status === 'draft'" type="success" link size="small" @click="handleSubmitForPublish(row)">
+            {{ t('shop.publish.submitReview') }}
+          </el-button>
+          <el-button v-if="row.status === 'published'" type="warning" link size="small" @click="openPublishDialog(row)">
+            {{ t('shop.publish.title') }}
+          </el-button>
           <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">
             {{ t('common.delete') }}
           </el-button>
         </div>
       </template>
     </ProTable>
+
+    <PublishDialog v-model="publishVisible" :spu-id="publishSpuId" @published="fetchList" />
   </div>
 </template>
 
@@ -54,9 +62,10 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { spuApi, type Spu, type ShopStatus, type StatusAction } from '@/api/shop'
+import { publishApi, spuApi, type Spu, type ShopStatus, type StatusAction } from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'
 import ProTable from '@/components/ProTable/index.vue'
+import PublishDialog from './PublishDialog.vue'
 import { useI18n } from '@/i18n'
 
 const { t, locale } = useI18n()
@@ -198,6 +207,26 @@ const handleStatusAction = (row: Record<string, unknown>, act: StatusActionItem)
   } else {
     run()
   }
+}
+
+/** 提交发布审核（走工作流审批流，合规卡点由后端校验） */
+const handleSubmitForPublish = async (row: Record<string, unknown>): Promise<void> => {
+  try {
+    await publishApi.submitForPublish(row.id as number)
+    ElMessage.success(t('shop.publish.submitSuccess'))
+    fetchList()
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err))
+  }
+}
+
+/** 发布到渠道 */
+const publishVisible = ref(false)
+const publishSpuId = ref<number | null>(null)
+
+const openPublishDialog = (row: Record<string, unknown>): void => {
+  publishSpuId.value = row.id as number
+  publishVisible.value = true
 }
 
 const handleDelete = (row: Record<string, unknown>): void => {

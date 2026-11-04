@@ -1,4 +1,6 @@
 import { AppError } from '../../../middleware/errorHandler.js'
+import { Op } from 'sequelize'
+import type { Attributes, WhereOptions } from 'sequelize'
 import { ShopSku, ShopSpu } from '../models/index.js'
 import type { CreateSkuInput, SpuStatus, UpdateSkuInput } from '../../../shared/schemas/shop.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
@@ -8,6 +10,26 @@ const tid = (): number => getTenantContext()?.tenantId ?? 1
 
 export async function listSkusBySpu(spuId: number) {
   return ShopSku.findAll({ where: { spuId, tenantId: tid() }, order: [['id', 'ASC']] })
+}
+
+/**
+ * 全局 SKU 列表（跨 SPU），供库存中心选择 SKU 使用。
+ * keyword 同时匹配 SKU 编码与条码。
+ */
+export async function listSkus(params: { keyword?: string; page?: number; pageSize?: number } = {}) {
+  const page = params.page ?? 1
+  const pageSize = params.pageSize ?? 20
+  const where: WhereOptions<Attributes<ShopSku>> = { tenantId: tid() }
+  if (params.keyword) {
+    where[Op.or] = [{ code: { [Op.like]: `%${params.keyword}%` } }, { barcode: { [Op.like]: `%${params.keyword}%` } }]
+  }
+  const { rows, count } = await ShopSku.findAndCountAll({
+    where,
+    order: [['id', 'ASC']],
+    offset: (page - 1) * pageSize,
+    limit: pageSize,
+  })
+  return { list: rows, total: count, page, pageSize }
 }
 
 export async function getSkuById(id: number): Promise<ShopSku> {

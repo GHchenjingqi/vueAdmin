@@ -58,13 +58,13 @@ const healthOk = ref(false)
 const checkTimeText = ref('')
 
 const modules = computed(() => [
-  { key: 'shop.modules.product', icon: 'Goods', ready: false },
-  { key: 'shop.modules.category', icon: 'Files', ready: false },
-  { key: 'shop.modules.channel', icon: 'Connection', ready: false },
-  { key: 'shop.modules.inventory', icon: 'Box', ready: false },
-  { key: 'shop.modules.order', icon: 'List', ready: false },
-  { key: 'shop.modules.marketing', icon: 'Present', ready: false },
-  { key: 'shop.modules.analytics', icon: 'TrendCharts', ready: false },
+  { key: 'shop.modules.product', icon: 'Goods', ready: true },
+  { key: 'shop.modules.category', icon: 'Files', ready: true },
+  { key: 'shop.modules.channel', icon: 'Connection', ready: true },
+  { key: 'shop.modules.inventory', icon: 'Box', ready: true },
+  { key: 'shop.modules.order', icon: 'List', ready: true },
+  { key: 'shop.modules.marketing', icon: 'Present', ready: true },
+  { key: 'shop.modules.analytics', icon: 'TrendCharts', ready: true },
 ])
 
 onMounted(async () => {

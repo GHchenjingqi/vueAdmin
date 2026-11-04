@@ -12,12 +12,20 @@ import { z } from 'zod'
 /** 多语言文本 JSON，如 { "zh-CN": "服饰", "en-US": "Apparel" } */
 export const i18nTextSchema = z.record(z.string().min(1).max(10), z.string().min(1).max(2000))
 
-/** 分页查询 */
-export const shopPaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).optional(),
-  pageSize: z.coerce.number().int().min(1).max(100).optional(),
-  keyword: z.string().max(100).optional(),
-})
+/**
+ * 分页查询
+ *
+ * 使用 `.passthrough()`：validate 中间件会用解析结果整体替换 req.query，
+ * Zod 默认会剥离未声明字段，导致各列表接口的专属筛选参数
+ * （skuId / warehouseId / spuId / channelId / status / type 等）全部丢失。
+ */
+export const shopPaginationSchema = z
+  .object({
+    page: z.coerce.number().int().min(1).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).optional(),
+    keyword: z.string().max(100).optional(),
+  })
+  .passthrough()
 
 // ==================== 上架/发布状态机 ====================
 
@@ -156,3 +164,151 @@ export const shopHealthSchema = z.object({
 })
 
 export type ShopHealth = z.infer<typeof shopHealthSchema>
+
+// ============================================================================
+// 阶段 2：渠道 / 店铺 / 渠道商品 / 合规卡点 / 发布
+// ============================================================================
+
+export const channelTypeSchema = z.enum(['amazon', 'shopify', 'tiktok', 'shopee', 'independent'])
+export type ChannelType = z.infer<typeof channelTypeSchema>
+
+export const createChannelSchema = z.object({
+  name: z.string().min(1).max(100),
+  type: channelTypeSchema,
+  config: z.record(z.string(), z.unknown()).nullable().optional(),
+})
+export type CreateChannelInput = z.infer<typeof createChannelSchema>
+
+export const updateChannelSchema = createChannelSchema.partial()
+export type UpdateChannelInput = z.infer<typeof updateChannelSchema>
+
+export const createShopSchema = z.object({
+  channelId: z.number().int().min(1),
+  name: z.string().min(1).max(100),
+  credentials: z.record(z.string(), z.unknown()).nullable().optional(),
+})
+export type CreateShopInput = z.infer<typeof createShopSchema>
+
+export const updateShopSchema = createShopSchema.partial()
+export type UpdateShopInput = z.infer<typeof updateShopSchema>
+
+export const channelProductStatusSchema = z.enum(['listed', 'published'])
+export type ChannelProductStatus = z.infer<typeof channelProductStatusSchema>
+
+export const createChannelProductSchema = z.object({
+  channelId: z.number().int().min(1),
+  shopId: z.number().int().min(1),
+  spuId: z.number().int().min(1),
+  skuId: z.number().int().min(1).nullable().optional(),
+})
+export type CreateChannelProductInput = z.infer<typeof createChannelProductSchema>
+
+/** 提交发布：选择渠道/店铺，触发审批流 */
+export const submitPublishSchema = z.object({
+  channelId: z.number().int().min(1),
+  shopId: z.number().int().min(1),
+  /** 是否同步上架到渠道（审批通过后写入 channel_products） */
+  listToChannel: z.boolean().default(true),
+})
+export type SubmitPublishInput = z.infer<typeof submitPublishSchema>
+
+// ============================================================================
+// 阶段 3：库存中心 / 订单履约 / 物流
+// ============================================================================
+
+export const warehouseTypeSchema = z.enum(['bonded', 'overseas', 'direct'])
+export type WarehouseType = z.infer<typeof warehouseTypeSchema>
+
+export const createWarehouseSchema = z.object({
+  name: z.string().min(1).max(100),
+  type: warehouseTypeSchema,
+  country: z.string().length(2).default('CN'),
+  address: z.string().max(500).nullable().optional(),
+})
+export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>
+
+export const updateWarehouseSchema = createWarehouseSchema.partial()
+export type UpdateWarehouseInput = z.infer<typeof updateWarehouseSchema>
+
+export const inventoryLogTypeSchema = z.enum(['in', 'out', 'lock', 'unlock'])
+export type InventoryLogType = z.infer<typeof inventoryLogTypeSchema>
+
+export const adjustInventorySchema = z.object({
+  skuId: z.number().int().min(1),
+  warehouseId: z.number().int().min(1),
+  delta: z.number().int(),
+})
+export type AdjustInventoryInput = z.infer<typeof adjustInventorySchema>
+
+export const orderStatusSchema = z.enum(['created', 'paid', 'fulfilled', 'shipped', 'done', 'cancelled'])
+export type OrderStatus = z.infer<typeof orderStatusSchema>
+
+export const createOrderItemSchema = z.object({
+  skuId: z.number().int().min(1),
+  qty: z.number().int().min(1),
+  price: z.number().min(0).max(9999999999.99),
+})
+export type CreateOrderItemInput = z.infer<typeof createOrderItemSchema>
+
+export const createOrderSchema = z.object({
+  channelId: z.number().int().min(1),
+  shopId: z.number().int().min(1),
+  buyer: z.record(z.string(), z.unknown()),
+  currency: z.string().length(3).default('USD'),
+  items: z.array(createOrderItemSchema).min(1),
+})
+export type CreateOrderInput = z.infer<typeof createOrderSchema>
+
+export const shipOrderSchema = z.object({
+  carrier: z.string().min(1).max(100),
+  trackingNo: z.string().min(1).max(100).optional(),
+})
+export type ShipOrderInput = z.infer<typeof shipOrderSchema>
+
+// ============================================================================
+// 阶段 4：营销中心 / 数据参谋
+// ============================================================================
+
+export const promotionTypeSchema = z.enum(['discount', 'full_reduce'])
+export const promotionScopeSchema = z.enum(['sku', 'spu', 'category', 'all'])
+export type PromotionType = z.infer<typeof promotionTypeSchema>
+export type PromotionScope = z.infer<typeof promotionScopeSchema>
+
+export const createPromotionSchema = z.object({
+  name: i18nTextSchema,
+  type: promotionTypeSchema,
+  scope: promotionScopeSchema,
+  rule: z.record(z.string(), z.unknown()),
+  startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  targetIds: z.array(z.number().int()).nullable().optional(),
+})
+export type CreatePromotionInput = z.infer<typeof createPromotionSchema>
+
+export const updatePromotionSchema = createPromotionSchema.partial()
+export type UpdatePromotionInput = z.infer<typeof updatePromotionSchema>
+
+export const couponTypeSchema = z.enum(['fixed', 'percent'])
+export type CouponType = z.infer<typeof couponTypeSchema>
+
+export const createCouponSchema = z.object({
+  code: z.string().min(1).max(50),
+  type: couponTypeSchema,
+  value: z.number().min(0).max(9999999999.99),
+  minSpend: z.number().min(0).default(0),
+  currency: z.string().length(3).default('USD'),
+  validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  validTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+})
+export type CreateCouponInput = z.infer<typeof createCouponSchema>
+
+export const updateCouponSchema = createCouponSchema.partial()
+export type UpdateCouponInput = z.infer<typeof updateCouponSchema>
+
+export const analyticsQuerySchema = z.object({
+  startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dimension: z.enum(['channel', 'country', 'category', 'day']).default('day'),
+  channelId: z.number().int().min(1).optional(),
+})
+export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>

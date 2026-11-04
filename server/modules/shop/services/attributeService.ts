@@ -12,7 +12,9 @@ export async function listAttributes(params: { page?: number; pageSize?: number;
   const pageSize = params.pageSize ?? 20
   const where: Record<string, unknown> = { tenantId: tid() }
   if (params.keyword) where.name = { [Op.like]: `%${params.keyword}%` }
-  if (params.categoryId) where.categoryId = params.categoryId
+  // params 来自透传的 req.query，categoryId 可能是字符串，需安全转换
+  const categoryId = Number(params.categoryId)
+  if (Number.isInteger(categoryId) && categoryId > 0) where.categoryId = categoryId
   const { rows, count } = await ShopAttribute.findAndCountAll({
     where,
     order: [['sort', 'ASC'], ['id', 'DESC']],

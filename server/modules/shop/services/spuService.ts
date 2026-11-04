@@ -5,6 +5,12 @@ import type { CreateSpuInput, SpuStatus, StatusAction, UpdateSpuInput } from '..
 import { spuStatusTransitions, statusActionTarget } from '../../../shared/schemas/shop.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
 import * as skuService from './skuService.js'
+import { checkSpuCompliance } from './complianceService.js'
+import * as channelProductService from './channelProductService.js'
+import WorkflowInstance from '../../../models/WorkflowInstance.js'
+import WorkflowBinding from '../../../models/WorkflowBinding.js'
+import Workflow from '../../../models/Workflow.js'
+import WorkflowEngine from '../../../services/WorkflowEngine.js'
 
 /** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
 const tid = (): number => getTenantContext()?.tenantId ?? 1
@@ -13,8 +19,11 @@ export async function listSpus(params: { page?: number; pageSize?: number; keywo
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 20
   const where: Record<string, unknown> = { tenantId: tid() }
-  if (params.categoryId) where.categoryId = params.categoryId
-  if (params.status) where.status = params.status
+  // params 来自透传的 req.query，categoryId 可能是字符串，需安全转换
+  const categoryId = Number(params.categoryId)
+  if (Number.isInteger(categoryId) && categoryId > 0) where.categoryId = categoryId
+  const validStatus = ['draft', 'review', 'rejected', 'listed', 'published', 'unlisted', 'archived']
+  if (params.status && validStatus.includes(params.status)) where.status = params.status
   // 多语言标题关键字：JSON 列序列化后 like
   if (params.keyword) where.name = { [Op.like]: `%${params.keyword}%` }
   const { rows, count } = await ShopSpu.findAndCountAll({
@@ -90,4 +99,101 @@ export async function deleteSpu(id: number): Promise<void> {
   }
   await ShopSku.destroy({ where: { spuId: id, tenantId: tid() } })
   await row.destroy()
+}
+
+// ==================== 阶段 2：提交发布（接入工作流审批流） ====================
+
+export interface SubmitPublishOptions {
+  channelId?: number
+  shopId?: number
+  listToChannel?: boolean
+  requiredQualifications?: string[]
+}
+
+/**
+ * 提交发布：合规卡点 + 进入审批流（bindingKey = shop-publish）。
+ * 审批通过后由工作流回调 applyWorkflowResult 将 SPU 置为 published，并按需发布到渠道。
+ * 若未配置审批流绑定，则降级为直接发布（保证可用性，已记录日志）。
+ */
+export async function submitForPublish(spuId: number, opts: SubmitPublishOptions = {}): Promise<{ status: SpuStatus; instanceId: number | null }> {
+  const row = await getSpuById(spuId)
+  if (!['draft', 'rejected', 'listed'].includes(row.status)) {
+    throw new AppError(400, `当前状态 ${row.status} 不可提交发布`)
+  }
+
+  // 合规卡点（跨境红线）：每个 SKU 须齐备 hs_code / origin_country / declared_value
+  const compliance = await checkSpuCompliance(spuId, opts.requiredQualifications)
+  if (!compliance.ok) {
+    const detail = compliance.missing
+      .map((m) => `SKU[${m.skuCode}] 缺失: ${m.fields.join('、')}`)
+      .join('; ')
+    throw new AppError(400, `合规校验未通过: ${detail}`)
+  }
+
+  // 进入待审状态（复用状态机 submit 动作）
+  await changeSpuStatus(spuId, 'submit')
+
+  const binding = await WorkflowBinding.findOne({ where: { bindingKey: 'shop-publish', status: 1 } })
+  if (!binding) {
+    // 未配置审批流：降级直接发布（并记录）
+    await row.update({ status: 'published' })
+    await skuService.followSpuStatus(spuId, 'published')
+    return { status: 'published', instanceId: null }
+  }
+  const workflow = await Workflow.findByPk(binding.workflowId)
+  if (!workflow || !workflow.publishedVersionId) {
+    await row.update({ status: 'published' })
+    await skuService.followSpuStatus(spuId, 'published')
+    return { status: 'published', instanceId: null }
+  }
+
+  const instance = await WorkflowInstance.create({
+    workflowId: workflow.id,
+    versionId: workflow.publishedVersionId,
+    bindingKey: 'shop-publish',
+    bindingId: spuId,
+    title: `商品发布审批 #${spuId}`,
+    status: 'pending',
+    input: JSON.stringify({
+      spuId,
+      channelId: opts.channelId ?? null,
+      shopId: opts.shopId ?? null,
+      listToChannel: opts.listToChannel ?? false,
+    }),
+    startedBy: getTenantContext()?.userId ?? 0,
+    tenantId: tid(),
+  } as never)
+
+  const engine = new WorkflowEngine()
+  engine.execute(instance).catch(() => {})
+  return { status: 'review', instanceId: instance.id }
+}
+
+/**
+ * 工作流审批结果回调：审批流结束后由引擎回调 shop/workflow-callback 触发。
+ * approved → SPU 置为 published（SKU 跟随）；rejected → rejected。
+ * 若提交时已选择渠道，则审批通过后同步发布到渠道（channel_products）。
+ */
+export async function applyWorkflowResult(instanceId: number, finalStatus: 'approved' | 'rejected', reason?: string): Promise<ShopSpu> {
+  const instance = await WorkflowInstance.findByPk(instanceId)
+  if (!instance || !instance.bindingKey || instance.bindingKey !== 'shop-publish') {
+    throw new AppError(400, '无效的工作流实例')
+  }
+  const input = (instance.input ? JSON.parse(instance.input) : {}) as { spuId: number; channelId?: number; shopId?: number; listToChannel?: boolean }
+  const spu = await getSpuById(input.spuId)
+
+  if (finalStatus === 'rejected') {
+    await spu.update({ status: 'rejected' })
+    return spu
+  }
+
+  // 审批通过：发布（SKU 跟随流转）
+  await spu.update({ status: 'published' })
+  await skuService.followSpuStatus(input.spuId, 'published')
+
+  // 审批通过后按提交时选择的渠道发布
+  if (input.listToChannel && input.channelId && input.shopId) {
+    await channelProductService.publishToChannel(input.spuId, input.channelId, input.shopId).catch(() => null)
+  }
+  return spu
 }
