@@ -21,7 +21,7 @@
 | 客服查单 | ✅ API 已备 | admin `GET /shop/orders`（分页）、`GET /shop/orders/:id`（详情）；P4-T03 顾客侧订单列表归属隔离（`751c61e`） | admin 前端订单管理页是否满足客服操作习惯，需业务试用确认 |
 | 订单履约操作 | ✅ API 已备 | `POST /orders/:id/pay` / `ship` / `cancel`（均为 authMiddleware 保护） | 同上 |
 | 退款执行 | ✅ API 已备 | `GET/POST /orders/:id/refunds`（T-09，`751df39`）：订单行锁、累计不超实付、部分→refunding/全额→refunded、幂等键、可插拔 provider 异常整笔回滚；10 例单测 | 退款审批权限分配（谁可操作）为业务决策 |
-| 售后 RMA | ⚠️ 顾客侧已备 | 顾客 `POST/GET /rma`、cancel、return tracking（customerAuth） | **admin 侧 RMA 审批/驳回端点未见专门路由**——若客服需在后台处理 RMA，属后续技术任务；当前可经订单退款通道兜底 |
+| 售后 RMA | ✅ 顾客侧+后台已备 | 顾客 `POST/GET /rma`、cancel、return tracking（customerAuth）；**后台 `GET /shop/rmas`（status/orderId 过滤）、`POST /shop/rmas/:id/approve`、`POST /shop/rmas/:id/reject`（附原因，仅 pending）**（2026-11-05 补齐，`shop-rma-admin.test.ts` 3 例） | RMA 审批权限分配（谁可操作）为业务决策 |
 | 订单邮件补偿 | ✅ API 已备 | `GET /order-mails` / `drain` / `:id/retry`（P3-T17，`019d7ae`）：入队即快照币种、5 次退避→dead、人工重发 | SMTP 实际投递与 drain 定时调度仍未接生产配置（如实登记） |
 | 物流轨迹查询 | ✅ 已备 | `GET /track/:orderNo?accessToken=` 双要素防枚举（`6c55a9b`）；17track provider 可插拔+缓存降级 | 外部物流 API 密钥配置为上线项 |
 
@@ -32,11 +32,11 @@
 | 事件采集与幂等 | ✅ 已备 | `shop_analytics_events`（唯一 (tenantId,eventId)）、GA4 九事件 + refund 白名单、consent 门控（未授予仅落库 `skipped_no_consent`）、金额取订单快照校验（`b8a5b9c`，14 例单测） | 无 |
 | 前端→后端链路 | ✅ 已联调 | `shared/analytics/capi.ts` + BFF `track-event` 直通；端到端 8/8（合法 200/重放幂等/未知 400/purchase 校验 400）（`c57d26a`/`7831d41`） | 无 |
 | 订单归因 | ✅ 已备 | attribution first-touch 缓存、建单固化 sourceSiteId+UTM（`c57d26a`） | 无 |
-| **后台对账通道** | ⚠️ 缺口 | admin 仅有 `analytics/sales|profit|turnover` 销售分析 | **缺 `shop_analytics_events` 的 admin 查询/抽样导出端点**——对账操作前需补一个技术任务（查询 + 按 dispatchStatus 过滤）；属后续可执行项 |
+| **后台对账通道** | ✅ 已补齐 | **`GET /shop/analytics/events`（authMiddleware）**：eventName/dispatchStatus/orderId 过滤 + limit 钳制 1..500、createdAt 倒序（2026-11-05 补齐，`shop-analytics-reconcile.test.ts` 3 例） | 无 |
 | 抽样对账执行 | ⬜ 待业务 | — | 需真实 GA4 后台 vs 本地落库抽样比对（业务操作，依赖真实投放/流量环境） |
 
 ## 4. 结论与行动项
 
-- **技术侧可继续**：补 `shop_analytics_events` admin 对账查询端点（建议列为下一个技术任务）。
-- **业务侧待决策**：政策文本专业审核签字、退款/RMA 权限分配、admin 履约界面试用确认、真实环境抽样对账。
+- **技术缺口已全部闭合**（2026-11-05）：admin RMA 审批端点（approve/reject/list）与埋点对账查询端点（analytics/events）均已实现并有单测；后端全量 592 passed（63 文件）、server typecheck 0 错误。
+- **业务侧待决策**：政策文本专业审核签字、退款/RMA 审批权限分配、admin 履约界面试用确认、真实环境抽样对账（用 `GET /shop/analytics/events` 抽样比对 GA4 后台）。
 - G4 整体保持 `[ ]`，任一子项完成由业务方在计划文档回填，本清单不代勾。

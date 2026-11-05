@@ -329,3 +329,9 @@ export const createRefundSchema = z.object({
   currency: z.string().length(3).optional(),
 })
 export type CreateRefundInput = z.infer<typeof createRefundSchema>
+
+/** RMA 驳回（P4-T17 G4：客服履约） */
+export const rmaRejectSchema = z.object({
+  rejectReason: z.string().min(1, '驳回原因不能为空').max(255),
+})
+export type RmaRejectInput = z.infer<typeof rmaRejectSchema>

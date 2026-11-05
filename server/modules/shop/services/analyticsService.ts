@@ -1,5 +1,5 @@
 import { Op } from 'sequelize'
-import { ShopOrder, ShopOrderItem, ShopRateSnapshot, ShopSku, ShopSpu, ShopInventory, ShopInventoryLog } from '../models/index.js'
+import { ShopOrder, ShopOrderItem, ShopRateSnapshot, ShopSku, ShopSpu, ShopInventory, ShopInventoryLog, ShopAnalyticsEvent } from '../models/index.js'
 import type { AnalyticsQuery } from '../../../shared/schemas/shop.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
 
@@ -189,4 +189,19 @@ export async function inventoryTurnover(query: AnalyticsQuery) {
     return { skuId, outQty, avgStock, dailyOut: Number(dailyOut.toFixed(2)), turnoverDays }
   })
   return { periodDays, rows }
+}
+
+/** G4 埋点对账：按事件名/派发状态/订单抽样查询原始埋点事件（createdAt 倒序，limit 1..500 默认 100） */
+export async function listEventsForReconcile(q: {
+  eventName?: string
+  dispatchStatus?: string
+  orderId?: number
+  limit?: number
+}) {
+  const where: Record<string, unknown> = { tenantId: tid() }
+  if (q.eventName) where.eventName = q.eventName
+  if (q.dispatchStatus) where.dispatchStatus = q.dispatchStatus
+  if (q.orderId) where.orderId = q.orderId
+  const limit = Math.min(Math.max(q.limit ?? 100, 1), 500)
+  return ShopAnalyticsEvent.findAll({ where, order: [['createdAt', 'DESC'], ['id', 'DESC']], limit })
 }

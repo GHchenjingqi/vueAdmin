@@ -37,3 +37,20 @@ export const turnover = async (req: Request, res: Response, next: NextFunction) 
     next(err)
   }
 }
+
+/** G4 埋点对账：查询原始埋点事件（eventName/dispatchStatus/orderId 过滤，limit 1..500） */
+export const listEvents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({
+      code: 0,
+      data: await analyticsService.listEventsForReconcile({
+        eventName: queryStr(req.query.eventName),
+        dispatchStatus: queryStr(req.query.dispatchStatus),
+        orderId: queryInt(req.query.orderId),
+        limit: queryInt(req.query.limit),
+      }),
+    })
+  } catch (err) {
+    next(err)
+  }
+}

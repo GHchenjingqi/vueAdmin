@@ -34,6 +34,7 @@ import {
   updateCouponSchema,
   analyticsQuerySchema,
   createRefundSchema,
+  rmaRejectSchema,
 } from '../../../shared/schemas/shop.js'
 import * as categoryController from '../controllers/categoryController.js'
 import * as brandController from '../controllers/brandController.js'
@@ -52,6 +53,7 @@ import * as analyticsController from '../controllers/analyticsController.js'
 import * as currencyConfigController from '../controllers/currencyConfigController.js'
 import * as refundController from '../controllers/refundController.js'
 import * as orderMailController from '../controllers/orderMailController.js'
+import * as rmaAdminController from '../controllers/rmaAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
 import { updateCurrencySchema, rollbackCurrencySchema } from '../../../shared/schemas/storefront-commerce.js'
 
@@ -172,6 +174,11 @@ router.get('/order-mails', authMiddleware, orderMailController.list)
 router.post('/order-mails/drain', authMiddleware, orderMailController.drain)
 router.post('/order-mails/:id/retry', authMiddleware, validate(idParamSchema, 'params'), orderMailController.retry)
 
+// ==================== 售后 RMA 审批（P4-T17 G4：客服履约可执行） ====================
+router.get('/rmas', authMiddleware, rmaAdminController.list)
+router.post('/rmas/:id/approve', authMiddleware, validate(idParamSchema, 'params'), rmaAdminController.approve)
+router.post('/rmas/:id/reject', authMiddleware, validate(idParamSchema, 'params'), validate(rmaRejectSchema, 'body'), rmaAdminController.reject)
+
 // ==================== 阶段 4：营销中心 ====================
 router.get('/promotions', authMiddleware, validate(shopPaginationSchema, 'query'), marketingController.listPromotions)
 router.get('/promotions/:id', authMiddleware, validate(idParamSchema, 'params'), marketingController.getPromotion)
@@ -189,6 +196,8 @@ router.delete('/coupons/:id', authMiddleware, validate(idParamSchema, 'params'),
 router.get('/analytics/sales', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.sales)
 router.get('/analytics/profit', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.profit)
 router.get('/analytics/turnover', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.turnover)
+// G4 埋点对账：原始事件抽样查询（P4-T17 / docs/reports/g4-gate-checklist.md §3）
+router.get('/analytics/events', authMiddleware, analyticsController.listEvents)
 
 // ==================== 商城设置：币种配置治理（P0-T05b / P5-T02 / X-T03） ====================
 // 二次确认（confirmImpact + ackNoConversion）、审计 config_changes、定时生效与回滚；
