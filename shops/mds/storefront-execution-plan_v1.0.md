@@ -283,13 +283,13 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P4-T01 | 账户中心：注册/登录/登出、会话撤销 | `domains/customer/**` | 顾客 JWT 与管理员权限体系完全隔离；支持强制下线 | G3, P0-T10 | 3 [x] ✅ 2026-11-05 · 证据：账户中心前端（shops/pages/account + shared/customer/auth）+ 真实 E2E（register/login/me 200，Bearer 透传，登出本地清理）；后端步骤3（e389210）
+| P4-T01 | 账户中心：注册/登录/登出、会话撤销 | `domains/customer/**` | 顾客 JWT 与管理员权限体系完全隔离；支持强制下线 | G3, P0-T10 | 3 [x] ✅ 2026-11-05 · 证据：账户中心前端（shops/pages/account + shared/customer/auth）+ 真实 E2E（register/login/me 200，Bearer 透传，登出本地清理）；后端步骤3（e389210） |
 | P4-T02 | 地址簿（新增/编辑/默认/删除） | 地址 API + UI | 顾客只能操作自己的地址；删除默认地址有兜底 | P4-T01 | 2 | [ ] |
 | P4-T03 | 顾客订单列表与详情 | `pages/account/orders/**` | 仅展示本人订单；金额按订单快照币种展示；分页与空态完整 | P4-T01, P3-T16 | 2 | [ ] |
-| P4-T04 | 物流跟踪（Provider 适配，防信息泄露） | `GET /orders/:id/tracking` | 不可凭可猜测订单号获取物流信息 | P4-T03 | 2 [x] ✅ 2026-11-05 · 证据：/track 轨迹页（c57d26a）+ BFF 直通 + 防枚举实测（错误 accessToken → 404）；后端 17track 适配（6c55a9b）
-| P4-T05 | 退货政策模型（后台可配置）+ 服务端资格判断 | `ReturnPolicy` + `POST /orders/:id/returns` | 政策含市场/类目/时间窗口/状态要求/运费承担/版本快照；前端只展示摘要 | P0-T11, P4-T03 | 4 [x] ✅ 2026-11-05 · 证据：RMA 端到端实测——未支付 400/未履约 400/非本人 403 均有明确原因；退款服务端重算 refundAmountCents=12990 + refundCurrency=USD（原订单快照）；后端步骤5（29ce004/9903b62）
-| P4-T06 | 退货申请入口与状态展示 | `pages/account/returns/**` | 超期/不符合条件有明确拒绝原因；退款走独立状态流程，退款币种取原订单 | P4-T05 | 2 [x] ✅ 2026-11-05 · 证据：shops/pages/account/rma.vue（提交/列表/空态）+ 真实 E2E（pending 申请 id=25 落库并列表回读）
-| P4-T07 | 评价展示与审核流程 | `domains/.../reviews/**` | 仅展示已审核评价；订单验证标记正确；不写入未审核结构化数据 | P4-T03 | 3 [x] ✅ 2026-11-05 · 证据：ProductReviews.vue（approved 列表 + 提交进 pending 审核）；后端 review 路由（29ce004）仅返回 approved；JSON-LD 未写入未审核评价
+| P4-T04 | 物流跟踪（Provider 适配，防信息泄露） | `GET /orders/:id/tracking` | 不可凭可猜测订单号获取物流信息 | P4-T03 | 2 [x] ✅ 2026-11-05 · 证据：/track 轨迹页（c57d26a）+ BFF 直通 + 防枚举实测（错误 accessToken → 404）；后端 17track 适配（6c55a9b） |
+| P4-T05 | 退货政策模型（后台可配置）+ 服务端资格判断 | `ReturnPolicy` + `POST /orders/:id/returns` | 政策含市场/类目/时间窗口/状态要求/运费承担/版本快照；前端只展示摘要 | P0-T11, P4-T03 | 4 [x] ✅ 2026-11-05 · 证据：RMA 端到端实测——未支付 400/未履约 400/非本人 403 均有明确原因；退款服务端重算 refundAmountCents=12990 + refundCurrency=USD（原订单快照）；后端步骤5（29ce004/9903b62） |
+| P4-T06 | 退货申请入口与状态展示 | `pages/account/returns/**` | 超期/不符合条件有明确拒绝原因；退款走独立状态流程，退款币种取原订单 | P4-T05 | 2 [x] ✅ 2026-11-05 · 证据：shops/pages/account/rma.vue（提交/列表/空态）+ 真实 E2E（pending 申请 id=25 落库并列表回读） |
+| P4-T07 | 评价展示与审核流程 | `domains/.../reviews/**` | 仅展示已审核评价；订单验证标记正确；不写入未审核结构化数据 | P4-T03 | 3 [x] ✅ 2026-11-05 · 证据：ProductReviews.vue（approved 列表 + 提交进 pending 审核）；后端 review 路由（29ce004）仅返回 approved；JSON-LD 未写入未审核评价 |
 | P4-T08 | 评价图片上传安全（MIME/大小/分辨率/扫描） | 上传服务 | 非图片文件被拒；超限被拒；存储路径不可遍历 | P4-T07 | 2 | [ ] |
 | P4-T09 | 邮件订阅与欢迎邮件 | 订阅 API + 模板 | 双重确认或明确同意记录；退订可用 | P4-T01 | 2 | [x] ✅ 2026-11-05 · 证据：页脚订阅组件（显式同意勾选）+ BFF 接线真实 /newsletter/subscribe（200 subscribed+token）+ 退订落地页 /newsletter/unsubscribe；欢迎邮件由后台 mailer（步骤5） |
 | P4-T10 | GA4 与事件字典落地（九个事件，金额带 currency 参数） | 埋点模块 + 事件字典文档 | 九个事件参数齐全；`purchase`/`refund` 以服务端事实为准且 currency 取订单快照 | G3, P3-T13 | 3 | [x] ✅ 2026-11-05 · 证据：docs/ANALYTICS_EVENTS.md 九事件字典 + shared/analytics/{events,ecommerce}.ts；purchase 由服务端 captured 事实触发；**服务端 CAPI 已闭环**（步骤 6 `b8a5b9c`：事件白名单含 refund、purchase/refund 金额币种强制取订单快照并校验支付/退款态），`b8a5b9c..c57d26a` 前端接 `POST /track-event`；仅 GA4 Measurement ID 属部署环境配置，非代码待办 |
