@@ -44,6 +44,16 @@ class ShopOrder extends Model<InferAttributes<ShopOrder>, InferCreationAttribute
   declare closedAt: Date | null
   declare cancelledReason: string | null
 
+  // —— 阶段 5 步骤 6：订单来源（site / utm 归因）——
+  declare sourceSiteId: number | null
+  declare utmSource: string | null
+  declare utmMedium: string | null
+  declare utmCampaign: string | null
+  declare utmTerm: string | null
+  declare utmContent: string | null
+  declare landingPage: string | null
+  declare referrer: string | null
+
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
 }
@@ -88,6 +98,16 @@ ShopOrder.init(
     paidAt: { type: DataTypes.DATE, allowNull: true },
     closedAt: { type: DataTypes.DATE, allowNull: true },
     cancelledReason: { type: DataTypes.STRING(255), allowNull: true },
+
+    // —— 阶段 5 步骤 6：订单来源（site / utm 归因）——
+    sourceSiteId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, comment: '来源站点ID' },
+    utmSource: { type: DataTypes.STRING(120), allowNull: true, comment: 'UTM source' },
+    utmMedium: { type: DataTypes.STRING(120), allowNull: true, comment: 'UTM medium' },
+    utmCampaign: { type: DataTypes.STRING(200), allowNull: true, comment: 'UTM campaign' },
+    utmTerm: { type: DataTypes.STRING(200), allowNull: true, comment: 'UTM term' },
+    utmContent: { type: DataTypes.STRING(200), allowNull: true, comment: 'UTM content' },
+    landingPage: { type: DataTypes.STRING(512), allowNull: true, comment: '首次落地页' },
+    referrer: { type: DataTypes.STRING(512), allowNull: true, comment: '来源 referrer' },
 
     createdAt: { type: DataTypes.DATE, allowNull: false },
     updatedAt: { type: DataTypes.DATE, allowNull: false },

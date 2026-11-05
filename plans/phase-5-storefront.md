@@ -19,7 +19,7 @@
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | ✅ 已完成 |
 | 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | ✅ 已完成（7 域全数落地：newsletter+restock / 评价+问答 / CMS / RMA / 17track） |
-| 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 🟡 进行中 |
+| 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | ✅ 已完成 |
 | 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | ✅ 已由并行方建成（`shops/`，不纳入后端提交树） |
 
 ---
@@ -278,6 +278,39 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 ### 5.18 验证
 - `npm run typecheck` 通过；`vitest run` 全量 **448 用例通过**（新增 `storefront-tracking.test.ts` 6 例：双要素防枚举/空凭证 404、跨租户隔离、缓存写入+幂等、provider 过期拉取刷新、未过期不重复拉取、provider 异常降级、无缓存拉取成功落库）；
 - 提交一并纳入迁移 `000057`（已 apply 到 DB）。
+
+---
+
+## 第 6 步：服务端 CAPI 埋点 + 订单来源（site / utm）
+
+> 对齐 `docs/ANALYTICS_EVENTS.md`（GA4 九事件 + 服务端侧 refund）与设计文档 §4.12 / §5。
+> 全程复用 shop 模型层，storefront 仅做薄编排；服务端事件落库供后台抽样对账（G4）。
+
+### 6.1 模型与迁移
+- 迁移 `000058`：
+  - `orders` 增补归因列 `sourceSiteId / utmSource / utmMedium / utmCampaign / utmTerm / utmContent / landingPage / referrer`（全部可空，存量订单不受影响）+ 索引 `(tenantId, utmSource, utmCampaign)`；
+  - 新建 `shop_analytics_events`：`tenantId / siteId / eventId / eventName / consentAnalytics / customerId / sessionId / orderId / transactionId / currency / valueCents(BIGINT) / params(JSON) / dispatchStatus / dispatchedAt / 时间戳`；唯一索引 `(tenantId, eventId)` 幂等、索引 `(tenantId, siteId, eventName, createdAt)` 供报表。
+- 模型层注册 `ShopAnalyticsEvent`（class + `declare`）；扩展 `ShopOrder` 归因列。`models/index.ts` 注册。已 apply 到 DB。
+
+### 6.2 埋点服务（`storefront/services/analyticsService.ts`）
+- **事件白名单**：GA4 九事件 + 服务端侧 `refund`；未知事件 / 空 eventId → 400。
+- **幂等**：`(tenantId, eventId)` 唯一，重复上报只落一行、不重复派发；并发撞唯一约束按已受理处理。
+- **同意门控（P4-T11）**：`consent.analytics !== true` → 仅落库 `skipped_no_consent`，**绝不外发**；同意撤回后新事件同样不外发。
+- **服务端事实**：`purchase` / `refund` 金额与币种一律取**订单快照**（忽略前端伪造 value/currency），且校验订单确为已支付 / 退款态，否则 400（防伪造转化）。浏览类事件前端 GA4 已发，服务端只落库 `local_only`，不重复外发。
+- **可插拔 CAPI provider**：`setCapiProvider(fn)` 注入 Meta / Google sender；默认 null（仅落库，测试零外网依赖）；派发成功 `sent`、异常隔离为 `failed`，绝不把第三方故障抛给 C 端。
+- `countEvents(site, eventName)` 供后台抽样对账。
+
+### 6.3 订单来源接线
+- `createOrderSchema` 新增可选 `attribution`（UTM 五参数 + landingPage + referrer）；
+- `checkoutController` 透传 → `checkoutService.createOrder` 随订单固化 `sourceSiteId = site.shopId` 与 UTM 字段；未传则来源列为 null（游客 / 存量下单不受影响）。
+
+### 6.4 公开路由（免 admin 鉴权，走 siteContext）
+- `POST /api/storefront/v1/track-event` —— 上报埋点事件
+
+### 6.5 验证
+- `npm run typecheck` 通过（同款 `Op.or` 为 `unique symbol`，用 `Record<string | symbol, unknown>` 索引签名处理）；
+- `vitest run` 全量 **462 用例通过**（新增 `storefront-analytics.test.ts` 14 例：白名单 400 / eventId 幂等不重复派发 / 空 eventId 400、同意门控不外发、已同意 sent 且金额币种取订单快照、provider 异常 failed 隔离、无 provider local_only、purchase 未支付 400 / 缺 transaction_id 400、refund 需退款态、浏览类 local_only、跨租户隔离、建单归因落库 + 未传为 null）；
+- 提交一并纳入迁移 `000058`（已 apply 到 DB）。
 
 ---
 

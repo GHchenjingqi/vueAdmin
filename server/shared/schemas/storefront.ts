@@ -105,7 +105,20 @@ export const quoteSchema = z
   })
   .passthrough()
 
-/** POST /orders —— 建单（幂等键 + 快照 + 库存预占） */
+/** 订单来源归因（site / utm），随建单固化进订单快照 */
+export const orderAttributionSchema = z.object({
+  utmSource: z.string().max(120).optional(),
+  utmMedium: z.string().max(120).optional(),
+  utmCampaign: z.string().max(200).optional(),
+  utmTerm: z.string().max(200).optional(),
+  utmContent: z.string().max(200).optional(),
+  landingPage: z.string().max(512).optional(),
+  referrer: z.string().max(512).optional(),
+})
+
+export type OrderAttribution = z.infer<typeof orderAttributionSchema>
+
+/** POST /orders —— 建单（幂等键 + 快照 + 库存预占 + 来源归因） */
 export const createOrderSchema = z
   .object({
     idempotencyKey: z.string().min(1).max(64).optional(),
@@ -115,6 +128,7 @@ export const createOrderSchema = z
     cartToken: z.string().min(1).max(64).optional(),
     items: z.array(cartLineInput).max(100).optional(),
     customerId: z.number().int().positive().optional(),
+    attribution: orderAttributionSchema.optional(),
   })
   .passthrough()
 
@@ -291,3 +305,23 @@ export const trackOrderQuerySchema = z
 
 export type TrackOrderParamInput = z.infer<typeof trackOrderParamSchema>
 export type TrackOrderQueryInput = z.infer<typeof trackOrderQuerySchema>
+
+// ————————————————————————————————————————————————
+// 阶段 5 步骤 6：服务端 CAPI 埋点（事件幂等 + 同意门控 + 服务端事实校准）
+// ————————————————————————————————————————————————
+
+/** POST /track-event —— 上报一个埋点事件（params 为开放字典，容纳各事件参数） */
+export const trackEventSchema = z
+  .object({
+    eventId: z.string().min(1).max(64, 'eventId 最长 64 字符'),
+    eventName: z.string().min(1).max(40),
+    consent: z
+      .object({ analytics: z.boolean().optional() })
+      .passthrough()
+      .optional(),
+    sessionId: z.string().max(64).optional(),
+    params: z.record(z.unknown()).optional(),
+  })
+  .passthrough()
+
+export type TrackEventInputSchema = z.infer<typeof trackEventSchema>

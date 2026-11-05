@@ -33,6 +33,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       cartToken: body.cartToken,
       items: body.items as { skuId: number; qty: number }[] | undefined,
       customerId,
+      attribution: body.attribution,
     })
     res.json({ code: 0, data })
   } catch (err) {

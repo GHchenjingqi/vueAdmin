@@ -18,6 +18,7 @@ import reviewRouter from './review.js'
 import cmsRouter from './cms.js'
 import rmaRouter from './rma.js'
 import trackingRouter from './tracking.js'
+import analyticsRouter from './analytics.js'
 
 /**
  * Storefront 公开接口路由
@@ -49,5 +50,6 @@ router.use('/', reviewRouter)
 router.use('/', cmsRouter)
 router.use('/rma', rmaRouter)
 router.use('/', trackingRouter)
+router.use('/', analyticsRouter)
 
 export default router

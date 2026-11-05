@@ -4,6 +4,7 @@ import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderItem } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
 import { createQuote, type QuoteResult } from './quoteService.js'
+import type { OrderAttribution } from '../../../shared/schemas/storefront.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
 /**
@@ -36,6 +37,8 @@ export interface CreateOrderParams {
   cartToken?: string
   items?: { skuId: number; qty: number }[]
   customerId?: number
+  /** 订单来源归因（site / utm），建单时固化进订单快照 */
+  attribution?: OrderAttribution
 }
 
 export interface OrderItemView {
@@ -159,6 +162,15 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
       shippingCents: quote.shippingCents,
       generatedAt: new Date().toISOString(),
     } as Record<string, unknown>,
+    // 阶段 5 步骤 6：订单来源归因（site / utm），随订单固化，后台报表据此出渠道 ROI
+    sourceSiteId: site.shopId ?? null,
+    utmSource: params.attribution?.utmSource ?? null,
+    utmMedium: params.attribution?.utmMedium ?? null,
+    utmCampaign: params.attribution?.utmCampaign ?? null,
+    utmTerm: params.attribution?.utmTerm ?? null,
+    utmContent: params.attribution?.utmContent ?? null,
+    landingPage: params.attribution?.landingPage ?? null,
+    referrer: params.attribution?.referrer ?? null,
     tenantId: tId,
   } as never)
 

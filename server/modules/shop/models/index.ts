@@ -55,3 +55,6 @@ export { default as ShopRmaRequest } from './ShopRmaRequest.js'
 
 // 阶段 5 步骤 5（第五切片）：物流轨迹缓存（复用 shop 模型层，不建第二套后端）
 export { default as ShopTrackingEvent } from './ShopTrackingEvent.js'
+
+// 阶段 5 步骤 6：服务端 CAPI 埋点事件（复用 shop 模型层，不建第二套后端）
+export { default as ShopAnalyticsEvent } from './ShopAnalyticsEvent.js'
