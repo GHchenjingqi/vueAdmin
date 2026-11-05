@@ -157,3 +157,56 @@ export const restockSubscribeSchema = z.object({
 export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>
 export type NewsletterUnsubscribeInput = z.infer<typeof newsletterUnsubscribeSchema>
 export type RestockSubscribeInput = z.infer<typeof restockSubscribeSchema>
+
+// ————————————————————————————————————————————————
+// 阶段 5 步骤 5（第二切片）：商品评价 + 问答（公开接口）
+// ————————————————————————————————————————————————
+
+/** GET /reviews?spuId=&page=&pageSize= —— 公开评价列表（仅 approved + 评分汇总） */
+export const reviewListQuerySchema = z
+  .object({
+    spuId: z.coerce.number().int().positive('spuId 必须为正整数'),
+    page: optionalQueryInt(),
+    pageSize: optionalQueryInt(60),
+  })
+  .passthrough()
+
+/** POST /reviews —— 提交评价（游客/登录顾客，进入 pending 审核态） */
+export const reviewSubmitSchema = z.object({
+  spuId: z.number().int().positive('spuId 必须为正整数'),
+  skuId: z.number().int().positive().optional(),
+  rating: z.number().int().min(1).max(5, '评分必须为 1-5'),
+  title: z.string().max(120).optional(),
+  content: z.string().min(1).max(2000),
+  images: z.array(z.string().url()).max(9).optional(),
+  isAnonymous: z.boolean().optional(),
+  orderId: z.number().int().positive().optional(),
+  locale: z.string().max(10).optional(),
+})
+
+/** POST /reviews/:id/helpful —— 标记有用 */
+export const reviewHelpfulParamSchema = z
+  .object({
+    id: z.coerce.number().int().positive(),
+  })
+  .passthrough()
+
+/** GET /qa?spuId= —— 公开问答列表（仅 answered） */
+export const qaListQuerySchema = z
+  .object({
+    spuId: z.coerce.number().int().positive('spuId 必须为正整数'),
+  })
+  .passthrough()
+
+/** POST /qa —— 提交问题（进入 pending 待回答） */
+export const qaSubmitSchema = z.object({
+  spuId: z.number().int().positive('spuId 必须为正整数'),
+  skuId: z.number().int().positive().optional(),
+  question: z.string().min(1).max(1000),
+  locale: z.string().max(10).optional(),
+})
+
+export type ReviewListQueryInput = z.infer<typeof reviewListQuerySchema>
+export type ReviewSubmitInput = z.infer<typeof reviewSubmitSchema>
+export type QaListQueryInput = z.infer<typeof qaListQuerySchema>
+export type QaSubmitInput = z.infer<typeof qaSubmitSchema>

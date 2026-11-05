@@ -42,3 +42,7 @@ export { default as ShopOrderPayment } from './ShopOrderPayment.js'
 // 阶段 5 步骤 5：邮件订阅 + 到货提醒（复用 shop 模型层，不建第二套后端）
 export { default as ShopNewsletter } from './ShopNewsletter.js'
 export { default as ShopRestockSubscription } from './ShopRestockSubscription.js'
+
+// 阶段 5 步骤 5（第二切片）：商品评价 + 问答（复用 shop 模型层，不建第二套后端）
+export { default as ShopReview } from './ShopReview.js'
+export { default as ShopProductQA } from './ShopProductQA.js'

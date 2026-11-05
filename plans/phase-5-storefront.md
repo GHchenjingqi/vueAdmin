@@ -18,7 +18,7 @@
 | 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | ✅ 已完成 |
-| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify 已完成，其余域待续） |
+| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify + 评价 + 问答 已完成，RMA / CMS / 17track 待续） |
 | 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 后续 |
 | 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | 后续 |
 
@@ -177,6 +177,40 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 - `npm run typecheck` 通过；
 - `vitest run` 全量 **414 用例通过**（新增 `storefront-subscription.test.ts` 7 例：邮件订阅/重复幂等/退订/重订/无效令牌 404、到货订阅/未知 SKU 404/库存补货触发钩子标记 notified + 去重）；
 - 提交一并纳入迁移 `000051` / `000052`（已 apply 到 DB）。
+
+---
+
+## 第 5 步（第二切片）：评价 + 问答（步骤 5 第二个自包含域）
+
+> 步骤 5 共 7 个独立域。继 newsletter + restock-notify 之后，本切片落地**商品评价 + 问答**；
+> 其余域（RMA / CMS / 17track）留作后续。全程复用 shop 模型与服务层（不建第二套后端），storefront 仅做薄编排层。
+
+### 5.6 模型与迁移
+- 迁移 `000053` `shop_reviews`：`tenantId / spuId / skuId(可空) / customerId(可空) / orderId(可空) / rating(TINYINT 1-5) / title / content / images(JSON) / status(pending|approved|rejected) / verified / isAnonymous / helpfulCount / locale`；
+- 迁移 `000054` `shop_product_qa`：`tenantId / spuId / skuId(可空) / customerId(可空) / question / answer(可空) / answeredBy / answeredAt / status(pending|answered|hidden) / locale`；
+- 模型层 `server/modules/shop/models/` 注册 `ShopReview` / `ShopProductQA`（含 `createdAt/updatedAt`，复用 shop 模型层）。均已 apply 到 DB。
+
+### 5.7 评价服务（`storefront/services/reviewService.ts`）
+- `submitReview`：校验 SPU 存在（404）、SKU 归属该 SPU（404）、评分 1-5（service 兜底 400）；提交即 `pending`，登录顾客自动填 `customerId`；
+- **已购验证**：仅当传入 `orderId` 且已登录时，以顾客 `email` 匹配 `orders.email` 且订单含该 `skuId`、状态为已支付及以上（`paid/fulfilled/shipped/done`）→ `verified=true`；（`ShopOrder` 无 `customerId` 列，故以 email 关联买家）；
+- `listReviews`：仅 `approved` 可见，附评分汇总（平均 / 各星级分布 / 总数）；批量取顾客昵称供展示，匿名折叠为「匿名用户」；
+- `markHelpful`：仅对公开评价自增 `helpfulCount`（不存在 / 未公开 404），防越权投票。
+
+### 5.8 问答服务
+- `submitQuestion`：校验 SPU/SKU 存在 → `pending`（回答由后台 / admin 填充，本步仅建表 + 公开读取 `answered`）；
+- `listQuestions`：仅 `answered` 可见。
+
+### 5.9 公开路由（免 admin 鉴权，走 siteContext）
+- `GET /api/storefront/v1/reviews?spuId=&page=&pageSize=`
+- `POST /api/storefront/v1/reviews`
+- `POST /api/storefront/v1/reviews/:id/helpful`
+- `GET /api/storefront/v1/qa?spuId=`
+- `POST /api/storefront/v1/qa`
+
+### 5.10 验证
+- `npm run typecheck` 通过；
+- `vitest run` 全量 **428 用例通过**（新增 `storefront-review.test.ts` 14 例：游客/登录提交、SPU 不存在 404、SKU 归属 404、评分越界 400、列表仅 approved + 汇总、pending 不计入、markHelpful 自增 / 越权 404、问答提交 / 列表仅 answered、已购验证 命中 / email 不符 / 未支付 三种场景）。
+- 提交一并纳入迁移 `000053` / `000054`（已 apply 到 DB）。
 
 ---
 

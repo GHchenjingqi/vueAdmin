@@ -13,6 +13,7 @@ import cartRouter from './cart.js'
 import checkoutRouter from './checkout.js'
 import paymentRouter from './payment.js'
 import subscriptionRouter from './subscription.js'
+import reviewRouter from './review.js'
 
 /**
  * Storefront 公开接口路由
@@ -37,5 +38,6 @@ router.use('/cart', cartRouter)
 router.use('/checkout', checkoutRouter)
 router.use('/payments', paymentRouter)
 router.use('/', subscriptionRouter)
+router.use('/', reviewRouter)
 
 export default router
