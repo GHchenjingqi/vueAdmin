@@ -61,3 +61,6 @@ export { default as ShopAnalyticsEvent } from './ShopAnalyticsEvent.js'
 
 // T-07 优惠券占用流水（复用 shop 模型层，不建第二套后端）
 export { default as ShopCouponRedemption } from './ShopCouponRedemption.js'
+
+// T-09 订单退款流水（复用 shop 模型层，不建第二套后端）
+export { default as ShopOrderRefund } from './ShopOrderRefund.js'

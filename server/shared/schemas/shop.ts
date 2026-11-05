@@ -319,3 +319,13 @@ export const analyticsQuerySchema = z.object({
   channelId: z.number().int().min(1).optional(),
 })
 export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>
+
+/** T-09：创建订单退款（金额单位分；省略 amountCents 表示退剩余全部） */
+export const createRefundSchema = z.object({
+  amountCents: z.number().int().positive('退款金额须为正整数分').optional(),
+  reason: z.string().max(255).optional(),
+  idempotencyKey: z.string().min(1).max(64).optional(),
+  /** 仅用于校验；与订单快照不符直接拒绝，不参与落库 */
+  currency: z.string().length(3).optional(),
+})
+export type CreateRefundInput = z.infer<typeof createRefundSchema>

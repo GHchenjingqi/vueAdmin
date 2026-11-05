@@ -32,6 +32,7 @@ import {
   createCouponSchema,
   updateCouponSchema,
   analyticsQuerySchema,
+  createRefundSchema,
 } from '../../../shared/schemas/shop.js'
 import * as categoryController from '../controllers/categoryController.js'
 import * as brandController from '../controllers/brandController.js'
@@ -48,6 +49,7 @@ import * as orderController from '../controllers/orderController.js'
 import * as marketingController from '../controllers/marketingController.js'
 import * as analyticsController from '../controllers/analyticsController.js'
 import * as currencyConfigController from '../controllers/currencyConfigController.js'
+import * as refundController from '../controllers/refundController.js'
 import { updateCurrencySchema, rollbackCurrencySchema } from '../../../shared/schemas/storefront-commerce.js'
 
 /**
@@ -158,6 +160,9 @@ router.post('/orders', authMiddleware, validate(createOrderSchema), orderControl
 router.post('/orders/:id/pay', authMiddleware, validate(idParamSchema, 'params'), orderController.markPaid)
 router.post('/orders/:id/ship', authMiddleware, validate(idParamSchema, 'params'), validate(shipOrderSchema), orderController.ship)
 router.post('/orders/:id/cancel', authMiddleware, validate(idParamSchema, 'params'), orderController.cancel)
+// T-09：退款（薄层复用 shop 订单快照，金额/币种由服务端决定）
+router.get('/orders/:id/refunds', authMiddleware, validate(idParamSchema, 'params'), refundController.list)
+router.post('/orders/:id/refunds', authMiddleware, validate(idParamSchema, 'params'), validate(createRefundSchema), refundController.create)
 
 // ==================== 阶段 4：营销中心 ====================
 router.get('/promotions', authMiddleware, validate(shopPaginationSchema, 'query'), marketingController.listPromotions)
