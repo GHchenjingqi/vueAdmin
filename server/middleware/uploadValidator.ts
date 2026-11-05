@@ -162,6 +162,117 @@ export function validateUploadFiles(req: {
   }
 }
 
+// ————————————————————————————————————————————————
+// 评价图片专用安全校验（P4-T08）
+// ————————————————————————————————————————————————
+
+/** 图片允许的最大边长（像素），超过即拒绝，防止超大分辨率图片耗尽资源 */
+export const MAX_IMAGE_DIMENSION = 8000
+
+/** 允许作为评价图片的扩展名（与 uploadValidator 图片白名单一致） */
+export const REVIEW_IMAGE_EXTENSIONS = ALLOWED.image.extensions
+
+/**
+ * 读取图片真实尺寸（无需第三方库）：支持 PNG / JPEG / WebP。
+ * 不支持的格式返回 null（交由魔数校验兜底，不阻断上传）。
+ */
+export function readImageDimensions(buf: Buffer): { width: number; height: number } | null {
+  const head = buf.subarray(0, 32)
+  const sig = head.toString('hex')
+
+  // PNG：IHDR 在偏移 16，宽/高各 4 字节大端
+  if (sig.startsWith('89504e470d0a1a0a')) {
+    if (buf.length < 24) return null
+    const width = buf.readUInt32BE(16)
+    const height = buf.readUInt32BE(20)
+    return { width, height }
+  }
+
+  // JPEG：FFD8FF 起始，扫描 SOF 标记读取宽高
+  if (sig.startsWith('ffd8ff')) {
+    let i = 2
+    while (i + 9 < buf.length) {
+      if (buf[i] !== 0xff) {
+        i++
+        continue
+      }
+      const marker = buf[i + 1]
+      // SOF0..SOF3, SOF5..SOF7, SOF9..SOF11（排除 DHT=0xC4, 0xC8, 0xCC）
+      const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
+      if (isSof) {
+        const height = buf.readUInt16BE(i + 5)
+        const width = buf.readUInt16BE(i + 7)
+        return { width, height }
+      }
+      const len = buf.readUInt16BE(i + 2)
+      i += 2 + len
+    }
+    return null
+  }
+
+  // WebP：RIFF....WEBP，按分块解析 VP8 / VP8L / VP8X
+  if (sig.startsWith('52494646') && sig.slice(16) === '57454250') {
+    const fourcc = buf.subarray(12, 16).toString('ascii')
+    if (fourcc === 'VP8X') {
+      const width = 1 + ((buf[20] | (buf[21] << 8) | (buf[22] << 16)) & 0xffffff)
+      const height = 1 + ((buf[23] | (buf[24] << 8) | (buf[25] << 16)) & 0xffffff)
+      return { width, height }
+    }
+    if (fourcc === 'VP8 ') {
+      if (buf.length < 30) return null
+      const width = (buf[26] | (buf[27] << 8)) & 0x3fff
+      const height = (buf[28] | (buf[29] << 8)) & 0x3fff
+      return { width, height }
+    }
+    if (fourcc === 'VP8L') {
+      if (buf.length < 25) return null
+      const width = ((buf[21] & 0x3f) << 12) | (buf[20] << 4) | (buf[19] >> 4)
+      const height = ((buf[23] & 0x0f) << 10) | (buf[22] << 2) | (buf[21] >> 6)
+      return { width: width + 1, height: height + 1 }
+    }
+  }
+
+  return null
+}
+
+/**
+ * 评价图片校验：仅允许图片类型、大小与图片一致、魔数校验防伪装、
+ * 分辨率不超过上限。任一文件不合法时清理已写入文件并抛出。
+ */
+export function validateReviewImages(req: {
+  file?: { originalname: string; size: number; path: string } | null
+  files?: Array<{ originalname: string; size: number; path: string }> | null
+}): void {
+  const files = req.files?.length ? req.files : req.file ? [req.file] : []
+
+  if (files.length === 0) throw new AppError(400, '请至少上传一张评价图片')
+
+  try {
+    for (const f of files) {
+      const ext = extname(f.originalname).toLowerCase()
+      if (!REVIEW_IMAGE_EXTENSIONS.includes(ext)) {
+        throw new AppError(400, `评价仅支持图片文件，不支持 ${ext || '(无扩展名)'}`)
+      }
+      if (f.size > ALLOWED.image.maxSize) {
+        throw new AppError(400, `图片大小不能超过 ${formatSize(ALLOWED.image.maxSize)}，当前 ${formatSize(f.size)}`)
+      }
+      if (existsSync(f.path)) {
+        const header = readFileHeader(f.path, 32)
+        if (!checkImageMagicBytes(ext, header.subarray(0, 16))) {
+          throw new AppError(400, '文件内容与扩展名不匹配，可能不是合法的图片文件')
+        }
+        const dim = readImageDimensions(header)
+        if (dim && (dim.width > MAX_IMAGE_DIMENSION || dim.height > MAX_IMAGE_DIMENSION)) {
+          throw new AppError(400, `图片分辨率过高（${dim.width}×${dim.height}），上限 ${MAX_IMAGE_DIMENSION}px`)
+        }
+      }
+    }
+  } catch (err) {
+    cleanupFiles(files)
+    throw err
+  }
+}
+
 /**
  * Express 中间件形态（适用于把 multer 前置到路由层时使用）。
  * 若保留控制器内调用 multer 的现状，请直接用 validateUploadFiles(req)。

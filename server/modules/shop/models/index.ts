@@ -64,6 +64,8 @@ export { default as ShopCouponRedemption } from './ShopCouponRedemption.js'
 
 // T-09 订单退款流水（复用 shop 模型层，不建第二套后端）
 export { default as ShopOrderRefund } from './ShopOrderRefund.js'
+// P3-T06 税率规则表
+export { default as ShopTaxRate } from './ShopTaxRate.js'
 
 // P3-T17 订单邮件 outbox（确认 / 发货 / 退款）
 export { default as ShopOrderEmail } from './ShopOrderEmail.js'

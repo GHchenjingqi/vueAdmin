@@ -2,9 +2,9 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopSku, ShopSpu, ShopProductPrice } from '../../shop/models/index.js'
 import * as inventoryService from '../../shop/services/inventoryService.js'
-import config from '../../../config/index.js'
 import { resolveShipping } from './shippingService.js'
 import { evaluateCoupon } from './couponService.js'
+import { resolveTax } from './taxService.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
 /**
@@ -15,7 +15,7 @@ import type { StorefrontSite } from '../middleware/siteContext.js'
  * - 购物车币种与配置不一致 → 抛 CURRENCY_CHANGED，要求前端重建报价；
  * - 逐项校验可售 + 可用库存，不足直接拒绝；
  * - 运费：提供收货地址时按 settings.shop.shipping 白名单校验并按分区计费（T-08 / P3-T05）；
- *   未提供地址时沿用 config.checkout.shippingCents 的既有行为；税费仍为占位规则（P3-T06）；
+ * - 税费：提供目的国时按 P3-T06 可插拔 TaxProvider 计算，目的国无配置税率则阻断报价（fail-closed）。
  * - 返回版本号 + 过期时间，供建单时校验报价新鲜度。
  */
 
@@ -40,6 +40,8 @@ export interface QuoteResult {
   subtotalCents: number
   shippingCents: number
   taxCents: number
+  /** 实际适用税率（0..1），未计税费时为 0 */
+  taxRate: number
   discountCents: number
   /** T-07：服务端校验通过的券码 / 券 ID（供建单占用，未用券为 null） */
   couponCode: string | null
@@ -131,8 +133,18 @@ export async function createQuote(
 
   // 运费：地址驱动的白名单校验 + 分区计费（服务端重算，忽略前端传入运费）
   const { shippingCents } = await resolveShipping(input.shippingAddress)
-  // 税费占位规则（P3-T06 接入真实税务 Provider 后替换）
-  const taxCents = Math.round(subtotalCents * Number(config.checkout?.taxRate ?? 0))
+  // 税费：仅当提供目的国时计算；目的国无配置税率时 Provider 会阻断报价（fail-closed，不静默按 0）
+  let taxCents = 0
+  let taxRate = 0
+  if (input.shippingAddress && input.shippingAddress.country) {
+    const tax = await resolveTax({
+      country: String(input.shippingAddress.country),
+      subtotalCents,
+      currency,
+    })
+    taxCents = tax.taxCents
+    taxRate = tax.rate
+  }
 
   // T-07：券码由服务端校验并重算折扣，前端传入的任何折扣金额一律忽略
   const coupon = await evaluateCoupon(input.couponCode, { currency, subtotalCents })
@@ -145,6 +157,7 @@ export async function createQuote(
     subtotalCents,
     shippingCents,
     taxCents,
+    taxRate,
     discountCents,
     couponCode: coupon?.couponCode ?? null,
     couponId: coupon?.couponId ?? null,
