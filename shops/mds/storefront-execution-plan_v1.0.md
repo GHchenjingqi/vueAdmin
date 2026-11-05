@@ -186,7 +186,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P1-T03 | 运行时配置与环境变量治理 | `.env.example`、`runtimeConfig` | 服务端密钥只在 `server` 侧可见；前端 bundle 中检索不到任何密钥；**币种不得放进环境变量**（必须来自后台配置） | P1-T01 | 1 | [x] ✅ 2026-11-04 · 证据：shops/.env.example + runtimeConfig（币种不进 env，public 仅 siteUrl） |
 | P1-T04 | SSR 渲染与部署流水线（Docker + CI + 预览环境） | `Dockerfile`、CI 配置 | 预览环境可访问；SSR HTML 中直接含商品文本与正确货币符号（非客户端二次请求） | P1-T01 | 2 | [x] ✅ 2026-11-04 · 证据：SSR HTML 直出真实商品标题与 $1,299.00（docs/reports/frontend-smoke.md §2/§3） |
 | P1-T05 | i18n 基础（首发单语言，结构预留扩展） | `i18n/` 配置 | 文案无硬编码；语言策略与 `SEO_SPEC.md` 一致；locale 与 currency 解耦（不可从 locale 推导币种） | P1-T02, P0-T16 | 1 | [x] ✅ 2026-11-04 · 证据：shops/layouts（html lang=store config）+ shared/i18n + cart 文案 t()（locale 与 currency 解耦） |
-| P1-T06 | **Store Config 服务**：读取后台币种配置，返回 `{code, symbol, decimalDigits, symbolPosition, locale}`，含缓存与降级 | `server/api/store-config.get.ts`、`shared/types/currency.ts` | 后台改 USD→CNY 后 ≤60s 前台生效；配置缺失/非法返回明确错误码而非默认 USD；接口不缓存私有数据 | P1-T03, P0-T07, P0-T15 | 3 | [ ] |
+| P1-T06 | **Store Config 服务**：读取后台币种配置，返回 `{code, symbol, decimalDigits, symbolPosition, locale}`，含缓存与降级 | `server/api/store-config.get.ts`、`shared/types/currency.ts` | 后台改 USD→CNY 后 ≤60s 前台生效；配置缺失/非法返回明确错误码而非默认 USD；接口不缓存私有数据 | P1-T03, P0-T07, P0-T15 | 3 | [x] ✅ 2026-11-05 · 证据：GET /api/storefront/v1/store-config 上线（settings 唯一数据源 + C7 fail-closed + C8 60s TTL）；T-12 实测切换生效（docs/reports/t12-currency-switch.md） |
 | P1-T07 | 统一 API Client（超时、取消、重试边界、错误码映射） | `shared/api/client.ts` | 超时可配；5xx 有限重试；4xx 不重试；错误统一转内部错误类型 | P1-T03 | 2 | [x] ✅ 2026-11-04 · 证据：shops/shared/api/client.ts（超时/取消/5xx 有限重试/错误映射） |
 | P1-T08 | BFF 代理层与 Express Storefront API 连通 | `server/api/**` 代理路由 | 浏览器不直连 Express；Cookie 透传与改写策略明确；无 CORS 裸奔 | P1-T07, P0-T15 | 2 | [x] ✅ 2026-11-04 · 证据：shops/server/api/*（catalog 真实代理连通后台 + mock catch-all + private no-store） |
 
@@ -200,7 +200,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P1-T12 | 基础 UI 组件（Button/Dialog/Input/Stock/Shipping）与响应式设计 token | 组件目录、Tailwind theme | 组件有 loading/disabled/error 三态；320/375/768/1280 四档视口无横向滚动 | P1-T02 | 3 | [x] ✅ 2026-11-04 · 证据：shops/components/ui/*（Button/Dialog/Input/Stock/Shipping）+ 响应式栅格 |
 | P1-T13 | 测试框架：Vitest + Playwright + 覆盖率门槛 | `tests/unit`、`tests/e2e`、CI 配置 | CI 中 unit 与 smoke e2e 必跑；失败阻断合并 | P1-T04 | 2 | [x] ✅ 2026-11-04 · 证据：vitest 12/12 + tests/e2e/*（浏览器运行随 CI） |
 | P1-T14 | 契约测试骨架：Zod schema 前后端共享 | `shared/schemas/` | 至少 3 个核心接口（含 store-config）有 schema 校验；契约变更导致 CI 失败 | P0-T15, P1-T13 | 2 | [x] ✅ 2026-11-04 · 证据：shared/schemas/contract.ts + tests/unit/contract.spec.ts |
-| P1-T15 | **G1 门禁**：SSR 可用、币种配置正确下发、密钥不泄漏、错误可观测 | 门禁检查记录 | 四项逐条截图/日志佐证；含一次「后台切币种 → 前台生效」实测 | P1-T01 ~ P1-T14 | 1 | [ ] |
+| P1-T15 | **G1 门禁**：SSR 可用、币种配置正确下发、密钥不泄漏、错误可观测 | 门禁检查记录 | 四项逐条截图/日志佐证；含一次「后台切币种 → 前台生效」实测 | P1-T01 ~ P1-T14 | 1 | [x] ✅ 2026-11-05 · 证据：四项实证——①SSR 可用（BFF :3014 全站 200，window.__NUXT__ 注入）②币种正确下发且「后台切币种→前台生效」实测（T-12：USD→CNY→BFF→SSR）③密钥不泄漏（.env 不在 git、前端 bundle 无 SECRET/PASSWORD、JWT_SECRET 仅服务端 chunk）④错误可观测（requestId 贯穿 + 结构化日志 + /api/log-errors 接收端）｜记录 docs/reports/t12-currency-switch.md |
 
 ---
 
@@ -311,7 +311,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P5-T01 | 多语言（第二语言上线） | i18n 词条 + 路由前缀 | hreflang 只指向真实存在的版本；切换语言不丢购物车；语言与币种互不推导 | G4, P1-T05 | 3 | [ ] |
-| P5-T02 | **币种配置切换治理**：后台二次确认、影响提示、审计日志、定时生效与回滚、切换后存量购物车/未支付订单处置 | 后台配置页改造 + 审计表 + 回归用例 | 切 USD→CNY 有明确二次确认与「价格数值不换算」提示；写入审计（谁/何时/从→到）；未支付订单被安全关闭或重新报价；可回滚 | G4, P0-T05b, P1-T06 | 4 | [ ] |
+| P5-T02 | **币种配置切换治理**：后台二次确认、影响提示、审计日志、定时生效与回滚、切换后存量购物车/未支付订单处置 | 后台配置页改造 + 审计表 + 回归用例 | 切 USD→CNY 有明确二次确认与「价格数值不换算」提示；写入审计（谁/何时/从→到）；未支付订单被安全关闭或重新报价；可回滚 | G4, P0-T05b, P1-T06 | 4 | [~] 进行中 ✅后端 2026-11-05 · 证据：admin API GET/PUT/rollback/config-changes（literal 二次确认强制 + config_changes 审计链 + 定时生效就绪）；T-12 实测含回滚（docs/reports/t12-currency-switch.md）；后台设置界面（admin Vue 页面）待做 |
 | P5-T03 | 区域支付方式与 BNPL | 新 Provider 适配 | 不影响既有支付链路；Webhook 复用同一验签与幂等框架；币种能力校验前置 | P5-T02, P3-T12 | 4 | [ ] |
 | P5-T04 | 多仓与更精细配送策略 | 仓库路由规则 | 同一 SKU 多仓发货时库存口径一致；配送承诺按仓计算 | G4, P3-T08 | 4 | [ ] |
 | P5-T05 | Bundle / 搭配购 / 推荐位 | 促销扩展 | 组合商品报价仍走服务端 Quote；库存按组件 SKU 扣减 | P5-T04 | 3 | [ ] |
