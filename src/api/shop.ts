@@ -687,3 +687,109 @@ export const analyticsApi = {
     return request.get<TurnoverReport>('/shop/analytics/turnover', { params: query })
   },
 }
+
+// ==================== 币种配置治理（P5-T02 / X-T03） ====================
+
+/**
+ * 与后端 `CurrencyConfig`（server/modules/storefront/services/currencyConfig.ts）
+ * 及 `currencyConfigSchema` 一一对应。金额一律「最小货币单位」（分），此处只管展示口径。
+ */
+export interface CurrencyConfig {
+  code: string
+  symbol: string
+  decimalDigits: number
+  symbolPosition: 'before' | 'after'
+  thousandsSeparator: string
+  decimalSeparator: string
+  locale: string
+}
+
+/** ISO-4217 预设，与后端 ISO_META 白名单保持一致（以后台 settings 为准） */
+export const CURRENCY_PRESETS: CurrencyConfig[] = [
+  { code: 'USD', symbol: '$', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-US' },
+  { code: 'CNY', symbol: '¥', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'zh-CN' },
+  { code: 'EUR', symbol: '€', decimalDigits: 2, symbolPosition: 'after', thousandsSeparator: '.', decimalSeparator: ',', locale: 'de-DE' },
+  { code: 'GBP', symbol: '£', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-GB' },
+  { code: 'CAD', symbol: 'CA$', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-CA' },
+  { code: 'AUD', symbol: 'A$', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-AU' },
+]
+
+export interface CurrencySetting {
+  current: CurrencyConfig | null
+  pending: { config: CurrencyConfig; changeId: number; effectiveAt: string } | null
+}
+
+export interface CurrencyUpdateResult {
+  applied: boolean
+  scheduled?: boolean
+  changeId: number
+}
+
+export interface CurrencyRollbackResult {
+  applied: boolean
+  changeId: number
+  rollbackOf: number
+}
+
+export interface ConfigChange {
+  id: number
+  tenantId: number
+  key: string
+  oldValue: CurrencyConfig | null
+  newValue: CurrencyConfig | null
+  operatorId: number | null
+  operatorName: string | null
+  effectiveAt: string | null
+  appliedAt: string | null
+  rollbackOf: number | null
+  status: 'applied' | 'scheduled' | 'rolled_back'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CurrencyUpdatePayload {
+  config: CurrencyConfig
+  /** 后端 schema 为 z.literal(true)：缺失或 false 一律 400 CONFIRMATION_REQUIRED */
+  confirmImpact: true
+  ackNoConversion: true
+  /** ISO 8601 UTC；不传表示立即生效 */
+  effectiveAt?: string
+}
+
+/**
+ * 构造保存请求。二次确认字段由本函数强制写入，页面不能绕过；
+ * effectiveAt 统一转 ISO（后端 z.string().datetime() 只接受带时区的时间串）。
+ */
+export function buildCurrencyUpdatePayload(config: CurrencyConfig, effectiveAt?: string | Date | null): CurrencyUpdatePayload {
+  const payload: CurrencyUpdatePayload = {
+    config: { ...config, code: config.code.trim().toUpperCase() },
+    confirmImpact: true,
+    ackNoConversion: true,
+  }
+  if (effectiveAt) {
+    const d = effectiveAt instanceof Date ? effectiveAt : new Date(effectiveAt)
+    if (!Number.isNaN(d.getTime())) payload.effectiveAt = d.toISOString()
+  }
+  return payload
+}
+
+export const currencyApi = {
+  /** 读取原始配置 + 待生效配置 */
+  get() {
+    return request.get<CurrencySetting>('/shop/settings/currency')
+  },
+  /** 读取经 fail-closed 校验后的当前生效配置 */
+  active() {
+    return request.get<CurrencyConfig>('/shop/settings/currency/active')
+  },
+  update(payload: CurrencyUpdatePayload) {
+    return request.put<CurrencyUpdateResult>('/shop/settings/currency', payload)
+  },
+  rollback(changeId: number) {
+    return request.post<CurrencyRollbackResult>('/shop/settings/currency/rollback', { changeId })
+  },
+  /** 审计链：最近 50 条，DESC */
+  changes() {
+    return request.get<ConfigChange[]>('/shop/config-changes')
+  },
+}
