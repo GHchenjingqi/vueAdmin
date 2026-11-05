@@ -270,3 +270,24 @@ export const rmaTrackSchema = z.object({
 export type RmaSubmitInput = z.infer<typeof rmaSubmitSchema>
 export type RmaIdParamInput = z.infer<typeof rmaIdParamSchema>
 export type RmaTrackInput = z.infer<typeof rmaTrackSchema>
+
+// ————————————————————————————————————————————————
+// 阶段 5 步骤 5（第五切片）：物流轨迹 17track（防枚举，需 orderNo + accessToken 双要素）
+// ————————————————————————————————————————————————
+
+/** GET /track/:orderNo —— 路径参数订单号 */
+export const trackOrderParamSchema = z
+  .object({
+    orderNo: z.string().min(1).max(64),
+  })
+  .passthrough()
+
+/** GET /track/:orderNo?accessToken= —— 访问凭证（缺失时 service 层按 404 处理） */
+export const trackOrderQuerySchema = z
+  .object({
+    accessToken: z.string().min(1).max(128).optional(),
+  })
+  .passthrough()
+
+export type TrackOrderParamInput = z.infer<typeof trackOrderParamSchema>
+export type TrackOrderQueryInput = z.infer<typeof trackOrderQuerySchema>

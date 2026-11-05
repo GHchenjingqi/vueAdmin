@@ -18,9 +18,9 @@
 | 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | ✅ 已完成 |
-| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify + 评价 + 问答 + CMS + RMA 已完成，17track 待续） |
-| 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 后续 |
-| 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | 后续 |
+| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | ✅ 已完成（7 域全数落地：newsletter+restock / 评价+问答 / CMS / RMA / 17track） |
+| 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 🟡 进行中 |
+| 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | ✅ 已由并行方建成（`shops/`，不纳入后端提交树） |
 
 ---
 
@@ -254,6 +254,30 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 - `npm run typecheck` 通过（顺带修复上一刀 CMS 切片 `cmsService.ts` 中 `where[Op.and]` 以 `unique symbol` 索引 `Record<string,unknown>` 的严格类型报错）；
 - `vitest run` 全量 **442 用例通过**（新增 `storefront-rma.test.ts` 9 例：提交退货+pending+退款重算、订单不存在 404、email 不符 403、状态不可退 400、明细不归属 400、超量 400、列表/详情+非本人 404、取消仅 pending、回寄仅 approved）；
 - 提交一并纳入迁移 `000056`（已 apply 到 DB）。
+
+---
+
+## 第 5 步（五 · 收官）：物流轨迹 17track（薄层复用 shop 服务）
+
+> 步骤 5 最后一个域。复用 shop 的 `orders` + `order_shipments`（已有 carrier/trackingNo），
+> **仅新增轨迹缓存表**，不建第二套订单数据。外部 17track 用**可插拔 provider 钩子**，
+> 默认无外网依赖，异常自动降级本地缓存（与 `inventoryService.setRestockHook` 同款单向依赖思路）。
+
+### 5.15 模型与迁移
+- 迁移 `000057` `shop_tracking_events`：`tenantId / siteId / orderId / shipmentId / carrier / trackingNo / status / events(JSON 轨迹数组) / provider / syncedAt / 时间戳`；唯一索引 `(tenantId, shipmentId)`、索引 `(tenantId, orderId)`。
+- 模型层注册 `ShopTrackingEvent`（class + `declare`），`models/index.ts` 注册。已 apply 到 DB。
+
+### 5.16 轨迹服务（`storefront/services/trackingService.ts`）
+- `getOrderTracking(site, orderNo, accessToken)`：**orderNo + accessToken 双要素 + tenantId 隔离**，任一不符一律 404（防订单枚举，对齐 P4-T04 / P3-T16）；无物流单返回空轨迹视图 `not_shipped`（不泄漏发货态之外信息）；
+- `setTrackingProvider(fn)`：注入真实 17track 客户端；仅当缓存缺失或 `syncedAt` 超过 10 分钟时拉取并刷新缓存，拉取异常 `try/catch` 降级到本地缓存，外部 API 故障不打挂 C 端；
+- `upsertTrackingCache`：供后台发货/测试写入轨迹缓存，同 `(tenantId, shipmentId)` 幂等 upsert（公开接口不暴露）。
+
+### 5.17 公开路由（免 admin 鉴权，走 siteContext）
+- `GET /api/storefront/v1/track/:orderNo?accessToken=` —— 订单号 + 访问凭证双要素查询轨迹
+
+### 5.18 验证
+- `npm run typecheck` 通过；`vitest run` 全量 **448 用例通过**（新增 `storefront-tracking.test.ts` 6 例：双要素防枚举/空凭证 404、跨租户隔离、缓存写入+幂等、provider 过期拉取刷新、未过期不重复拉取、provider 异常降级、无缓存拉取成功落库）；
+- 提交一并纳入迁移 `000057`（已 apply 到 DB）。
 
 ---
 
