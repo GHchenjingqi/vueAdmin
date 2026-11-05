@@ -299,7 +299,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P4-T14 | 无障碍与移动端验收 | 验收报告 | 表单有可访问标签；键盘可达；对比度达标 | P1-T12 | 2 | [x] ✅ 2026-11-04 · 证据：docs/reports/a11y-checklist.md（表单标签/焦点可见/skip-link/对比度/语义结构 AA 关键项通过） |
 | P4-T15 | 安全测试：越权、订单枚举、CSRF、限流、注入、优惠券滥用、**配置接口越权修改** | 渗透测试报告 | 高危项为零；中危项有修复计划；非管理员无法改币种配置 | P4-T01, P3-T12 | 3 | [x] ✅ 2026-11-05 · 证据：`requireAdmin` 守卫（无 user→401 / 非 admin→403，不做任何写操作）+ `shop/routes/index.ts` 将 `/settings/currency`(PUT)、`/settings/currency/rollback`(POST)、`/config-changes`(GET) 全挂 `requireAdmin`；`security-audit.test.ts` 14 例覆盖七向量（越权/CSRF/originValidator/登录限流/SQLi 字面量/订单枚举双因子源码回归/配置越权源码回归/优惠券滥用伪造码拒绝），全绿；`storefront-coupon.test.ts` 10 例覆盖过期用尽币种错配并发幂等；`docs/reports/security-pentest.md` 渗透报告：**高危 0**、中危 3（限流覆盖面/监控端点暴露/CSRF Token）均附修复计划 |
 | P4-T16 | 性能验收：RUM 监控 LCP/INP/CLS + API P95 | 性能报告 | 移动端 LCP < 2.5s（P75）；区分移动与桌面 | P2-T08, P4-T13 | 2 | [x] ✅ 2026-11-04 · 证据：`plugins/vitals.client.ts`（LCP/INP/CLS/FCP/TTFB sendBeacon）+ `/api/vitals` sink 实测 204 + **`docs/reports/performance-acceptance.md`**（Playwright 实测：移动端 LCP P75 最大 140ms < 2500ms、CLS=0、TTFB 34–95ms，移动/桌面分设备；API P95 与告警阈值归 P4-T13 后端监控闭环） |
-| P4-T17 | **G4 门禁**：政策审核、客服履约可执行、埋点验证 | 门禁检查记录 | 政策经目标市场专业人士审核；客服可查单可退款；埋点抽样与后台对账一致 | P4-T01 ~ P4-T16 | 1 | [ ] |
+| P4-T17 | **G4 门禁**：政策审核、客服履约可执行、埋点验证 | 门禁检查记录 | 政策经目标市场专业人士审核；客服可查单可退款；埋点抽样与后台对账一致 | P4-T01 ~ P4-T16 | 1 | [ ] · 技术能力盘点与待决策清单已整理：`docs/reports/g4-gate-checklist.md`（政策审核=页面渠道已备、**文本需专业人士审核**；客服履约=查单/履约/退款/邮件补偿 API 已备、admin RMA 审批端点缺；埋点=采集/幂等/归因/consent 已备、**缺 events 后台对账查询端点**）——不代勾，G4 达成需业务方逐项复核签字 |
 
 ---
 
@@ -443,6 +443,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.13 | 2026-11-04 | **X-T04 Feature Flag**（`modules/featureflags/featureFlags.ts`：5 个关键新功能默认关闭 + `isFeatureEnabled` fail-closed + `setFlag` 持久化 `feature.flags` 并写审计 + `requireFeature` 守卫关闭→403；admin `GET/PUT /api/v1/flags`（`requireAdmin`）+ 公开 `GET /api/storefront/v1/flags/:key`；`featureFlags.test.ts` 6 例）；修复 **X-T03** `audit-log.test.ts` 损坏导入（`setTenantContext` 不存在 → `runInTenant`）与测试隔离（beforeEach 清理固定实体 ID），4/4 通过；后端全量 586 passed（61 文件）、typecheck 0 错误 | AI |
 | v1.14 | 2026-11-05 | X-T04 收口提交 + `setFlag` 审计修正：原实现先改写 `ov[key]` 再算 `oldValue`，导致审计恒记 `!enabled`（无法反映真实旧值，重复设置同值也记成变更）；改为变更前捕获 `ov[key] ?? defaultEnabled`（JSON 列存布尔）。featureFlags 6/6、后端全量 586 passed（61 文件）、server typecheck 0 错误 | AI |
 | v1.15 | 2026-11-05 | **X-T06 回滚演练**（dev）：000065 `migrate down` 0.568s / `up` 重放 0.243s、端到端 ≈11.7s（含 CLI 冷启动），RTO 实测回填 runbook §6.1，任务行 [ ]→[~]（staging 完整演练与生产备份/恢复需真实环境）；另将 P4-T16 性能报告 `docs/reports/performance-acceptance.md` 入库（v1.12 已引用但文件此前未跟踪） | AI |
+| v1.16 | 2026-11-05 | **P4-T17 G4 门禁清单整理**：`docs/reports/g4-gate-checklist.md`（政策审核/客服履约/埋点验证三类逐项登记证据与缺口：admin RMA 审批端点缺、analytics events 对账查询端点缺为两个可执行技术缺口；政策文本专业审核、权限分配、真实环境对账为业务决策项）。任务行保持 [ ] 不代勾 | AI |
 
 ---
 
