@@ -29,7 +29,7 @@ export const cartItemSchema = z.object({
   skuId: z.number().int(),
   spuId: z.number().int(),
   title: z.string(),
-  spec: z.record(z.string()),
+  spec: z.record(z.string(), z.string()),
   qty: z.number().int().min(1).max(10),
   unit: moneySchema,
   lineTotal: moneySchema,
