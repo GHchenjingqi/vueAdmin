@@ -14,6 +14,13 @@ export function setRestockHook(fn: RestockHook | null): void {
   restockHook = fn
 }
 
+/** P4-T13 库存异常钩子（占用不足/并发冲突时回调），由 storefront monitoring 侧注册 */
+type InventoryAnomalyHook = (skuId: number) => void | Promise<void>
+let inventoryAnomalyHook: InventoryAnomalyHook | null = null
+export function setInventoryAnomalyHook(fn: InventoryAnomalyHook | null): void {
+  inventoryAnomalyHook = fn
+}
+
 /** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
 const tid = (): number => getTenantContext()?.tenantId ?? 1
 
@@ -103,6 +110,8 @@ export async function occupy(skuId: number, qty: number, ref: string): Promise<v
       let available = 0
       for (const r of rows) available += r.quantity - r.locked
       if (available < qty) {
+        // P4-T13：库存异常钩子（由 storefront 侧注册计数，避免 shop→storefront 反向依赖）
+        inventoryAnomalyHook?.(skuId)
         throw new AppError(400, `库存不足，可用量 ${available}，需占用 ${qty}`)
       }
       // 按仓库顺序占用（优先扣减有货的仓库）

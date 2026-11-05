@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { getSite } from '../middleware/siteContext.js'
-import { getActiveCurrency } from '../services/currencyConfig.js'
+import { getActiveCurrencyMonitored } from '../services/currencyConfig.js'
 
 /**
  * GET /api/storefront/v1/store-config（P1-T06）
@@ -10,7 +10,7 @@ import { getActiveCurrency } from '../services/currencyConfig.js'
 export const config = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const site = getSite(res)
-    const currency = await getActiveCurrency()
+    const currency = await getActiveCurrencyMonitored()
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=30')
     res.json({
       code: 0,

@@ -6,6 +6,7 @@ import { ShopOrder, ShopOrderPayment } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
 import { tryEnqueue } from '../../shop/services/orderMailService.js'
 import { assertShippableCountry, extractCountry } from './shippingService.js'
+import { getCounter, incCounter, setGauge } from './monitoringService.js'
 import config from '../../../config/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
@@ -84,6 +85,14 @@ export interface WebhookResult {
   message?: string
 }
 
+/** P4-T13：支付失败率 gauge（失败 /（成功+失败）），供告警评估 */
+function updatePaymentFailureRate(): void {
+  const success = getCounter('payment_success')
+  const failure = getCounter('payment_failure')
+  const total = success + failure
+  setGauge('payment_failure_rate', total > 0 ? Number((failure / total).toFixed(4)) : 0)
+}
+
 /**
  * 处理支付 Webhook（原始 body + 签名头）。
  * 返回 { ok, status } 供 controller 转化为 HTTP 响应；验签失败抛 401，且不产生任何副作用。
@@ -130,6 +139,8 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
   }
 
   if (eventType === 'payment.succeeded') {
+    incCounter('payment_success')
+    updatePaymentFailureRate()
     if (order.paymentStatus === 'captured') return { ok: true, alreadyProcessed: true, status: 200 }
     await order.update({ paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never)
     await reservationService.commitReservation(order.orderNo)
@@ -140,6 +151,8 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
   }
 
   if (eventType === 'payment.failed') {
+    incCounter('payment_failure')
+    updatePaymentFailureRate()
     await order.update({ paymentStatus: 'failed' } as never)
     await reservationService.releaseReservation(order.orderNo)
     if (prev) await prev.update({ status: 'failed', rawPayload: payload } as never)

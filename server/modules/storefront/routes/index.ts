@@ -20,6 +20,7 @@ import rmaRouter from './rma.js'
 import trackingRouter from './tracking.js'
 import analyticsRouter from './analytics.js'
 import addressRouter from './address.js'
+import monitoringRouter from './monitoring.js'
 
 /**
  * Storefront 公开接口路由
@@ -53,5 +54,6 @@ router.use('/rma', rmaRouter)
 router.use('/', trackingRouter)
 router.use('/', analyticsRouter)
 router.use('/addresses', addressRouter)
+router.use('/monitoring', monitoringRouter)
 
 export default router

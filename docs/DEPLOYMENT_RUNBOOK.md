@@ -34,7 +34,20 @@
 | 库存异常（locked 不落） | 跑释放任务 `POST /admin/ops/reservations/sweep`；核对 inventory_log |
 | 回滚发布 | `docker rollback` / 前一版本镜像 + 数据库迁移 `migrate:down`（仅撤销最后一批） |
 
-## 5. 待演练项（X-T06 完成项）
+## 5. 监控告警处置（P4-T13）
+
+> 每条告警含阈值 / 通知渠道 / runbook 链接。处置要点：
+
+| 告警 | 阈值（示例） | 处置 |
+| --- | --- | --- |
+| ssr-error-rate | >5%（5 分钟） | 查 SSR 错误堆栈与上游 API 连通；按 requestId 串三层 |
+| api-p95 | >800ms | 查慢查询 `slowQueryLog`、缓存命中、DB 连接池 |
+| payment-failure-rate | >10%（10 分钟） | 查支付 provider 状态/密钥/限流；勿盲目重试 |
+| webhook-latency | >2000ms | 查验签与幂等耗时；确认无回调风暴 |
+| inventory-anomaly | ≥1 次 | 跑 `POST /admin/ops/reservations/sweep` 释放过期；核对 inventory_log |
+| currency-config-fail | ≥1 次 | 检查 settings `shop.currency`；恢复合法 JSON（C7 阻断属预期） |
+
+## 6. 待演练项（X-T06 完成项）
 
 - [ ] staging 完整演练记录（时间/人/耗时）
 - [ ] RTO 实测值回填

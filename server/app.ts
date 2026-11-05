@@ -8,6 +8,7 @@ import * as Sentry from '@sentry/node'
 import swaggerSpec from './swagger.js'
 import apiRoutes from './routes/index.js'
 import accessLog from './middleware/accessLog.js'
+import { metricsMiddleware } from './middleware/metrics.js'
 import errorHandler from './middleware/errorHandler.js'
 import { slowQueryLogMiddleware } from './middleware/slowQueryLog.js'
 import originValidator from './middleware/originValidator.js'
@@ -137,6 +138,9 @@ app.use(accessLog)
 
 // ---------- 慢查询日志（>1000ms 的请求会被记录）----------
 app.use(slowQueryLogMiddleware(1000))
+
+// ---------- 指标中间件（P4-T13：API P95 与错误率观测，放在路由之前）----------
+app.use(metricsMiddleware)
 
 // ---------- 中间件 ----------
 app.use(cookieParser())

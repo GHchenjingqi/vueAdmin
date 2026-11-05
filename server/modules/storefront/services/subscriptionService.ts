@@ -4,6 +4,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopNewsletter, ShopRestockSubscription, ShopSku } from '../../shop/models/index.js'
 import * as inventoryService from '../../shop/services/inventoryService.js'
+import { incCounter } from './monitoringService.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
 /**
@@ -125,4 +126,9 @@ export async function notifyRestock(skuId: number, tenantId: number): Promise<Re
 // 库存补货钩子注册：保持 shop → storefront 单向依赖，避免反向 import
 inventoryService.setRestockHook(async (skuId, tenantId) => {
   await notifyRestock(skuId, tenantId)
+})
+
+// P4-T13：库存异常（占用不足）计数钩子，走同一注入模式
+inventoryService.setInventoryAnomalyHook(() => {
+  incCounter('inventory_anomaly')
 })

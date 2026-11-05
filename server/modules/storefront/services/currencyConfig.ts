@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto'
 import { AppError } from '../../../middleware/errorHandler.js'
 import Setting from '../../../models/Setting.js'
 import { refreshSiteInfo } from '../../../utils/siteCache.js'
+import { incCounter } from './monitoringService.js'
 
 /**
  * 单一启用币种服务（P1-T06 / C1/C7/C8）——后端侧
@@ -73,6 +74,16 @@ export async function getActiveCurrency(): Promise<CurrencyConfig> {
   cache.value = cfg
   cache.expiresAt = now + TTL_MS
   return cfg
+}
+
+/** P4-T13 观测：币种配置读取失败（fail-closed 503）计数 */
+export async function getActiveCurrencyMonitored(): Promise<CurrencyConfig> {
+  try {
+    return await getActiveCurrency()
+  } catch (err) {
+    incCounter('currency_config_fail')
+    throw err
+  }
 }
 
 /** siteContext 回退用：settings 失效时回退站点 credentials 币种（warn，不阻断目录浏览） */
