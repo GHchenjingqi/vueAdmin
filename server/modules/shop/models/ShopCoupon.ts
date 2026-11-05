@@ -13,6 +13,8 @@ class ShopCoupon extends Model<InferAttributes<ShopCoupon>, InferCreationAttribu
   declare currency: string
   declare validFrom: string
   declare validTo: string
+  declare usageLimit: CreationOptional<number>
+  declare usedCount: CreationOptional<number>
   declare tenantId: number
 
   declare readonly createdAt: CreationOptional<Date>
@@ -33,6 +35,8 @@ ShopCoupon.init(
     currency: { type: DataTypes.STRING(3), allowNull: false, defaultValue: 'USD', comment: '币种' },
     validFrom: { type: DataTypes.DATEONLY, allowNull: false, comment: '生效日期' },
     validTo: { type: DataTypes.DATEONLY, allowNull: false, comment: '失效日期' },
+    usageLimit: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0, comment: '最大使用次数，0=不限量' },
+    usedCount: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0, comment: '已使用次数' },
     tenantId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, comment: '租户ID' },
     createdAt: { type: DataTypes.DATE, allowNull: false },
     updatedAt: { type: DataTypes.DATE, allowNull: false },

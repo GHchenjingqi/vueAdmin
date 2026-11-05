@@ -13,6 +13,7 @@ export const quote = async (req: Request, res: Response, next: NextFunction) => 
       cartToken: body.cartToken,
       items: body.items as { skuId: number; qty: number }[] | undefined,
       shippingAddress: body.shippingAddress,
+      couponCode: body.couponCode,
     })
     res.json({ code: 0, data })
   } catch (err) {
@@ -34,6 +35,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       cartToken: body.cartToken,
       items: body.items as { skuId: number; qty: number }[] | undefined,
       customerId,
+      couponCode: body.couponCode,
       attribution: body.attribution,
     })
     res.json({ code: 0, data })

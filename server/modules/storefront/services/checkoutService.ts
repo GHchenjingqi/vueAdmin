@@ -4,6 +4,7 @@ import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderItem } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
 import { createQuote, type QuoteResult } from './quoteService.js'
+import { redeemCoupon, releaseCoupon, type CouponEvaluation } from './couponService.js'
 import type { OrderAttribution } from '../../../shared/schemas/storefront.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
@@ -37,6 +38,8 @@ export interface CreateOrderParams {
   cartToken?: string
   items?: { skuId: number; qty: number }[]
   customerId?: number
+  /** T-07：券码由服务端校验并重算折扣，建单时原子占用 */
+  couponCode?: string
   /** 订单来源归因（site / utm），建单时固化进订单快照 */
   attribution?: OrderAttribution
 }
@@ -60,6 +63,7 @@ export interface OrderView {
   currency: string
   subtotalCents: number
   discountCents: number
+  couponCode: string | null
   shippingCents: number
   taxCents: number
   amountCents: number
@@ -82,6 +86,7 @@ export async function toOrderView(order: ShopOrder, withToken = false): Promise<
     currency: order.currency,
     subtotalCents: Number(order.subtotalCents),
     discountCents: Number(order.discountCents),
+    couponCode: order.couponCode ?? null,
     shippingCents: Number(order.shippingCents),
     taxCents: Number(order.taxCents),
     amountCents: Number(order.amountCents),
@@ -110,21 +115,34 @@ export async function toOrderView(order: ShopOrder, withToken = false): Promise<
 export async function createOrder(site: StorefrontSite, params: CreateOrderParams): Promise<OrderView> {
   const tId = tid()
 
-  // 1) 服务端重算报价（价格 / 库存 / 币种一致性）
-  const quote: QuoteResult = await createQuote(site, {
-    cartToken: params.cartToken,
-    items: params.items,
-    // T-08：地址不可配送时直接拒绝建单（与报价同口径，服务端重算）
-    shippingAddress: params.shippingAddress,
-  })
-
-  // 2) 幂等：同一 idempotencyKey 直接返回首单
+  // 1) 幂等：必须先于报价。重复提交应直接返回首单，
+  //    否则券已用尽 / 价格已变化会让幂等重放被误拒，且白跑一次服务端重算。
   const idempotencyKey = (params.idempotencyKey ?? crypto.randomBytes(16).toString('hex')).slice(0, 64)
   const existing = await ShopOrder.findOne({ where: { idempotencyKey, tenantId: tId } })
   if (existing) return toOrderView(existing, true)
 
-  // 3) 库存预占
+  // 2) 服务端重算报价（价格 / 库存 / 币种一致性 / 配送范围 / 优惠券）
+  const quote: QuoteResult = await createQuote(site, {
+    cartToken: params.cartToken,
+    items: params.items,
+    shippingAddress: params.shippingAddress,
+    couponCode: params.couponCode,
+  })
+
+  // 3) T-07 优惠券占用（幂等键 = orderNo，失败可精确回退）
   const orderNo = genOrderNo()
+  const coupon: CouponEvaluation | null =
+    quote.couponId && quote.couponCode
+      ? {
+          couponId: quote.couponId,
+          couponCode: quote.couponCode,
+          discountCents: quote.discountCents,
+          currency: quote.currency,
+        }
+      : null
+  if (coupon) await redeemCoupon(coupon, orderNo)
+
+  // 4) 库存预占（失败需同时释放预占与券占用）
   const reserveInputs = []
   for (const line of quote.items) {
     const warehouseId = await reservationService.pickWarehouse(line.skuId)
@@ -135,6 +153,7 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
     reservations = await reservationService.reserveItems(orderNo, reserveInputs)
   } catch (err) {
     await reservationService.releaseReservation(orderNo).catch(() => undefined)
+    if (coupon) await releaseCoupon(orderNo).catch(() => undefined)
     throw err
   }
 
@@ -157,7 +176,7 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
     shippingCents: quote.shippingCents,
     taxCents: quote.taxCents,
     amountCents: quote.amountCents,
-    couponCode: null,
+    couponCode: quote.couponCode ?? null,
     accessToken,
     idempotencyKey,
     reservationId: reservations[0]?.id ?? null,
@@ -212,6 +231,8 @@ export async function cancelOrder(orderId: number, accessToken: string): Promise
     throw new AppError(400, `当前状态 ${order.status} 不可取消`)
   }
   await reservationService.releaseReservation(order.orderNo)
+  // T-07：取消订单同时回退优惠券用量，避免券被白白消耗
+  await releaseCoupon(order.orderNo)
   await order.update({ status: 'cancelled', cancelledReason: 'customer_cancel', closedAt: new Date() } as never)
   return toOrderView(order, false)
 }

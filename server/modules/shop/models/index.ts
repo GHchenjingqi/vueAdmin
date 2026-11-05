@@ -58,3 +58,6 @@ export { default as ShopTrackingEvent } from './ShopTrackingEvent.js'
 
 // 阶段 5 步骤 6：服务端 CAPI 埋点事件（复用 shop 模型层，不建第二套后端）
 export { default as ShopAnalyticsEvent } from './ShopAnalyticsEvent.js'
+
+// T-07 优惠券占用流水（复用 shop 模型层，不建第二套后端）
+export { default as ShopCouponRedemption } from './ShopCouponRedemption.js'

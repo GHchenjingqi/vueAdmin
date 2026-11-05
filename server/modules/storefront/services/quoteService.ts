@@ -4,6 +4,7 @@ import { ShopSku, ShopSpu, ShopProductPrice } from '../../shop/models/index.js'
 import * as inventoryService from '../../shop/services/inventoryService.js'
 import config from '../../../config/index.js'
 import { resolveShipping } from './shippingService.js'
+import { evaluateCoupon } from './couponService.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
 /**
@@ -40,6 +41,9 @@ export interface QuoteResult {
   shippingCents: number
   taxCents: number
   discountCents: number
+  /** T-07：服务端校验通过的券码 / 券 ID（供建单占用，未用券为 null） */
+  couponCode: string | null
+  couponId: number | null
   amountCents: number
   version: number
   expiresAt: string
@@ -84,7 +88,12 @@ export async function resolveQuoteLines(
 /** 服务端重算报价 */
 export async function createQuote(
   site: StorefrontSite,
-  input: { cartToken?: string; items?: { skuId: number; qty: number }[]; shippingAddress?: Record<string, unknown> | null },
+  input: {
+    cartToken?: string
+    items?: { skuId: number; qty: number }[]
+    shippingAddress?: Record<string, unknown> | null
+    couponCode?: string
+  },
 ): Promise<QuoteResult> {
   const { currency, lines } = await resolveQuoteLines(site, input)
   const tId = tid()
@@ -124,7 +133,10 @@ export async function createQuote(
   const { shippingCents } = await resolveShipping(input.shippingAddress)
   // 税费占位规则（P3-T06 接入真实税务 Provider 后替换）
   const taxCents = Math.round(subtotalCents * Number(config.checkout?.taxRate ?? 0))
-  const discountCents = 0
+
+  // T-07：券码由服务端校验并重算折扣，前端传入的任何折扣金额一律忽略
+  const coupon = await evaluateCoupon(input.couponCode, { currency, subtotalCents })
+  const discountCents = coupon?.discountCents ?? 0
   const amountCents = subtotalCents + shippingCents + taxCents - discountCents
 
   return {
@@ -134,6 +146,8 @@ export async function createQuote(
     shippingCents,
     taxCents,
     discountCents,
+    couponCode: coupon?.couponCode ?? null,
+    couponId: coupon?.couponId ?? null,
     amountCents,
     version: Date.now(),
     expiresAt: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),

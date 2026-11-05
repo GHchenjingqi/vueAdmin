@@ -102,6 +102,8 @@ export const quoteSchema = z
     cartToken: z.string().min(1).max(64).optional(),
     items: z.array(cartLineInput).max(100).optional(),
     shippingAddress: z.record(z.unknown()).optional(),
+    // T-07：券码仅作输入，折扣金额由服务端重算
+    couponCode: z.string().min(1).max(50).optional(),
   })
   .passthrough()
 
@@ -128,6 +130,7 @@ export const createOrderSchema = z
     cartToken: z.string().min(1).max(64).optional(),
     items: z.array(cartLineInput).max(100).optional(),
     customerId: z.number().int().positive().optional(),
+    couponCode: z.string().min(1).max(50).optional(),
     attribution: orderAttributionSchema.optional(),
   })
   .passthrough()
