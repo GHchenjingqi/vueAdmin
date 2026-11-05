@@ -297,7 +297,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P4-T12 | 政策页：隐私、条款、配送、退货（按市场，币种表述与配置一致） | `pages/policies/**` | 内容与市场一致；版本与生效日期可见；文中货币表述不写死 | P0-T03, P0-T05 | 2 | [x] ✅ 2026-11-04 · 证据：shops/pages/policies/[slug].vue（版本/生效日期可见，币种表述不写死） |
 | P4-T13 | 监控告警：SSR 错误率、API P95、支付失败率、Webhook 延迟、库存异常、**币种配置读取失败** | 告警规则 + 看板 | 每条告警有阈值、通知渠道、处置手册链接 | P1-T10, P3-T18 | 2 | [x] ✅ 2026-11-05 · 证据：`monitoringService`（计数器/gauge/延迟 P95 注册表 + `DEFAULT_ALERT_RULES` 六条规则，每条含阈值/窗口/通知渠道/`DEPLOYMENT_RUNBOOK.md#监控告警处置` runbook + 冷却去重）+ `middleware/metrics.ts`（API P95 与 SSR 5xx 错误率观测）+ 埋点（webhook 延迟/支付成败率/库存异常钩子/币种配置 fail-closed）+ 端点 `GET /monitoring/{metrics,rules,alerts,dashboard}` + `POST /monitoring/evaluate` + Runbook §5 处置章节；`storefront-monitoring.test.ts` 8 例 |
 | P4-T14 | 无障碍与移动端验收 | 验收报告 | 表单有可访问标签；键盘可达；对比度达标 | P1-T12 | 2 | [x] ✅ 2026-11-04 · 证据：docs/reports/a11y-checklist.md（表单标签/焦点可见/skip-link/对比度/语义结构 AA 关键项通过） |
-| P4-T15 | 安全测试：越权、订单枚举、CSRF、限流、注入、优惠券滥用、**配置接口越权修改** | 渗透测试报告 | 高危项为零；中危项有修复计划；非管理员无法改币种配置 | P4-T01, P3-T12 | 3 | [ ] |
+| P4-T15 | 安全测试：越权、订单枚举、CSRF、限流、注入、优惠券滥用、**配置接口越权修改** | 渗透测试报告 | 高危项为零；中危项有修复计划；非管理员无法改币种配置 | P4-T01, P3-T12 | 3 | [x] ✅ 2026-11-05 · 证据：`requireAdmin` 守卫（无 user→401 / 非 admin→403，不做任何写操作）+ `shop/routes/index.ts` 将 `/settings/currency`(PUT)、`/settings/currency/rollback`(POST)、`/config-changes`(GET) 全挂 `requireAdmin`；`security-audit.test.ts` 14 例覆盖七向量（越权/CSRF/originValidator/登录限流/SQLi 字面量/订单枚举双因子源码回归/配置越权源码回归/优惠券滥用伪造码拒绝），全绿；`storefront-coupon.test.ts` 10 例覆盖过期用尽币种错配并发幂等；`docs/reports/security-pentest.md` 渗透报告：**高危 0**、中危 3（限流覆盖面/监控端点暴露/CSRF Token）均附修复计划 |
 | P4-T16 | 性能验收：RUM 监控 LCP/INP/CLS + API P95 | 性能报告 | 移动端 LCP < 2.5s（P75）；区分移动与桌面 | P2-T08, P4-T13 | 2 | [~] 进行中 ✅前端 2026-11-05 · 证据：plugins/vitals.client.ts（LCP/INP/CLS/FCP/TTFB sendBeacon）+ /api/vitals sink 实测 204；API P95 与告警阈值归 P4-T13 后端监控 |
 | P4-T17 | **G4 门禁**：政策审核、客服履约可执行、埋点验证 | 门禁检查记录 | 政策经目标市场专业人士审核；客服可查单可退款；埋点抽样与后台对账一致 | P4-T01 ~ P4-T16 | 1 | [ ] |
 
@@ -437,6 +437,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.8 | 2026-11-05 | P3-T06 税费计算（可插拔 `TaxProvider` + `shop_tax_rates` 规则表 + fail-closed 阻断）+ P4-T08 评价图片上传安全（图片专用端点 + 魔数校验 + 分辨率上限 + 随机文件名防遍历）；`storefront-tax.test.ts` 7 例、`storefront-review-image.test.ts` 7 例；后端全量 549 passed（56 文件）、typecheck 0 错误 | AI |
 | v1.9 | 2026-11-05 | P4-T03 顾客订单列表与详情（`listMyOrders`：`buyer.customerId` JSON 归属 + 租户隔离 + 分页 + 快照币种/金额分；`GET /checkout/orders` 顾客鉴权 + 站点租户一致性；BFF 直通 + mock 兜底 + `account/orders/index.vue` 本人订单/快照币种/分页/空态，详情复用 P3-T16 双要素）；`storefront-orders-list.test.ts` 5 例；前端 typecheck 0 错误、vitest 34/34 | AI |
 | v1.10 | 2026-11-05 | P4-T13 监控告警（`monitoringService` 指标注册表 + 六条规则含阈值/渠道/runbook + `metrics` 中间件 + webhook/支付/库存/币种埋点 + `/monitoring` 端点与看板 + Runbook §5 处置章节）；`storefront-monitoring.test.ts` 8 例；后端 typecheck 0 错误、相关回归 63/63 | AI |
+| v1.11 | 2026-11-05 | P4-T15 安全测试（`requireAdmin` 守卫 + 币种配置三端点挂 admin + `security-audit.test.ts` 七向量 14 例 + `docs/reports/security-pentest.md` 渗透报告：高危 0 / 中危 3 附修复计划）；后端全量 562 passed（58 文件）、typecheck 0 错误 | AI |
 
 ---
 

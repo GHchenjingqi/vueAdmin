@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware } from '../../../middleware/auth.js'
+import { requireAdmin } from '../../../middleware/requireAdmin.js'
 import { validate } from '../../../middleware/validate.js'
 import { idParamSchema } from '../../../shared/schemas/common.js'
 import {
@@ -193,8 +194,8 @@ router.get('/analytics/turnover', authMiddleware, validate(analyticsQuerySchema,
 // 价格数值不会自动换算（C5）——界面提示由后台前端承接。
 router.get('/settings/currency', authMiddleware, currencyConfigController.getCurrency)
 router.get('/settings/currency/active', authMiddleware, currencyConfigController.getActive)
-router.put('/settings/currency', authMiddleware, validate(updateCurrencySchema), currencyConfigController.updateCurrency)
-router.post('/settings/currency/rollback', authMiddleware, validate(rollbackCurrencySchema), currencyConfigController.rollbackCurrency)
-router.get('/config-changes', authMiddleware, currencyConfigController.listConfigChanges)
+router.put('/settings/currency', authMiddleware, requireAdmin, validate(updateCurrencySchema), currencyConfigController.updateCurrency)
+router.post('/settings/currency/rollback', authMiddleware, requireAdmin, validate(rollbackCurrencySchema), currencyConfigController.rollbackCurrency)
+router.get('/config-changes', authMiddleware, requireAdmin, currencyConfigController.listConfigChanges)
 
 export default router
