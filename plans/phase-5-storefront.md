@@ -314,9 +314,27 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 
 ---
 
+## 第 7 步：Nuxt 3 独立站前端（`shops/`）—— 核查结论
+
+> 该目录由**并行方**按 `shops/mds/storefront-execution-plan_v1.0.md` 交付，
+> 按贯穿全程的边界约定：本会话后端主线只提交 `server/` 与本文档，**不纳入 `shops/` 提交树、不越界改动**。
+
+- 工程已建成：Nuxt 3 + TS + Tailwind，`nuxt.config.ts` / `app.vue` / `layouts` / `pages`
+  （首页 / 集合 / 详情 / 搜索 / 购物车 / 结算 / 结果 / 政策 / 博客 / 订阅退订）/ `components` / `composables`
+  / `shared`（currency / analytics / schemas / i18n / mock）/ `server`（BFF 代理、store-config、sitemap、robots）/ `tests`。
+- 埋点侧已具备：`shared/analytics/{consent,events,ecommerce}.ts` + `plugins/analytics.client.ts` + `ConsentBanner`，
+  GA4 九事件字典与 Cookie 同意门控（P4-T10 / P4-T11）已落地。
+- 本会话核查验证：`npm --prefix shops run typecheck`（nuxi）通过；`npm --prefix shops test` **12/12 通过**
+  （另有 2 条 `EPERM` 为沙箱临时目录写入权限告警，非业务失败）。
+- 交接边界：本次新增的 3 个后端接口（`GET /track/:orderNo`、`POST /track-event`、建单 `attribution`）
+  尚未在前端 BFF 接线，属并行方步骤 7 后续工作量（其执行计划 P4-T04 物流跟踪、P4-T10 CAPI 仍登记待办）。
+  后端契约已就绪并有测试覆盖，前端只需按 `shops/shared/api/client.ts` 现有范式转发即可。
+
+---
+
 ## 通用验收标准（沿用 §6）
 
 - 后端：`npm --prefix server run typecheck && npm --prefix server run test`
-- 前端本轮不改动（独立站前端未建），无需跑前端验证。
+- 前端（步骤 7，并行方）：`npm --prefix shops run typecheck && npm --prefix shops test`；本会话仅核查不改动。
 - 提交前缀：`feat(storefront):` / `test(storefront):` / `docs(storefront):`。
 - GitHub push 走本机代理 `https_proxy=http://127.0.0.1:7892`，直连会 `schannel: server closed abruptly`。
