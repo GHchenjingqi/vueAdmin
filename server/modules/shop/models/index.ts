@@ -49,3 +49,6 @@ export { default as ShopProductQA } from './ShopProductQA.js'
 
 // 阶段 5 步骤 5（第三切片）：内容管理（博客/内容页，复用 shop 模型层，不建第二套后端）
 export { default as ShopArticle } from './ShopArticle.js'
+
+// 阶段 5 步骤 5（第四切片）：退货/售后（复用 shop 模型层，不建第二套后端）
+export { default as ShopRmaRequest } from './ShopRmaRequest.js'

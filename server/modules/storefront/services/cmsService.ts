@@ -49,12 +49,13 @@ export interface ArticleListView {
 export async function listArticles(site: StorefrontSite, q: ArticleListQuery): Promise<ArticleListView> {
   const tId = tid()
   const siteId = site.shopId ?? 0
-  const where: Record<string, unknown> = { tenantId: tId, siteId, status: 'published' as const }
+  const where: Record<string | symbol, unknown> = { tenantId: tId, siteId, status: 'published' as const }
   if (q.keyword) where.title = { [Op.like]: `%${q.keyword}%` }
   // MySQL 不支持 Op.contains（→ PG @>）；用参数化 JSON_CONTAINS 做标签过滤，防注入
   const replacements: Record<string, unknown> = {}
   if (q.tag) {
-    where[Op.and] = Sequelize.literal('JSON_CONTAINS(tags, :tag)')
+    // Op.and 为 unique symbol，需用 symbol 索引签名绕过 Record<string,unknown> 的限制
+    ;(where as Record<string | symbol, unknown>)[Op.and] = Sequelize.literal('JSON_CONTAINS(tags, :tag)')
     replacements.tag = JSON.stringify(q.tag)
   }
 

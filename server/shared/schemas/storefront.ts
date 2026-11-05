@@ -234,3 +234,39 @@ export const cmsSlugParamSchema = z
 
 export type CmsListQueryInput = z.infer<typeof cmsListQuerySchema>
 export type CmsSlugParamInput = z.infer<typeof cmsSlugParamSchema>
+
+// ————————————————————————————————————————————————
+// 阶段 5 步骤 5（第四切片）：退货/售后（顾客登录，需校验订单归属与服务端重算退款）
+// ————————————————————————————————————————————————
+
+/** POST /rma —— 提交退货申请（orderId + 退货明细 + 原因） */
+export const rmaSubmitSchema = z.object({
+  orderId: z.number().int().positive('orderId 必须为正整数'),
+  items: z
+    .array(
+      z.object({
+        orderItemId: z.number().int().positive('orderItemId 必须为正整数'),
+        skuId: z.number().int().positive('skuId 必须为正整数'),
+        qty: z.number().int().min(1, '退货数量至少为 1').max(9999),
+      }),
+    )
+    .min(1, '退货明细不能为空')
+    .max(100),
+  reason: z.string().max(1000).optional(),
+})
+
+/** GET /rma/:id、POST /rma/:id/cancel、POST /rma/:id/track —— 路径参数 id */
+export const rmaIdParamSchema = z
+  .object({
+    id: z.coerce.number().int().positive(),
+  })
+  .passthrough()
+
+/** POST /rma/:id/track —— 回寄物流单号 */
+export const rmaTrackSchema = z.object({
+  trackingNo: z.string().min(1).max(64, '物流单号最长 64 字符'),
+})
+
+export type RmaSubmitInput = z.infer<typeof rmaSubmitSchema>
+export type RmaIdParamInput = z.infer<typeof rmaIdParamSchema>
+export type RmaTrackInput = z.infer<typeof rmaTrackSchema>

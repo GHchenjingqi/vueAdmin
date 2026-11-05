@@ -18,7 +18,7 @@
 | 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | ✅ 已完成 |
-| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify + 评价 + 问答 + CMS 已完成，RMA / 17track 待续） |
+| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify + 评价 + 问答 + CMS + RMA 已完成，17track 待续） |
 | 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 后续 |
 | 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | 后续 |
 
@@ -223,6 +223,37 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 - **公开路由**（免 admin 鉴权，走 siteContext）：`GET /cms/articles`、`GET /cms/articles/:slug`。
 - **验证**：`storefront-cms.test.ts`（5 例：写入自动置 publishedAt、列表仅 published、草稿不可见、分页+排序、keyword/tag 过滤、slug 取详情、未发布/不存在 404、跨站点隔离）。
 - 提交一并纳入迁移 `000055`（已 apply 到 DB）。
+
+---
+
+## 第 5 步（四）：退货 / 售后 RMA（薄层复用 shop 服务）
+
+> 步骤 5 共 7 个独立域。继 newsletter+restock / 评价+问答 / CMS 之后，本切片落地**退货售后 RMA**；
+> 仅剩 **17track 轨迹**待续。全程复用 shop 模型与服务层（不建第二套后端），storefront 仅做薄编排层。
+> RMA 为敏感链路（涉及退款），故**强制顾客登录**（customerAuth），并以订单归属 + 可退状态双重校验。
+
+### 5.11 模型与迁移
+- 迁移 `000056` `shop_rma_requests`：`tenantId / siteId / orderId / customerId(可空) / email / status(pending|approved|rejected|returned|refunded|cancelled) / reason / items(JSON 明细) / refundAmountCents(BIGINT) / refundCurrency / trackingNo / rejectReason / 时间戳`；索引 `(tenantId,customerId)`、`(tenantId,orderId)`。
+- 模型层 `server/modules/shop/models/` 注册 `ShopRmaRequest`（class 写法 + `declare`，与 ShopArticle 同约定），`models/index.ts` 注册。已 apply 到 DB。
+
+### 5.12 退货服务（`storefront/services/rmaService.ts`）
+- `submitRma`：校验订单存在（404）、**订单邮箱 == 登录顾客邮箱**（403 防越权）、订单状态 ∈ `fulfilled/shipped/done`（否则 400 不可退）；
+  逐项校验退货明细归属该订单且数量 ≤ 已购（否则 400）；**退款金额按订单快照单价(分) × 退货数服务端重算**（绝不信前端传入）；
+- `listMyRmas` / `getMyRma`：仅本人可见，非本人 `getMyRma → 404`；
+- `cancelRma`：仅 `pending` 可取消（否则 400）；
+- `submitReturnTracking`：仅 `approved`（审核通过）可回寄，状态置 `returned` 并记录物流单号（否则 400）；`rejected/refunded` 由 admin 侧填写，本切片不实现。
+
+### 5.13 公开路由（需 customerAuth，走 siteContext）
+- `POST /api/storefront/v1/rma` —— 提交退货申请
+- `GET  /api/storefront/v1/rma` —— 我的退货申请列表
+- `GET  /api/storefront/v1/rma/:id` —— 申请详情（非本人 404）
+- `POST /api/storefront/v1/rma/:id/cancel` —— 取消（仅 pending）
+- `POST /api/storefront/v1/rma/:id/track` —— 回寄物流单号（仅 approved）
+
+### 5.14 验证
+- `npm run typecheck` 通过（顺带修复上一刀 CMS 切片 `cmsService.ts` 中 `where[Op.and]` 以 `unique symbol` 索引 `Record<string,unknown>` 的严格类型报错）；
+- `vitest run` 全量 **442 用例通过**（新增 `storefront-rma.test.ts` 9 例：提交退货+pending+退款重算、订单不存在 404、email 不符 403、状态不可退 400、明细不归属 400、超量 400、列表/详情+非本人 404、取消仅 pending、回寄仅 approved）；
+- 提交一并纳入迁移 `000056`（已 apply 到 DB）。
 
 ---
 
