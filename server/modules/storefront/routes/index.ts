@@ -21,6 +21,7 @@ import trackingRouter from './tracking.js'
 import analyticsRouter from './analytics.js'
 import addressRouter from './address.js'
 import monitoringRouter from './monitoring.js'
+import * as flagsController from '../../featureflags/flagsController.js'
 
 /**
  * Storefront 公开接口路由
@@ -55,5 +56,6 @@ router.use('/', trackingRouter)
 router.use('/', analyticsRouter)
 router.use('/addresses', addressRouter)
 router.use('/monitoring', monitoringRouter)
+router.get('/flags/:key', flagsController.publicCheck)
 
 export default router

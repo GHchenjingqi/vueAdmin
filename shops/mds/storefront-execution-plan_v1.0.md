@@ -440,6 +440,8 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.11 | 2026-11-05 | P4-T15 安全测试（`requireAdmin` 守卫 + 币种配置三端点挂 admin + `security-audit.test.ts` 七向量 14 例 + `docs/reports/security-pentest.md` 渗透报告：高危 0 / 中危 3 附修复计划）；后端全量 562 passed（58 文件）、typecheck 0 错误 | AI |
 | v1.12 | 2026-11-05 | X-T03 审计日志（`audit_logs` 表 + `AuditLog` 模型 + `auditLogService` record/listByEntity + 支付 Webhook/库存 occupy-release/退款 createRefund 三处状态变更埋点 + `GET /audit-logs` admin 查询端点；币种配置审计沿用 `config_changes`）；`audit-log.test.ts` 4 例；后端全量 passed、typecheck 0 错误 | AI |
 | v1.12 | 2026-11-04 | P4-T15 复核（`requireAdmin` 中间件 3 例 + CSRF/originValidator 3 例 + 登录限流 2 例 + SQLi 字面量 2 例 + 订单枚举/配置越权源码回归；安全套件 14/14、全量 576/576、typecheck 0 错误）+ **P4-T16 性能验收**（Playwright 实测店面 SSR：移动端 LCP P75 最大 140ms < 2500ms、CLS=0、TTFB 34–95ms，移动/桌面分设备；`docs/reports/performance-acceptance.md`） | AI |
+| v1.13 | 2026-11-04 | **X-T04 Feature Flag**（`modules/featureflags/featureFlags.ts`：5 个关键新功能默认关闭 + `isFeatureEnabled` fail-closed + `setFlag` 持久化 `feature.flags` 并写审计 + `requireFeature` 守卫关闭→403；admin `GET/PUT /api/v1/flags`（`requireAdmin`）+ 公开 `GET /api/storefront/v1/flags/:key`；`featureFlags.test.ts` 6 例）；修复 **X-T03** `audit-log.test.ts` 损坏导入（`setTenantContext` 不存在 → `runInTenant`）与测试隔离（beforeEach 清理固定实体 ID），4/4 通过；后端全量 586 passed（61 文件）、typecheck 0 错误 | AI |
+| v1.14 | 2026-11-05 | X-T04 收口提交 + `setFlag` 审计修正：原实现先改写 `ov[key]` 再算 `oldValue`，导致审计恒记 `!enabled`（无法反映真实旧值，重复设置同值也记成变更）；改为变更前捕获 `ov[key] ?? defaultEnabled`（JSON 列存布尔）。featureFlags 6/6、后端全量 586 passed（61 文件）、server typecheck 0 错误 | AI |
 
 ---
 

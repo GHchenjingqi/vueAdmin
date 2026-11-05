@@ -30,6 +30,7 @@ import knowledgeRoutes from '../modules/knowledge/routes/index.js'
 import workflowRoutes from './workflowRoutes.js'
 // ==================== 商城后台 ====================
 import shopRoutes from '../modules/shop/routes/index.js'
+import flagsRoutes from '../modules/featureflags/routes.js'
 
 const router = Router()
 
@@ -1964,6 +1965,7 @@ if (config.app.aiAssistantEnabled !== false) {
 router.use(workflowRoutes)
 router.use('/knowledge', knowledgeRoutes)
 router.use('/shop', shopRoutes)
+router.use('/flags', flagsRoutes)
 
 // ==================== 计费与配额 ====================
 import billingRoutes from '../modules/billing/routes/billingRoutes.js'
