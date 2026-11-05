@@ -46,3 +46,6 @@ export { default as ShopRestockSubscription } from './ShopRestockSubscription.js
 // 阶段 5 步骤 5（第二切片）：商品评价 + 问答（复用 shop 模型层，不建第二套后端）
 export { default as ShopReview } from './ShopReview.js'
 export { default as ShopProductQA } from './ShopProductQA.js'
+
+// 阶段 5 步骤 5（第三切片）：内容管理（博客/内容页，复用 shop 模型层，不建第二套后端）
+export { default as ShopArticle } from './ShopArticle.js'

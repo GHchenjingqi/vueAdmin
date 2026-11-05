@@ -210,3 +210,27 @@ export type ReviewListQueryInput = z.infer<typeof reviewListQuerySchema>
 export type ReviewSubmitInput = z.infer<typeof reviewSubmitSchema>
 export type QaListQueryInput = z.infer<typeof qaListQuerySchema>
 export type QaSubmitInput = z.infer<typeof qaSubmitSchema>
+
+// ————————————————————————————————————————————————
+// 阶段 5 步骤 5（第三切片）：内容管理 CMS（公开读取接口）
+// ————————————————————————————————————————————————
+
+/** GET /cms/articles?page=&pageSize=&tag=&keyword= —— 公开文章列表（仅 published） */
+export const cmsListQuerySchema = z
+  .object({
+    page: optionalQueryInt(),
+    pageSize: optionalQueryInt(60),
+    tag: optionalQueryStr(40),
+    keyword: optionalQueryStr(100),
+  })
+  .passthrough()
+
+/** GET /cms/articles/:slug —— 文章详情（路径参数 slug） */
+export const cmsSlugParamSchema = z
+  .object({
+    slug: z.string().min(1).max(255),
+  })
+  .passthrough()
+
+export type CmsListQueryInput = z.infer<typeof cmsListQuerySchema>
+export type CmsSlugParamInput = z.infer<typeof cmsSlugParamSchema>

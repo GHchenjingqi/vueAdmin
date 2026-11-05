@@ -18,7 +18,7 @@
 | 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | ✅ 已完成 |
-| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify + 评价 + 问答 已完成，RMA / CMS / 17track 待续） |
+| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify + 评价 + 问答 + CMS 已完成，RMA / 17track 待续） |
 | 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 后续 |
 | 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | 后续 |
 
@@ -211,6 +211,18 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 - `npm run typecheck` 通过；
 - `vitest run` 全量 **428 用例通过**（新增 `storefront-review.test.ts` 14 例：游客/登录提交、SPU 不存在 404、SKU 归属 404、评分越界 400、列表仅 approved + 汇总、pending 不计入、markHelpful 自增 / 越权 404、问答提交 / 列表仅 answered、已购验证 命中 / email 不符 / 未支付 三种场景）。
 - 提交一并纳入迁移 `000053` / `000054`（已 apply 到 DB）。
+
+### 第 5 步（三）：内容管理 CMS（博客 / 内容页）—— 薄层复用 shop 模型
+
+- **迁移 `000055`**：`shop_articles`（tenantId / siteId / title / slug / summary / content / coverImage / status / authorName / tags(JSON) / publishedAt / sortOrder / 时间戳），唯一索引 `(tenantId, siteId, slug)`。
+- **模型**：`server/modules/shop/models/ShopArticle.ts`（class extends Model + `declare`，与 ShopReview 同约定），`models/index.ts` 注册。
+- **服务** `storefront/services/cmsService.ts`：
+  - `listArticles(site, {page,pageSize,tag,keyword})`：仅 `status='published'`，按 `tenantId + siteId` 隔离，`publishedAt DESC, sortOrder DESC, id DESC`；`keyword` 走 `title LIKE`、`tag` 走参数化 `JSON_CONTAINS(tags, :tag)`（MySQL 语法，`Op.contains` 会被翻成 PG 的 `@>`，故禁用）。
+  - `getArticleBySlug(site, slug)`：仅 published，未发布/不存在 → `404`。
+  - `createArticle(site, input)`：供测试与未来 admin 写入；公开接口不暴露本方法（admin 路由属后续）。
+- **公开路由**（免 admin 鉴权，走 siteContext）：`GET /cms/articles`、`GET /cms/articles/:slug`。
+- **验证**：`storefront-cms.test.ts`（5 例：写入自动置 publishedAt、列表仅 published、草稿不可见、分页+排序、keyword/tag 过滤、slug 取详情、未发布/不存在 404、跨站点隔离）。
+- 提交一并纳入迁移 `000055`（已 apply 到 DB）。
 
 ---
 
