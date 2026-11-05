@@ -5,6 +5,7 @@ import ApparelAttributes from '~/components/commerce/ApparelAttributes.vue'
 import VariantSelector from '~/components/commerce/VariantSelector.vue'
 import { useStoreConfig } from '~/composables/useStoreConfig'
 import { trackViewItem, trackAddToCart } from '@shared/analytics/ecommerce'
+import ProductReviews from '~/components/commerce/ProductReviews.vue'
 
 /**
  * 商品详情页（P2-T04/T05/T06）：变体选择、价格、库存、配送承诺、退货摘要。
@@ -126,6 +127,8 @@ useSeo({
           <p v-if="!inStock" class="text-xs text-stone-500">{{ stockNote ?? 'Currently unavailable' }}</p>
         </div>
       </div>
+
+      <ProductReviews v-if="product" :spu-id="product.id" class="lg:col-span-2" />
     </div>
   </div>
 </template>

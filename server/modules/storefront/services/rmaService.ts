@@ -110,7 +110,7 @@ export async function submitRma(
 
   const row = await ShopRmaRequest.create({
     tenantId: tId,
-    siteId: _site.shopId,
+    siteId: _site.shopId ?? 0,
     orderId: order.id,
     customerId: auth.customerId,
     email: auth.email,

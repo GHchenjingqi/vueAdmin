@@ -23,6 +23,21 @@ export default defineEventHandler(async (event) => {
 
   const source = getCommerceSource()
   const cookie = event.node.req.headers.cookie
+  const authorization = event.node.req.headers.authorization as string | undefined
+
+  // ---- 直通域（并行后端已交付的扩展能力；auto/real 下透传，4xx 业务错误原样返回） ----
+  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth)\b/.exec(url)
+  if (extMatch && source !== 'mock') {
+    const res = await commerceRealFetch(url, {
+      method,
+      body: ['POST', 'PATCH', 'PUT'].includes(method) ? await readBody(event).catch(() => undefined) : undefined,
+      cookie,
+      authorization,
+      requestId: event.context.requestId as string | undefined,
+    })
+    setResponseStatus(event, res.status)
+    return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'ext upstream error' })
+  }
 
   const isCommercePath =
     url === 'cart' ||
@@ -32,7 +47,7 @@ export default defineEventHandler(async (event) => {
     url.startsWith('orders/')
 
   if (isCommercePath && source !== 'mock') {
-    const real = await handleReal(url, method, event, cookie)
+    const real = await handleReal(url, method, event, cookie, authorization)
     if (real !== null) return real
     // auto + 网络级失败 → 落入 mock；real + 失败已在 handleReal 返回错误
   }
@@ -41,7 +56,7 @@ export default defineEventHandler(async (event) => {
 })
 
 /** 真实后台处理；返回 null 表示「网络级失败且允许回退 mock」 */
-async function handleReal(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], cookie?: string): Promise<unknown | null> {
+async function handleReal(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], cookie?: string, authorization?: string): Promise<unknown | null> {
   const source = getCommerceSource()
   const requestId = event.context.requestId as string | undefined
 
@@ -57,7 +72,7 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
   // ---- POST /api/cart/items ----
   if (url === 'cart/items' && method === 'POST') {
     const body = await readBody(event)
-    const res = await commerceRealFetch('cart/items', { method: 'POST', body: { skuId: body.skuId, qty: body.qty }, cookie, requestId })
+    const res = await commerceRealFetch('cart/items', { method: 'POST', body: { skuId: body.skuId, qty: body.qty }, cookie, authorization, requestId })
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
     if (!res.ok) return upstreamFail(event, res)
     if (res.setCookie) for (const c of res.setCookie) appendHeader(event, 'set-cookie', c)
@@ -84,7 +99,7 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
   if (url === 'checkout/quote' && method === 'POST') {
     await readBody(event) // 消费 body（真实契约仅需 cartToken；地址/运费/优惠由后台规则表承接）
     const cartToken = cartTokenFrom(cookie)
-    const res = await commerceRealFetch('checkout/quote', { method: 'POST', body: { cartToken }, cookie, requestId })
+    const res = await commerceRealFetch('checkout/quote', { method: 'POST', body: { cartToken }, cookie, authorization, requestId })
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
     if (!res.ok) return upstreamFail(event, res)
     return adaptQuote(unwrapEnvelope(res.body) as Record<string, unknown>)
@@ -106,6 +121,7 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
         attribution: body.attribution,
       },
       cookie,
+      authorization,
       requestId,
     })
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)

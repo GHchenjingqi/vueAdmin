@@ -38,12 +38,13 @@ export interface RealFetchResult {
 }
 
 /** 调用现有后台 storefront 接口（转发 Cookie + requestId；dev 自签名证书开关 NUXT_API_INSECURE_TLS=1） */
-export async function commerceRealFetch(path: string, init: { method?: string; body?: unknown; cookie?: string; rawBody?: string; requestId?: string } = {}): Promise<RealFetchResult> {
+export async function commerceRealFetch(path: string, init: { method?: string; body?: unknown; cookie?: string; rawBody?: string; requestId?: string; authorization?: string } = {}): Promise<RealFetchResult> {
   if (process.env.NUXT_API_INSECURE_TLS === '1') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
   const apiBase = useRuntimeConfig().apiBase as string
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (init.cookie) headers.cookie = init.cookie
   if (init.requestId) headers['x-request-id'] = init.requestId
+  if (init.authorization) headers.authorization = init.authorization
   try {
     const res = await fetch(`${apiBase}/api/storefront/v1/${path}`, {
       method: init.method || 'GET',
