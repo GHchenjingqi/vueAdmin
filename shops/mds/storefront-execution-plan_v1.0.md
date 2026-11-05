@@ -342,19 +342,24 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 ## 9. 上线前必须通过的交易测试（逐项勾选）
 
 > 来源：基线文档 §8.2，另补币种相关两项。任一项未通过，不得上线。
+>
+> **2026-11-05 门禁盘点**：自动化证据集中于 `server/__tests__/storefront-trade-gate.test.ts`
+> （按 T 编号固定，8 条真实断言 + 3 条 `it.todo` 如实暴露功能缺口），
+> 另有 `storefront-commerce.test.ts` / `shopPhases.test.ts` 与 `docs/reports/` 实测报告。
+> 后端全量 **470 passed / 3 todo（48 文件）**。状态按 §0.3 图例，`[!]` 已在 §11 登记。
 
-- [ ] T-01 同一 SKU 并发购买，不超卖
-- [ ] T-02 同一支付请求重复提交，不产生重复订单或重复扣款
-- [ ] T-03 同一 Webhook 重复投递，不重复更新订单或库存
-- [ ] T-04 用户支付成功但浏览器关闭，订单仍正确变为已支付
-- [ ] T-05 支付失败或超时，库存预占能释放
-- [ ] T-06 商品价格在加购后变化，结算能提示并重新报价
-- [ ] T-07 优惠券过期或用尽，服务端拒绝使用
-- [ ] T-08 地址不在配送范围，不能创建可支付订单
-- [ ] T-09 部分退款与全额退款状态均正确，退款币种等于原订单币种
-- [ ] T-10 顾客不能访问其他顾客的订单、地址和购物车
-- [ ] T-11 CDN 不缓存账户、购物车和结算数据
-- [ ] T-12 后台把币种从 USD 改为 CNY 后，前台展示符号、结构化数据、邮件、支付金额四处口径一致；切换期间的未支付订单被安全处理
+- [x] T-01 同一 SKU 并发购买，不超卖 · 证据：trade-gate T-01（12 个并发 `occupy` 对库存 10，成功数 ≤10、`locked ≤ quantity`、`available` 守恒；`inventoryService.occupy` 用 `FOR UPDATE` 行锁 + 死锁重试）
+- [x] T-02 同一支付请求重复提交，不产生重复订单或重复扣款 · 证据：trade-gate T-02 + `storefront-commerce.test.ts:151`（相同 `idempotencyKey` 返回同一订单 id，可用库存不二次预占）
+- [x] T-03 同一 Webhook 重复投递，不重复更新订单或库存 · 证据：trade-gate T-03 + `storefront-commerce.test.ts:211`（重复投递 `alreadyProcessed=true`，订单状态不回退）
+- [x] T-04 用户支付成功但浏览器关闭，订单仍正确变为已支付 · 证据：trade-gate T-04（不依赖浏览器回跳，验签 Webhook 独立把订单推到 `paymentStatus=captured` / `status=paid`）
+- [x] T-05 支付失败或超时，库存预占能释放 · 证据：trade-gate T-05（`occupy(3) → release(3)` 后 `available` 精确恢复）+ `shopPhases.test.ts:263`（未发货订单取消释放占用）
+- [x] T-06 商品价格在加购后变化，结算能提示并重新报价 · 证据：trade-gate T-06（改价后 `createQuote` 返回新单价 15000 分，前端旧总价被忽略，带 `version` + `expiresAt`）；前端「提示」交互属 P3-T04 UI 层，报价新鲜度已由服务端保证
+- [!] T-07 优惠券过期或用尽，服务端拒绝使用 · **阻塞**：P3-T07 未实现，`quoteService.createQuote` 中 `discountCents` 恒为 0、无券码校验入口；见 §11
+- [!] T-08 地址不在配送范围，不能创建可支付订单 · **阻塞**：P3-T05 未实现，`createQuote` 不接收 `shippingAddress`，无 `ADDRESS_NOT_SHIPPABLE` 错误码；见 §11
+- [!] T-09 部分退款与全额退款状态均正确，退款币种等于原订单币种 · **阻塞**：`paymentService` 无退款流程；`rmaService` 仅按订单快照计算 `refundAmountCents/refundCurrency`，`refunding/refunded` 状态流与部分退款金额校验缺自动化证据；见 §11
+- [~] T-10 顾客不能访问其他顾客的订单、地址和购物车 · 部分实证：trade-gate T-10（错误 `accessToken` 一律 404、伪造购物车 token 404、token 48 位不可枚举）+ `storefront-rma.test.ts:153`（email 不符 403）+ `storefront-tracking.test.ts` 双要素防枚举；**地址簿 P4-T02 未实现**，该项无法整体勾选
+- [x] T-11 CDN 不缓存账户、购物车和结算数据 · 证据：trade-gate T-11 静态断言 `shops/nuxt.config.ts` 的 `routeRules` 对 `/cart`、`/checkout/**`、`/account/**`、`/track` 全部输出 `private, no-store`；部署层 CDN 按响应头透传属上线检查项
+- [~] T-12 后台把币种从 USD 改为 CNY 后，前台展示符号、结构化数据、邮件、支付金额四处口径一致；切换期间的未支付订单被安全处理 · 部分实证：docs/reports/t12-currency-switch.md（store-config / 新购物车 / quote / BFF 页面 / 历史订单快照不变 / 旧购物车 `409 CURRENCY_CHANGED` 重建 / 审计回滚 / 缓存失效）+ trade-gate T-12（fail-closed 503 + ISO 白名单）；**尚缺 JSON-LD 结构化数据、订单邮件、支付金额三处口径证据**，不得整体勾选。报告「遗留 #1 后台设置界面未做」已由 `4421a98` 闭合
 
 ---
 
@@ -397,6 +402,10 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 2026-11-04 | P4-T11 | Cookie 同意与 CAPI 不一致 | 隐私合规风险 | 前端 / 数据 | ✅ 已闭环 2026-11-05：consent 随事件上报（`shops/shared/analytics/capi.ts`）+ 后端未同意只落库不外发（`b8a5b9c`）+ 真实 HTTP 实证（`7831d41`） |
 | 2026-11-04 | — | 原 6–8 周计划过于乐观 | 交付延期 | 项目负责人 | 已按阶段门禁重排 |
 | 2026-11-04 | P3-T01~T14 | 分工裁决（用户确认）：后端交易闭环移交并行 Agent；本会话交付已应用迁移 000040-000050 + 契约文档 + 前端接线层（NUXT_COMMERCE_SOURCE mock/real/auto） | 交接成本 | 项目负责人 | 已移交 |
+| 2026-11-05 | T-07 | 服务端优惠券校验未实现：`quoteService.createQuote` 中 `discountCents` 恒为 0，无券码/过期/用尽/币种适用性入口 | §9 门禁 `[!]`：过期或用尽券无法被拒绝，存在价格与合规风险 | 后端 / 营销 | 阻塞（依赖 P3-T07，见 `storefront-trade-gate.test.ts` todo） |
+| 2026-11-05 | T-08 | 配送范围判定未实现：`createQuote` 不接收 `shippingAddress`，无 `ShippingProvider` 与 `ADDRESS_NOT_SHIPPABLE` | §9 门禁 `[!]`：不可配送地址可创建可支付订单，履约风险 | 后端 / 履约 | 阻塞（依赖 P3-T05，见 `storefront-trade-gate.test.ts` todo） |
+| 2026-11-05 | T-09 | 退款状态流未闭环：`paymentService` 无 refund；RMA 仅算退款金额，`refunding/refunded` 由 admin 推进且缺部分退款金额校验 | §9 门禁 `[!]`：部分/全额退款状态与退款币种无法自动回归 | 后端 / 财务 | 阻塞（依赖 P3-T14 / T17，见 `storefront-trade-gate.test.ts` todo） |
+| 2026-11-05 | T-12 | 币种切换四处口径实证不全：已有 store-config/购物车/报价/订单快照/回滚证据，缺 JSON-LD、订单邮件、支付金额三处 | §9 门禁 `[~]`：不得作为「四处口径一致」整体通过 | 前端 / 数据 / 财务 | 待补证据 |
 
 ---
 
