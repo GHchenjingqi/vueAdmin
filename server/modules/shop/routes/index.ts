@@ -50,6 +50,7 @@ import * as marketingController from '../controllers/marketingController.js'
 import * as analyticsController from '../controllers/analyticsController.js'
 import * as currencyConfigController from '../controllers/currencyConfigController.js'
 import * as refundController from '../controllers/refundController.js'
+import * as orderMailController from '../controllers/orderMailController.js'
 import { updateCurrencySchema, rollbackCurrencySchema } from '../../../shared/schemas/storefront-commerce.js'
 
 /**
@@ -163,6 +164,11 @@ router.post('/orders/:id/cancel', authMiddleware, validate(idParamSchema, 'param
 // T-09：退款（薄层复用 shop 订单快照，金额/币种由服务端决定）
 router.get('/orders/:id/refunds', authMiddleware, validate(idParamSchema, 'params'), refundController.list)
 router.post('/orders/:id/refunds', authMiddleware, validate(idParamSchema, 'params'), validate(createRefundSchema), refundController.create)
+
+// ==================== P3-T17：订单邮件 outbox（查询 / 手动投递 / 失败重发） ====================
+router.get('/order-mails', authMiddleware, orderMailController.list)
+router.post('/order-mails/drain', authMiddleware, orderMailController.drain)
+router.post('/order-mails/:id/retry', authMiddleware, validate(idParamSchema, 'params'), orderMailController.retry)
 
 // ==================== 阶段 4：营销中心 ====================
 router.get('/promotions', authMiddleware, validate(shopPaginationSchema, 'query'), marketingController.listPromotions)

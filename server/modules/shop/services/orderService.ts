@@ -5,6 +5,7 @@ import type { CreateOrderInput, ShipOrderInput } from '../../../shared/schemas/s
 import { getTenantContext } from '../../../modules/tenant/context.js'
 import * as inventoryService from './inventoryService.js'
 import { createShipment } from './channelAdapter.js'
+import { tryEnqueue } from './orderMailService.js'
 
 /** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
 const tid = (): number => getTenantContext()?.tenantId ?? 1
@@ -134,6 +135,8 @@ export async function ship(id: number, input: ShipOrderInput): Promise<ShopOrder
     } as never, { transaction: t })
     await order.update({ status: 'shipped' }, { transaction: t })
   })
+  // P3-T17：发货通知入队（以运单号去重；邮件失败不影响发货事实）
+  await tryEnqueue({ orderId: id, type: 'shipped', dedupeKey: trackingNo, trackingNo, carrier: logistics.carrier })
   return order
 }
 

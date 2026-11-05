@@ -101,11 +101,12 @@ describe('T-08 配送范围与分区运费', () => {
 
   it('建单：不可配送地址直接拒绝，且不落库订单', async () => {
     await inTenant(async () => {
-      const before = await ShopOrder.count({ where: { tenantId: TID } })
+      // 用唯一幂等键精确核对本次建单未落库；全表 count 会被并行测试造的订单干扰
+      const key = `SHIP-UNSHIPPABLE-${uniq()}`
       await expect(
-        checkoutService.createOrder(site, { items: [{ skuId, qty: 1 }], shippingAddress: addr('XX'), email: 'ship@example.com' }),
+        checkoutService.createOrder(site, { items: [{ skuId, qty: 1 }], shippingAddress: addr('XX'), email: 'ship@example.com', idempotencyKey: key }),
       ).rejects.toThrow(/ADDRESS_NOT_SHIPPABLE/)
-      expect(await ShopOrder.count({ where: { tenantId: TID } })).toBe(before)
+      expect(await ShopOrder.count({ where: { tenantId: TID, idempotencyKey: key } })).toBe(0)
     })
   })
 

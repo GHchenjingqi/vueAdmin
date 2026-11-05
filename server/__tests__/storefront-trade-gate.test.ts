@@ -33,6 +33,7 @@ import * as checkoutService from '../modules/storefront/services/checkoutService
 import * as paymentService from '../modules/storefront/services/paymentService.js'
 import * as customerService from '../modules/shop/services/customerService.js'
 import * as addressService from '../modules/storefront/services/addressService.js'
+import * as orderMailService from '../modules/shop/services/orderMailService.js'
 
 const TID = 1
 function uniq(): string {
@@ -310,6 +311,27 @@ describe('T-12 币种切换 fail-closed 与元数据一致性', () => {
       const session = await paymentService.createSession(site, order.id)
       expect(session.currency).toBe('CNY')
       expect(session.amountCents).toBe(order.amountCents)
+    })
+  })
+
+  it('订单邮件按订单快照币种渲染：站点 USD 下历史 CNY 订单仍出 ¥/CNY，且不含支付凭据', async () => {
+    await inTenant(async () => {
+      const cart = await cartService.addItem(site, undefined, { skuId, qty: 1 })
+      const order = await checkoutService.createOrder(site, {
+        cartToken: cart.token,
+        email: `t12mail-${uniq()}@example.com`,
+        idempotencyKey: `T12M-${uniq()}`,
+      })
+      await ShopOrder.update({ currency: 'CNY' } as never, { where: { id: order.id, tenantId: TID } })
+      const mail = await orderMailService.enqueueOrderMail({ orderId: order.id, type: 'confirmed' })
+      expect(mail?.currency).toBe('CNY')
+      expect(mail?.bodyText).toContain('CNY')
+      expect(mail?.bodyText).toContain('¥')
+      expect(mail?.bodyText).not.toContain('USD')
+      expect(orderMailService.formatOrderAmount(order.amountCents, 'CNY')).toContain('CNY')
+      for (const secret of ['accessToken', 'providerRef', 'cardNumber', 'cvv']) {
+        expect(mail?.bodyText).not.toContain(secret)
+      }
     })
   })
 })

@@ -4,6 +4,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
 import sequelize from '../../../config/database.js'
 import { ShopOrderRefund } from '../models/index.js'
+import { tryEnqueue } from './orderMailService.js'
 
 /**
  * 订单退款（T-09 / P3-T14）
@@ -99,6 +100,17 @@ async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T>
   throw lastErr
 }
 
+/** P3-T17：退款邮件以退款单号去重；入队失败不影响退款结果 */
+async function notifyRefund(view: RefundView): Promise<RefundView> {
+  await tryEnqueue({
+    orderId: view.orderId,
+    type: 'refunded',
+    dedupeKey: view.refundNo,
+    amountCents: view.amountCents,
+  })
+  return view
+}
+
 /** 列出某订单的退款流水（租户隔离） */
 export async function listRefunds(orderId: number): Promise<RefundView[]> {
   const rows = await ShopOrderRefund.findAll({
@@ -114,10 +126,10 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
   const idempotencyKey = (params.idempotencyKey ?? crypto.randomBytes(16).toString('hex')).slice(0, 64)
 
   const existing = await ShopOrderRefund.findOne({ where: { idempotencyKey, tenantId: tId } })
-  if (existing) return toView(existing)
+  if (existing) return notifyRefund(toView(existing))
 
   try {
-    return await withDeadlockRetry(() =>
+    return await notifyRefund(await withDeadlockRetry(() =>
       sequelize.transaction(async (tx) => {
         const [orderRows] = await sequelize.query(
           'SELECT id, orderNo, amountCents, currency, paymentStatus FROM orders WHERE id = ? AND tenantId = ? FOR UPDATE',
@@ -186,12 +198,12 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
 
         return toView(row)
       }),
-    )
+    ))
   } catch (err) {
     // 并发下同一幂等键已被处理：返回首笔结果，不二次退款
     if (err instanceof UniqueConstraintError) {
       const dup = await ShopOrderRefund.findOne({ where: { idempotencyKey, tenantId: tId } })
-      if (dup) return toView(dup)
+      if (dup) return notifyRefund(toView(dup))
     }
     throw err
   }

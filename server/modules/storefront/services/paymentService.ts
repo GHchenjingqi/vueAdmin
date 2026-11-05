@@ -4,6 +4,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderPayment } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
+import { tryEnqueue } from '../../shop/services/orderMailService.js'
 import { assertShippableCountry, extractCountry } from './shippingService.js'
 import config from '../../../config/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
@@ -133,6 +134,8 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
     await order.update({ paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never)
     await reservationService.commitReservation(order.orderNo)
     if (prev) await prev.update({ status: 'captured', rawPayload: payload } as never)
+    // P3-T17：订单确认邮件入队（幂等 + 异常隔离，邮件失败不得让支付回调重投失败）
+    await tryEnqueue({ orderId: order.id, type: 'confirmed' })
     return { ok: true, status: 200 }
   }
 
