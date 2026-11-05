@@ -7,8 +7,10 @@
  *
  * 诚实原则：T-07 / T-08 / T-09 曾因功能未实现以 it.todo 登记；
  * 三项功能落地后已改为真实断言，完整边界用例见
- * storefront-shipping / storefront-coupon / storefront-refund 三个专项测试文件。
- * 尚未实现的能力（地址簿 P4-T02、订单邮件等）仍在 §9 如实标注 `[~]`。
+ * storefront-shipping / storefront-coupon / storefront-refund / storefront-address /
+ * storefront-order-mail 五个专项测试文件。
+ * 地址簿 P4-T02 与订单邮件 P3-T17 补齐后，§9 T-01~T-12 已全部 [x]；
+ * 非门禁遗留（SMTP 调度、CDN 透传、业务签字）在计划 §11 如实登记。
  *
  * 依赖已迁移的测试库；所有 DB 操作显式包 runInTenant。
  */
@@ -300,6 +302,16 @@ describe('T-12 币种切换 fail-closed 与元数据一致性', () => {
     const body = readFileSync(report, 'utf8')
     expect(body).toContain('CURRENCY_CHANGED')
     expect(body).toContain('confirmImpact')
+  })
+
+  it('JSON-LD / 前台符号切币种真实 HTTP 实测报告已产出（5/5 PASS）', () => {
+    const report = fileURLToPath(new URL('../../docs/reports/t12-jsonld-currency-switch.md', import.meta.url))
+    expect(existsSync(report)).toBe(true)
+    const body = readFileSync(report, 'utf8')
+    expect(body).toContain('priceCurrency')
+    expect(body).toContain('129.90')
+    expect(body).toContain('数值不换算')
+    expect(body).toContain('restored store-config = CNY')
   })
 
   it('支付会话金额与币种取订单快照，不随当前站点币种漂移', async () => {
