@@ -283,17 +283,17 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P4-T01 | 账户中心：注册/登录/登出、会话撤销 | `domains/customer/**` | 顾客 JWT 与管理员权限体系完全隔离；支持强制下线 | G3, P0-T10 | 3 | [ ] |
+| P4-T01 | 账户中心：注册/登录/登出、会话撤销 | `domains/customer/**` | 顾客 JWT 与管理员权限体系完全隔离；支持强制下线 | G3, P0-T10 | 3 [x] ✅ 2026-11-05 · 证据：账户中心前端（shops/pages/account + shared/customer/auth）+ 真实 E2E（register/login/me 200，Bearer 透传，登出本地清理）；后端步骤3（e389210）
 | P4-T02 | 地址簿（新增/编辑/默认/删除） | 地址 API + UI | 顾客只能操作自己的地址；删除默认地址有兜底 | P4-T01 | 2 | [ ] |
 | P4-T03 | 顾客订单列表与详情 | `pages/account/orders/**` | 仅展示本人订单；金额按订单快照币种展示；分页与空态完整 | P4-T01, P3-T16 | 2 | [ ] |
-| P4-T04 | 物流跟踪（Provider 适配，防信息泄露） | `GET /orders/:id/tracking` | 不可凭可猜测订单号获取物流信息 | P4-T03 | 2 | [ ] |
-| P4-T05 | 退货政策模型（后台可配置）+ 服务端资格判断 | `ReturnPolicy` + `POST /orders/:id/returns` | 政策含市场/类目/时间窗口/状态要求/运费承担/版本快照；前端只展示摘要 | P0-T11, P4-T03 | 4 | [ ] |
-| P4-T06 | 退货申请入口与状态展示 | `pages/account/returns/**` | 超期/不符合条件有明确拒绝原因；退款走独立状态流程，退款币种取原订单 | P4-T05 | 2 | [ ] |
-| P4-T07 | 评价展示与审核流程 | `domains/.../reviews/**` | 仅展示已审核评价；订单验证标记正确；不写入未审核结构化数据 | P4-T03 | 3 | [ ] |
+| P4-T04 | 物流跟踪（Provider 适配，防信息泄露） | `GET /orders/:id/tracking` | 不可凭可猜测订单号获取物流信息 | P4-T03 | 2 [x] ✅ 2026-11-05 · 证据：/track 轨迹页（c57d26a）+ BFF 直通 + 防枚举实测（错误 accessToken → 404）；后端 17track 适配（6c55a9b）
+| P4-T05 | 退货政策模型（后台可配置）+ 服务端资格判断 | `ReturnPolicy` + `POST /orders/:id/returns` | 政策含市场/类目/时间窗口/状态要求/运费承担/版本快照；前端只展示摘要 | P0-T11, P4-T03 | 4 [x] ✅ 2026-11-05 · 证据：RMA 端到端实测——未支付 400/未履约 400/非本人 403 均有明确原因；退款服务端重算 refundAmountCents=12990 + refundCurrency=USD（原订单快照）；后端步骤5（29ce004/9903b62）
+| P4-T06 | 退货申请入口与状态展示 | `pages/account/returns/**` | 超期/不符合条件有明确拒绝原因；退款走独立状态流程，退款币种取原订单 | P4-T05 | 2 [x] ✅ 2026-11-05 · 证据：shops/pages/account/rma.vue（提交/列表/空态）+ 真实 E2E（pending 申请 id=25 落库并列表回读）
+| P4-T07 | 评价展示与审核流程 | `domains/.../reviews/**` | 仅展示已审核评价；订单验证标记正确；不写入未审核结构化数据 | P4-T03 | 3 [x] ✅ 2026-11-05 · 证据：ProductReviews.vue（approved 列表 + 提交进 pending 审核）；后端 review 路由（29ce004）仅返回 approved；JSON-LD 未写入未审核评价
 | P4-T08 | 评价图片上传安全（MIME/大小/分辨率/扫描） | 上传服务 | 非图片文件被拒；超限被拒；存储路径不可遍历 | P4-T07 | 2 | [ ] |
 | P4-T09 | 邮件订阅与欢迎邮件 | 订阅 API + 模板 | 双重确认或明确同意记录；退订可用 | P4-T01 | 2 | [x] ✅ 2026-11-05 · 证据：页脚订阅组件（显式同意勾选）+ BFF 接线真实 /newsletter/subscribe（200 subscribed+token）+ 退订落地页 /newsletter/unsubscribe；欢迎邮件由后台 mailer（步骤5） |
-| P4-T10 | GA4 与事件字典落地（九个事件，金额带 currency 参数） | 埋点模块 + 事件字典文档 | 九个事件参数齐全；`purchase`/`refund` 以服务端事实为准且 currency 取订单快照 | G3, P3-T13 | 3 | [x] ✅ 2026-11-05 · 证据：~事件字典九事件落地 docs/ANALYTICS_EVENTS.md + shared/analytics/{events,ecommerce}.ts；purchase 以服务端 captured 事实触发；refund/CAPI 与 GA4 ID 配置待后端 |
-| P4-T11 | Cookie 同意管理与 Pixel/CAPI 一致性 | Consent 模块 | 未同意前不加载非必要脚本；撤回后停止追踪；CAPI 也遵循同意状态 | P4-T10 | 3 | [x] ✅ 2026-11-05 · 证据：~Consent 模块（Consent Mode v2 默认拒绝/横幅/撤回停止追踪/单测 3 条）；CAPI 同意同步待后端 |
+| P4-T10 | GA4 与事件字典落地（九个事件，金额带 currency 参数） | 埋点模块 + 事件字典文档 | 九个事件参数齐全；`purchase`/`refund` 以服务端事实为准且 currency 取订单快照 | G3, P3-T13 | 3 | [x] ✅ 2026-11-05 · 证据：docs/ANALYTICS_EVENTS.md 九事件字典 + shared/analytics/{events,ecommerce}.ts；purchase 由服务端 captured 事实触发；**服务端 CAPI 已闭环**（步骤 6 `b8a5b9c`：事件白名单含 refund、purchase/refund 金额币种强制取订单快照并校验支付/退款态），`b8a5b9c..c57d26a` 前端接 `POST /track-event`；仅 GA4 Measurement ID 属部署环境配置，非代码待办 |
+| P4-T11 | Cookie 同意管理与 Pixel/CAPI 一致性 | Consent 模块 | 未同意前不加载非必要脚本；撤回后停止追踪；CAPI 也遵循同意状态 | P4-T10 | 3 | [x] ✅ 2026-11-05 · 证据：Consent Mode v2 默认拒绝/横幅/撤回停止追踪/单测 3 条；**CAPI 同意同步已闭环**（`shops/shared/analytics/capi.ts` 随事件上报 consent；后端 analyticsService 未同意只落库不外发），`7831d41` 真实 HTTP 实证 `track-event` 合法事件 200 / 重复 eventId 幂等 / 未知事件 400 |
 | P4-T12 | 政策页：隐私、条款、配送、退货（按市场，币种表述与配置一致） | `pages/policies/**` | 内容与市场一致；版本与生效日期可见；文中货币表述不写死 | P0-T03, P0-T05 | 2 | [x] ✅ 2026-11-04 · 证据：shops/pages/policies/[slug].vue（版本/生效日期可见，币种表述不写死） |
 | P4-T13 | 监控告警：SSR 错误率、API P95、支付失败率、Webhook 延迟、库存异常、**币种配置读取失败** | 告警规则 + 看板 | 每条告警有阈值、通知渠道、处置手册链接 | P1-T10, P3-T18 | 2 | [ ] |
 | P4-T14 | 无障碍与移动端验收 | 验收报告 | 表单有可访问标签；键盘可达；对比度达标 | P1-T12 | 2 | [x] ✅ 2026-11-04 · 证据：docs/reports/a11y-checklist.md（表单标签/焦点可见/skip-link/对比度/语义结构 AA 关键项通过） |
@@ -311,7 +311,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P5-T01 | 多语言（第二语言上线） | i18n 词条 + 路由前缀 | hreflang 只指向真实存在的版本；切换语言不丢购物车；语言与币种互不推导 | G4, P1-T05 | 3 | [ ] |
-| P5-T02 | **币种配置切换治理**：后台二次确认、影响提示、审计日志、定时生效与回滚、切换后存量购物车/未支付订单处置 | 后台配置页改造 + 审计表 + 回归用例 | 切 USD→CNY 有明确二次确认与「价格数值不换算」提示；写入审计（谁/何时/从→到）；未支付订单被安全关闭或重新报价；可回滚 | G4, P0-T05b, P1-T06 | 4 | [~] 进行中 ✅后端 2026-11-05 · 证据：admin API GET/PUT/rollback/config-changes（literal 二次确认强制 + config_changes 审计链 + 定时生效就绪）；T-12 实测含回滚（docs/reports/t12-currency-switch.md）；后台设置界面（admin Vue 页面）待做 |
+| P5-T02 | **币种配置切换治理**：后台二次确认、影响提示、审计日志、定时生效与回滚、切换后存量购物车/未支付订单处置 | 后台配置页改造 + 审计表 + 回归用例 | 切 USD→CNY 有明确二次确认与「价格数值不换算」提示；写入审计（谁/何时/从→到）；未支付订单被安全关闭或重新报价；可回滚 | G4, P0-T05b, P1-T06 | 4 | [x] ✅ 2026-11-05 · 证据：admin API GET/PUT/rollback/config-changes（literal 二次确认强制 + config_changes 审计链 + 定时生效就绪）+ **后台设置界面** `4421a98`（`src/views/shop/settings/CurrencyConfig.vue`：强制双勾选 confirmImpact/ackNoConversion、不换算红色警示、ISO 预设、展示预览、定时生效、审计表逐行回滚；`src/__tests__/currencyApi.test.ts` 12 例锁死二次确认载荷）；T-12 实测含回滚与旧购物车 `409 CURRENCY_CHANGED` 重建（docs/reports/t12-currency-switch.md）；菜单种子 `000059` 已 apply |
 | P5-T03 | 区域支付方式与 BNPL | 新 Provider 适配 | 不影响既有支付链路；Webhook 复用同一验签与幂等框架；币种能力校验前置 | P5-T02, P3-T12 | 4 | [ ] |
 | P5-T04 | 多仓与更精细配送策略 | 仓库路由规则 | 同一 SKU 多仓发货时库存口径一致；配送承诺按仓计算 | G4, P3-T08 | 4 | [ ] |
 | P5-T05 | Bundle / 搭配购 / 推荐位 | 促销扩展 | 组合商品报价仍走服务端 Quote；库存按组件 SKU 扣减 | P5-T04 | 3 | [ ] |
@@ -321,6 +321,8 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P5-T09 | **G5 门禁**：扩展未破坏主链路回归 | 回归测试报告 | 主市场交易 E2E 全绿；币种切换回归通过；缓存与 SEO 无回归 | P5-T01 ~ P5-T08 | 1 | [ ] |
 
 > **注意**：若后台币种配置对运营人员开放自助修改，P5-T02 **必须提前到 Phase 4 完成**（并入 G4），否则上线后存在被误切币种导致价格口径错乱的现实风险。
+>
+> 2026-11-05 更新：后台设置界面已随 `4421a98` 开放（菜单「商城 → 币种设置」），该前置条件已触发。**G4 门禁须复核**：哪些运营角色被授予该菜单权限、变更审计可查询、以及 T-12 四处口径回归；菜单权限配置不在代码实现范围内。
 
 ---
 
@@ -333,7 +335,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | X-T03 | 审计日志：订单/支付/库存/退款/币种配置变更全留痕 | 审计表 + 查询入口 | 任一订单可回溯完整状态变更链；币种变更可追溯到操作人 | P0-T14 | [ ] |
 | X-T04 | Feature Flag 机制（新功能可灰度可回滚） | Flag 配置 | 关键新功能默认关闭；关闭后无副作用 | P1-T04 | [ ] |
 | X-T05 | 核心数据字典（字段含义、金额单位、时区、枚举） | `DATA_DICTIONARY.md` | 金额、时间、状态枚举三类字段全部登记；金额必标「最小货币单位」 | P0-T07 | [x] ✅ 2026-11-04 · 证据：docs/DATA_DICTIONARY.md（金额分/时间 UTC/枚举/键约束四类登记） |
-| X-T06 | 发布与回滚 Runbook（含故障处置） | `DEPLOYMENT_RUNBOOK.md` | 回滚步骤经演练；RTO 有实测值 | P1-T04, P4-T13 | [ ] |
+| X-T06 | 发布与回滚 Runbook（含故障处置） | `DEPLOYMENT_RUNBOOK.md` | 回滚步骤经演练；RTO 有实测值 | P1-T04, P4-T13 | [ ] · 已产出**骨架** docs/DEPLOYMENT_RUNBOOK.md（§10 交付物 #9 因此标 [x]，两者语义不同：交付物=文件存在，任务=验收标准达成）；尚缺回滚演练记录与 RTO 实测值，保持未勾选 |
 
 ---
 
@@ -360,21 +362,21 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | # | 交付物 | 负责阶段 | 状态 |
 | --- | --- | --- | --- |
-| 1 | `PRODUCT_REQUIREMENTS.md` | P0-T13 | [ ] |
-| 2 | `MARKET_STRATEGY.md` | P0-T01 / T03 / T05 / T05b | | [x] ✅ 2026-11-04 · 证据：P0-T01/T03/T05/T05b |
-| 3 | `PRODUCT_DATA_MODEL.md` | P0-T02 | | [x] ✅ 2026-11-04 · 证据：P0-T02 |
-| 4 | `API_CONTRACT.md` | P0-T15 | | [x] ✅ 2026-11-04 · 证据：P0-T15 |
-| 5 | `ORDER_PAYMENT_STATE_MACHINE.md` | P0-T14 | | [x] ✅ 2026-11-04 · 证据：P0-T14 |
-| 6 | `SEO_SPEC.md` | P0-T16 | | [x] ✅ 2026-11-04 · 证据：P0-T16 |
-| 7 | `FRONTEND_ARCHITECTURE.md` | P1-T02 | | [x] ✅ 2026-11-04 · 证据：P1-T02 |
-| 8 | `TEST_PLAN.md` | P0-T17 | | [x] ✅ 2026-11-04 · 证据：P0-T17 |
-| 9 | `DEPLOYMENT_RUNBOOK.md` | P0-T17 / X-T06 | | [x] ✅ 2026-11-04 · 证据：P0-T17 |
+| 1 | `PRODUCT_REQUIREMENTS.md` | P0-T13 | [x] ✅ 2026-11-04 · 证据：docs/PRODUCT_REQUIREMENTS.md（C 端 8 步旅程逐环节异常场景 + 全局异常，含「币种配置异常」） |
+| 2 | `MARKET_STRATEGY.md` | P0-T01 / T03 / T05 / T05b | [x] ✅ 2026-11-04 · 证据：P0-T01/T03/T05/T05b |
+| 3 | `PRODUCT_DATA_MODEL.md` | P0-T02 | [x] ✅ 2026-11-04 · 证据：P0-T02 |
+| 4 | `API_CONTRACT.md` | P0-T15 | [x] ✅ 2026-11-04 · 证据：P0-T15 |
+| 5 | `ORDER_PAYMENT_STATE_MACHINE.md` | P0-T14 | [x] ✅ 2026-11-04 · 证据：P0-T14 |
+| 6 | `SEO_SPEC.md` | P0-T16 | [x] ✅ 2026-11-04 · 证据：P0-T16 |
+| 7 | `FRONTEND_ARCHITECTURE.md` | P1-T02 | [x] ✅ 2026-11-04 · 证据：P1-T02 |
+| 8 | `TEST_PLAN.md` | P0-T17 | [x] ✅ 2026-11-04 · 证据：P0-T17 |
+| 9 | `DEPLOYMENT_RUNBOOK.md` | P0-T17 / X-T06 | [x] ✅ 2026-11-04 · 证据：docs/DEPLOYMENT_RUNBOOK.md（骨架：架构/部署/币种切换/故障处置/回滚）；**X-T06 的演练与 RTO 实测仍待补**，见 §8 |
 | 10 | `IMPLEMENTATION_ROADMAP.md`（本文档） | — | [x] ✅ 2026-11-04 · 证据：`跨境独立站开发执行计划_v1.2.md` |
-| 11 | `BACKEND_AUDIT.md` | P0-T06 ~ T11 | | [x] ✅ 2026-11-04 · 证据：P0-T06~T11 |
-| 12 | `API_REUSE_MATRIX.md` | P0-T12 | | [x] ✅ 2026-11-04 · 证据：P0-T12 |
-| 13 | `PAYMENT_PROVIDER_CHECK.md` | P0-T04 | | [x] ✅ 2026-11-04 · 证据：P0-T04 |
-| 14 | `DATA_DICTIONARY.md` | X-T05 | | [x] ✅ 2026-11-04 · 证据：X-T05 |
-| 15 | `CURRENCY_CONFIG_SPEC.md` | P1-T06 / P5-T02 | | [x] ✅ 2026-11-04 · 证据：P1-T06/P5-T02 规格定稿（读取/缓存/治理/四处口径） |
+| 11 | `BACKEND_AUDIT.md` | P0-T06 ~ T11 | [x] ✅ 2026-11-04 · 证据：P0-T06~T11 |
+| 12 | `API_REUSE_MATRIX.md` | P0-T12 | [x] ✅ 2026-11-04 · 证据：P0-T12 |
+| 13 | `PAYMENT_PROVIDER_CHECK.md` | P0-T04 | [x] ✅ 2026-11-04 · 证据：P0-T04 |
+| 14 | `DATA_DICTIONARY.md` | X-T05 | [x] ✅ 2026-11-04 · 证据：X-T05 |
+| 15 | `CURRENCY_CONFIG_SPEC.md` | P1-T06 / P5-T02 | [x] ✅ 2026-11-04 · 证据：P1-T06/P5-T02 规格定稿（读取/缓存/治理/四处口径） |
 
 ---
 
