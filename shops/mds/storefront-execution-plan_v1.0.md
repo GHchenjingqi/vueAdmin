@@ -250,7 +250,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P3-T04 | Quote 服务端报价：价格重算、可售校验、促销校验、明细与版本，**currency 取当前配置** | `POST /checkout/quote` | 前端传入总价被忽略；报价含 currency、过期时间、版本号；**购物车 currency 与配置不一致时返回 `CURRENCY_CHANGED` 并要求重建报价** | P3-T01, P0-T07, P1-T06 | 4 | [x] ✅ 2026-11-04 · 证据：服务端报价重算（12990×2 分、CURRENCY_CHANGED 校验在位），BFF 适配联调（docs/reports/real-integration.md（真实 E2E 实证） §2-2/§1） |
 | P3-T05 | 运费计算接入（按地址与仓库，Provider 适配层） | `ShippingProvider` | 地址不在配送范围返回明确错误码；运费币种必须与报价币种一致，不一致则拒绝 | P3-T04, P0-T03 | 3 | [x] ✅ 2026-11-05 · 证据：shippingService 白名单+分区计费（settings 唯一数据源 60s TTL）+ 实测 US=800/CN=1200/BR=400 ADDRESS_NOT_SHIPPABLE（293cb45） |
 | P3-T06 | 税费计算接入（服务商或规则表） | `TaxProvider` | 税费币种与报价币种一致；税费失败有降级或阻断策略，不静默按 0 处理 | P3-T04, P0-T05 | 3 | [ ] |
-| P3-T07 | 优惠券校验（服务端，含币种适用性） | 促销校验模块 | 过期/用尽/不适用市场/不适用币种均被拒绝；错误码可区分 | P3-T04, P0-T11 | 2 | [x] ✅ 2026-11-05 · 证据：evaluateCoupon 服务端重算（discountCents=500 fixed 实测）+ 未知券 COUPON_NOT_FOUND 404 拒绝；过期/用尽/币种不适用由券配置与 usageLimit 承接（293cb45 之前的 T-07 WIP） |
+| P3-T07 | 优惠券校验（服务端，含币种适用性） | 促销校验模块 | 过期/用尽/不适用市场/不适用币种均被拒绝；错误码可区分 | P3-T04, P0-T11 | 2 | [x] ✅ 2026-11-05 · 证据：`7f7100f` 落地 `couponService`（`COUPON_NOT_FOUND` / `NOT_ACTIVE` / `EXPIRED` / `MIN_SPEND_NOT_MET` / `CURRENCY_MISMATCH` / `EXHAUSTED` 错误码可区分）+ 折扣服务端重算封顶 + 原子占用与取消回退；`storefront-coupon.test.ts` 10 例 |
 | P3-T08 | 库存预占：条件更新/行锁、TTL、过期释放任务、跨 SKU 一致性 | `InventoryReservation` + 定时任务 | 并发同 SKU 不超卖（压测证据）；释放任务有幂等与监控 | P0-T08, P3-T04 | 5 | [x] ✅ 2026-11-04 · 证据：库存预占 committed 实证：quantity 50→45、locked→0（docs/reports/real-integration.md（真实 E2E 实证） §3） |
 
 ### 5.2 泳道 B · 结算 / 订单 / 支付（B6）
@@ -343,10 +343,13 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 > 来源：基线文档 §8.2，另补币种相关两项。任一项未通过，不得上线。
 >
-> **2026-11-05 门禁盘点**：自动化证据集中于 `server/__tests__/storefront-trade-gate.test.ts`
-> （按 T 编号固定，8 条真实断言 + 3 条 `it.todo` 如实暴露功能缺口），
+> **2026-11-05 门禁盘点（二次更新）**：自动化证据集中于 `server/__tests__/storefront-trade-gate.test.ts`
+> （按 T 编号固定，12 条真实断言 / **0 todo**），专项边界用例见
+> `storefront-shipping.test.ts`(9) / `storefront-coupon.test.ts`(10) / `storefront-refund.test.ts`(10)，
 > 另有 `storefront-commerce.test.ts` / `shopPhases.test.ts` 与 `docs/reports/` 实测报告。
-> 后端全量 **470 passed / 3 todo（48 文件）**。状态按 §0.3 图例，`[!]` 已在 §11 登记。
+> 后端全量 **503 passed / 0 todo（51 文件）**；admin 前端 629 passed（39 文件）；前后端 typecheck 0 错误。
+> T-07 / T-08 / T-09 三项功能缺口已于 2026-11-05 补齐（`293cb45` / `7f7100f` / `751df39`），
+> 状态按 §0.3 图例；剩余 `[~]` 项（T-10 地址簿、T-12 邮件/JSON-LD 口径）已在 §11 登记。
 
 - [x] T-01 同一 SKU 并发购买，不超卖 · 证据：trade-gate T-01（12 个并发 `occupy` 对库存 10，成功数 ≤10、`locked ≤ quantity`、`available` 守恒；`inventoryService.occupy` 用 `FOR UPDATE` 行锁 + 死锁重试）
 - [x] T-02 同一支付请求重复提交，不产生重复订单或重复扣款 · 证据：trade-gate T-02 + `storefront-commerce.test.ts:151`（相同 `idempotencyKey` 返回同一订单 id，可用库存不二次预占）
@@ -354,12 +357,12 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 - [x] T-04 用户支付成功但浏览器关闭，订单仍正确变为已支付 · 证据：trade-gate T-04（不依赖浏览器回跳，验签 Webhook 独立把订单推到 `paymentStatus=captured` / `status=paid`）
 - [x] T-05 支付失败或超时，库存预占能释放 · 证据：trade-gate T-05（`occupy(3) → release(3)` 后 `available` 精确恢复）+ `shopPhases.test.ts:263`（未发货订单取消释放占用）
 - [x] T-06 商品价格在加购后变化，结算能提示并重新报价 · 证据：trade-gate T-06（改价后 `createQuote` 返回新单价 15000 分，前端旧总价被忽略，带 `version` + `expiresAt`）；前端「提示」交互属 P3-T04 UI 层，报价新鲜度已由服务端保证
-- [x] T-07 优惠券过期或用尽，服务端拒绝使用 · 证据：evaluateCoupon 服务端重算实测（有效券 discountCents=500；未知券 404 COUPON_NOT_FOUND）；过期/用尽/币种适用由券配置+usageLimit 承接（2026-11-05）
-- [x] T-08 地址不在配送范围，不能创建可支付订单 · 证据：293cb45 配送白名单（settings.shop.shipping）+ 实测 BR→400 ADDRESS_NOT_SHIPPABLE、JP/CN 分区计费 1200 分（2026-11-05）
-- [!] T-09 部分退款与全额退款状态均正确，退款币种等于原订单币种 · **阻塞**：`paymentService` 无退款流程；`rmaService` 仅按订单快照计算 `refundAmountCents/refundCurrency`，`refunding/refunded` 状态流与部分退款金额校验缺自动化证据；见 §11
+- [x] T-07 优惠券过期或用尽，服务端拒绝使用 · 证据：`7f7100f` 落地 `couponService.evaluateCoupon`（存在性/生效期/最低消费/币种/用量上限/折扣封顶）+ `redeemCoupon` 原子占用与取消回退；`storefront-coupon.test.ts` 10 例（过期 `COUPON_EXPIRED`、用尽 `COUPON_EXHAUSTED`、币种错配、并发不超发、幂等不重复占用）；trade-gate T-07 真实断言（2026-11-05）
+- [x] T-08 地址不在配送范围，不能创建可支付订单 · 证据：`293cb45` 配送白名单 `settings.shop.shipping` + 分区运费服务端重算，报价/建单/支付会话三处拒绝；`storefront-shipping.test.ts` 9 例（`ADDRESS_NOT_SHIPPABLE` / `ADDRESS_COUNTRY_REQUIRED` / 分区计费 / 无地址向后兼容）；trade-gate T-08 真实断言（2026-11-05）
+- [x] T-09 部分退款与全额退款状态均正确，退款币种等于原订单币种 · 证据：`751df39` 落地 `refundService.createRefund`（订单行锁 + 累计不超实付 + 币种恒取订单快照 + 幂等键 + 可插拔 provider 异常回滚），部分 → `paymentStatus=refunding`、全额 → `refunded`；`storefront-refund.test.ts` 10 例 + trade-gate T-09 真实断言；admin 路由 `POST/GET /shop/orders/:id/refunds`（2026-11-05）。联调提示：`tsx app.ts` 无热重载，新路由需**重启后端进程**才生效；未重启时该路径因未注册会挂起（已知现象，非代码缺陷）
 - [~] T-10 顾客不能访问其他顾客的订单、地址和购物车 · 部分实证：trade-gate T-10（错误 `accessToken` 一律 404、伪造购物车 token 404、token 48 位不可枚举）+ `storefront-rma.test.ts:153`（email 不符 403）+ `storefront-tracking.test.ts` 双要素防枚举；**地址簿 P4-T02 未实现**，该项无法整体勾选
 - [x] T-11 CDN 不缓存账户、购物车和结算数据 · 证据：trade-gate T-11 静态断言 `shops/nuxt.config.ts` 的 `routeRules` 对 `/cart`、`/checkout/**`、`/account/**`、`/track` 全部输出 `private, no-store`；部署层 CDN 按响应头透传属上线检查项
-- [~] T-12 后台把币种从 USD 改为 CNY 后，前台展示符号、结构化数据、邮件、支付金额四处口径一致；切换期间的未支付订单被安全处理 · 部分实证：docs/reports/t12-currency-switch.md（store-config / 新购物车 / quote / BFF 页面 / 历史订单快照不变 / 旧购物车 `409 CURRENCY_CHANGED` 重建 / 审计回滚 / 缓存失效）+ trade-gate T-12（fail-closed 503 + ISO 白名单）；**尚缺 JSON-LD 结构化数据、订单邮件、支付金额三处口径证据**，不得整体勾选。报告「遗留 #1 后台设置界面未做」已由 `4421a98` 闭合
+- [~] T-12 后台把币种从 USD 改为 CNY 后，前台展示符号、结构化数据、邮件、支付金额四处口径一致；切换期间的未支付订单被安全处理 · 部分实证：docs/reports/t12-currency-switch.md（store-config / 新购物车 / quote / BFF 页面 / 历史订单快照不变 / 旧购物车 `409 CURRENCY_CHANGED` 重建 / 审计回滚 / 缓存失效）+ trade-gate T-12（fail-closed 503 + ISO 白名单）；**支付金额口径已补齐实证**：trade-gate T-12 新增断言 `createSession` 的 `amountCents/currency` 恒取订单快照、不随站点当前币种漂移；JSON-LD 前端 `shops/components/commerce/JsonLd.vue` 的 `priceCurrency` 取自 store config（代码层跟随，缺切币种后的实测抓取）；**订单邮件通知服务尚未实现**，故仍不得整体勾选 `[x]`。报告「遗留 #1 后台设置界面未做」已由 `4421a98` 闭合
 
 ---
 
@@ -402,10 +405,10 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 2026-11-04 | P4-T11 | Cookie 同意与 CAPI 不一致 | 隐私合规风险 | 前端 / 数据 | ✅ 已闭环 2026-11-05：consent 随事件上报（`shops/shared/analytics/capi.ts`）+ 后端未同意只落库不外发（`b8a5b9c`）+ 真实 HTTP 实证（`7831d41`） |
 | 2026-11-04 | — | 原 6–8 周计划过于乐观 | 交付延期 | 项目负责人 | 已按阶段门禁重排 |
 | 2026-11-04 | P3-T01~T14 | 分工裁决（用户确认）：后端交易闭环移交并行 Agent；本会话交付已应用迁移 000040-000050 + 契约文档 + 前端接线层（NUXT_COMMERCE_SOURCE mock/real/auto） | 交接成本 | 项目负责人 | 已移交 |
-| 2026-11-05 | T-07 | 服务端优惠券校验未实现：`quoteService.createQuote` 中 `discountCents` 恒为 0，无券码/过期/用尽/币种适用性入口 | §9 门禁 `[!]`：过期或用尽券无法被拒绝，存在价格与合规风险 | 后端 / 营销 | ✅ 已解除：evaluateCoupon 落地，T-07 实测 discountCents=500/未知券 404（2026-11-05） |
-| 2026-11-05 | T-08 | 配送范围判定未实现：`createQuote` 不接收 `shippingAddress`，无 `ShippingProvider` 与 `ADDRESS_NOT_SHIPPABLE` | §9 门禁 `[!]`：不可配送地址可创建可支付订单，履约风险 | 后端 / 履约 | ✅ 已解除：resolveShipping 白名单+分区，实测 BR 400/JP·CN 分区计费（2026-11-05） |
-| 2026-11-05 | T-09 | 退款状态流未闭环：`paymentService` 无 refund；RMA 仅算退款金额，`refunding/refunded` 由 admin 推进且缺部分退款金额校验 | §9 门禁 `[!]`：部分/全额退款状态与退款币种无法自动回归 | 后端 / 财务 | 阻塞（依赖 P3-T14 / T17，见 `storefront-trade-gate.test.ts` todo） |
-| 2026-11-05 | T-12 | 币种切换四处口径实证不全：已有 store-config/购物车/报价/订单快照/回滚证据，缺 JSON-LD、订单邮件、支付金额三处 | §9 门禁 `[~]`：不得作为「四处口径一致」整体通过 | 前端 / 数据 / 财务 | 待补证据 |
+| 2026-11-05 | T-07 | 服务端优惠券校验未实现：`quoteService.createQuote` 中 `discountCents` 恒为 0，无券码/过期/用尽/币种适用性入口 | §9 门禁 `[!]`：过期或用尽券无法被拒绝，存在价格与合规风险 | 后端 / 营销 | ✅ 已解除（`7f7100f`）：`couponService` 全量校验 + 原子占用，`storefront-coupon.test.ts` 10 例 / trade-gate T-07 真实断言 |
+| 2026-11-05 | T-08 | 配送范围判定未实现：`createQuote` 不接收 `shippingAddress`，无 `ShippingProvider` 与 `ADDRESS_NOT_SHIPPABLE` | §9 门禁 `[!]`：不可配送地址可创建可支付订单，履约风险 | 后端 / 履约 | ✅ 已解除（`293cb45`）：`shippingService` 白名单 + 分区运费 + 支付会话拒绝，`storefront-shipping.test.ts` 9 例 |
+| 2026-11-05 | T-09 | 退款状态流未闭环：`paymentService` 无 refund；RMA 仅算退款金额，`refunding/refunded` 由 admin 推进且缺部分退款金额校验 | §9 门禁 `[!]`：部分/全额退款状态与退款币种无法自动回归 | 后端 / 财务 | ✅ 已解除（`751df39`）：`refundService` 行锁幂等退款 + 状态流 + 币种快照，`storefront-refund.test.ts` 10 例 / trade-gate T-09 真实断言；trade-gate 已无 todo |
+| 2026-11-05 | T-12 | 币种切换四处口径实证不全：已有 store-config/购物车/报价/订单快照/回滚证据，缺 JSON-LD、订单邮件、支付金额三处 | §9 门禁 `[~]`：不得作为「四处口径一致」整体通过 | 前端 / 数据 / 财务 | 🟡 部分收敛：支付金额口径已由 trade-gate T-12 快照断言补齐；仍缺 **订单邮件通知服务（未实现）** 与 **JSON-LD 切币种后实测**，保持 `[~]` |
 
 ---
 
@@ -495,6 +498,10 @@ export function formatMoney(amount: number /* 最小货币单位 */, cfg: Curren
 | 前端 `shops/` 三接口接线（track-event / attribution / track） | `c57d26a` | — | 前端 25/25 |
 | 端到端真实 HTTP 实证（后端 8 条 + BFF 3 链路） | `7831d41` | — | 见 `plans/phase-5-storefront.md` |
 | P5-T02 后台币种治理界面 | `4421a98` | 000059 | 前端 629/629 |
+| T-08 配送白名单 / 分区运费 / 不可配送禁支付 | `293cb45` | 000060 | 479 + 3 todo |
+| T-07 优惠券校验 / 原子占用 / 幂等重放前置 | `7f7100f` | 000061 | 489 + 3 todo |
+| T-09 退款状态流 / 订单快照币种 / 并发不超退 | `751df39` | 000062 | 499 + 3 todo |
+| §9 门禁 todo 清零 + 状态回填 | 本次 | — | **503 passed / 0 todo（51 文件）** |
 
 **能力 → 任务映射（供门禁抽查）**：P4-T04 物流防枚举 ← `6c55a9b` + `c57d26a`；
 P4-T05/T06 退货服务端资格与状态机 ← `db6f5f6`（**注意：后台可配置 `ReturnPolicy` 模型未在本索引内，勾选时须单独核验**）；
@@ -502,3 +509,5 @@ P4-T07 评价审核与已购验证 ← `29ce004`；P4-T09 订阅退订 ← `b8ff
 P4-T10/T11 CAPI 与同意一致性 ← `b8a5b9c` + `c57d26a` + `7831d41`；
 X-T03 币种配置变更审计 ← `880d38c` + `4421a98`（界面查询入口）；P5-T02 ← `4421a98`。
 §9 的 T-01~T-12 属**上线门禁**，需逐项自动化/实证证据后单独勾选，本附录不代勾。
+T-07 / T-08 / T-09 已于 2026-11-05 由上述三次提交补齐，`storefront-trade-gate.test.ts` 的 3 个 `it.todo`
+已全部转为真实断言（12 条 / 0 todo）；T-10（地址簿 P4-T02）与 T-12（订单邮件 / JSON-LD 实测）仍为 `[~]`。

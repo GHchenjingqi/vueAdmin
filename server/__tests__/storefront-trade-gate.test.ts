@@ -5,8 +5,10 @@
  * 定位：把分散在 storefront-commerce / shopPhases 等用例里的交易约束，
  * 按执行计划 §9 的 T 编号逐项固定，便于 G3/G4 门禁抽查与回归。
  *
- * 诚实原则：当前实现尚不具备的能力（T-07 优惠券校验 / T-08 配送范围 /
- * T-09 退款状态流）以 it.todo 登记，**不写假通过**，并在 §9 标注阻塞依赖。
+ * 诚实原则：T-07 / T-08 / T-09 曾因功能未实现以 it.todo 登记；
+ * 三项功能落地后已改为真实断言，完整边界用例见
+ * storefront-shipping / storefront-coupon / storefront-refund 三个专项测试文件。
+ * 尚未实现的能力（地址簿 P4-T02、订单邮件等）仍在 §9 如实标注 `[~]`。
  *
  * 依赖已迁移的测试库；所有 DB 操作显式包 runInTenant。
  */
@@ -14,7 +16,8 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { runInTenant } from '../modules/tenant/context.js'
-import { ShopChannel, ShopShop, ShopInventory } from '../modules/shop/models/index.js'
+import { ShopChannel, ShopShop, ShopInventory, ShopCoupon, ShopOrder } from '../modules/shop/models/index.js'
+import * as refundService from '../modules/shop/services/refundService.js'
 import * as categoryService from '../modules/shop/services/categoryService.js'
 import * as brandService from '../modules/shop/services/brandService.js'
 import * as spuService from '../modules/shop/services/spuService.js'
@@ -160,19 +163,64 @@ describe('T-06 商品价格在加购后变化，结算能提示并重新报价',
 })
 
 describe('T-07 优惠券过期或用尽，服务端拒绝使用', () => {
-  // 阻塞：P3-T07 未实现。quoteService.createQuote 中 discountCents 恒为 0，且无券码校验入口。
-  it.todo('阻塞于 P3-T07：需先实现服务端优惠券校验（过期/用尽/不适用市场/不适用币种），再补此用例')
+  const day = (offset: number): string => {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() + offset)
+    return d.toISOString().slice(0, 10)
+  }
+  const mkCoupon = (over: Record<string, unknown>): Promise<ShopCoupon> =>
+    ShopCoupon.create({
+      code: 'TG' + uniq(), type: 'fixed', value: 10, minSpend: 0, currency: 'USD',
+      validFrom: day(-1), validTo: day(1), usageLimit: 0, usedCount: 0, tenantId: TID, ...over,
+    } as never)
+
+  it('过期 / 用尽 / 不存在的券码在报价阶段一律被拒', async () => {
+    await inTenant(async () => {
+      const expired = await mkCoupon({ validFrom: day(-5), validTo: day(-1) })
+      const exhausted = await mkCoupon({ usageLimit: 1, usedCount: 1 })
+      await expect(quoteService.createQuote(site, { items: [{ skuId, qty: 1 }], couponCode: expired.code })).rejects.toThrow(/COUPON_EXPIRED/)
+      await expect(quoteService.createQuote(site, { items: [{ skuId, qty: 1 }], couponCode: exhausted.code })).rejects.toThrow(/COUPON_EXHAUSTED/)
+      await expect(quoteService.createQuote(site, { items: [{ skuId, qty: 1 }], couponCode: 'NOPE' + uniq() })).rejects.toThrow(/COUPON_NOT_FOUND/)
+    })
+  })
 })
 
 describe('T-08 地址不在配送范围，不能创建可支付订单', () => {
-  // 阻塞：P3-T05 未实现。createQuote 只接收 cartToken/items，无 shippingAddress 与配送范围判定。
-  it.todo('阻塞于 P3-T05：需先实现 ShippingProvider 与 ADDRESS_NOT_SHIPPABLE 错误码，再补此用例')
+  it('不可配送地址在报价与建单两处均被拒绝', async () => {
+    await inTenant(async () => {
+      const address = { country: 'XX', city: 'Somewhere' }
+      await expect(
+        quoteService.createQuote(site, { items: [{ skuId, qty: 1 }], shippingAddress: address }),
+      ).rejects.toThrow(/ADDRESS_NOT_SHIPPABLE/)
+      await expect(
+        checkoutService.createOrder(site, { items: [{ skuId, qty: 1 }], shippingAddress: address }),
+      ).rejects.toThrow(/ADDRESS_NOT_SHIPPABLE/)
+    })
+  })
 })
 
 describe('T-09 部分退款与全额退款状态均正确，退款币种等于原订单币种', () => {
-  // 阻塞：paymentService 无 refund 流程；rmaService 只计算退款金额，订单 paymentStatus 的
-  // refunding/refunded 由 admin 侧推进，且币种虽取 order.currency 快照，缺少状态流回归。
-  it.todo('阻塞于 P3-T14/T17：需先实现退款状态流与部分退款金额校验，再补此用例')
+  it('部分 → refunding、全额 → refunded，退款币种恒等于订单快照', async () => {
+    await inTenant(async () => {
+      const cart = await cartService.addItem(site, undefined, { skuId, qty: 1 })
+      const order = await checkoutService.createOrder(site, { cartToken: cart.token, idempotencyKey: `T09-${uniq()}` })
+      const session = await paymentService.createSession(site, order.id)
+      const raw = Buffer.from(JSON.stringify({
+        type: 'payment.succeeded', orderNo: order.orderNo, providerRef: session.providerRef, currency: 'USD',
+      }))
+      await paymentService.handleWebhook('mock', raw, paymentService.signWebhook(raw))
+
+      const part = await refundService.createRefund({ orderId: order.id, amountCents: 3000 })
+      expect(part.currency).toBe(order.currency)
+      expect((await ShopOrder.findByPk(order.id))?.paymentStatus).toBe('refunding')
+
+      const rest = await refundService.createRefund({ orderId: order.id })
+      expect(rest.currency).toBe(order.currency)
+      expect((await ShopOrder.findByPk(order.id))?.paymentStatus).toBe('refunded')
+      const rows = await refundService.listRefunds(order.id)
+      expect(rows.reduce((sum, r) => sum + r.amountCents, 0)).toBe(order.amountCents)
+    })
+  })
 })
 
 describe('T-10 顾客不能访问其他顾客的订单、地址和购物车', () => {
@@ -221,5 +269,17 @@ describe('T-12 币种切换 fail-closed 与元数据一致性', () => {
     const body = readFileSync(report, 'utf8')
     expect(body).toContain('CURRENCY_CHANGED')
     expect(body).toContain('confirmImpact')
+  })
+
+  it('支付会话金额与币种取订单快照，不随当前站点币种漂移', async () => {
+    await inTenant(async () => {
+      const cart = await cartService.addItem(site, undefined, { skuId, qty: 1 })
+      const order = await checkoutService.createOrder(site, { cartToken: cart.token, idempotencyKey: `T12-${uniq()}` })
+      // 模拟「后台切币种前的历史订单」：站点已 USD，订单快照为另一币种
+      await ShopOrder.update({ currency: 'CNY' } as never, { where: { id: order.id, tenantId: TID } })
+      const session = await paymentService.createSession(site, order.id)
+      expect(session.currency).toBe('CNY')
+      expect(session.amountCents).toBe(order.amountCents)
+    })
   })
 })
