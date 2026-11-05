@@ -47,8 +47,19 @@
 | inventory-anomaly | ≥1 次 | 跑 `POST /admin/ops/reservations/sweep` 释放过期；核对 inventory_log |
 | currency-config-fail | ≥1 次 | 检查 settings `shop.currency`；恢复合法 JSON（C7 阻断属预期） |
 
-## 6. 待演练项（X-T06 完成项）
+## 6. 演练记录（X-T06）
 
-- [ ] staging 完整演练记录（时间/人/耗时）
-- [ ] RTO 实测值回填
-- [ ] 生产数据库备份/恢复演练（每日备份 + 7 天保留）
+### 6.1 数据库迁移回滚演练 ✅ 2026-11-05（dev 环境）
+
+- **对象**：最后一批迁移 `20261105_000065_create-audit-logs`（对应 runbook §4「回滚发布」中 `migrate:down` 仅撤销最后一批的路径）。
+- **步骤**：`tsx server/scripts/migrate.ts down`（revert 000065，drop audit_logs）→ `status` 核验「已执行 90 / 待执行 1」→ `up` 重放 → `status` 核验恢复「已执行 91 / 待执行 0」。
+- **RTO 实测**：
+  - 单次 down：**0.568s**；单次 up 重放：**0.243s**（Umzug 日志 durationSeconds）。
+  - 端到端演练墙钟 **≈11.7s**（含 4 次 tsx CLI 冷启动与两次 status 核验）。
+- **结论**：DB 回滚路径可逆、亚秒级完成；down→up 空窗期间业务写入不受阻（audit 埋点按设计仅 warn 不阻断，X-T03）。
+- **数据影响**：drop 掉的 audit_logs 为当日 dev 数据（演练性质，重放后表结构完整恢复）。
+
+### 6.2 待演练项
+
+- [ ] staging 完整演练记录（应用镜像回滚 `docker rollback` + 全链路验证；需 staging 环境）
+- [ ] 生产数据库备份/恢复演练（每日备份 + 7 天保留；需生产环境）

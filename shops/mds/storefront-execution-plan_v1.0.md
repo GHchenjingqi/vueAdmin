@@ -335,7 +335,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | X-T03 | 审计日志：订单/支付/库存/退款/币种配置变更全留痕 | 审计表 + 查询入口 | 任一订单可回溯完整状态变更链；币种变更可追溯到操作人 | P0-T14 | [x] ✅ 2026-11-05 · 证据：迁移 `20261105_000065` 建 `audit_logs`（tenantId/actorType/actorId/action/entityType/entityId/beforeState/afterState + 索引）；`AuditLog` 模型；`auditLogService.record`（失败仅告警不阻断主流程，可随业务事务原子提交）/ `listByEntity`（按实体倒序回溯）；支付 Webhook（订单→paid / 失败）、库存 occupy/release、退款 createRefund 三处状态变更已埋点；`GET /api/v1/shop/audit-logs`（admin 限定）查询端点；币种配置审计沿用既有 `config_changes`（operatorId/operatorName 可追溯）；`audit-log.test.ts` 4 例（写入/倒序回溯/JSON 快照/租户隔离） |
 | X-T04 | Feature Flag 机制（新功能可灰度可回滚） | Flag 配置 | 关键新功能默认关闭；关闭后无副作用 | P1-T04 | [x] ✅ 2026-11-04 · 证据：`modules/featureflags/featureFlags.ts`（`FLAG_DEFS` 注册 5 个关键新功能全部 `defaultEnabled=false` + `isFeatureEnabled` fail-closed + `setFlag` 持久化 `feature.flags` 并写审计 + `requireFeature` 守卫关闭→403 不执行）；admin 路由 `GET/PUT /api/v1/flags`（`requireAdmin`）+ 公开 `GET /api/storefront/v1/flags/:key`；`featureFlags.test.ts` 6 例（默认关/开与回滚/未知 key fail-closed/列表/FLAG_NOT_FOUND/守卫 403 与放行）全绿 |
 | X-T05 | 核心数据字典（字段含义、金额单位、时区、枚举） | `DATA_DICTIONARY.md` | 金额、时间、状态枚举三类字段全部登记；金额必标「最小货币单位」 | P0-T07 | [x] ✅ 2026-11-04 · 证据：docs/DATA_DICTIONARY.md（金额分/时间 UTC/枚举/键约束四类登记） |
-| X-T06 | 发布与回滚 Runbook（含故障处置） | `DEPLOYMENT_RUNBOOK.md` | 回滚步骤经演练；RTO 有实测值 | P1-T04, P4-T13 | [ ] · 已产出**骨架** docs/DEPLOYMENT_RUNBOOK.md（§10 交付物 #9 因此标 [x]，两者语义不同：交付物=文件存在，任务=验收标准达成）；尚缺回滚演练记录与 RTO 实测值，保持未勾选 |
+| X-T06 | 发布与回滚 Runbook（含故障处置） | `DEPLOYMENT_RUNBOOK.md` | 回滚步骤经演练；RTO 有实测值 | P1-T04, P4-T13 | [~] · runbook 已产出（§10 交付物 #9 标 [x] 系文件存在，语义不同）；**DB 迁移回滚路径已演练**（2026-11-05 dev：000065 down 0.568s / up 0.243s、端到端 ≈11.7s，RTO 实测已回填 runbook §6.1，空窗期业务写入不受阻）；staging 完整发布回滚与生产备份/恢复演练需真实环境，保持未勾 |
 
 ---
 
@@ -442,6 +442,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.12 | 2026-11-04 | P4-T15 复核（`requireAdmin` 中间件 3 例 + CSRF/originValidator 3 例 + 登录限流 2 例 + SQLi 字面量 2 例 + 订单枚举/配置越权源码回归；安全套件 14/14、全量 576/576、typecheck 0 错误）+ **P4-T16 性能验收**（Playwright 实测店面 SSR：移动端 LCP P75 最大 140ms < 2500ms、CLS=0、TTFB 34–95ms，移动/桌面分设备；`docs/reports/performance-acceptance.md`） | AI |
 | v1.13 | 2026-11-04 | **X-T04 Feature Flag**（`modules/featureflags/featureFlags.ts`：5 个关键新功能默认关闭 + `isFeatureEnabled` fail-closed + `setFlag` 持久化 `feature.flags` 并写审计 + `requireFeature` 守卫关闭→403；admin `GET/PUT /api/v1/flags`（`requireAdmin`）+ 公开 `GET /api/storefront/v1/flags/:key`；`featureFlags.test.ts` 6 例）；修复 **X-T03** `audit-log.test.ts` 损坏导入（`setTenantContext` 不存在 → `runInTenant`）与测试隔离（beforeEach 清理固定实体 ID），4/4 通过；后端全量 586 passed（61 文件）、typecheck 0 错误 | AI |
 | v1.14 | 2026-11-05 | X-T04 收口提交 + `setFlag` 审计修正：原实现先改写 `ov[key]` 再算 `oldValue`，导致审计恒记 `!enabled`（无法反映真实旧值，重复设置同值也记成变更）；改为变更前捕获 `ov[key] ?? defaultEnabled`（JSON 列存布尔）。featureFlags 6/6、后端全量 586 passed（61 文件）、server typecheck 0 错误 | AI |
+| v1.15 | 2026-11-05 | **X-T06 回滚演练**（dev）：000065 `migrate down` 0.568s / `up` 重放 0.243s、端到端 ≈11.7s（含 CLI 冷启动），RTO 实测回填 runbook §6.1，任务行 [ ]→[~]（staging 完整演练与生产备份/恢复需真实环境）；另将 P4-T16 性能报告 `docs/reports/performance-acceptance.md` 入库（v1.12 已引用但文件此前未跟踪） | AI |
 
 ---
 
