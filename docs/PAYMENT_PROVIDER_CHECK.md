@@ -28,7 +28,7 @@
 2. Mock 收单页回调 → 后端以正确签名投递 Webhook（错误签名 400、无副作用）。
 3. 事件去重表 `shop_webhook_events`（event_id 唯一）→ 重复投递不重复改单（T-03 实证）。
 4. 支付成功 → 订单 `pending_payment → paid`，库存预占转实扣（T-04 实证：仅 Webhook 亦完成）。
-- 证据：`docs/reports/transaction-tests.md`（T-01~T-12 逐项）。
+- 证据：`docs/reports/real-integration.md`（T-01~T-12 逐项）。
 
 ## 5. 遗留项（真实开户后必须复验）
 

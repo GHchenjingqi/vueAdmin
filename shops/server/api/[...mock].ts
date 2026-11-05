@@ -1,0 +1,229 @@
+import { mockStore } from '@shared/mock/store'
+import {
+  adaptCartView,
+  adaptOrderView,
+  adaptQuote,
+  commerceRealFetch,
+  getCommerceSource,
+  simulateMockProviderWebhook,
+  unwrapEnvelope,
+} from '../utils/commerce'
+
+/**
+ * BFF 商务路由（cart / checkout / orders）：前端接线层。
+ * - auto（默认）：real 优先（转发 cart_token Cookie，字段适配为前端契约），网络级失败回退 mock；
+ *   4xx（真实业务错误，如 CURRENCY_CHANGED / 库存不足）原样透传，不吞。
+ * - real：仅真实后台；mock：shared/mock 契约层。
+ * 私有接口统一 Cache-Control: private, no-store（T-11）。
+ */
+export default defineEventHandler(async (event) => {
+  const url = event.path.replace(/^\/api\//, '')
+  const method = event.method
+  setResponseHeaders(event, { 'cache-control': 'private, no-store' })
+
+  const source = getCommerceSource()
+  const cookie = event.node.req.headers.cookie
+
+  const isCommercePath =
+    url === 'cart' ||
+    url.startsWith('cart/') ||
+    url === 'checkout/quote' ||
+    url.startsWith('checkout/orders') ||
+    url.startsWith('orders/')
+
+  if (isCommercePath && source !== 'mock') {
+    const real = await handleReal(url, method, event, cookie)
+    if (real !== null) return real
+    // auto + 网络级失败 → 落入 mock；real + 失败已在 handleReal 返回错误
+  }
+
+  return mockHandle(url, method, event)
+})
+
+/** 真实后台处理；返回 null 表示「网络级失败且允许回退 mock」 */
+async function handleReal(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], cookie?: string): Promise<unknown | null> {
+  const source = getCommerceSource()
+  const requestId = event.context.requestId as string | undefined
+
+  // ---- GET /api/cart ----
+  if (url === 'cart' && method === 'GET') {
+    const res = await commerceRealFetch('cart', { cookie, requestId })
+    if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
+    if (!res.ok) return upstreamFail(event, res)
+    if (res.setCookie) for (const c of res.setCookie) appendHeader(event, 'set-cookie', c)
+    return adaptCartView(unwrapEnvelope(res.body) as Record<string, unknown>)
+  }
+
+  // ---- POST /api/cart/items ----
+  if (url === 'cart/items' && method === 'POST') {
+    const body = await readBody(event)
+    const res = await commerceRealFetch('cart/items', { method: 'POST', body: { skuId: body.skuId, qty: body.qty }, cookie, requestId })
+    if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
+    if (!res.ok) return upstreamFail(event, res)
+    if (res.setCookie) for (const c of res.setCookie) appendHeader(event, 'set-cookie', c)
+    return adaptCartView(unwrapEnvelope(res.body) as Record<string, unknown>)
+  }
+
+  // ---- PATCH/DELETE /api/cart/items/:id ----
+  const itemMatch = /^cart\/items\/(\d+)$/.exec(url)
+  if (itemMatch) {
+    const body = method === 'PATCH' ? await readBody(event) : undefined
+    const realMethod = method === 'DELETE' ? 'DELETE' : 'PATCH'
+    const res = await commerceRealFetch(`cart/items/${itemMatch[1]}`, {
+      method: realMethod,
+      body: realMethod === 'PATCH' ? { qty: body?.qty } : undefined,
+      cookie,
+      requestId,
+    })
+    if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
+    if (!res.ok) return upstreamFail(event, res)
+    return adaptCartView(unwrapEnvelope(res.body) as Record<string, unknown>)
+  }
+
+  // ---- POST /api/checkout/quote ----
+  if (url === 'checkout/quote' && method === 'POST') {
+    await readBody(event) // 消费 body（真实契约仅需 cartToken；地址/运费/优惠由后台规则表承接）
+    const cartToken = cartTokenFrom(cookie)
+    const res = await commerceRealFetch('checkout/quote', { method: 'POST', body: { cartToken }, cookie, requestId })
+    if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
+    if (!res.ok) return upstreamFail(event, res)
+    return adaptQuote(unwrapEnvelope(res.body) as Record<string, unknown>)
+  }
+
+  // ---- POST /api/checkout/orders ----
+  if (url === 'checkout/orders' && method === 'POST') {
+    const body = await readBody(event)
+    const cartToken = cartTokenFrom(cookie)
+    const res = await commerceRealFetch('checkout/orders', {
+      method: 'POST',
+      body: {
+        idempotencyKey: body.idempotencyKey ?? crypto.randomUUID(),
+        email: body.email,
+        shippingAddress: body.address,
+        note: body.note,
+        cartToken,
+      },
+      cookie,
+      requestId,
+    })
+    if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
+    if (!res.ok) return upstreamFail(event, res)
+    const order = adaptOrderView(unwrapEnvelope(res.body) as Record<string, unknown>)
+    // 真实契约：accessToken 仅建单响应返回一次 → 下发给前端保存（结果页用 id + accessToken 查询）
+    return { ...order, accessToken: order.accessToken || body.idempotencyKey }
+  }
+
+  // ---- POST /api/checkout/orders/:orderId/pay?t=<accessToken>（mock provider 模拟器：模拟服务商服务器发签名 Webhook） ----
+  const payMatch = /^checkout\/orders\/([^/]+)\/pay(\?.*)?$/.exec(url)
+  if (payMatch && method === 'POST') {
+    const key = payMatch[1]
+    const t = queryToken(url)
+    if (!/^\d+$/.test(key)) return null // 非数字（mock 单号）→ mock 层
+    const sessionRes = await commerceRealFetch('payments/session', { method: 'POST', body: { orderId: Number(key) }, cookie, requestId })
+    if (sessionRes.networkError) return source === 'auto' ? null : upstreamFail(event, sessionRes)
+    if (!sessionRes.ok) return upstreamFail(event, sessionRes)
+    const session = unwrapEnvelope(sessionRes.body) as Record<string, unknown>
+    const provider = String(session.provider ?? 'mock')
+    if (provider !== 'mock') {
+      // 真实服务商：返回会话信息（跳转/SDK 流程按 provider 扩展）
+      return { sessionUrl: `/checkout/result?id=${key}&t=${t}`, provider }
+    }
+    // mock：模拟「服务商服务器」向后台投递签名 Webhook（验签/事件去重/幂等/库存实扣全走真实链路）
+    const delivered = await simulateMockProviderWebhook(String(session.orderNo), String(session.providerRef), String(session.currency))
+    if (!delivered.delivered) {
+      setResponseStatus(event, 502)
+      return { code: 'PROVIDER_WEBHOOK_FAILED', message: 'mock provider webhook delivery failed' }
+    }
+    return { sessionUrl: `/checkout/result?id=${key}&t=${t}`, provider }
+  }
+
+  // ---- GET /api/orders/:id?t=<accessToken>（防枚举：id+token 双要素，越权/缺 token → 404） ----
+  const orderMatch = /^orders\/([^/?]+)(\?.*)?$/.exec(url)
+  if (orderMatch && method === 'GET') {
+    const key = orderMatch[1]
+    const token = queryToken(url)
+    if (!/^\d+$/.test(key)) return null // 非数字（mock 单号）→ mock 层
+    const res = await commerceRealFetch(`checkout/orders/${key}?accessToken=${encodeURIComponent(token)}`, { cookie, requestId })
+    if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
+    if (!res.ok) {
+      // 404/401 统一 404 语义（防枚举：不泄露「存在但 token 错」）
+      setResponseStatus(event, 404)
+      return { code: 'ORDER_NOT_FOUND', message: 'order not found' }
+    }
+    const order = adaptOrderView(unwrapEnvelope(res.body) as Record<string, unknown>)
+    return { ...order, accessToken: token }
+  }
+
+  return null // 不认识的路径 → 交给 mock 层兜底（保持旧行为）
+}
+
+function queryToken(url: string): string {
+  const q = url.split('?')[1] ?? ''
+  return new URLSearchParams(q).get('t') ?? ''
+}
+
+function cartTokenFrom(cookie: string | undefined): string | undefined {
+  if (!cookie) return undefined
+  const m = /(?:^|;\s*)cart_token=([^;]+)/.exec(cookie)
+  return m ? decodeURIComponent(m[1]) : undefined
+}
+
+function upstreamFail(event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], res: { status: number; body: unknown }): unknown {
+  setResponseStatus(event, res.status || 502)
+  return res.body ?? { code: 'UPSTREAM_ERROR', message: 'commerce upstream error', requestId: event.context.requestId }
+}
+
+/** mock 契约层（后端不可用时的独立数据源） */
+async function mockHandle(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0]): Promise<unknown> {
+  if (url === 'cart' && method === 'GET') {
+    return mockStore.presentCart(mockStore.getOrCreateCart('guest', 'USD'))
+  }
+  if (url === 'cart/items' && method === 'POST') {
+    const body = await readBody(event)
+    return mockStore.addItem('guest', 'USD', Number(body.skuId), Number(body.qty ?? 1))
+  }
+  if (url.startsWith('cart/items/') && method === 'PATCH') {
+    const body = await readBody(event)
+    return mockStore.updateItem('guest', 'USD', Number(url.split('/')[2]), Number(body.qty))
+  }
+  if (url.startsWith('cart/items/') && method === 'DELETE') {
+    return mockStore.updateItem('guest', 'USD', Number(url.split('/')[2]), 0)
+  }
+  if (url === 'checkout/quote' && method === 'POST') {
+    const body = await readBody(event)
+    return mockStore.quote('guest', 'USD', { shippingRateId: body.shippingRateId, couponCode: body.couponCode })
+  }
+  if (url === 'checkout/orders' && method === 'POST') {
+    const body = await readBody(event)
+    return mockStore.createOrder('guest', 'USD', (event.node.req.headers['idempotency-key'] as string | undefined) ?? null, {
+      email: body.email, address: body.address, shippingRateId: body.shippingRateId, couponCode: body.couponCode,
+    })
+  }
+  if (url.startsWith('checkout/orders/') && url.endsWith('/pay') && method === 'POST') {
+    const key = url.split('/')[2]
+    const order = [...mockStore.orders.values()].find((o) => String(o.id) === key || o.orderNo === key)
+    if (!order) {
+      setResponseStatus(event, 404)
+      return { code: 'ORDER_NOT_FOUND', message: 'order not found' }
+    }
+    return mockStore.pay(order.orderNo)
+  }
+  if (url.startsWith('orders/') && method === 'GET') {
+    const [pathPart, queryPart] = url.split('?')
+    const key = pathPart.split('/')[1]
+    const token = new URLSearchParams(queryPart ?? '').get('t') ?? ''
+    const order = [...mockStore.orders.values()].find((o) => String(o.id) === key || o.orderNo === key)
+    if (!order) {
+      setResponseStatus(event, 404)
+      return { code: 'ORDER_NOT_FOUND', message: 'order not found' }
+    }
+    try {
+      return mockStore.getOrder(order.orderNo, token)
+    } catch {
+      setResponseStatus(event, 404)
+      return { code: 'ORDER_NOT_FOUND', message: 'order not found' }
+    }
+  }
+  setResponseStatus(event, 404)
+  return { code: 'NOT_FOUND', message: `no handler for ${method} /api/${url}` }
+}

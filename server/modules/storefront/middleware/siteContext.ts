@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { runInTenant } from '../../tenant/context.js'
 import { ShopShop } from '../../shop/models/index.js'
+import { getActiveCurrencyWithFallback } from '../services/currencyConfig.js'
 
 /**
  * Storefront 站点上下文
@@ -45,15 +46,23 @@ export async function siteContext(req: Request, res: Response, next: NextFunctio
     const shopId = parsePositiveInt(req.header('X-Site-Id')) ?? parsePositiveInt(req.query.siteId)
     let site: StorefrontSite = DEFAULT_SITE
 
+    // 默认站点同样跟随全局币种设置（P1-T06）
+    const globalCurrency = await getActiveCurrencyWithFallback(DEFAULT_SITE.defaultCurrency)
+    DEFAULT_SITE.defaultCurrency = globalCurrency.code
+
     if (shopId !== undefined) {
       // 查站点记录时还没有租户上下文，用 bypass 避免被租户钩子过滤
       const shop = await runInTenant({ tenantId: null, bypass: true }, () => ShopShop.findByPk(shopId))
       if (!shop) throw new AppError(404, '站点不存在')
+      // P1-T06：币种跟随全局商城设置（settings.shop.currency 唯一数据源）；settings 缺失时回退站点 credentials 并告警
+      const currency = await getActiveCurrencyWithFallback(
+        readCredential(shop.credentials, 'defaultCurrency', DEFAULT_SITE.defaultCurrency).toUpperCase(),
+      )
       site = {
         tenantId: shop.tenantId,
         channelId: shop.channelId,
         shopId: shop.id,
-        defaultCurrency: readCredential(shop.credentials, 'defaultCurrency', DEFAULT_SITE.defaultCurrency).toUpperCase(),
+        defaultCurrency: currency.code,
         defaultLocale: readCredential(shop.credentials, 'defaultLocale', DEFAULT_SITE.defaultLocale),
       }
     }

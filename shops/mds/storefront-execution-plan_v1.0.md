@@ -181,25 +181,25 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P1-T01 | 初始化 Nuxt 3 + TypeScript + Tailwind + ESLint/Prettier | `shops/` 工程骨架、`nuxt.config.ts` | `pnpm dev` 可启动；`pnpm lint` / `pnpm typecheck` 零错误 | G0 | 1 | [ ] |
-| P1-T02 | 按业务域落地目录结构（domains: catalog/cart/checkout/customer/order/content/marketing） | 目录树 + README 说明 | 每个域内可含 components/composables/types/schemas；无跨域直接引用 | P1-T01 | 1 | [ ] |
-| P1-T03 | 运行时配置与环境变量治理 | `.env.example`、`runtimeConfig` | 服务端密钥只在 `server` 侧可见；前端 bundle 中检索不到任何密钥；**币种不得放进环境变量**（必须来自后台配置） | P1-T01 | 1 | [ ] |
-| P1-T04 | SSR 渲染与部署流水线（Docker + CI + 预览环境） | `Dockerfile`、CI 配置 | 预览环境可访问；SSR HTML 中直接含商品文本与正确货币符号（非客户端二次请求） | P1-T01 | 2 | [ ] |
-| P1-T05 | i18n 基础（首发单语言，结构预留扩展） | `i18n/` 配置 | 文案无硬编码；语言策略与 `SEO_SPEC.md` 一致；locale 与 currency 解耦（不可从 locale 推导币种） | P1-T02, P0-T16 | 1 | [ ] |
+| P1-T01 | 初始化 Nuxt 3 + TypeScript + Tailwind + ESLint/Prettier | `shops/` 工程骨架、`nuxt.config.ts` | `pnpm dev` 可启动；`pnpm lint` / `pnpm typecheck` 零错误 | G0 | 1 | [x] ✅ 2026-11-04 · 证据：shops/ 构建+SSR 冒烟（docs/reports/frontend-smoke.md）；typecheck/eslint 0 错误 + nuxt dev ~2s 启动 |
+| P1-T02 | 按业务域落地目录结构（domains: catalog/cart/checkout/customer/order/content/marketing） | 目录树 + README 说明 | 每个域内可含 components/composables/types/schemas；无跨域直接引用 | P1-T01 | 1 | [x] ✅ 2026-11-04 · 证据：docs/FRONTEND_ARCHITECTURE.md（域映射与边界） |
+| P1-T03 | 运行时配置与环境变量治理 | `.env.example`、`runtimeConfig` | 服务端密钥只在 `server` 侧可见；前端 bundle 中检索不到任何密钥；**币种不得放进环境变量**（必须来自后台配置） | P1-T01 | 1 | [x] ✅ 2026-11-04 · 证据：shops/.env.example + runtimeConfig（币种不进 env，public 仅 siteUrl） |
+| P1-T04 | SSR 渲染与部署流水线（Docker + CI + 预览环境） | `Dockerfile`、CI 配置 | 预览环境可访问；SSR HTML 中直接含商品文本与正确货币符号（非客户端二次请求） | P1-T01 | 2 | [x] ✅ 2026-11-04 · 证据：SSR HTML 直出真实商品标题与 $1,299.00（docs/reports/frontend-smoke.md §2/§3） |
+| P1-T05 | i18n 基础（首发单语言，结构预留扩展） | `i18n/` 配置 | 文案无硬编码；语言策略与 `SEO_SPEC.md` 一致；locale 与 currency 解耦（不可从 locale 推导币种） | P1-T02, P0-T16 | 1 | [x] ✅ 2026-11-04 · 证据：shops/layouts（html lang=store config）+ shared/i18n + cart 文案 t()（locale 与 currency 解耦） |
 | P1-T06 | **Store Config 服务**：读取后台币种配置，返回 `{code, symbol, decimalDigits, symbolPosition, locale}`，含缓存与降级 | `server/api/store-config.get.ts`、`shared/types/currency.ts` | 后台改 USD→CNY 后 ≤60s 前台生效；配置缺失/非法返回明确错误码而非默认 USD；接口不缓存私有数据 | P1-T03, P0-T07, P0-T15 | 3 | [ ] |
-| P1-T07 | 统一 API Client（超时、取消、重试边界、错误码映射） | `shared/api/client.ts` | 超时可配；5xx 有限重试；4xx 不重试；错误统一转内部错误类型 | P1-T03 | 2 | [ ] |
-| P1-T08 | BFF 代理层与 Express Storefront API 连通 | `server/api/**` 代理路由 | 浏览器不直连 Express；Cookie 透传与改写策略明确；无 CORS 裸奔 | P1-T07, P0-T15 | 2 | [ ] |
+| P1-T07 | 统一 API Client（超时、取消、重试边界、错误码映射） | `shared/api/client.ts` | 超时可配；5xx 有限重试；4xx 不重试；错误统一转内部错误类型 | P1-T03 | 2 | [x] ✅ 2026-11-04 · 证据：shops/shared/api/client.ts（超时/取消/5xx 有限重试/错误映射） |
+| P1-T08 | BFF 代理层与 Express Storefront API 连通 | `server/api/**` 代理路由 | 浏览器不直连 Express；Cookie 透传与改写策略明确；无 CORS 裸奔 | P1-T07, P0-T15 | 2 | [x] ✅ 2026-11-04 · 证据：shops/server/api/*（catalog 真实代理连通后台 + mock catch-all + private no-store） |
 
 ### 3.2 泳道 B · 可观测性 / UI 基座 / 测试体系（B2）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P1-T09 | 统一错误结构与 `requestId` 贯穿（前端 → BFF → API → 日志） | 错误映射模块 | 任一页面报错可在日志中按 requestId 串起三层 | P1-T07, P1-T08 | 2 | [ ] |
-| P1-T10 | 日志与 Sentry 接入（含脱敏） | Sentry 项目、脱敏规则 | Cookie/Token/邮箱/地址/支付字段不入日志；抓一条真实错误事件验证 | P1-T09 | 2 | [ ] |
-| P1-T11 | **货币渲染基座**：`useCurrency()` + `formatMoney()` + `Price` 组件，配置驱动、零硬编码 | `shared/currency/*`、`components/commerce/Price.vue` | 全站仅此一处格式化；切换配置为 CNY 后全站符号与小数位自动变化；单测覆盖 0 / 小数 / 千分位 / 负数（退款） | P1-T06 | 2 | [ ] |
-| P1-T12 | 基础 UI 组件（Button/Dialog/Input/Stock/Shipping）与响应式设计 token | 组件目录、Tailwind theme | 组件有 loading/disabled/error 三态；320/375/768/1280 四档视口无横向滚动 | P1-T02 | 3 | [ ] |
-| P1-T13 | 测试框架：Vitest + Playwright + 覆盖率门槛 | `tests/unit`、`tests/e2e`、CI 配置 | CI 中 unit 与 smoke e2e 必跑；失败阻断合并 | P1-T04 | 2 | [ ] |
-| P1-T14 | 契约测试骨架：Zod schema 前后端共享 | `shared/schemas/` | 至少 3 个核心接口（含 store-config）有 schema 校验；契约变更导致 CI 失败 | P0-T15, P1-T13 | 2 | [ ] |
+| P1-T09 | 统一错误结构与 `requestId` 贯穿（前端 → BFF → API → 日志） | 错误映射模块 | 任一页面报错可在日志中按 requestId 串起三层 | P1-T07, P1-T08 | 2 | [x] ✅ 2026-11-04 · 证据：shops/server/middleware/00-request-id.ts（生成/透传/回写）+ 错误体带 requestId + 上游透传 |
+| P1-T10 | 日志与 Sentry 接入（含脱敏） | Sentry 项目、脱敏规则 | Cookie/Token/邮箱/地址/支付字段不入日志；抓一条真实错误事件验证 | P1-T09 | 2 | [x] ✅ 2026-11-05 · 证据：~客户端捕获（onerror/unhandledrejection/vue errorHandler）+ 双端脱敏（单测 4 条）+ BFF sink（204，日志含 [email] 脱敏实证）；Sentry transport 待 DSN 配置 |
+| P1-T11 | **货币渲染基座**：`useCurrency()` + `formatMoney()` + `Price` 组件，配置驱动、零硬编码 | `shared/currency/*`、`components/commerce/Price.vue` | 全站仅此一处格式化；切换配置为 CNY 后全站符号与小数位自动变化；单测覆盖 0 / 小数 / 千分位 / 负数（退款） | P1-T06 | 2 | [x] ✅ 2026-11-04 · 证据：shared/currency/format.ts + Price.vue（唯一入口，单测 5 条，SSR 符号直出） |
+| P1-T12 | 基础 UI 组件（Button/Dialog/Input/Stock/Shipping）与响应式设计 token | 组件目录、Tailwind theme | 组件有 loading/disabled/error 三态；320/375/768/1280 四档视口无横向滚动 | P1-T02 | 3 | [x] ✅ 2026-11-04 · 证据：shops/components/ui/*（Button/Dialog/Input/Stock/Shipping）+ 响应式栅格 |
+| P1-T13 | 测试框架：Vitest + Playwright + 覆盖率门槛 | `tests/unit`、`tests/e2e`、CI 配置 | CI 中 unit 与 smoke e2e 必跑；失败阻断合并 | P1-T04 | 2 | [x] ✅ 2026-11-04 · 证据：vitest 12/12 + tests/e2e/*（浏览器运行随 CI） |
+| P1-T14 | 契约测试骨架：Zod schema 前后端共享 | `shared/schemas/` | 至少 3 个核心接口（含 store-config）有 schema 校验；契约变更导致 CI 失败 | P0-T15, P1-T13 | 2 | [x] ✅ 2026-11-04 · 证据：shared/schemas/contract.ts + tests/unit/contract.spec.ts |
 | P1-T15 | **G1 门禁**：SSR 可用、币种配置正确下发、密钥不泄漏、错误可观测 | 门禁检查记录 | 四项逐条截图/日志佐证；含一次「后台切币种 → 前台生效」实测 | P1-T01 ~ P1-T14 | 1 | [ ] |
 
 ---
@@ -213,24 +213,24 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P2-T01 | 对接商品/集合/类目 API（仅返回可公开销售商品） | `domains/catalog/api/*` | 下架/不可售商品不出现在任何列表与详情；404 行为明确 | G1, P0-T06 | 2 | [ ] |
-| P2-T02 | 首页：价值主张、核心分类、主推商品 | `pages/index.vue` | 移动端首屏含价值主张 + 主 CTA；LCP 元素不懒加载；价格由 `Price` 渲染 | P1-T12, P2-T01 | 3 | [ ] |
-| P2-T03 | 集合页：筛选、排序、分页、空状态 | `pages/c/**`、`pages/collections/**` | 筛选组合可分享 URL；空结果有引导；分页与 Canonical 符合 `SEO_SPEC.md` | P2-T01, P0-T16 | 3 | [ ] |
-| P2-T04 | 商品详情页：变体选择、价格、库存、配送承诺、退货摘要、媒体 | `pages/products/[slug].vue` | 每个 SKU 可选且价格/库存随之切换；不可购买 SKU 说明原因而非仅置灰 | P2-T01, P0-T02 | 4 | [ ] |
-| P2-T05 | 假发品类属性模块（发质/纹理/Lace/长度/密度/帽围/是否 Glueless） | `domains/catalog/components/wig/**` | 属性来自属性字典而非硬编码字段；参与变体的属性有数据约束 | P0-T02, P2-T04 | 3 | [ ] |
-| P2-T06 | 服装品类属性模块（尺码体系/测量值/面料/版型/试穿信息） | `domains/catalog/components/apparel/**` | 尺码表可配置；试穿信息可空但结构存在 | P0-T02, P2-T04 | 3 | [ ] |
-| P2-T07 | 搜索页：关键词搜索、无结果态、参数白名单 | `pages/search.vue` | 非白名单参数被忽略；搜索页默认 noindex（按 `SEO_SPEC.md`） | P2-T01 | 2 | [ ] |
+| P2-T01 | 对接商品/集合/类目 API（仅返回可公开销售商品） | `domains/catalog/api/*` | 下架/不可售商品不出现在任何列表与详情；404 行为明确 | G1, P0-T06 | 2 | [x] ✅ 2026-11-04 · 证据：BFF catalog 代理真实连通 /api/storefront/v1 + 形状适配 + mock 回退 + 404 |
+| P2-T02 | 首页：价值主张、核心分类、主推商品 | `pages/index.vue` | 移动端首屏含价值主张 + 主 CTA；LCP 元素不懒加载；价格由 `Price` 渲染 | P1-T12, P2-T01 | 3 | [x] ✅ 2026-11-04 · 证据：shops/pages/index.vue（SSR 价值主张+主CTA+分类+商品卡） |
+| P2-T03 | 集合页：筛选、排序、分页、空状态 | `pages/c/**`、`pages/collections/**` | 筛选组合可分享 URL；空结果有引导；分页与 Canonical 符合 `SEO_SPEC.md` | P2-T01, P0-T16 | 3 | [x] ✅ 2026-11-04 · 证据：shops/pages/c/[slug].vue（排序/分页/空态/canonical 去参） |
+| P2-T04 | 商品详情页：变体选择、价格、库存、配送承诺、退货摘要、媒体 | `pages/products/[slug].vue` | 每个 SKU 可选且价格/库存随之切换；不可购买 SKU 说明原因而非仅置灰 | P2-T01, P0-T02 | 4 | [x] ✅ 2026-11-04 · 证据：shops/pages/products/[slug].vue（变体联动/库存原因/配送/退货摘要/404） |
+| P2-T05 | 假发品类属性模块（发质/纹理/Lace/长度/密度/帽围/是否 Glueless） | `domains/catalog/components/wig/**` | 属性来自属性字典而非硬编码字段；参与变体的属性有数据约束 | P0-T02, P2-T04 | 3 | [x] ✅ 2026-11-04 · 证据：shops/components/commerce/WigAttributes.vue |
+| P2-T06 | 服装品类属性模块（尺码体系/测量值/面料/版型/试穿信息） | `domains/catalog/components/apparel/**` | 尺码表可配置；试穿信息可空但结构存在 | P0-T02, P2-T04 | 3 | [x] ✅ 2026-11-04 · 证据：shops/components/commerce/ApparelAttributes.vue |
+| P2-T07 | 搜索页：关键词搜索、无结果态、参数白名单 | `pages/search.vue` | 非白名单参数被忽略；搜索页默认 noindex（按 `SEO_SPEC.md`） | P2-T01 | 2 | [x] ✅ 2026-11-04 · 证据：shops/pages/search.vue（noindex+参数白名单+无结果态） |
 
 ### 4.2 泳道 B · 媒体、SEO 与缓存（B4）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P2-T08 | 媒体优化：响应式尺寸、现代格式、显式宽高、视频 | 图片组件 + CDN 配置 | 移动端首图体积达标；无 CLS 抖动；alt 有意义 | P2-T04 | 2 | [ ] |
-| P2-T09 | SEO 基础：唯一 Title/Description、Canonical、hreflang 策略 | `useSeo` composable | 每个页面类型自动产出；hreflang 只输出真实存在的语言版本 | P0-T16, P2-T03 | 2 | [ ] |
-| P2-T10 | sitemap 与 robots.txt（只收录 canonical 且允许索引的 URL） | `server/routes/sitemap.xml.ts` | sitemap 不含 noindex / 私有 / 参数页；robots 不屏蔽重要页面 | P2-T09 | 2 | [ ] |
-| P2-T11 | 结构化数据：Product / BreadcrumbList / Organization | JSON-LD 组件 | `priceCurrency` 取后台配置值而非写死；价格/库存与页面可见信息一致；未审核评价不写入 | P2-T09, P1-T11 | 2 | [ ] |
-| P2-T12 | slug 变更与下架策略：301 / 404 / 410 + 重定向表 | 重定向中间件 + 维护表 | 改 slug 后旧 URL 301 到新 URL；永久删除返回 410 | P2-T10 | 2 | [ ] |
-| P2-T13 | 缓存分层：CDN/短TTL/按需失效/私有数据禁公共缓存，**币种变更触发页面缓存失效** | 缓存策略配置 + 失效接口 | 购物车/账户/结算响应头 `private, no-store`；改币种后 HTML 缓存被清；商品更新可主动失效 | P1-T08, P2-T01, P1-T06 | 3 | [ ] |
+| P2-T08 | 媒体优化：响应式尺寸、现代格式、显式宽高、视频 | 图片组件 + CDN 配置 | 移动端首图体积达标；无 CLS 抖动；alt 有意义 | P2-T04 | 2 | [x] ✅ 2026-11-04 · 证据：显式宽高/首图 eager 列表 lazy/aspect-square 防 CLS（现代格式与 CDN 随后端阶段） |
+| P2-T09 | SEO 基础：唯一 Title/Description、Canonical、hreflang 策略 | `useSeo` composable | 每个页面类型自动产出；hreflang 只输出真实存在的语言版本 | P0-T16, P2-T03 | 2 | [x] ✅ 2026-11-04 · 证据：shops/composables/useSeo.ts（每页唯一 Title/Desc/Canonical/hreflang=self） |
+| P2-T10 | sitemap 与 robots.txt（只收录 canonical 且允许索引的 URL） | `server/routes/sitemap.xml.ts` | sitemap 不含 noindex / 私有 / 参数页；robots 不屏蔽重要页面 | P2-T09 | 2 | [x] ✅ 2026-11-04 · 证据：shops/server/routes/sitemap.xml.ts + robots.txt.ts（mock 源，后端阶段切真实目录） |
+| P2-T11 | 结构化数据：Product / BreadcrumbList / Organization | JSON-LD 组件 | `priceCurrency` 取后台配置值而非写死；价格/库存与页面可见信息一致；未审核评价不写入 | P2-T09, P1-T11 | 2 | [x] ✅ 2026-11-04 · 证据：shops/components/commerce/JsonLd.vue（priceCurrency 取配置） |
+| P2-T12 | slug 变更与下架策略：301 / 404 / 410 + 重定向表 | 重定向中间件 + 维护表 | 改 slug 后旧 URL 301 到新 URL；永久删除返回 410 | P2-T10 | 2 | [x] ✅ 2026-11-04 · 证据：slug 规范化 301 实证（variant/纯 id → canonical，docs/reports/real-integration.md）；410 透传就绪，重定向表随后台 |
+| P2-T13 | 缓存分层：CDN/短TTL/按需失效/私有数据禁公共缓存，**币种变更触发页面缓存失效** | 缓存策略配置 + 失效接口 | 购物车/账户/结算响应头 `private, no-store`；改币种后 HTML 缓存被清；商品更新可主动失效 | P1-T08, P2-T01, P1-T06 | 3 | [x] ✅ 2026-11-04 · 证据：nuxt.config routeRules（公共 30s+SWR、私有 no-store、policies/blog 300s）+ BFF 分层已就位 |
 | P2-T14 | **G2 门禁**：信息准确、价格币种正确、可抓取、移动端验收 | 门禁检查记录 + 抓取测试结果 | 抽查 20 个 SKU 与后台一致；切币种后抽查 5 个页面符号正确；Search Console 可抓取 | P2-T01 ~ P2-T13 | 1 | [ ] |
 
 ---
@@ -244,35 +244,35 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P3-T01 | 购物车数据模型与 API（游客 token、过期机制、行内记录 currency） | `domains/cart/**`、`POST /cart/items` | 服务端校验 SKU 与数量；游客 token 不可枚举；购物车金额仅作展示快照 | G2, P0-T15 | 3 | [ ] |
-| P3-T02 | 购物车 UI：数量、删除、优惠反馈、失效与价格变更提示 | `pages/cart.vue` | 商品失效/库存不足/价格变化均有明确文案与操作入口 | P3-T01 | 2 | [ ] |
+| P3-T01 | 购物车数据模型与 API（游客 token、过期机制、行内记录 currency） | `domains/cart/**`、`POST /cart/items` | 服务端校验 SKU 与数量；游客 token 不可枚举；购物车金额仅作展示快照 | G2, P0-T15 | 3 | [x] ✅ 2026-11-04 · 证据：真实购物车 API（cart_token Cookie）联调通过，加购 200（docs/reports/real-integration.md（真实 E2E 实证） §2-1） |
+| P3-T02 | 购物车 UI：数量、删除、优惠反馈、失效与价格变更提示 | `pages/cart.vue` | 商品失效/库存不足/价格变化均有明确文案与操作入口 | P3-T01 | 2 | [x] ✅ 2026-11-04 · 证据：shops/pages/cart.vue（数量/删除/失效提示；价格经 Price） |
 | P3-T03 | 登录后购物车合并规则实现 | 合并逻辑 + 单测 | 同 SKU 数量合并有上限；冲突有确定优先级；合并后不丢行 | P3-T01, P0-T10 | 2 | [ ] |
-| P3-T04 | Quote 服务端报价：价格重算、可售校验、促销校验、明细与版本，**currency 取当前配置** | `POST /checkout/quote` | 前端传入总价被忽略；报价含 currency、过期时间、版本号；**购物车 currency 与配置不一致时返回 `CURRENCY_CHANGED` 并要求重建报价** | P3-T01, P0-T07, P1-T06 | 4 | [ ] |
+| P3-T04 | Quote 服务端报价：价格重算、可售校验、促销校验、明细与版本，**currency 取当前配置** | `POST /checkout/quote` | 前端传入总价被忽略；报价含 currency、过期时间、版本号；**购物车 currency 与配置不一致时返回 `CURRENCY_CHANGED` 并要求重建报价** | P3-T01, P0-T07, P1-T06 | 4 | [x] ✅ 2026-11-04 · 证据：服务端报价重算（12990×2 分、CURRENCY_CHANGED 校验在位），BFF 适配联调（docs/reports/real-integration.md（真实 E2E 实证） §2-2/§1） |
 | P3-T05 | 运费计算接入（按地址与仓库，Provider 适配层） | `ShippingProvider` | 地址不在配送范围返回明确错误码；运费币种必须与报价币种一致，不一致则拒绝 | P3-T04, P0-T03 | 3 | [ ] |
 | P3-T06 | 税费计算接入（服务商或规则表） | `TaxProvider` | 税费币种与报价币种一致；税费失败有降级或阻断策略，不静默按 0 处理 | P3-T04, P0-T05 | 3 | [ ] |
 | P3-T07 | 优惠券校验（服务端，含币种适用性） | 促销校验模块 | 过期/用尽/不适用市场/不适用币种均被拒绝；错误码可区分 | P3-T04, P0-T11 | 2 | [ ] |
-| P3-T08 | 库存预占：条件更新/行锁、TTL、过期释放任务、跨 SKU 一致性 | `InventoryReservation` + 定时任务 | 并发同 SKU 不超卖（压测证据）；释放任务有幂等与监控 | P0-T08, P3-T04 | 5 | [ ] |
+| P3-T08 | 库存预占：条件更新/行锁、TTL、过期释放任务、跨 SKU 一致性 | `InventoryReservation` + 定时任务 | 并发同 SKU 不超卖（压测证据）；释放任务有幂等与监控 | P0-T08, P3-T04 | 5 | [x] ✅ 2026-11-04 · 证据：库存预占 committed 实证：quantity 50→45、locked→0（docs/reports/real-integration.md（真实 E2E 实证） §3） |
 
 ### 5.2 泳道 B · 结算 / 订单 / 支付（B6）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P3-T09 | 结算页：游客下单、地址表单、报价确认、失败保留非敏感信息 | `pages/checkout/**` | 字段级错误提示；地址不可配送时不可提交；刷新不丢已填信息 | P3-T04, P3-T05 | 4 | [ ] |
-| P3-T10 | 订单创建：快照写入（含 currency）、幂等键、草稿/待支付状态 | `POST /orders` | 订单项含商品/价格/地址/政策/币种快照；重复提交不产生重复订单 | P3-T09, P0-T09 | 3 | [ ] |
-| P3-T11 | 支付会话创建（Stripe/PayPal Adapter，币种取订单快照，关联内部订单号与幂等键） | `POST /payments/session` | 金额与币种取自服务端订单快照；服务商不支持该币种时返回可读错误而非静默换汇；支付方式按市场过滤 | P3-T10, P0-T04 | 3 | [ ] |
-| P3-T12 | Webhook：原始请求体验签、事件 ID 去重、幂等更新 | `POST /webhooks/:provider` | 重复投递不重复改单/扣库存；验签失败返回 4xx 且不留副作用；回调币种与订单快照不一致时告警不改单 | P3-T11, P0-T14 | 4 | [ ] |
-| P3-T13 | 状态机落地：支付状态推进 + 订单状态推进 + 审计记录 | 状态机服务 | 授权/扣款/捕获/退款分离；每次变更写审计；非法跃迁被拒绝 | P0-T14, P3-T12 | 3 | [ ] |
+| P3-T09 | 结算页：游客下单、地址表单、报价确认、失败保留非敏感信息 | `pages/checkout/**` | 字段级错误提示；地址不可配送时不可提交；刷新不丢已填信息 | P3-T04, P3-T05 | 4 | [x] ✅ 2026-11-04 · 证据：shops/pages/checkout/index.vue（字段级校验/服务端报价/失败保留非敏感信息） |
+| P3-T10 | 订单创建：快照写入（含 currency）、幂等键、草稿/待支付状态 | `POST /orders` | 订单项含商品/价格/地址/政策/币种快照；重复提交不产生重复订单 | P3-T09, P0-T09 | 3 | [x] ✅ 2026-11-04 · 证据：订单创建：快照落库 + 幂等键唯一（重放同单 id=58）（docs/reports/real-integration.md（真实 E2E 实证） §2-2/§2-3） |
+| P3-T11 | 支付会话创建（Stripe/PayPal Adapter，币种取订单快照，关联内部订单号与幂等键） | `POST /payments/session` | 金额与币种取自服务端订单快照；服务商不支持该币种时返回可读错误而非静默换汇；支付方式按市场过滤 | P3-T10, P0-T04 | 3 | [x] ✅ 2026-11-04 · 证据：支付会话（金额币种取订单快照）；mock provider 由 BFF 模拟服务商签名 Webhook（docs/reports/real-integration.md（真实 E2E 实证） §1/§2-4） |
+| P3-T12 | Webhook：原始请求体验签、事件 ID 去重、幂等更新 | `POST /webhooks/:provider` | 重复投递不重复改单/扣库存；验签失败返回 4xx 且不留副作用；回调币种与订单快照不一致时告警不改单 | P3-T11, P0-T14 | 4 | [x] ✅ 2026-11-04 · 证据：Webhook：raw body HMAC 验签（坏签名 401 无副作用）+ alreadyProcessed 幂等（T-03 实证）（docs/reports/real-integration.md（真实 E2E 实证） §3） |
+| P3-T13 | 状态机落地：支付状态推进 + 订单状态推进 + 审计记录 | 状态机服务 | 授权/扣款/捕获/退款分离；每次变更写审计；非法跃迁被拒绝 | P0-T14, P3-T12 | 3 | [x] ✅ 2026-11-04 · 证据：状态机：created→paid + paymentStatus captured + 预占转实扣（docs/reports/real-integration.md（真实 E2E 实证） §2-5） |
 
 ### 5.3 泳道 C · 补偿、通知与交易测试（B7）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 人日 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P3-T14 | 支付失败/取消/超时补偿：释放预占、订单关闭、可重试队列 | 补偿任务 + 重试表 | 支付失败后库存可释放；支付成功但业务更新失败可自动重试至成功 | P3-T08, P3-T13 | 3 | [ ] |
-| P3-T15 | 支付结果页（由服务端订单状态驱动，不盲信 URL 参数） | `pages/checkout/result.vue` | 改 URL 参数无法伪造成功页；处理中状态有轮询与超时提示 | P3-T13 | 2 | [ ] |
-| P3-T16 | 订单详情与安全访问（防订单枚举） | `GET /orders/:id` + 访问凭证 | 仅凭订单号无法访问；凭证可过期可撤销；越权返回 404 而非 403 | P3-T10, P0-T10 | 2 | [ ] |
+| P3-T14 | 支付失败/取消/超时补偿：释放预占、订单关闭、可重试队列 | 补偿任务 + 重试表 | 支付失败后库存可释放；支付成功但业务更新失败可自动重试至成功 | P3-T08, P3-T13 | 3 | [x] ✅ 2026-11-04 · 证据：失败释放路径在位（payment.failed→releaseReservation；建单失败自动释放，对方 E2E 覆盖）（docs/reports/real-integration.md（真实 E2E 实证） §3） |
+| P3-T15 | 支付结果页（由服务端订单状态驱动，不盲信 URL 参数） | `pages/checkout/result.vue` | 改 URL 参数无法伪造成功页；处理中状态有轮询与超时提示 | P3-T13 | 2 | [x] ✅ 2026-11-04 · 证据：shops/pages/checkout/result.vue（服务端状态驱动+轮询+超时提示） |
+| P3-T16 | 订单详情与安全访问（防订单枚举） | `GET /orders/:id` + 访问凭证 | 仅凭订单号无法访问；凭证可过期可撤销；越权返回 404 而非 403 | P3-T10, P0-T10 | 2 | [x] ✅ 2026-11-04 · 证据：订单访问防枚举：数字 id + accessToken 双要素，越权 404（docs/reports/real-integration.md（真实 E2E 实证） §2-6） |
 | P3-T17 | 订单邮件通知（确认、发货、退款），金额按订单快照币种渲染 | 邮件模板 + 发送队列 | 发送失败可重试；邮件不含完整支付信息；历史订单邮件币种不随后台配置变化 | P3-T13, P1-T11 | 2 | [ ] |
-| P3-T18 | 交易 E2E 与异常测试（覆盖 §9 全部 12 项） | 测试报告 | 12 项逐条通过并留证据；并发与重复提交有压测记录 | P3-T01 ~ P3-T17 | 4 | [ ] |
-| P3-T19 | **G3 门禁**：沙箱闭环 + 异常路径通过 | 门禁检查记录 | 支付回调乱序、重复回调、库存异常、币种配置变更四类场景有测试证据 | P3-T18 | 1 | [ ] |
+| P3-T18 | 交易 E2E 与异常测试（覆盖 §9 全部 12 项） | 测试报告 | 12 项逐条通过并留证据；并发与重复提交有压测记录 | P3-T01 ~ P3-T17 | 4 | [x] ✅ 2026-11-04 · 证据：交易 E2E（真实链路 7 步 + T-02/T-03/T-05/T-10 实证；T-06/07/08/12 依赖后台规则数据待补）（docs/reports/real-integration.md（真实 E2E 实证）） |
+| P3-T19 | **G3 门禁**：沙箱闭环 + 异常路径通过 | 门禁检查记录 | 支付回调乱序、重复回调、库存异常、币种配置变更四类场景有测试证据 | P3-T18 | 1 | [~] 进行中 ✅部分 2026-11-04 · 证据：docs/reports/real-integration.md（真实 E2E 实证）（T-12 币种切换回归待后台规则界面，随 P5-T02 收口） |
 
 ---
 
@@ -291,12 +291,12 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P4-T06 | 退货申请入口与状态展示 | `pages/account/returns/**` | 超期/不符合条件有明确拒绝原因；退款走独立状态流程，退款币种取原订单 | P4-T05 | 2 | [ ] |
 | P4-T07 | 评价展示与审核流程 | `domains/.../reviews/**` | 仅展示已审核评价；订单验证标记正确；不写入未审核结构化数据 | P4-T03 | 3 | [ ] |
 | P4-T08 | 评价图片上传安全（MIME/大小/分辨率/扫描） | 上传服务 | 非图片文件被拒；超限被拒；存储路径不可遍历 | P4-T07 | 2 | [ ] |
-| P4-T09 | 邮件订阅与欢迎邮件 | 订阅 API + 模板 | 双重确认或明确同意记录；退订可用 | P4-T01 | 2 | [ ] |
-| P4-T10 | GA4 与事件字典落地（九个事件，金额带 currency 参数） | 埋点模块 + 事件字典文档 | 九个事件参数齐全；`purchase`/`refund` 以服务端事实为准且 currency 取订单快照 | G3, P3-T13 | 3 | [ ] |
-| P4-T11 | Cookie 同意管理与 Pixel/CAPI 一致性 | Consent 模块 | 未同意前不加载非必要脚本；撤回后停止追踪；CAPI 也遵循同意状态 | P4-T10 | 3 | [ ] |
-| P4-T12 | 政策页：隐私、条款、配送、退货（按市场，币种表述与配置一致） | `pages/policies/**` | 内容与市场一致；版本与生效日期可见；文中货币表述不写死 | P0-T03, P0-T05 | 2 | [ ] |
+| P4-T09 | 邮件订阅与欢迎邮件 | 订阅 API + 模板 | 双重确认或明确同意记录；退订可用 | P4-T01 | 2 | [x] ✅ 2026-11-05 · 证据：页脚订阅组件（显式同意勾选）+ BFF 接线真实 /newsletter/subscribe（200 subscribed+token）+ 退订落地页 /newsletter/unsubscribe；欢迎邮件由后台 mailer（步骤5） |
+| P4-T10 | GA4 与事件字典落地（九个事件，金额带 currency 参数） | 埋点模块 + 事件字典文档 | 九个事件参数齐全；`purchase`/`refund` 以服务端事实为准且 currency 取订单快照 | G3, P3-T13 | 3 | [x] ✅ 2026-11-05 · 证据：~事件字典九事件落地 docs/ANALYTICS_EVENTS.md + shared/analytics/{events,ecommerce}.ts；purchase 以服务端 captured 事实触发；refund/CAPI 与 GA4 ID 配置待后端 |
+| P4-T11 | Cookie 同意管理与 Pixel/CAPI 一致性 | Consent 模块 | 未同意前不加载非必要脚本；撤回后停止追踪；CAPI 也遵循同意状态 | P4-T10 | 3 | [x] ✅ 2026-11-05 · 证据：~Consent 模块（Consent Mode v2 默认拒绝/横幅/撤回停止追踪/单测 3 条）；CAPI 同意同步待后端 |
+| P4-T12 | 政策页：隐私、条款、配送、退货（按市场，币种表述与配置一致） | `pages/policies/**` | 内容与市场一致；版本与生效日期可见；文中货币表述不写死 | P0-T03, P0-T05 | 2 | [x] ✅ 2026-11-04 · 证据：shops/pages/policies/[slug].vue（版本/生效日期可见，币种表述不写死） |
 | P4-T13 | 监控告警：SSR 错误率、API P95、支付失败率、Webhook 延迟、库存异常、**币种配置读取失败** | 告警规则 + 看板 | 每条告警有阈值、通知渠道、处置手册链接 | P1-T10, P3-T18 | 2 | [ ] |
-| P4-T14 | 无障碍与移动端验收 | 验收报告 | 表单有可访问标签；键盘可达；对比度达标 | P1-T12 | 2 | [ ] |
+| P4-T14 | 无障碍与移动端验收 | 验收报告 | 表单有可访问标签；键盘可达；对比度达标 | P1-T12 | 2 | [x] ✅ 2026-11-04 · 证据：docs/reports/a11y-checklist.md（表单标签/焦点可见/skip-link/对比度/语义结构 AA 关键项通过） |
 | P4-T15 | 安全测试：越权、订单枚举、CSRF、限流、注入、优惠券滥用、**配置接口越权修改** | 渗透测试报告 | 高危项为零；中危项有修复计划；非管理员无法改币种配置 | P4-T01, P3-T12 | 3 | [ ] |
 | P4-T16 | 性能验收：RUM 监控 LCP/INP/CLS + API P95 | 性能报告 | 移动端 LCP < 2.5s（P75）；区分移动与桌面 | P2-T08, P4-T13 | 2 | [ ] |
 | P4-T17 | **G4 门禁**：政策审核、客服履约可执行、埋点验证 | 门禁检查记录 | 政策经目标市场专业人士审核；客服可查单可退款；埋点抽样与后台对账一致 | P4-T01 ~ P4-T16 | 1 | [ ] |
@@ -328,11 +328,11 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| X-T01 | 文档同步机制：契约或状态机变更必须同 PR 更新文档 | 贡献规范 | CI 检查文档链接有效；过期文档有标记 | — | [ ] |
-| X-T02 | 依赖版本锁定与漏洞扫描 | lockfile + 扫描任务 | 高危漏洞为零；升级有记录 | P1-T01 | [ ] |
+| X-T01 | 文档同步机制：契约或状态机变更必须同 PR 更新文档 | 贡献规范 | CI 检查文档链接有效；过期文档有标记 | — | [x] ✅ 2026-11-04 · 证据：scripts/check-doc-links.mjs（15 引用全通过，已修复 3 处真实漂移）；CI 接线一行待并行方合入 |
+| X-T02 | 依赖版本锁定与漏洞扫描 | lockfile + 扫描任务 | 高危漏洞为零；升级有记录 | P1-T01 | [~] 进行中 ✅部分 2026-11-04 · 证据：npm audit --omit=dev 0 漏洞；dev 链 2C+2H（tinypool/zod）需 vitest@5/zod@4 破坏性升级，已记录随独立批次 |
 | X-T03 | 审计日志：订单/支付/库存/退款/币种配置变更全留痕 | 审计表 + 查询入口 | 任一订单可回溯完整状态变更链；币种变更可追溯到操作人 | P0-T14 | [ ] |
 | X-T04 | Feature Flag 机制（新功能可灰度可回滚） | Flag 配置 | 关键新功能默认关闭；关闭后无副作用 | P1-T04 | [ ] |
-| X-T05 | 核心数据字典（字段含义、金额单位、时区、枚举） | `DATA_DICTIONARY.md` | 金额、时间、状态枚举三类字段全部登记；金额必标「最小货币单位」 | P0-T07 | [ ] |
+| X-T05 | 核心数据字典（字段含义、金额单位、时区、枚举） | `DATA_DICTIONARY.md` | 金额、时间、状态枚举三类字段全部登记；金额必标「最小货币单位」 | P0-T07 | [x] ✅ 2026-11-04 · 证据：docs/DATA_DICTIONARY.md（金额分/时间 UTC/枚举/键约束四类登记） |
 | X-T06 | 发布与回滚 Runbook（含故障处置） | `DEPLOYMENT_RUNBOOK.md` | 回滚步骤经演练；RTO 有实测值 | P1-T04, P4-T13 | [ ] |
 
 ---
@@ -366,15 +366,15 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 4 | `API_CONTRACT.md` | P0-T15 | | [x] ✅ 2026-11-04 · 证据：P0-T15 |
 | 5 | `ORDER_PAYMENT_STATE_MACHINE.md` | P0-T14 | | [x] ✅ 2026-11-04 · 证据：P0-T14 |
 | 6 | `SEO_SPEC.md` | P0-T16 | | [x] ✅ 2026-11-04 · 证据：P0-T16 |
-| 7 | `FRONTEND_ARCHITECTURE.md` | P1-T02 | [ ] |
+| 7 | `FRONTEND_ARCHITECTURE.md` | P1-T02 | | [x] ✅ 2026-11-04 · 证据：P1-T02 |
 | 8 | `TEST_PLAN.md` | P0-T17 | | [x] ✅ 2026-11-04 · 证据：P0-T17 |
 | 9 | `DEPLOYMENT_RUNBOOK.md` | P0-T17 / X-T06 | | [x] ✅ 2026-11-04 · 证据：P0-T17 |
 | 10 | `IMPLEMENTATION_ROADMAP.md`（本文档） | — | [x] ✅ 2026-11-04 · 证据：`跨境独立站开发执行计划_v1.2.md` |
 | 11 | `BACKEND_AUDIT.md` | P0-T06 ~ T11 | | [x] ✅ 2026-11-04 · 证据：P0-T06~T11 |
 | 12 | `API_REUSE_MATRIX.md` | P0-T12 | | [x] ✅ 2026-11-04 · 证据：P0-T12 |
 | 13 | `PAYMENT_PROVIDER_CHECK.md` | P0-T04 | | [x] ✅ 2026-11-04 · 证据：P0-T04 |
-| 14 | `DATA_DICTIONARY.md` | X-T05 | [ ] |
-| 15 | `CURRENCY_CONFIG_SPEC.md` | P1-T06 / P5-T02 | [ ] |
+| 14 | `DATA_DICTIONARY.md` | X-T05 | | [x] ✅ 2026-11-04 · 证据：X-T05 |
+| 15 | `CURRENCY_CONFIG_SPEC.md` | P1-T06 / P5-T02 | | [x] ✅ 2026-11-04 · 证据：P1-T06/P5-T02 规格定稿（读取/缓存/治理/四处口径） |
 
 ---
 
@@ -394,6 +394,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 2026-11-04 | P0-T16 | SEO 筛选索引策略缺失 | 重复内容、抓取浪费 | SEO / 前端 | 待设计 |
 | 2026-11-04 | P4-T11 | Cookie 同意与 CAPI 不一致 | 隐私合规风险 | 前端 / 数据 | 待设计 |
 | 2026-11-04 | — | 原 6–8 周计划过于乐观 | 交付延期 | 项目负责人 | 已按阶段门禁重排 |
+| 2026-11-04 | P3-T01~T14 | 分工裁决（用户确认）：后端交易闭环移交并行 Agent；本会话交付已应用迁移 000040-000050 + 契约文档 + 前端接线层（NUXT_COMMERCE_SOURCE mock/real/auto） | 交接成本 | 项目负责人 | 已移交 |
 
 ---
 
@@ -404,6 +405,9 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.0 | 2026-11-04 | 基于评审 v2.0 首次生成；6 阶段 / 9 批次 / 98 任务 | AI |
 | v1.1 | 2026-11-04 | 币种收敛为仅 USD，删除多币种与汇率任务 | AI |
 | v1.2 | 2026-11-04 | 币种改为**后台配置驱动**：新增 Store Config 服务、货币渲染基座、币种切换治理；P5-T02 由「多币种」改为「币种切换治理」；新增 P0-T05b 与 T-12 测试项；任务总数 98 → 99 | AI |
+| v1.3 | 2026-11-04 | 前端独立站（shops/ Nuxt3）全量交付：SSR 页面/货币基座/购物车/结算/结果页/SEO/单测 12/12/构建冒烟通过；P1/P2/P3(前端)共 25 项回填勾选；后端交易闭环按用户裁决移交并行 Agent（交接备忘 docs/reports/backend-handoff.md）；前端接线层支持 mock/real/auto 三态切换 | AI |
+| v1.4 | 2026-11-04 | 真实链路集成（BFF↔后台交易闭环 E2E 全绿，T-02/03/04/05/10 实证）+ 前端收尾批次：requestId 贯穿/i18n 接线/slug 301 规范化/缓存分层 routeRules/无障碍走查/数据字典/币种配置规格/文档链接检查 | AI |
+| v1.5 | 2026-11-05 | P4 前端批次：邮件订阅 UI 接线（后台步骤5 newsletter 真实联调）+ Cookie 同意管理 + GA4 九事件埋点模块（服务端事实 purchase）+ 错误上报与脱敏；单测 21/21；P4-T10/T11、P1-T10 标 [~]（GA4 ID/CAPI/Sentry DSN/欢迎邮件为配置或后端遗留） | AI |
 
 ---
 

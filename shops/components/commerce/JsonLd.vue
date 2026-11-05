@@ -1,0 +1,42 @@
+<script setup lang="ts">
+import type { CatalogProduct } from '@shared/types/api'
+import { useStoreConfig } from '~/composables/useStoreConfig'
+
+/**
+ * JSON-LD 结构化数据（P2-T11）：Product offers.priceCurrency 取 store config（禁止写死 C1/C4）。
+ * 价格与页面可见价格同源（同一 product.price 数据源）。
+ */
+const props = defineProps<{ product: CatalogProduct }>()
+const { currency } = useStoreConfig()
+
+const productJsonLd = computed(() => {
+  const p = props.product.price
+  if (!p) return null
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: props.product.title,
+    description: props.product.description,
+    offers: {
+      '@type': 'Offer',
+      price: (p.amount / 10 ** currency.value.decimalDigits).toFixed(currency.value.decimalDigits),
+      priceCurrency: currency.value.code,
+      availability: props.product.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    },
+  }
+})
+
+const breadcrumbJsonLd = computed(() => ({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: '/' },
+    ...(props.product.category ? [{ '@type': 'ListItem', position: 2, name: props.product.category.name, item: `/c/${props.product.category.slug}` }] : []),
+  ],
+}))
+</script>
+
+<template>
+  <script v-if="productJsonLd" type="application/ld+json" v-html="JSON.stringify(productJsonLd)" />
+  <script v-if="breadcrumbJsonLd" type="application/ld+json" v-html="JSON.stringify(breadcrumbJsonLd)" />
+</template>

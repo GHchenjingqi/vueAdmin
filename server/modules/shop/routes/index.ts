@@ -47,6 +47,8 @@ import * as inventoryController from '../controllers/inventoryController.js'
 import * as orderController from '../controllers/orderController.js'
 import * as marketingController from '../controllers/marketingController.js'
 import * as analyticsController from '../controllers/analyticsController.js'
+import * as currencyConfigController from '../controllers/currencyConfigController.js'
+import { updateCurrencySchema, rollbackCurrencySchema } from '../../../shared/schemas/storefront-commerce.js'
 
 /**
  * 商城后台模块路由
@@ -174,5 +176,14 @@ router.delete('/coupons/:id', authMiddleware, validate(idParamSchema, 'params'),
 router.get('/analytics/sales', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.sales)
 router.get('/analytics/profit', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.profit)
 router.get('/analytics/turnover', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.turnover)
+
+// ==================== 商城设置：币种配置治理（P0-T05b / P5-T02 / X-T03） ====================
+// 二次确认（confirmImpact + ackNoConversion）、审计 config_changes、定时生效与回滚；
+// 价格数值不会自动换算（C5）——界面提示由后台前端承接。
+router.get('/settings/currency', authMiddleware, currencyConfigController.getCurrency)
+router.get('/settings/currency/active', authMiddleware, currencyConfigController.getActive)
+router.put('/settings/currency', authMiddleware, validate(updateCurrencySchema), currencyConfigController.updateCurrency)
+router.post('/settings/currency/rollback', authMiddleware, validate(rollbackCurrencySchema), currencyConfigController.rollbackCurrency)
+router.get('/config-changes', authMiddleware, currencyConfigController.listConfigChanges)
 
 export default router
