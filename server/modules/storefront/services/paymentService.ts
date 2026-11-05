@@ -7,6 +7,7 @@ import * as reservationService from '../../shop/services/reservationService.js'
 import { tryEnqueue } from '../../shop/services/orderMailService.js'
 import { assertShippableCountry, extractCountry } from './shippingService.js'
 import { getCounter, incCounter, setGauge } from './monitoringService.js'
+import * as auditLogService from '../../shop/services/auditLogService.js'
 import config from '../../../config/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
@@ -145,6 +146,9 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
     await order.update({ paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never)
     await reservationService.commitReservation(order.orderNo)
     if (prev) await prev.update({ status: 'captured', rawPayload: payload } as never)
+    // X-T03：审计订单/支付状态变更（system 事件，不阻断主流程）
+    await auditLogService.record({ actorType: 'system', action: 'order.payment_captured', entityType: 'order', entityId: order.id, afterState: { status: 'paid', paymentStatus: 'captured' } })
+    await auditLogService.record({ actorType: 'system', action: 'payment.captured', entityType: 'payment', entityId: order.id, afterState: { paymentStatus: 'captured' } })
     // P3-T17：订单确认邮件入队（幂等 + 异常隔离，邮件失败不得让支付回调重投失败）
     await tryEnqueue({ orderId: order.id, type: 'confirmed' })
     return { ok: true, status: 200 }
@@ -156,6 +160,8 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
     await order.update({ paymentStatus: 'failed' } as never)
     await reservationService.releaseReservation(order.orderNo)
     if (prev) await prev.update({ status: 'failed', rawPayload: payload } as never)
+    // X-T03：审计订单支付失败（system 事件，不阻断主流程）
+    await auditLogService.record({ actorType: 'system', action: 'order.payment_failed', entityType: 'order', entityId: order.id, afterState: { paymentStatus: 'failed' } })
     return { ok: true, status: 200 }
   }
 

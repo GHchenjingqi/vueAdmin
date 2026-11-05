@@ -3,6 +3,7 @@ import type { Transaction } from 'sequelize'
 import sequelize from '../../../config/database.js'
 import { ShopInventory, ShopInventoryLog, ShopSku } from '../models/index.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
+import * as auditLogService from './auditLogService.js'
 
 /**
  * 库存补货钩子：入库（delta > 0）提交后触发，用于通知「到货提醒」订阅者。
@@ -134,6 +135,8 @@ export async function occupy(skuId: number, qty: number, ref: string): Promise<v
       }
     }),
   )
+  // X-T03：审计库存预占（system 事件，不阻断主流程）
+  await auditLogService.record({ actorType: 'system', action: 'inventory.reserved', entityType: 'inventory', entityId: skuId, afterState: { qty, ref } })
 }
 
 /** 释放占用（取消订单时） */
@@ -161,6 +164,8 @@ export async function release(skuId: number, qty: number, ref: string): Promise<
       }
     }),
   )
+  // X-T03：审计库存释放（system 事件，不阻断主流程）
+  await auditLogService.record({ actorType: 'system', action: 'inventory.released', entityType: 'inventory', entityId: skuId, afterState: { qty, ref } })
 }
 
 /** 跨仓聚合可用量 */

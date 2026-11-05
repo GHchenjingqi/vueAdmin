@@ -52,6 +52,7 @@ import * as analyticsController from '../controllers/analyticsController.js'
 import * as currencyConfigController from '../controllers/currencyConfigController.js'
 import * as refundController from '../controllers/refundController.js'
 import * as orderMailController from '../controllers/orderMailController.js'
+import * as auditLogController from '../controllers/auditLogController.js'
 import { updateCurrencySchema, rollbackCurrencySchema } from '../../../shared/schemas/storefront-commerce.js'
 
 /**
@@ -197,5 +198,8 @@ router.get('/settings/currency/active', authMiddleware, currencyConfigController
 router.put('/settings/currency', authMiddleware, requireAdmin, validate(updateCurrencySchema), currencyConfigController.updateCurrency)
 router.post('/settings/currency/rollback', authMiddleware, requireAdmin, validate(rollbackCurrencySchema), currencyConfigController.rollbackCurrency)
 router.get('/config-changes', authMiddleware, requireAdmin, currencyConfigController.listConfigChanges)
+
+// X-T03 审计日志查询（仅 admin 可读，用于回溯订单/支付/库存/退款状态变更链）
+router.get('/audit-logs', authMiddleware, requireAdmin, auditLogController.listAuditLogs)
 
 export default router

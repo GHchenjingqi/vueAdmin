@@ -5,6 +5,7 @@ import { getTenantContext } from '../../../modules/tenant/context.js'
 import sequelize from '../../../config/database.js'
 import { ShopOrderRefund } from '../models/index.js'
 import { tryEnqueue } from './orderMailService.js'
+import * as auditLogService from './auditLogService.js'
 
 /**
  * 订单退款（T-09 / P3-T14）
@@ -187,6 +188,18 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
             idempotencyKey,
           } as never,
           { transaction: tx },
+        )
+
+        // X-T03：审计退款创建（system 事件，写入同事务；失败被服务吞掉，不阻断主流程）
+        await auditLogService.record(
+          {
+            actorType: 'system',
+            action: 'refund.created',
+            entityType: 'refund',
+            entityId: row.id,
+            afterState: { orderId: params.orderId, refundNo, amountCents, currency: order.currency },
+          },
+          tx,
         )
 
         const total = alreadyRefunded + amountCents

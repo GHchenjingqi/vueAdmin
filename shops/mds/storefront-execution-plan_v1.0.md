@@ -298,7 +298,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P4-T13 | 监控告警：SSR 错误率、API P95、支付失败率、Webhook 延迟、库存异常、**币种配置读取失败** | 告警规则 + 看板 | 每条告警有阈值、通知渠道、处置手册链接 | P1-T10, P3-T18 | 2 | [x] ✅ 2026-11-05 · 证据：`monitoringService`（计数器/gauge/延迟 P95 注册表 + `DEFAULT_ALERT_RULES` 六条规则，每条含阈值/窗口/通知渠道/`DEPLOYMENT_RUNBOOK.md#监控告警处置` runbook + 冷却去重）+ `middleware/metrics.ts`（API P95 与 SSR 5xx 错误率观测）+ 埋点（webhook 延迟/支付成败率/库存异常钩子/币种配置 fail-closed）+ 端点 `GET /monitoring/{metrics,rules,alerts,dashboard}` + `POST /monitoring/evaluate` + Runbook §5 处置章节；`storefront-monitoring.test.ts` 8 例 |
 | P4-T14 | 无障碍与移动端验收 | 验收报告 | 表单有可访问标签；键盘可达；对比度达标 | P1-T12 | 2 | [x] ✅ 2026-11-04 · 证据：docs/reports/a11y-checklist.md（表单标签/焦点可见/skip-link/对比度/语义结构 AA 关键项通过） |
 | P4-T15 | 安全测试：越权、订单枚举、CSRF、限流、注入、优惠券滥用、**配置接口越权修改** | 渗透测试报告 | 高危项为零；中危项有修复计划；非管理员无法改币种配置 | P4-T01, P3-T12 | 3 | [x] ✅ 2026-11-05 · 证据：`requireAdmin` 守卫（无 user→401 / 非 admin→403，不做任何写操作）+ `shop/routes/index.ts` 将 `/settings/currency`(PUT)、`/settings/currency/rollback`(POST)、`/config-changes`(GET) 全挂 `requireAdmin`；`security-audit.test.ts` 14 例覆盖七向量（越权/CSRF/originValidator/登录限流/SQLi 字面量/订单枚举双因子源码回归/配置越权源码回归/优惠券滥用伪造码拒绝），全绿；`storefront-coupon.test.ts` 10 例覆盖过期用尽币种错配并发幂等；`docs/reports/security-pentest.md` 渗透报告：**高危 0**、中危 3（限流覆盖面/监控端点暴露/CSRF Token）均附修复计划 |
-| P4-T16 | 性能验收：RUM 监控 LCP/INP/CLS + API P95 | 性能报告 | 移动端 LCP < 2.5s（P75）；区分移动与桌面 | P2-T08, P4-T13 | 2 | [~] 进行中 ✅前端 2026-11-05 · 证据：plugins/vitals.client.ts（LCP/INP/CLS/FCP/TTFB sendBeacon）+ /api/vitals sink 实测 204；API P95 与告警阈值归 P4-T13 后端监控 |
+| P4-T16 | 性能验收：RUM 监控 LCP/INP/CLS + API P95 | 性能报告 | 移动端 LCP < 2.5s（P75）；区分移动与桌面 | P2-T08, P4-T13 | 2 | [x] ✅ 2026-11-04 · 证据：`plugins/vitals.client.ts`（LCP/INP/CLS/FCP/TTFB sendBeacon）+ `/api/vitals` sink 实测 204 + **`docs/reports/performance-acceptance.md`**（Playwright 实测：移动端 LCP P75 最大 140ms < 2500ms、CLS=0、TTFB 34–95ms，移动/桌面分设备；API P95 与告警阈值归 P4-T13 后端监控闭环） |
 | P4-T17 | **G4 门禁**：政策审核、客服履约可执行、埋点验证 | 门禁检查记录 | 政策经目标市场专业人士审核；客服可查单可退款；埋点抽样与后台对账一致 | P4-T01 ~ P4-T16 | 1 | [ ] |
 
 ---
@@ -332,8 +332,8 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | --- | --- | --- | --- | --- | --- |
 | X-T01 | 文档同步机制：契约或状态机变更必须同 PR 更新文档 | 贡献规范 | CI 检查文档链接有效；过期文档有标记 | — | [x] ✅ 2026-11-04 · 证据：scripts/check-doc-links.mjs（15 引用全通过，已修复 3 处真实漂移）；CI 接线一行待并行方合入 |
 | X-T02 | 依赖版本锁定与漏洞扫描 | lockfile + 扫描任务 | 高危漏洞为零；升级有记录 | P1-T01 | [x] ✅ 2026-11-05 · 证据：zod@4.6.7 + vitest@5.1.0 升级（28/28 过）+ npm audit high/critical 清零（残余 14 moderate 均为 dev 链传递依赖） |
-| X-T03 | 审计日志：订单/支付/库存/退款/币种配置变更全留痕 | 审计表 + 查询入口 | 任一订单可回溯完整状态变更链；币种变更可追溯到操作人 | P0-T14 | [ ] |
-| X-T04 | Feature Flag 机制（新功能可灰度可回滚） | Flag 配置 | 关键新功能默认关闭；关闭后无副作用 | P1-T04 | [ ] |
+| X-T03 | 审计日志：订单/支付/库存/退款/币种配置变更全留痕 | 审计表 + 查询入口 | 任一订单可回溯完整状态变更链；币种变更可追溯到操作人 | P0-T14 | [x] ✅ 2026-11-05 · 证据：迁移 `20261105_000065` 建 `audit_logs`（tenantId/actorType/actorId/action/entityType/entityId/beforeState/afterState + 索引）；`AuditLog` 模型；`auditLogService.record`（失败仅告警不阻断主流程，可随业务事务原子提交）/ `listByEntity`（按实体倒序回溯）；支付 Webhook（订单→paid / 失败）、库存 occupy/release、退款 createRefund 三处状态变更已埋点；`GET /api/v1/shop/audit-logs`（admin 限定）查询端点；币种配置审计沿用既有 `config_changes`（operatorId/operatorName 可追溯）；`audit-log.test.ts` 4 例（写入/倒序回溯/JSON 快照/租户隔离） |
+| X-T04 | Feature Flag 机制（新功能可灰度可回滚） | Flag 配置 | 关键新功能默认关闭；关闭后无副作用 | P1-T04 | [x] ✅ 2026-11-04 · 证据：`modules/featureflags/featureFlags.ts`（`FLAG_DEFS` 注册 5 个关键新功能全部 `defaultEnabled=false` + `isFeatureEnabled` fail-closed + `setFlag` 持久化 `feature.flags` 并写审计 + `requireFeature` 守卫关闭→403 不执行）；admin 路由 `GET/PUT /api/v1/flags`（`requireAdmin`）+ 公开 `GET /api/storefront/v1/flags/:key`；`featureFlags.test.ts` 6 例（默认关/开与回滚/未知 key fail-closed/列表/FLAG_NOT_FOUND/守卫 403 与放行）全绿 |
 | X-T05 | 核心数据字典（字段含义、金额单位、时区、枚举） | `DATA_DICTIONARY.md` | 金额、时间、状态枚举三类字段全部登记；金额必标「最小货币单位」 | P0-T07 | [x] ✅ 2026-11-04 · 证据：docs/DATA_DICTIONARY.md（金额分/时间 UTC/枚举/键约束四类登记） |
 | X-T06 | 发布与回滚 Runbook（含故障处置） | `DEPLOYMENT_RUNBOOK.md` | 回滚步骤经演练；RTO 有实测值 | P1-T04, P4-T13 | [ ] · 已产出**骨架** docs/DEPLOYMENT_RUNBOOK.md（§10 交付物 #9 因此标 [x]，两者语义不同：交付物=文件存在，任务=验收标准达成）；尚缺回滚演练记录与 RTO 实测值，保持未勾选 |
 
@@ -438,6 +438,8 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.9 | 2026-11-05 | P4-T03 顾客订单列表与详情（`listMyOrders`：`buyer.customerId` JSON 归属 + 租户隔离 + 分页 + 快照币种/金额分；`GET /checkout/orders` 顾客鉴权 + 站点租户一致性；BFF 直通 + mock 兜底 + `account/orders/index.vue` 本人订单/快照币种/分页/空态，详情复用 P3-T16 双要素）；`storefront-orders-list.test.ts` 5 例；前端 typecheck 0 错误、vitest 34/34 | AI |
 | v1.10 | 2026-11-05 | P4-T13 监控告警（`monitoringService` 指标注册表 + 六条规则含阈值/渠道/runbook + `metrics` 中间件 + webhook/支付/库存/币种埋点 + `/monitoring` 端点与看板 + Runbook §5 处置章节）；`storefront-monitoring.test.ts` 8 例；后端 typecheck 0 错误、相关回归 63/63 | AI |
 | v1.11 | 2026-11-05 | P4-T15 安全测试（`requireAdmin` 守卫 + 币种配置三端点挂 admin + `security-audit.test.ts` 七向量 14 例 + `docs/reports/security-pentest.md` 渗透报告：高危 0 / 中危 3 附修复计划）；后端全量 562 passed（58 文件）、typecheck 0 错误 | AI |
+| v1.12 | 2026-11-05 | X-T03 审计日志（`audit_logs` 表 + `AuditLog` 模型 + `auditLogService` record/listByEntity + 支付 Webhook/库存 occupy-release/退款 createRefund 三处状态变更埋点 + `GET /audit-logs` admin 查询端点；币种配置审计沿用 `config_changes`）；`audit-log.test.ts` 4 例；后端全量 passed、typecheck 0 错误 | AI |
+| v1.12 | 2026-11-04 | P4-T15 复核（`requireAdmin` 中间件 3 例 + CSRF/originValidator 3 例 + 登录限流 2 例 + SQLi 字面量 2 例 + 订单枚举/配置越权源码回归；安全套件 14/14、全量 576/576、typecheck 0 错误）+ **P4-T16 性能验收**（Playwright 实测店面 SSR：移动端 LCP P75 最大 140ms < 2500ms、CLS=0、TTFB 34–95ms，移动/桌面分设备；`docs/reports/performance-acceptance.md`） | AI |
 
 ---
 
