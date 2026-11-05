@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
   const authorization = event.node.req.headers.authorization as string | undefined
 
   // ---- 直通域（并行后端已交付的扩展能力；auto/real 下透传，4xx 业务错误原样返回） ----
-  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth)\b/.exec(url)
+  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses)\b/.exec(url)
   if (extMatch && source !== 'mock') {
     const res = await commerceRealFetch(url, {
       method,

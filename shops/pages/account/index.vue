@@ -60,6 +60,7 @@ useSeo({ title: 'Account', description: 'Sign in to your account', path: '/accou
         <p class="text-sm text-stone-500">Welcome back</p>
         <h1 class="mt-1 text-xl font-semibold">{{ customer?.nickname || customer?.email }}</h1>
         <div class="mt-5 space-y-2 text-sm">
+          <NuxtLink to="/account/addresses" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">收货地址簿</NuxtLink>
           <NuxtLink to="/account/rma" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">退货申请 / RMA</NuxtLink>
           <NuxtLink to="/policies/returns" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">退货政策</NuxtLink>
         </div>

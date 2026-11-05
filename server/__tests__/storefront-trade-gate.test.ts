@@ -31,6 +31,8 @@ import * as cartService from '../modules/storefront/services/cartService.js'
 import * as quoteService from '../modules/storefront/services/quoteService.js'
 import * as checkoutService from '../modules/storefront/services/checkoutService.js'
 import * as paymentService from '../modules/storefront/services/paymentService.js'
+import * as customerService from '../modules/shop/services/customerService.js'
+import * as addressService from '../modules/storefront/services/addressService.js'
 
 const TID = 1
 function uniq(): string {
@@ -237,6 +239,34 @@ describe('T-10 顾客不能访问其他顾客的订单、地址和购物车', ()
       await expect(quoteService.createQuote(site, { cartToken: 'forged-cart-token' })).rejects.toMatchObject({ statusCode: 404 })
       expect(cart.token).toHaveLength(48)
       expect(cart.token).not.toMatch(/^\d+$/)
+    })
+  })
+
+  it('地址簿（P4-T02）：他人 / 跨租户不能读写改删，删除默认有兜底', async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const tag = uniq()
+      const a = await customerService.registerCustomer({ tenantId: TID, email: `t10a-${tag}@example.com`, password: 'password123' })
+      const b = await customerService.registerCustomer({ tenantId: TID, email: `t10b-${tag}@example.com`, password: 'password123' })
+      const ownerA = { tenantId: TID, customerId: a.customer.id }
+      const ownerB = { tenantId: TID, customerId: b.customer.id }
+      const base = {
+        fullName: 'Alice', phone: '5550100', country: 'US', province: 'CA',
+        city: 'LA', address1: '1 Main St', address2: null, postcode: '90001',
+      }
+      const first = await addressService.createAddress(ownerA, base)
+      const second = await addressService.createAddress(ownerA, { ...base, address1: '2 Main St', isDefault: true })
+
+      expect(first.isDefault).toBe(true) // 首条自动默认
+      expect((await addressService.listAddresses(ownerA)).filter((x) => x.isDefault)).toHaveLength(1)
+      expect(await addressService.listAddresses(ownerB)).toHaveLength(0)
+      await expect(addressService.updateAddress(ownerB, first.id, { city: 'Hacked' })).rejects.toMatchObject({ statusCode: 404 })
+      await expect(addressService.deleteAddress(ownerB, first.id)).rejects.toMatchObject({ statusCode: 404 })
+      await expect(addressService.setDefaultAddress(ownerB, first.id)).rejects.toMatchObject({ statusCode: 404 })
+      expect(await addressService.listAddresses({ tenantId: 2, customerId: ownerA.customerId })).toHaveLength(0)
+
+      const deleted = await addressService.deleteAddress(ownerA, second.id)
+      expect(deleted.promotedId).toBe(first.id)
+      expect((await addressService.listAddresses(ownerA)).filter((x) => x.isDefault).map((x) => x.id)).toEqual([first.id])
     })
   })
 })
