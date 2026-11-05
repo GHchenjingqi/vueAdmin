@@ -102,6 +102,8 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
         shippingAddress: body.address,
         note: body.note,
         cartToken,
+        // 步骤 6：订单来源归因（site / utm），后端 createOrderSchema 精确剥离并固化进快照
+        attribution: body.attribution,
       },
       cookie,
       requestId,

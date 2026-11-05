@@ -37,6 +37,8 @@ export default defineNuxtConfig({
       '/cart': { headers: { 'cache-control': 'private, no-store' } },
       '/checkout/**': { headers: { 'cache-control': 'private, no-store' } },
       '/account/**': { headers: { 'cache-control': 'private, no-store' } },
+      // P4-T04：轨迹页 URL 含访问凭证，不进 CDN/公共缓存
+      '/track': { headers: { 'cache-control': 'private, no-store' } },
       '/search': { headers: { 'cache-control': 'private, max-age=0' } },
     },
   },

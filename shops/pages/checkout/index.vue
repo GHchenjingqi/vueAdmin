@@ -2,6 +2,7 @@
 import { useCheckout } from '~/composables/useCheckout'
 import Price from '~/components/commerce/Price.vue'
 import { trackBeginCheckout } from '@shared/analytics/ecommerce'
+import { collectAttribution } from '@shared/analytics/attribution'
 
 /**
  * 结算页（P3-T09 前端版）：地址表单（字段级校验）、报价确认、运费选择、优惠券。
@@ -77,6 +78,7 @@ async function submit(): Promise<void> {
       shippingRateId: shippingRateId.value,
       couponCode: couponCode.value || undefined,
       idempotencyKey: crypto.randomUUID(),
+      attribution: collectAttribution(),
     })
     await navigateTo(`/checkout/result?id=${order.id}&order=${order.orderNo}&t=${order.accessToken}`)
   } catch (err) {

@@ -24,6 +24,7 @@ provide('t', t)
           <NuxtLink to="/c/lace-wigs" class="hover:text-stone-900">Lace Wigs</NuxtLink>
           <NuxtLink to="/c/apparel" class="hover:text-stone-900">Apparel</NuxtLink>
           <NuxtLink to="/cart" class="hover:text-stone-900">Cart</NuxtLink>
+          <NuxtLink to="/track" class="hover:text-stone-900">Track</NuxtLink>
         </nav>
       </div>
     </header>

@@ -1,4 +1,5 @@
 import type { OrderDetail, OrderDraft } from '@shared/types/commerce'
+import type { OrderAttribution } from '@shared/analytics/attribution'
 
 /**
  * Checkout 组合式（P3-T09/T15 前端版）：useCheckout()。
@@ -8,7 +9,7 @@ export function useCheckout() {
   const order = ref<OrderDraft | null>(null)
   const loading = ref(false)
 
-  async function placeOrder(payload: { email: string; address: Record<string, string>; shippingRateId?: string; couponCode?: string; idempotencyKey?: string }): Promise<OrderDraft> {
+  async function placeOrder(payload: { email: string; address: Record<string, string>; shippingRateId?: string; couponCode?: string; idempotencyKey?: string; attribution?: OrderAttribution }): Promise<OrderDraft> {
     loading.value = true
     try {
       order.value = await $fetch<OrderDraft>('/api/checkout/orders', {

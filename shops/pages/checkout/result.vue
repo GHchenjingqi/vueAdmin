@@ -39,6 +39,10 @@ const { data: order, refresh } = await useAsyncData(
 )
 
 const paid = computed(() => order.value?.paymentStatus === 'captured' || ['paid', 'processing'].includes(order.value?.status ?? ''))
+// P4-T04：凭订单号 + 访问凭证双要素进入轨迹页（与后端防枚举契约一致）
+const trackingLink = computed(() =>
+  order.value ? `/track?orderNo=${encodeURIComponent(order.value.orderNo)}&t=${encodeURIComponent(token.value)}` : '',
+)
 const polling = ref(false)
 const payError = ref<string | null>(null)
 const purchaseTracked = ref(false)
@@ -126,6 +130,9 @@ useSeo({ title: 'Order Result', description: 'Order status', path: '/checkout/re
         Pay Now (Mock)
       </button>
       <p v-if="polling && !paid" class="text-xs text-stone-500">Waiting for payment confirmation… polling up to 60s</p>
+      <NuxtLink v-if="paid && trackingLink" :to="trackingLink" class="block rounded-lg border border-stone-300 px-6 py-2.5 text-center text-sm font-semibold hover:border-stone-900">
+        Track shipment
+      </NuxtLink>
     </div>
   </div>
 </template>

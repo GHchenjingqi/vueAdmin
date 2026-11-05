@@ -314,10 +314,11 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 
 ---
 
-## 第 7 步：Nuxt 3 独立站前端（`shops/`）—— 核查结论
+## 第 7 步：Nuxt 3 独立站前端（`shops/`）—— 核查 + 三接口接线完成
 
-> 该目录由**并行方**按 `shops/mds/storefront-execution-plan_v1.0.md` 交付，
-> 按贯穿全程的边界约定：本会话后端主线只提交 `server/` 与本文档，**不纳入 `shops/` 提交树、不越界改动**。
+> 该目录由**并行方**按 `shops/mds/storefront-execution-plan_v1.0.md` 交付。
+> 本会话后端主线提交 `server/` 与本文档；本次另以**独立前端提交**补齐下列 3 个接口接线，
+> 不触碰并行方在建的顾客账户/登录模块（其改动完整保留在工作树，未纳入本提交树）。
 
 - 工程已建成：Nuxt 3 + TS + Tailwind，`nuxt.config.ts` / `app.vue` / `layouts` / `pages`
   （首页 / 集合 / 详情 / 搜索 / 购物车 / 结算 / 结果 / 政策 / 博客 / 订阅退订）/ `components` / `composables`
@@ -326,15 +327,24 @@ server/app.ts                              # app.use('/api/storefront/v1', store
   GA4 九事件字典与 Cookie 同意门控（P4-T10 / P4-T11）已落地。
 - 本会话核查验证：`npm --prefix shops run typecheck`（nuxi）通过；`npm --prefix shops test` **12/12 通过**
   （另有 2 条 `EPERM` 为沙箱临时目录写入权限告警，非业务失败）。
-- 交接边界：本次新增的 3 个后端接口（`GET /track/:orderNo`、`POST /track-event`、建单 `attribution`）
-  尚未在前端 BFF 接线，属并行方步骤 7 后续工作量（其执行计划 P4-T04 物流跟踪、P4-T10 CAPI 仍登记待办）。
-  后端契约已就绪并有测试覆盖，前端只需按 `shops/shared/api/client.ts` 现有范式转发即可。
+- 本会话补充接线（独立前端提交，3 个后端接口全部接入同源 BFF）：
+  - `POST /track-event`：`shared/analytics/capi.ts`（幂等 eventId + 会话 sessionId + consent 随事件上报、fire-and-forget）
+    → `server/api/track-event.post.ts`（精确字段转发、上游故障静默降级）；在 `events.ts:trackEvent` 内挂接，
+    结果页以服务端 `captured` 事实触发的 `purchase` 由此自动完成后端订单快照校准与 CAPI 派发。
+  - `GET /track/:orderNo?accessToken=`：`server/api/track/[orderNo].get.ts`（双要素防枚举、统一 404、`private, no-store`）
+    → `pages/track.vue` 查询页（noindex）；结果页与导航加「Track shipment」入口，`nuxt.config.ts` 加 `/track` 私有缓存规则。
+  - 建单 `attribution`：`shared/analytics/attribution.ts`（UTM 五参 + landingPage/referrer，首次触达缓存于 sessionStorage）
+    → `useCheckout.placeOrder` / `checkout/index.vue` 透传 → BFF 建单真实分支转发后端固化进订单快照。
+- 接线验收：`nuxi typecheck` **0 错误**；`vitest run` **25/25 通过**（新增 `storefront-wiring.spec.ts` 7 例）；
+  余 1 条 `EPERM` 为沙箱临时目录写入告警，非业务失败。
+- 边界：并行方 `shops/mds/storefront-execution-plan_v1.0.md` 中 P4-T04 / P4-T10 / P4-T11 的状态回填由其自行完成，
+  本提交不替其勾选、不改动其执行计划。
 
 ---
 
 ## 通用验收标准（沿用 §6）
 
 - 后端：`npm --prefix server run typecheck && npm --prefix server run test`
-- 前端（步骤 7，并行方）：`npm --prefix shops run typecheck && npm --prefix shops test`；本会话仅核查不改动。
+- 前端（步骤 7）：`npm --prefix shops run typecheck && npm --prefix shops test`；三接口接线后 typecheck 0 错误、25/25 单测通过。
 - 提交前缀：`feat(storefront):` / `test(storefront):` / `docs(storefront):`。
 - GitHub push 走本机代理 `https_proxy=http://127.0.0.1:7892`，直连会 `schannel: server closed abruptly`。

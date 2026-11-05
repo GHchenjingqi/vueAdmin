@@ -1,4 +1,5 @@
 import { readConsent } from './consent'
+import { sendCapiEvent } from './capi'
 
 /**
  * P4-T10：GA4 电商事件字典（九个）+ 同意门控发送。
@@ -46,6 +47,8 @@ export function trackEvent(name: EventName, params: Record<string, unknown>): vo
   const w = window as unknown as { dataLayer?: unknown[] }
   w.dataLayer = w.dataLayer || []
   w.dataLayer.push({ event: name, consent: readConsent()?.analytics === true, ...params })
+  // 同步上报服务端 CAPI（同意门控与 purchase/refund 事实校准由后端负责）
+  sendCapiEvent(name, params)
 }
 
 export function itemsFromLineItems(items: { skuId: number; title: string; qty: number; unit: MoneyParam }[]): AnalyticsItem[] {
