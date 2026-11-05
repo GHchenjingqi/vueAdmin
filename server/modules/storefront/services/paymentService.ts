@@ -4,6 +4,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderPayment } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
+import { assertShippableCountry, extractCountry } from './shippingService.js'
 import config from '../../../config/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
@@ -35,6 +36,10 @@ export async function createSession(site: StorefrontSite, orderId: number): Prom
   const order = await ShopOrder.findOne({ where: { id: orderId, tenantId: tId } })
   if (!order) throw new AppError(404, '订单不存在')
   if (order.paymentStatus === 'captured') throw new AppError(409, '订单已支付')
+
+  // T-08：地址不在配送范围的订单不得进入支付（不能创建可支付订单）
+  const country = extractCountry(order.shippingAddress)
+  if (country) await assertShippableCountry(country)
 
   const provider = config.payment?.provider ?? 'mock'
   const providerRef = `pay_${order.orderNo}_${crypto.randomBytes(8).toString('hex')}`

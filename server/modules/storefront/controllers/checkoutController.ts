@@ -12,6 +12,7 @@ export const quote = async (req: Request, res: Response, next: NextFunction) => 
     const data = await quoteService.createQuote(site, {
       cartToken: body.cartToken,
       items: body.items as { skuId: number; qty: number }[] | undefined,
+      shippingAddress: body.shippingAddress,
     })
     res.json({ code: 0, data })
   } catch (err) {

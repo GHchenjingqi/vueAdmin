@@ -3,6 +3,7 @@ import { getTenantContext } from '../../tenant/context.js'
 import { ShopSku, ShopSpu, ShopProductPrice } from '../../shop/models/index.js'
 import * as inventoryService from '../../shop/services/inventoryService.js'
 import config from '../../../config/index.js'
+import { resolveShipping } from './shippingService.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
 /**
@@ -12,7 +13,8 @@ import type { StorefrontSite } from '../middleware/siteContext.js'
  * - currency 取当前站点配置币种（来源 siteContext 注入的 site.defaultCurrency）；
  * - 购物车币种与配置不一致 → 抛 CURRENCY_CHANGED，要求前端重建报价；
  * - 逐项校验可售 + 可用库存，不足直接拒绝；
- * - 运费 / 税费为占位规则（config.checkout），待 P3-T05 / P3-T06 接入真实 Provider 后替换；
+ * - 运费：提供收货地址时按 settings.shop.shipping 白名单校验并按分区计费（T-08 / P3-T05）；
+ *   未提供地址时沿用 config.checkout.shippingCents 的既有行为；税费仍为占位规则（P3-T06）；
  * - 返回版本号 + 过期时间，供建单时校验报价新鲜度。
  */
 
@@ -82,7 +84,7 @@ export async function resolveQuoteLines(
 /** 服务端重算报价 */
 export async function createQuote(
   site: StorefrontSite,
-  input: { cartToken?: string; items?: { skuId: number; qty: number }[] },
+  input: { cartToken?: string; items?: { skuId: number; qty: number }[]; shippingAddress?: Record<string, unknown> | null },
 ): Promise<QuoteResult> {
   const { currency, lines } = await resolveQuoteLines(site, input)
   const tId = tid()
@@ -118,8 +120,9 @@ export async function createQuote(
     })
   }
 
-  // 运费 / 税费占位规则（P3-T05 / P3-T06 接入真实 Provider 后替换）
-  const shippingCents = Math.round(Number(config.checkout?.shippingCents ?? 0))
+  // 运费：地址驱动的白名单校验 + 分区计费（服务端重算，忽略前端传入运费）
+  const { shippingCents } = await resolveShipping(input.shippingAddress)
+  // 税费占位规则（P3-T06 接入真实税务 Provider 后替换）
   const taxCents = Math.round(subtotalCents * Number(config.checkout?.taxRate ?? 0))
   const discountCents = 0
   const amountCents = subtotalCents + shippingCents + taxCents - discountCents

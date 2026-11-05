@@ -111,7 +111,12 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
   const tId = tid()
 
   // 1) 服务端重算报价（价格 / 库存 / 币种一致性）
-  const quote: QuoteResult = await createQuote(site, { cartToken: params.cartToken, items: params.items })
+  const quote: QuoteResult = await createQuote(site, {
+    cartToken: params.cartToken,
+    items: params.items,
+    // T-08：地址不可配送时直接拒绝建单（与报价同口径，服务端重算）
+    shippingAddress: params.shippingAddress,
+  })
 
   // 2) 幂等：同一 idempotencyKey 直接返回首单
   const idempotencyKey = (params.idempotencyKey ?? crypto.randomBytes(16).toString('hex')).slice(0, 64)
