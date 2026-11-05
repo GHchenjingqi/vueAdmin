@@ -54,3 +54,19 @@ export const getOrder = async (req: Request, res: Response, next: NextFunction) 
     next(err)
   }
 }
+
+/** P4-T03 GET /orders —— 当前顾客订单列表（归属来自顾客 JWT，站点租户一致性校验） */
+export const listMyOrders = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const c = req.customer
+    if (!c) throw new AppError(401, '请先登录')
+    const site = getSite(res)
+    if (c.tenantId !== site.tenantId) throw new AppError(401, 'ORDERS_SITE_MISMATCH: 顾客令牌与站点不匹配')
+    const page = Number((req.query as Record<string, unknown>).page ?? 1) || 1
+    const pageSize = Number((req.query as Record<string, unknown>).pageSize ?? 10) || 10
+    const data = await checkoutService.listMyOrders({ tenantId: c.tenantId, customerId: c.customerId }, page, pageSize)
+    res.json({ code: 0, data })
+  } catch (err) {
+    next(err)
+  }
+}

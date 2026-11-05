@@ -35,8 +35,16 @@ export default defineEventHandler(async (event) => {
       authorization,
       requestId: event.context.requestId as string | undefined,
     })
+    console.log(`[ext] ${method} ${url} -> status=${res.status} networkError=${res.networkError} body=${JSON.stringify(res.body)?.slice(0, 140)}`)
     setResponseStatus(event, res.status)
     return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'ext upstream error' })
+  }
+
+  // ---- GET/PATCH/DELETE /api/addresses/:id（单条：404 业务语义透传；auto 网络失败回退 mock 列表兜底） ----
+  const addrIdMatch = /^(addresses\/(\d+))(\?.*)?$/.exec(url)
+  if (addrIdMatch && source !== 'mock') {
+    const real = await handleReal('addresses/' + addrIdMatch[1], method, event, cookie, authorization)
+    if (real !== null) return real
   }
 
   const isCommercePath =
@@ -95,6 +103,24 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
     return adaptCartView(unwrapEnvelope(res.body) as Record<string, unknown>)
   }
 
+  // ---- /api/addresses/:id（单条读写/删除；default 子路由走 ext 直通） ----
+  const addrMatch = /^addresses\/(\d+)$/.exec(url)
+  if (addrMatch) {
+    const real = await commerceRealFetch('addresses/' + addrMatch[1], {
+      method,
+      body: method === 'PATCH' ? await readBody(event).catch(() => undefined) : undefined,
+      cookie,
+      authorization,
+      requestId: event.context.requestId as string | undefined,
+    })
+    if (real.networkError) return source === 'auto' ? null : upstreamFail(event, real)
+    if (!real.ok) {
+      setResponseStatus(event, real.status)
+      return real.body ?? { code: 'UPSTREAM_ERROR', message: 'address upstream error' }
+    }
+    return unwrapEnvelope(real.body)
+  }
+
   // ---- POST /api/checkout/quote ----
   if (url === 'checkout/quote' && method === 'POST') {
     await readBody(event) // 消费 body（真实契约仅需 cartToken；地址/运费/优惠由后台规则表承接）
@@ -103,6 +129,22 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
     if (!res.ok) return upstreamFail(event, res)
     return adaptQuote(unwrapEnvelope(res.body) as Record<string, unknown>)
+  }
+
+  // ---- GET /api/checkout/orders（P4-T03：当前顾客订单列表，Bearer 顾客 JWT） ----
+  const ordersListMatch = /^checkout\/orders(\?.*)?$/.exec(url)
+  if (ordersListMatch && method === 'GET') {
+    const q = ordersListMatch[1] ?? ''
+    const res = await commerceRealFetch(`checkout/orders${q}`, { cookie, authorization, requestId })
+    if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
+    if (!res.ok) return upstreamFail(event, res)
+    const data = unwrapEnvelope(res.body) as { items?: unknown[]; total?: number; page?: number; pageSize?: number }
+    return {
+      items: (data.items ?? []).map((o) => adaptOrderView(o as Record<string, unknown>)),
+      total: data.total ?? 0,
+      page: data.page ?? 1,
+      pageSize: data.pageSize ?? 10,
+    }
   }
 
   // ---- POST /api/checkout/orders ----
@@ -216,6 +258,10 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
     return mockStore.createOrder('guest', 'USD', (event.node.req.headers['idempotency-key'] as string | undefined) ?? null, {
       email: body.email, address: body.address, shippingRateId: body.shippingRateId, couponCode: body.couponCode,
     })
+  }
+  // P4-T03 mock 兜底：游客无归属订单列表，返回空分页（真实模式走 BFF 直通）
+  if (url.startsWith('checkout/orders') && method === 'GET') {
+    return { items: [], total: 0, page: 1, pageSize: 10 }
   }
   if (url.startsWith('checkout/orders/') && url.endsWith('/pay') && method === 'POST') {
     const key = url.split('/')[2]

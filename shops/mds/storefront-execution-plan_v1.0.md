@@ -285,7 +285,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | --- | --- | --- | --- | --- | --- | --- |
 | P4-T01 | 账户中心：注册/登录/登出、会话撤销 | `domains/customer/**` | 顾客 JWT 与管理员权限体系完全隔离；支持强制下线 | G3, P0-T10 | 3 [x] ✅ 2026-11-05 · 证据：账户中心前端（shops/pages/account + shared/customer/auth）+ 真实 E2E（register/login/me 200，Bearer 透传，登出本地清理）；后端步骤3（e389210） |
 | P4-T02 | 地址簿（新增/编辑/默认/删除） | 地址 API + UI | 顾客只能操作自己的地址；删除默认地址有兜底 | P4-T01 | 2 | [x] ✅ 2026-11-05 · 证据：`20f76f0` — `addressService`（顾客行锁串行化 + tenantId/customerId 双隔离 + 首条自动默认 + 删除/取消默认兜底 + 唯一默认）、`/addresses` 五端点、账户中心地址页与 BFF 直通；`storefront-address.test.ts` 11 例（含并发双默认、同租户/跨租户越权 404）+ 前端 `address.spec.ts` 6 例 + trade-gate T-10 真实断言 + **真实 HTTP 端到端 8/8**（BFF :3014 直通 → 后端 :5173：注册 / 无令牌 401 / 新增自动默认 / 国家码大写 / 唯一默认 / 他人列表空且编辑 404 / 删除默认自动提升） |
-| P4-T03 | 顾客订单列表与详情 | `pages/account/orders/**` | 仅展示本人订单；金额按订单快照币种展示；分页与空态完整 | P4-T01, P3-T16 | 2 | [ ] |
+| P4-T03 | 顾客订单列表与详情 | `pages/account/orders/**` | 仅展示本人订单；金额按订单快照币种展示；分页与空态完整 | P4-T01, P3-T16 | 2 | [x] ✅ 2026-11-05 · 证据：后端 `checkoutService.listMyOrders`（`buyer.customerId` JSON 归属 + 租户隔离 + 分页 + 快照币种/金额分），`GET /checkout/orders`（customerAuth + 站点租户一致性，非本人不可见）+ BFF 直通与 mock 兜底 + `shops/pages/account/orders/index.vue`（本人订单/快照币种/分页/空态，详情复用 P3-T16 双要素）+ 账户中心导航入口；`storefront-orders-list.test.ts` 5 例（本人可见/金额快照/他人隔离/空态分页/无归属） |
 | P4-T04 | 物流跟踪（Provider 适配，防信息泄露） | `GET /orders/:id/tracking` | 不可凭可猜测订单号获取物流信息 | P4-T03 | 2 [x] ✅ 2026-11-05 · 证据：/track 轨迹页（c57d26a）+ BFF 直通 + 防枚举实测（错误 accessToken → 404）；后端 17track 适配（6c55a9b） |
 | P4-T05 | 退货政策模型（后台可配置）+ 服务端资格判断 | `ReturnPolicy` + `POST /orders/:id/returns` | 政策含市场/类目/时间窗口/状态要求/运费承担/版本快照；前端只展示摘要 | P0-T11, P4-T03 | 4 [x] ✅ 2026-11-05 · 证据：RMA 端到端实测——未支付 400/未履约 400/非本人 403 均有明确原因；退款服务端重算 refundAmountCents=12990 + refundCurrency=USD（原订单快照）；后端步骤5（29ce004/9903b62） |
 | P4-T06 | 退货申请入口与状态展示 | `pages/account/returns/**` | 超期/不符合条件有明确拒绝原因；退款走独立状态流程，退款币种取原订单 | P4-T05 | 2 [x] ✅ 2026-11-05 · 证据：shops/pages/account/rma.vue（提交/列表/空态）+ 真实 E2E（pending 申请 id=25 落库并列表回读） |
@@ -435,6 +435,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.6 | 2026-11-05 | 门禁收口：P4-T02 地址簿（`20f76f0`）与 P3-T17 订单邮件 outbox（`019d7ae`）落地；§9 T-10/T-12 由 `[~]` 转 `[x]`，T-01~T-12 全绿 / 0 todo；新增 `docs/reports/t12-jsonld-currency-switch.md` 真实 HTTP 切币种实测（5/5 PASS）并修复损坏的币种 symbol；后端 528 passed（53 文件）、storefront 前端 34 passed（6 文件）、两端 typecheck 0 错误 | AI |
 | v1.7 | 2026-11-05 | P3-T03 登录后购物车合并（`mergeCartOnLogin` + login 控制器透传 cartToken）：同 SKU 累加封顶 / 游客独有 SKU 迁入 / 冲突属性优先级 / 销毁游客车；`storefront-cart-merge.test.ts` 7 例；后端全量 535 passed（54 文件）、typecheck 0 错误 | AI |
 | v1.8 | 2026-11-05 | P3-T06 税费计算（可插拔 `TaxProvider` + `shop_tax_rates` 规则表 + fail-closed 阻断）+ P4-T08 评价图片上传安全（图片专用端点 + 魔数校验 + 分辨率上限 + 随机文件名防遍历）；`storefront-tax.test.ts` 7 例、`storefront-review-image.test.ts` 7 例；后端全量 549 passed（56 文件）、typecheck 0 错误 | AI |
+| v1.9 | 2026-11-05 | P4-T03 顾客订单列表与详情（`listMyOrders`：`buyer.customerId` JSON 归属 + 租户隔离 + 分页 + 快照币种/金额分；`GET /checkout/orders` 顾客鉴权 + 站点租户一致性；BFF 直通 + mock 兜底 + `account/orders/index.vue` 本人订单/快照币种/分页/空态，详情复用 P3-T16 双要素）；`storefront-orders-list.test.ts` 5 例；前端 typecheck 0 错误、vitest 34/34 | AI |
 
 ---
 

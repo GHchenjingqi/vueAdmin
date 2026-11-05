@@ -40,5 +40,17 @@ export function useCheckout() {
     return data
   }
 
-  return { order, loading, placeOrder, pay, getOrder }
+  /** P4-T03：当前顾客订单列表（Bearer 顾客 JWT，金额按订单快照币种展示） */
+  async function listOrders(page = 1, pageSize = 10): Promise<{ items: OrderDraft[]; total: number; page: number; pageSize: number }> {
+    const { getToken } = await import('@shared/customer/auth')
+    const token = getToken()
+    const res = await fetch(`/api/checkout/orders?page=${page}&pageSize=${pageSize}`, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    })
+    const data = (await res.json()) as { items?: OrderDraft[]; total?: number; page?: number; pageSize?: number } & { message?: string }
+    if (!res.ok) throw new Error(data.message || 'failed to load orders')
+    return { items: data.items ?? [], total: data.total ?? 0, page: data.page ?? page, pageSize: data.pageSize ?? pageSize }
+  }
+
+  return { order, loading, placeOrder, pay, getOrder, listOrders }
 }

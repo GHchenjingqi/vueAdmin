@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { Op, Sequelize } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderItem } from '../../shop/models/index.js'
@@ -235,4 +236,43 @@ export async function cancelOrder(orderId: number, accessToken: string): Promise
   await releaseCoupon(order.orderNo)
   await order.update({ status: 'cancelled', cancelledReason: 'customer_cancel', closedAt: new Date() } as never)
   return toOrderView(order, false)
+}
+
+export interface OrderListResult {
+  items: OrderView[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+/**
+ * P4-T03 顾客订单列表：仅返回归属该顾客（buyer.customerId）的订单。
+ * - 归属只来自已校验的顾客 JWT（tenantId + customerId），接口不接受任何归属字段；
+ * - 订单归属在创建时写入 buyer.customerId（JSON），此处用 JSON_EXTRACT 精确匹配，不依赖可枚举的 orderNo；
+ * - 金额一律取订单快照币种展示（toOrderView 已从快照读取 currency / 各金额分）。
+ */
+export async function listMyOrders(
+  owner: { tenantId: number; customerId: number },
+  page = 1,
+  pageSize = 10,
+): Promise<OrderListResult> {
+  const p = page > 0 ? page : 1
+  const ps = Math.min(pageSize > 0 ? pageSize : 10, 50)
+  const where = {
+    tenantId: owner.tenantId,
+    [Op.and]: Sequelize.literal('JSON_EXTRACT(buyer, "$.customerId") = :cid'),
+  } as Record<string | symbol, unknown>
+  const { rows, count } = await ShopOrder.findAndCountAll({
+    where,
+    replacements: { cid: owner.customerId },
+    order: [
+      ['createdAt', 'DESC'],
+      ['id', 'DESC'],
+    ],
+    limit: ps,
+    offset: (p - 1) * ps,
+  })
+  const items: OrderView[] = []
+  for (const row of rows) items.push(await toOrderView(row, true))
+  return { items, total: count, page: p, pageSize: ps }
 }
