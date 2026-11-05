@@ -130,3 +130,30 @@ export type CartUpdateInput = z.infer<typeof cartUpdateSchema>
 export type QuoteInput = z.infer<typeof quoteSchema>
 export type CreateOrderInput = z.infer<typeof createOrderSchema>
 export type CreatePaymentSessionInput = z.infer<typeof createPaymentSessionSchema>
+
+// ————————————————————————————————————————————————
+// 阶段 5 步骤 5：订阅 + 到货通知（公开接口，.passthrough() 容忍多余字段）
+// ————————————————————————————————————————————————
+
+/** POST /newsletter/subscribe —— 邮件订阅（POST 体仅接受声明字段，多余字段剥离） */
+export const newsletterSubscribeSchema = z.object({
+  email: z.string().email('邮箱格式不正确').max(255),
+  source: z.string().max(50).optional(),
+  locale: z.string().max(10).optional(),
+})
+
+/** POST /newsletter/unsubscribe & GET /newsletter/unsubscribe?token= —— 退订 */
+export const newsletterUnsubscribeSchema = z.object({
+  token: z.string().min(1).max(64),
+})
+
+/** POST /restock/subscribe —— 到货提醒订阅（POST 体仅接受声明字段，多余字段剥离） */
+export const restockSubscribeSchema = z.object({
+  email: z.string().email('邮箱格式不正确').max(255),
+  skuId: z.number().int().positive('skuId 必须为正整数'),
+  locale: z.string().max(10).optional(),
+})
+
+export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>
+export type NewsletterUnsubscribeInput = z.infer<typeof newsletterUnsubscribeSchema>
+export type RestockSubscribeInput = z.infer<typeof restockSubscribeSchema>

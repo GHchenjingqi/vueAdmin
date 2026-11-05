@@ -38,3 +38,7 @@ export { default as ShopCart } from './ShopCart.js'
 export { default as ShopCartItem } from './ShopCartItem.js'
 export { default as ShopInventoryReservation } from './ShopInventoryReservation.js'
 export { default as ShopOrderPayment } from './ShopOrderPayment.js'
+
+// 阶段 5 步骤 5：邮件订阅 + 到货提醒（复用 shop 模型层，不建第二套后端）
+export { default as ShopNewsletter } from './ShopNewsletter.js'
+export { default as ShopRestockSubscription } from './ShopRestockSubscription.js'

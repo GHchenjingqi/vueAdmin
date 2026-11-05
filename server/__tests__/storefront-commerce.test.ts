@@ -165,8 +165,6 @@ describe('阶段5-步骤4：建单 + 库存预占', () => {
       await expect(checkoutService.getOrderWithToken(orderId, 'wrong-token')).rejects.toMatchObject({ statusCode: 404 })
     })
   })
-
-  return { orderId, accessToken }
 })
 
 describe('阶段5-步骤4：支付会话 + Webhook', () => {

@@ -18,7 +18,7 @@
 | 2 | `spus.slug` 列 + 后台可编辑（替代生成式 slug）、JSON_SEARCH 全文检索 | ✅ 本轮交付 |
 | 3 | C 端顾客模型（customer 表 + 独立 JWT）、register/login | ✅ 已完成 |
 | 4 | 购物车 / 结算报价（运费+税）/ 建单 + 支付会话 + webhook | ✅ 已完成 |
-| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 后续 |
+| 5 | 评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track | 🟡 进行中（newsletter + restock-notify 已完成，其余域待续） |
 | 6 | 服务端 CAPI 埋点、订单来源字段（site / utm） | 后续 |
 | 7 | Nuxt 3 独立站前端工程（另起目录，不在本仓库 admin 内） | 后续 |
 
@@ -140,6 +140,43 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 ### 4.6 验证
 - `npm run typecheck` 通过；`vitest run` 全量 407 用例通过（新增 10 例：购物车 / 报价重算 / 币种切换 / 库存拦截 / 建单幂等 / 预占 / 支付 Webhook 验签·成功·去重·错签）。
 - 提交一并纳入迁移 `000040` / `000042` / `000043` / `000044`（均已 apply 到 DB）。
+
+---
+
+## 第 5 步：订阅 + 到货通知（步骤 5 首个切片）
+
+> 步骤 5 共 7 个独立域（评价 / Q&A / newsletter / restock-notify / RMA / CMS / 17track）。
+> 按用户拍板，**先落地 newsletter 订阅 + restock 到货提醒**这一自包含后端切片；
+> 其余域（评价/Q&A/RMA/CMS/17track）留作后续，避免一次性铺开造成范围蔓延。
+> 全程复用 shop 模型与服务层（不建第二套后端），storefront 仅做薄编排层。
+
+### 5.1 模型与迁移
+- 迁移 `000051` `newsletters`（租户内 `email` 唯一；`token` 唯一用于退订链接；`status` ∈ subscribed/unsubscribed/pending）；
+- 迁移 `000052` `restock_subscriptions`（租户内 `email+skuId` 唯一；`token` 唯一；`status` ∈ waiting/notified/cancelled）；
+- 模型层 `server/modules/shop/models/` 注册 `ShopNewsletter` / `ShopRestockSubscription`（含 `createdAt/updatedAt`，复用 shop 模型层）。
+
+### 5.2 订阅服务（`storefront/services/subscriptionService.ts`）
+- `subscribeNewsletter`：租户内同邮箱幂等（已退订则重新订阅）；返回不可枚举 `token`；
+- `unsubscribeNewsletter(token)`：凭令牌退订，无效/已退订返回 `404`（不暴露账号是否存在）；
+- `subscribeRestock`：校验 SKU 存在（404 否则）；租户内同邮箱同 SKU 幂等；返回 `inStock` 即时库存态；
+- `notifyRestock(skuId, tenantId)`：把关心的 `waiting` 订阅标记为 `notified` 并返回待发送邮件列表（去重）；
+  **实际邮件发送由后续营销/邮件任务消费（P4-T09），本层只负责落库与触发收口**。
+
+### 5.3 到货提醒触发（保持 shop → storefront 单向依赖）
+- `inventoryService` 新增 `setRestockHook(fn)`；在 `adjust(delta>0)` **提交后**调用钩子；
+- `subscriptionService` 模块加载时登记钩子：`adjust` 入库后自动触发 `notifyRestock`，把等待中的订阅标记为已通知；
+- 钩子异常被 `try/catch` 隔离，通知失败不影响入库本身。
+- 同时给 `inventoryService` 的 `adjust/occupy/release/deduct` 四个事务写入加**死锁重试**（MySQL 死锁为可重试瞬态，并行测试下偶发），事务回滚后重试安全。
+
+### 5.4 公开路由（免 admin 鉴权，走 siteContext）
+- `POST /api/storefront/v1/newsletter/subscribe`
+- `POST /api/storefront/v1/newsletter/unsubscribe` 与 `GET /api/storefront/v1/newsletter/unsubscribe?token=`（邮件一键退订链接）
+- `POST /api/storefront/v1/restock/subscribe`
+
+### 5.5 验证
+- `npm run typecheck` 通过；
+- `vitest run` 全量 **414 用例通过**（新增 `storefront-subscription.test.ts` 7 例：邮件订阅/重复幂等/退订/重订/无效令牌 404、到货订阅/未知 SKU 404/库存补货触发钩子标记 notified + 去重）；
+- 提交一并纳入迁移 `000051` / `000052`（已 apply 到 DB）。
 
 ---
 
