@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { AppError } from '../../../middleware/errorHandler.js'
 import type { LoginInput, RegisterInput } from '../../../shared/schemas/customer.js'
 import * as customerService from '../../shop/services/customerService.js'
+import * as cartService from '../services/cartService.js'
 import { getSite } from '../middleware/siteContext.js'
 
 /**
@@ -24,7 +25,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
   }
 }
 
-/** C 端顾客登录，返回顾客信息与 JWT。 */
+/** C 端顾客登录，返回顾客信息与 JWT；若请求携带游客购物车令牌则合并到顾客购物车。 */
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const site = getSite(res)
@@ -34,7 +35,9 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       email: body.email,
       password: body.password,
     })
-    res.json({ code: 0, data: result })
+    // P3-T03：登录后合并游客购物车（前端在后续请求用返回的 cartToken 替换本地购物车 cookie）
+    const merged = await cartService.mergeCartOnLogin(site, result.customer.id, body.cartToken)
+    res.json({ code: 0, data: { ...result, cartToken: merged.token } })
   } catch (err) {
     next(err)
   }

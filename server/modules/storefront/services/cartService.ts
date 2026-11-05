@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import sequelize from '../../../config/database.js'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import {
@@ -10,6 +11,26 @@ import {
 } from '../../shop/models/index.js'
 import * as inventoryService from '../../shop/services/inventoryService.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
+
+/** 单购物车行数量上限（防止合并或加购失控，与下单侧口径一致） */
+export const CART_LINE_MAX = 99
+
+/** 有界重试：应对 MySQL 并发写购物车/明细时的偶发死锁（与 shop 各服务同口径） */
+async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+  let lastErr: unknown
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      const msg = err instanceof Error ? err.message : String(err)
+      // MySQL 死锁错误码 1213 / ER_LOCK_DEADLOCK
+      if (/1213|ER_LOCK_DEADLOCK|Deadlock/i.test(msg) && i < tries - 1) continue
+      throw err
+    }
+  }
+  throw lastErr
+}
 
 /**
  * 购物车服务（阶段 5 步骤 4 / P3-T01）
@@ -156,4 +177,88 @@ export async function toCartView(cart: ShopCart): Promise<CartView> {
     })
   }
   return { token: cart.token, currency: cart.currency, items: views }
+}
+
+/**
+ * 登录后合并游客购物车到顾客购物车（P3-T03）。
+ *
+ * 规则：
+ * - 仅当 guestToken 指向一个「未归属顾客（customerId 为 null）」的购物车才执行合并；
+ *   若游客购物车已绑定某顾客，或 token 无效/缺失，则跳过合并，仅返回（或新建）顾客购物车。
+ * - 合并以「行（skuId）」为单元：同 SKU 在两购物车都存在时，**数量累加并封顶 CART_LINE_MAX**，
+ *   属性（快照价格/标题/规格）保留顾客购物车既有行，保证冲突有确定优先级且不丢行。
+ * - 游客购物车独有的 SKU 整体迁入顾客购物车（数量同样封顶）。
+ * - 完成后销毁游客购物车及其明细，返回顾客购物车；整段在事务 + 死锁重试内执行。
+ */
+export async function mergeCartOnLogin(
+  site: StorefrontSite,
+  customerId: number,
+  guestToken?: string,
+): Promise<ShopCart> {
+  const tId = tid()
+  return withDeadlockRetry(() =>
+    sequelize.transaction(async (tx) => {
+      // 顾客已有购物车：取最早一条，保证确定性
+      let customerCart = await ShopCart.findOne({
+        where: { tenantId: tId, customerId },
+        order: [['id', 'ASC']],
+        transaction: tx,
+        lock: tx.LOCK.UPDATE,
+      })
+      if (!customerCart) {
+        customerCart = await ShopCart.create(
+          { tenantId: tId, token: genCartToken(), customerId, currency: site.defaultCurrency } as never,
+          { transaction: tx },
+        )
+      }
+
+      if (!guestToken) return customerCart
+
+      const guestCart = await ShopCart.findOne({
+        where: { tenantId: tId, token: guestToken, customerId: null },
+        transaction: tx,
+        lock: tx.LOCK.UPDATE,
+      })
+      if (!guestCart) return customerCart
+
+      const guestItems = await ShopCartItem.findAll({
+        where: { tenantId: tId, cartId: guestCart.id },
+        transaction: tx,
+        lock: tx.LOCK.UPDATE,
+      })
+
+      for (const gi of guestItems) {
+        const existing = await ShopCartItem.findOne({
+          where: { tenantId: tId, cartId: customerCart.id, skuId: gi.skuId },
+          transaction: tx,
+        })
+        if (existing) {
+          // 冲突优先级：既有的顾客行属性优先，仅合并数量并封顶；不丢行
+          const merged = Math.min(CART_LINE_MAX, existing.qty + gi.qty)
+          await existing.update({ qty: merged } as never, { transaction: tx })
+        } else {
+          // 游客独有 SKU：整体迁入顾客购物车（数量封顶）
+          await ShopCartItem.create(
+            {
+              tenantId: tId,
+              cartId: customerCart.id,
+              skuId: gi.skuId,
+              spuId: gi.spuId,
+              qty: Math.min(CART_LINE_MAX, gi.qty),
+              unitAmountCents: gi.unitAmountCents,
+              currency: gi.currency,
+              titleSnapshot: gi.titleSnapshot,
+              specSnapshot: gi.specSnapshot,
+            } as never,
+            { transaction: tx },
+          )
+        }
+      }
+
+      // 销毁游客购物车及其明细，避免孤儿数据
+      await ShopCartItem.destroy({ where: { tenantId: tId, cartId: guestCart.id }, transaction: tx })
+      await guestCart.destroy({ transaction: tx })
+      return customerCart
+    }),
+  )
 }

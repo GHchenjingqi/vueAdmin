@@ -22,6 +22,8 @@ export const loginSchema = z
   .object({
     email: z.string().trim().toLowerCase().email('邮箱格式不正确').max(255),
     password: z.string().min(1, '请输入密码').max(72),
+    // 登录时携带的游客购物车令牌：用于把游客购物车合并进顾客购物车（P3-T03）
+    cartToken: z.string().trim().min(1).max(64).optional(),
   })
   .passthrough()
 

@@ -246,7 +246,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | --- | --- | --- | --- | --- | --- | --- |
 | P3-T01 | 购物车数据模型与 API（游客 token、过期机制、行内记录 currency） | `domains/cart/**`、`POST /cart/items` | 服务端校验 SKU 与数量；游客 token 不可枚举；购物车金额仅作展示快照 | G2, P0-T15 | 3 | [x] ✅ 2026-11-04 · 证据：真实购物车 API（cart_token Cookie）联调通过，加购 200（docs/reports/real-integration.md（真实 E2E 实证） §2-1） |
 | P3-T02 | 购物车 UI：数量、删除、优惠反馈、失效与价格变更提示 | `pages/cart.vue` | 商品失效/库存不足/价格变化均有明确文案与操作入口 | P3-T01 | 2 | [x] ✅ 2026-11-04 · 证据：shops/pages/cart.vue（数量/删除/失效提示；价格经 Price） |
-| P3-T03 | 登录后购物车合并规则实现 | 合并逻辑 + 单测 | 同 SKU 数量合并有上限；冲突有确定优先级；合并后不丢行 | P3-T01, P0-T10 | 2 | [ ] |
+| P3-T03 | 登录后购物车合并规则实现 | 合并逻辑 + 单测 | 同 SKU 数量合并有上限；冲突有确定优先级；合并后不丢行 | P3-T01, P0-T10 | 2 | [x] ✅ 2026-11-05 · 证据：`mergeCartOnLogin`（游客车 customerId=null 才合并；同 SKU 累加封顶 CART_LINE_MAX；游客独有 SKU 迁入；既有顾客行属性优先、仅合并数量；合并后销毁游客车）+ login 控制器透传 cartToken 回传合并后 cartToken；`storefront-cart-merge.test.ts` 7 例（空车合并/累加/封顶/冲突优先级/无效 token/已归属跳过/控制器集成） |
 | P3-T04 | Quote 服务端报价：价格重算、可售校验、促销校验、明细与版本，**currency 取当前配置** | `POST /checkout/quote` | 前端传入总价被忽略；报价含 currency、过期时间、版本号；**购物车 currency 与配置不一致时返回 `CURRENCY_CHANGED` 并要求重建报价** | P3-T01, P0-T07, P1-T06 | 4 | [x] ✅ 2026-11-04 · 证据：服务端报价重算（12990×2 分、CURRENCY_CHANGED 校验在位），BFF 适配联调（docs/reports/real-integration.md（真实 E2E 实证） §2-2/§1） |
 | P3-T05 | 运费计算接入（按地址与仓库，Provider 适配层） | `ShippingProvider` | 地址不在配送范围返回明确错误码；运费币种必须与报价币种一致，不一致则拒绝 | P3-T04, P0-T03 | 3 | [x] ✅ 2026-11-05 · 证据：shippingService 白名单+分区计费（settings 唯一数据源 60s TTL）+ 实测 US=800/CN=1200/BR=400 ADDRESS_NOT_SHIPPABLE（293cb45） |
 | P3-T06 | 税费计算接入（服务商或规则表） | `TaxProvider` | 税费币种与报价币种一致；税费失败有降级或阻断策略，不静默按 0 处理 | P3-T04, P0-T05 | 3 | [ ] |
@@ -433,6 +433,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.4 | 2026-11-04 | 真实链路集成（BFF↔后台交易闭环 E2E 全绿，T-02/03/04/05/10 实证）+ 前端收尾批次：requestId 贯穿/i18n 接线/slug 301 规范化/缓存分层 routeRules/无障碍走查/数据字典/币种配置规格/文档链接检查 | AI |
 | v1.5 | 2026-11-05 | P4 前端批次：邮件订阅 UI 接线（后台步骤5 newsletter 真实联调）+ Cookie 同意管理 + GA4 九事件埋点模块（服务端事实 purchase）+ 错误上报与脱敏；单测 21/21；P4-T10/T11、P1-T10 标 [~]（GA4 ID/CAPI/Sentry DSN/欢迎邮件为配置或后端遗留） | AI |
 | v1.6 | 2026-11-05 | 门禁收口：P4-T02 地址簿（`20f76f0`）与 P3-T17 订单邮件 outbox（`019d7ae`）落地；§9 T-10/T-12 由 `[~]` 转 `[x]`，T-01~T-12 全绿 / 0 todo；新增 `docs/reports/t12-jsonld-currency-switch.md` 真实 HTTP 切币种实测（5/5 PASS）并修复损坏的币种 symbol；后端 528 passed（53 文件）、storefront 前端 34 passed（6 文件）、两端 typecheck 0 错误 | AI |
+| v1.7 | 2026-11-05 | P3-T03 登录后购物车合并（`mergeCartOnLogin` + login 控制器透传 cartToken）：同 SKU 累加封顶 / 游客独有 SKU 迁入 / 冲突属性优先级 / 销毁游客车；`storefront-cart-merge.test.ts` 7 例；后端全量 535 passed（54 文件）、typecheck 0 错误 | AI |
 
 ---
 
