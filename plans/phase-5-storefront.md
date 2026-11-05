@@ -348,3 +348,28 @@ server/app.ts                              # app.use('/api/storefront/v1', store
 - 前端（步骤 7）：`npm --prefix shops run typecheck && npm --prefix shops test`；三接口接线后 typecheck 0 错误、25/25 单测通过。
 - 提交前缀：`feat(storefront):` / `test(storefront):` / `docs(storefront):`。
 - GitHub push 走本机代理 `https_proxy=http://127.0.0.1:7892`，直连会 `schannel: server closed abruptly`。
+
+---
+
+## 端到端联调实证（真实服务，2026-11-05）
+
+- 环境：后端 `tsx app.ts` **以当前代码**启动（HTTPS 5173，`migrate:status` 已执行 84 / 待执行 0）；
+  前端 `nuxt dev`（3000，`NUXT_API_BASE=https://127.0.0.1:5173`、`NUXT_API_INSECURE_TLS=1`、`NUXT_COMMERCE_SOURCE=real`）。
+- 起因与处置：原 5173 进程启动于 11:41，早于步骤 5/6 提交，而 `tsx app.ts` 无热重载，
+  导致 `POST /track-event`、`GET /track/:orderNo` 请求挂起超时（旧路由 `checkout/quote` 仍正常返回业务 400）。
+  检测到进程退出后以当前代码重启，服务恢复并保留运行（自签名证书需 `NUXT_API_INSECURE_TLS=1`）。
+- **后端直连断言 8/8 符合预期**：`health` 200；`cms/articles` 200；`track-event` 合法事件 200 `local_only`；
+  同 `eventId` 重放 200 幂等；未知事件 400「不支持的事件名」；`purchase` 无真实订单 400「关联订单不存在」；
+  `track` 错误 / 缺失 `accessToken` 均 404「订单不存在」（防枚举）。
+- **BFF 断言（3000 → 5173 真实转发）**：
+  - `POST /api/track-event` → 200 `{accepted:true, dispatchStatus:'local_only'}`，后端已落库；
+  - `GET /api/track/NOPE?t=bad` → 404 `ORDER_NOT_FOUND`（**专用路由的响应体**，非 catch-all 直通域或后端体）。
+    结合 `shops/.nuxt/types/nitro-routes.d.ts` 中 `/api/track/:orderNo` 与 `/api/track-event` 均独立注册，
+    确认具体路由优先于 `/api/**:mock`：并行方后加的通用直通分支（含 `track` / `track-event`）不会劫持这两条链路；
+  - 建单 `attribution` **差分探测**：合法 attribution → 业务 400「请提供购物车 token 或商品明细」（schema 通过）；
+    `utmSource` 传数字 → 400 `attribution.utmSource: Expected string, received number`（**后端 Zod 确实收到该字段**，
+    证明 BFF 透传生效）；不带 attribution → 同样的业务 400（对照组）。
+    目录中的测试商品均无价无库存，无法完成真实建单，故以此差分法验证传输链路，落库部分由
+    `storefront-analytics.test.ts` 的「订单来源落库」用例覆盖。
+- 结论：3 条新链路端到端打通，**未发现需修复的接线缺陷**；本轮无代码改动，仅补验收证据。
+  Nuxt dev server 验证后已停止，后端 5173 保留为当前代码版本。
