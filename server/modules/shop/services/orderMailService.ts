@@ -257,21 +257,44 @@ export async function drainOutbox(
   const result: DrainResult = { scanned: rows.length, sent: 0, failed: 0, dead: 0 }
 
   for (const row of rows) {
+    const attempts = Number(row.attempts) + 1
+    // 发送前先按 attempts 做 CAS 抢占：外部邮件不可回滚，两个 worker 同时扫到同一行时
+    // 只能有一个进入 provider，否则会发出两封信而库里只记一次 attempts。
+    // 抢占时同步落 attempts / nextAttemptAt，进程在发送中崩溃也会按退避时间重投。
+    const [claimed] = await ShopOrderEmail.update(
+      {
+        attempts,
+        nextAttemptAt: new Date(now.getTime() + Math.min(2 ** attempts * 1000, 300_000)),
+      },
+      {
+        where: {
+          id: row.id,
+          tenantId: tId,
+          attempts: Number(row.attempts),
+          status: { [Op.in]: ['pending', 'failed'] },
+        },
+      } as never,
+    )
+    if (claimed !== 1) continue
     try {
       // 只发出库里已固化的快照，不重新渲染、不读站点币种配置
       await provider({ to: row.toEmail, subject: row.subject, text: row.bodyText })
-      await row.update({ status: 'sent', sentAt: now, lastError: null, attempts: Number(row.attempts) + 1 } as never)
+      await ShopOrderEmail.update(
+        { status: 'sent', sentAt: now, lastError: null },
+        { where: { id: row.id, tenantId: tId } } as never,
+      )
       result.sent++
     } catch (err) {
-      const attempts = Number(row.attempts) + 1
       const dead = attempts >= MAX_ATTEMPTS
       const message = (err instanceof Error ? err.message : String(err)).slice(0, 255)
-      await row.update({
-        attempts,
-        status: dead ? 'dead' : 'failed',
-        lastError: message,
-        nextAttemptAt: new Date(now.getTime() + Math.min(2 ** attempts * 1000, 300_000)),
-      } as never)
+      await ShopOrderEmail.update(
+        {
+          status: dead ? 'dead' : 'failed',
+          lastError: message,
+          nextAttemptAt: new Date(now.getTime() + Math.min(2 ** attempts * 1000, 300_000)),
+        },
+        { where: { id: row.id, tenantId: tId } } as never,
+      )
       if (dead) result.dead++
       else result.failed++
     }

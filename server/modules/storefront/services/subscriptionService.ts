@@ -1,5 +1,4 @@
 import crypto from 'crypto'
-import { Op } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopNewsletter, ShopRestockSubscription, ShopSku } from '../../shop/models/index.js'
@@ -116,11 +115,19 @@ export interface RestockNotifyTarget {
 export async function notifyRestock(skuId: number, tenantId: number): Promise<RestockNotifyTarget[]> {
   const subs = await ShopRestockSubscription.findAll({ where: { skuId, tenantId, status: 'waiting' } })
   if (subs.length === 0) return []
-  await ShopRestockSubscription.update(
-    { status: 'notified', notifiedAt: new Date() },
-    { where: { id: { [Op.in]: subs.map((s) => s.id) } } } as never,
-  )
-  return subs.map((s) => ({ email: s.email, token: s.token, locale: s.locale }))
+  const notifiedAt = new Date()
+  const targets: RestockNotifyTarget[] = []
+  // 逐行 CAS 认领：只有真正把 waiting 改成 notified 的调用方才拿到该收件人。
+  // 并发补货 / 多 worker 下两个调用方可能同时查到同一批 waiting 行，
+  // 原「按 id 无条件批量 update + 返回全部」会让双方都返回同一批收件人 -> 重复发到货通知。
+  for (const s of subs) {
+    const [affected] = await ShopRestockSubscription.update(
+      { status: 'notified', notifiedAt },
+      { where: { id: s.id, tenantId, skuId, status: 'waiting' } } as never,
+    )
+    if (affected === 1) targets.push({ email: s.email, token: s.token, locale: s.locale })
+  }
+  return targets
 }
 
 // 库存补货钩子注册：保持 shop → storefront 单向依赖，避免反向 import
