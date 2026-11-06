@@ -95,6 +95,12 @@ function updatePaymentFailureRate(): void {
 }
 
 /**
+ * G3：已结算支付态。订单一旦成功扣款（captured）或进入退款流程（refunding/refunded），
+ * 迟到的回调不得把状态回退、重复 commit 预占或重复发送确认邮件。
+ */
+const SETTLED_PAYMENT_STATUSES = new Set(['captured', 'refunding', 'refunded'])
+
+/**
  * 处理支付 Webhook（原始 body + 签名头）。
  * 返回 { ok, status } 供 controller 转化为 HTTP 响应；验签失败抛 401，且不产生任何副作用。
  */
@@ -142,7 +148,7 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
   if (eventType === 'payment.succeeded') {
     incCounter('payment_success')
     updatePaymentFailureRate()
-    if (order.paymentStatus === 'captured') return { ok: true, alreadyProcessed: true, status: 200 }
+    if (SETTLED_PAYMENT_STATUSES.has(order.paymentStatus)) return { ok: true, alreadyProcessed: true, status: 200 }
     await order.update({ paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never)
     await reservationService.commitReservation(order.orderNo)
     if (prev) await prev.update({ status: 'captured', rawPayload: payload } as never)
@@ -155,6 +161,19 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
   }
 
   if (eventType === 'payment.failed') {
+    // G3：迟到/乱序的失败回调不得回退已结算订单，也不得重复释放已 committed 的预占。
+    if (SETTLED_PAYMENT_STATUSES.has(order.paymentStatus)) {
+      console.warn(`[webhook] 订单 ${order.orderNo} 已处于 ${order.paymentStatus}，忽略迟到失败事件 ${providerRef}`)
+      await auditLogService.record({
+        actorType: 'system',
+        action: 'payment.stale_failed_ignored',
+        entityType: 'order',
+        entityId: order.id,
+        beforeState: { paymentStatus: order.paymentStatus },
+        afterState: { paymentStatus: order.paymentStatus, providerRef },
+      })
+      return { ok: true, alreadyProcessed: true, status: 200 }
+    }
     incCounter('payment_failure')
     updatePaymentFailureRate()
     await order.update({ paymentStatus: 'failed' } as never)

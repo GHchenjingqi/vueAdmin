@@ -81,7 +81,8 @@ export async function releaseReservation(ref: string): Promise<void> {
   const rows = await ShopInventoryReservation.findAll({ where: { ref, tenantId: tId } as never })
   await sequelize.transaction(async (t) => {
     for (const row of rows) {
-      if (row.status !== 'released') {
+      // G3：已 committed 的预占代表已支付订单，重复释放会回补库存造成超卖
+      if (row.status !== 'released' && row.status !== 'committed') {
         await inventoryService.release(row.skuId, row.qty, ref)
         await row.update({ status: 'released', releasedAt: new Date() }, { transaction: t })
       }
