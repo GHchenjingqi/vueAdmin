@@ -317,7 +317,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P5-T05 | Bundle / 搭配购 / 推荐位 | 促销扩展 | 组合商品报价仍走服务端 Quote；库存按组件 SKU 扣减 | P5-T04 | 3 | [ ] |
 | P5-T06 | 博客 CMS 与内容 SEO | `pages/blog/**` | 发布触发缓存失效；文章有唯一 slug 与结构化数据 | G4, P2-T10 | 3 | [ ] |
 | P5-T07 | Referral / Affiliate | 归因与结算规则 | 归因窗口明确；与优惠券叠加规则明确；佣金币种与结算币种一致 | P5-T02 | 3 | [ ] |
-| P5-T08 | A/B 测试与个性化 | 实验框架 | 实验不影响报价与库存正确性；可一键关闭 | P5-T05 | 3 | [ ] |
+| P5-T08 | A/B 测试与个性化 | 实验框架 | 实验不影响报价与库存正确性；可一键关闭 | P5-T05 | 3 | [~] ✅框架已交付 2026-11-06 · 证据：`server/modules/experiments/experimentService.ts`（FNV-1a 确定性分桶 + 权重校验 + `ab_test` flag 关闭态降级 control 且不计算分桶/不触发曝光 hook）、admin `GET /api/v1/experiments`（requireAdmin）+ 公开 `GET /api/storefront/v1/experiments/:key/assign`（private,no-store）；`experiments.test.ts` 8 例（确定性/权重分布/fail-closed/零副作用/一键关闭/定义校验）。框架纯只读不碰报价与库存；**业务实验接入与 G5 主链路回归待做，保持未勾** |
 | P5-T09 | **G5 门禁**：扩展未破坏主链路回归 | 回归测试报告 | 主市场交易 E2E 全绿；币种切换回归通过；缓存与 SEO 无回归 | P5-T01 ~ P5-T08 | 1 | [ ] |
 
 > **注意**：若后台币种配置对运营人员开放自助修改，P5-T02 **必须提前到 Phase 4 完成**（并入 G4），否则上线后存在被误切币种导致价格口径错乱的现实风险。
@@ -419,6 +419,8 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 2026-11-05 | T-12 | 币种切换四处口径实证不全：已有 store-config/购物车/报价/订单快照/回滚证据，缺 JSON-LD、订单邮件、支付金额三处 | §9 门禁 `[~]`：不得作为「四处口径一致」整体通过 | 前端 / 数据 / 财务 | ✅ 已解除（`019d7ae` + `docs/reports/t12-jsonld-currency-switch.md`）：订单邮件 outbox 快照币种 + JSON-LD/前台符号真实 HTTP 切币种实测 5/5 PASS + 支付金额快照断言；顺带修复 `shop.currency.symbol` 的 U+FFFD 损坏字节（审计 changeId 8） |
 | 2026-11-05 | P3-T17 | 邮件真实 SMTP 投递与 outbox drain 调度未在生产环境配置 | 交易邮件可能滞留 pending，不影响交易主链路（入队异常已隔离） | 运维 / 后端 | 🟡 上线配置：配置 SMTP 后把 `POST /shop/order-mails/drain` 挂定时任务；`retryMail` 已提供终态重发。测试用可插拔 provider 覆盖渲染/重试/快照，不代勾生产投递 |
 | 2026-11-05 | — | G4 菜单权限复核、CDN 按响应头透传、P0-T05b 业务正式签字 | 上线检查 / 业务决策 | 运营 / 业务 / 运维 | 待对应责任方确认，非代码实现缺口；按 §0.2 不代勾 |
+| 2026-11-06 | X-T04 | `setFlag` 对 `Setting('feature.flags')` 做「全量 JSON 读改写 + 进程内缓存」，多写者并发时后写会覆盖先写的其它 key（多测试文件/多实例同时改不同 flag 即复现） | 灰度开关可能丢失；并发测试互相干扰 | 后端 | 🟡 已发现未修：本轮 P5-T08 测试改为 mock flag（不写 DB）规避；修复建议 setFlag 写入前重读 DB 最新值并合并（或改按 key 独立存储）。因 `featureFlags.ts` 正被并行方编辑（P5-T03 bnpl flag 未提交），本会话不夹带修改 |
+| 2026-11-06 | P5-T03 | 并行方 WIP：`featureFlags.test.ts` 新增 bnpl 默认关闭断言，但 dev 库 `feature.flags` 残留 `bnpl:true`（P5-T03 联调开启），该用例单跑即失败 | 全量套件 1 例失败（603/604），非本会话代码缺陷 | 并行方 / 后端 | 🟡 待并行方收口：联调后恢复 bnpl=false 或在 beforeEach 重置；本会话不改其联调状态 |
 
 ---
 
@@ -445,6 +447,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.15 | 2026-11-05 | **X-T06 回滚演练**（dev）：000065 `migrate down` 0.568s / `up` 重放 0.243s、端到端 ≈11.7s（含 CLI 冷启动），RTO 实测回填 runbook §6.1，任务行 [ ]→[~]（staging 完整演练与生产备份/恢复需真实环境）；另将 P4-T16 性能报告 `docs/reports/performance-acceptance.md` 入库（v1.12 已引用但文件此前未跟踪） | AI |
 | v1.16 | 2026-11-05 | **P4-T17 G4 门禁清单整理**：`docs/reports/g4-gate-checklist.md`（政策审核/客服履约/埋点验证三类逐项登记证据与缺口：admin RMA 审批端点缺、analytics events 对账查询端点缺为两个可执行技术缺口；政策文本专业审核、权限分配、真实环境对账为业务决策项）。任务行保持 [ ] 不代勾 | AI |
 | v1.17 | 2026-11-05 | **P4-T17 两个技术缺口补齐**：① `rmaAdminService` + admin `GET /shop/rmas`（status/orderId 过滤分页）、`POST /shop/rmas/:id/approve`、`POST /shop/rmas/:id/reject`（rmaRejectSchema 强制原因，仅 pending；租户隔离，与顾客侧状态机对齐）；② `analyticsService.listEventsForReconcile` + admin `GET /shop/analytics/events`（eventName/dispatchStatus/orderId 过滤，limit 钳 1..500，倒序）。新增 6 例单测；后端全量 **592 passed（63 文件）**、server typecheck 0 错误；清单与任务行同步回填，任务行保持 [ ]（业务签字项未代勾） | AI |
+| v1.20 | 2026-11-06 | **P5-T08 A/B 实验框架**：`server/modules/experiments/`（FNV-1a 确定性分桶 + 权重校验 + `ab_test` flag 关闭态降级 control 且不计算分桶/不触发曝光 hook，零副作用）+ admin `GET /api/v1/experiments`（requireAdmin）+ 公开 `GET /api/storefront/v1/experiments/:key/assign`（private,no-store）；`experiments.test.ts` 8 例（mock flag 规避 X-T04 共享 Setting 的并发覆盖）；server typecheck 0 错误、全量 603/604（唯一失败为并行方 WIP 的 bnpl 断言，见 §11）；P5-T08 [ ]→[~]。**并发隔离说明**：编号顺延避开并行方工作树中未提交的 v1.18/v1.19；本提交树经「备份混合版→还原 HEAD→只重放本会话改动→恢复混合版」隔离，零夹带 | AI |
 
 ---
 

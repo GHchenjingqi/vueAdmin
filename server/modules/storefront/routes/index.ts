@@ -22,6 +22,7 @@ import analyticsRouter from './analytics.js'
 import addressRouter from './address.js'
 import monitoringRouter from './monitoring.js'
 import * as flagsController from '../../featureflags/flagsController.js'
+import { publicRouter as experimentsPublicRouter } from '../../experiments/routes.js'
 
 /**
  * Storefront 公开接口路由
@@ -57,5 +58,6 @@ router.use('/', analyticsRouter)
 router.use('/addresses', addressRouter)
 router.use('/monitoring', monitoringRouter)
 router.get('/flags/:key', flagsController.publicCheck)
+router.use('/experiments', experimentsPublicRouter)
 
 export default router
