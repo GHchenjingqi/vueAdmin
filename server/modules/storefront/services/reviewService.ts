@@ -69,7 +69,10 @@ export async function submitReview(
   if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
     throw new AppError(400, '评分必须为 1-5 的整数')
   }
-  const verified = auth && input.orderId != null ? await verifyPurchase(tId, auth.email, input.orderId, skuId) : false
+  const verified =
+    auth && input.orderId != null
+      ? await verifyPurchase(tId, auth.email, input.orderId, input.spuId, skuId)
+      : false
   const row = await ShopReview.create({
     tenantId: tId,
     spuId: input.spuId,
@@ -89,11 +92,16 @@ export async function submitReview(
   return { id: row.id, status: row.status }
 }
 
-/** 已购验证：登录顾客 email 匹配订单，且订单含该 SKU、状态为已支付及以上 */
+/**
+ * 已购验证：登录顾客 email 匹配订单，且订单含被评价商品的 SKU、状态为已支付及以上。
+ * skuId 省略时评价针对 SPU 整体，须按该 SPU 下全部 SKU 匹配，
+ * 否则「买过任意商品」即可给任何商品刷出已购标记。
+ */
 async function verifyPurchase(
   tenantId: number,
   email: string,
   orderId: number,
+  spuId: number,
   skuId: number | null,
 ): Promise<boolean> {
   const order = await ShopOrder.findOne({
@@ -106,7 +114,13 @@ async function verifyPurchase(
   })
   if (!order) return false
   const whereItem: Record<string, unknown> = { orderId, tenantId }
-  if (skuId != null) whereItem.skuId = skuId
+  if (skuId != null) {
+    whereItem.skuId = skuId
+  } else {
+    const skus = await ShopSku.findAll({ where: { spuId, tenantId }, attributes: ['id'] })
+    if (skus.length === 0) return false
+    whereItem.skuId = { [Op.in]: skus.map((s) => s.id) }
+  }
   const item = await ShopOrderItem.findOne({ where: whereItem as never })
   return !!item
 }
