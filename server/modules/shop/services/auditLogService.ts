@@ -10,6 +10,7 @@
  * - 缺少 tenantId 时回退平台租户 1（与全局租户上下文一致）。
  */
 import type { Transaction } from 'sequelize'
+import { Op } from 'sequelize'
 import AuditLog from '../models/AuditLog.js'
 import { getTenantContext } from '../../tenant/context.js'
 
@@ -32,6 +33,14 @@ export interface AuditQuery {
   entityId?: number
   tenantId?: number
   limit?: number
+  /** 分页偏移（默认 0），与 limit 配合做审计回溯分页 */
+  offset?: number
+  /** 精确匹配动作名，如 order.payment_captured / article.published */
+  action?: string
+  /** createdAt 下界（含） */
+  from?: Date
+  /** createdAt 上界（含） */
+  to?: Date
 }
 
 /** 写入一条审计记录；失败仅告警，绝不影响业务主流程 */
@@ -56,15 +65,24 @@ export async function record(input: AuditRecordInput, tx?: Transaction): Promise
   }
 }
 
-/** 按实体回溯状态变更链（倒序，最新在前） */
+/** 按实体回溯状态变更链（倒序，最新在前）；支持 action / 时间范围 / 分页过滤 */
 export async function listByEntity(q: AuditQuery): Promise<AuditLog[]> {
+  const where: Record<string | symbol, unknown> = {
+    tenantId: q.tenantId ?? getTenantContext()?.tenantId ?? 1,
+    entityType: q.entityType,
+    ...(q.entityId != null ? { entityId: q.entityId } : {}),
+    ...(q.action ? { action: q.action } : {}),
+  }
+  if (q.from || q.to) {
+    const range: Record<symbol, Date> = {}
+    if (q.from) range[Op.gte] = q.from
+    if (q.to) range[Op.lte] = q.to
+    where.createdAt = range
+  }
   return AuditLog.findAll({
-    where: {
-      tenantId: q.tenantId ?? getTenantContext()?.tenantId ?? 1,
-      entityType: q.entityType,
-      ...(q.entityId != null ? { entityId: q.entityId } : {}),
-    },
+    where,
     order: [['id', 'DESC']],
-    limit: q.limit ?? 100,
+    limit: Math.min(Math.max(q.limit ?? 100, 1), 500),
+    offset: Math.max(q.offset ?? 0, 0),
   })
 }
