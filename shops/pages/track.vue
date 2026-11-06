@@ -85,7 +85,11 @@ useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
         />
       </div>
       <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ error }}</p>
-      <button type="submit" class="w-full rounded-lg bg-stone-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50" :disabled="loading">
+      <button
+        type="submit"
+        class="w-full rounded-lg bg-stone-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50"
+        :disabled="loading"
+      >
         {{ loading ? 'Looking up…' : 'Track order' }}
       </button>
     </form>

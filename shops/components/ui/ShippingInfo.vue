@@ -8,7 +8,9 @@ const props = withDefaults(defineProps<{ standardDays?: string; expressDays?: st
   freeThreshold: 9900,
 })
 const cfg = useStoreConfig()
-const thresholdText = computed(() => (props.freeThreshold ? `Free standard shipping over ${cfg.format(props.freeThreshold)}` : 'Shipping calculated at checkout'))
+const thresholdText = computed(() =>
+  props.freeThreshold ? `Free standard shipping over ${cfg.format(props.freeThreshold)}` : 'Shipping calculated at checkout',
+)
 </script>
 
 <template>

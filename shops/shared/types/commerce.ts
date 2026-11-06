@@ -18,6 +18,8 @@ export interface Cart {
   token: string
   items: CartItem[]
   currency: string
+  /** 购物车语言快照（P5-T01）：与币种互不推导，仅记录用户加购时的语言 */
+  locale?: string
   itemCount: number
 }
 
@@ -46,6 +48,8 @@ export interface Quote {
   shippingRates: ShippingRate[]
   appliedCoupon?: { code: string; discount: Money } | null
   warnings: string[]
+  /** P5-T04：按仓配送承诺（路由后的主仓，天） */
+  deliveryCommitment?: { warehouseId: number; warehouseName: string; warehouseType: string; deliveryEstimateDays: number } | null
 }
 
 export interface OrderDraft {

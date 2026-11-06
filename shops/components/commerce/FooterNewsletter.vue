@@ -54,7 +54,11 @@ async function subscribe(): Promise<void> {
         </div>
         <label class="flex items-start gap-2 text-xs text-stone-500">
           <input v-model="consent" type="checkbox" class="mt-0.5" />
-          <span>我同意接收营销邮件，并已阅读<a href="/policies/privacy" class="underline hover:text-stone-800">隐私政策</a>。可随时通过邮件链接退订。</span>
+          <span>
+            我同意接收营销邮件，并已阅读
+            <a href="/policies/privacy" class="underline hover:text-stone-800">隐私政策</a>
+            。可随时通过邮件链接退订。
+          </span>
         </label>
         <p v-if="errorMsg" class="text-xs text-red-600">{{ errorMsg }}</p>
       </form>

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  buildAddressPayload, listAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress,
+  buildAddressPayload,
+  listAddresses,
+  createAddress,
+  updateAddress,
+  deleteAddress,
+  setDefaultAddress,
   type AddressForm,
 } from '../../shared/customer/address'
 

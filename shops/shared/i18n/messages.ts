@@ -7,6 +7,7 @@ export const defaultLocale: Locale = 'en-US'
 const zh: Record<string, string> = {
   'shop.title': 'Aurora Hair Studio',
   'cart.title': '购物车',
+  'cart.description': '查看您的购物车商品、数量与金额',
   'cart.empty': '购物车是空的',
   'cart.backHome': '回到首页',
   'checkout.title': '结算',
@@ -18,6 +19,7 @@ const zh: Record<string, string> = {
 const en: Record<string, string> = {
   'shop.title': 'Aurora Hair Studio',
   'cart.title': 'Cart',
+  'cart.description': 'Review the items, quantities and totals in your cart',
   'cart.empty': 'Your cart is empty',
   'cart.backHome': 'Back to home',
   'checkout.title': 'Checkout',

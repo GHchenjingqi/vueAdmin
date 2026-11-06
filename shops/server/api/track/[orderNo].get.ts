@@ -18,10 +18,9 @@ export default defineEventHandler(async (event) => {
   }
   if (!orderNo || !token) return notFound()
 
-  const res = await commerceRealFetch(
-    `track/${encodeURIComponent(orderNo)}?accessToken=${encodeURIComponent(token)}`,
-    { requestId: event.context.requestId as string | undefined },
-  )
+  const res = await commerceRealFetch(`track/${encodeURIComponent(orderNo)}?accessToken=${encodeURIComponent(token)}`, {
+    requestId: event.context.requestId as string | undefined,
+  })
   if (res.networkError) {
     setResponseStatus(event, 502)
     return { code: 'UPSTREAM_ERROR', message: 'tracking upstream unavailable' }

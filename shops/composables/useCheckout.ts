@@ -9,7 +9,14 @@ export function useCheckout() {
   const order = ref<OrderDraft | null>(null)
   const loading = ref(false)
 
-  async function placeOrder(payload: { email: string; address: Record<string, string>; shippingRateId?: string; couponCode?: string; idempotencyKey?: string; attribution?: OrderAttribution }): Promise<OrderDraft> {
+  async function placeOrder(payload: {
+    email: string
+    address: Record<string, string>
+    shippingRateId?: string
+    couponCode?: string
+    idempotencyKey?: string
+    attribution?: OrderAttribution
+  }): Promise<OrderDraft> {
     loading.value = true
     try {
       order.value = await $fetch<OrderDraft>('/api/checkout/orders', {
@@ -23,10 +30,15 @@ export function useCheckout() {
     }
   }
 
-  async function pay(orderIdOrNo: string, accessToken?: string): Promise<{ sessionUrl: string; provider: string }> {
+  async function pay(orderIdOrNo: string, accessToken?: string, provider?: string): Promise<{ sessionUrl: string; provider: string }> {
     // 原生 fetch：绕开 Nuxt 类型化路由联合在深层动态路径上的指数比较（TS2321）
     const qs = accessToken ? `?t=${encodeURIComponent(accessToken)}` : ''
-    const res = await fetch(`/api/checkout/orders/${orderIdOrNo}/pay${qs}`, { method: 'POST' })
+    const res = await fetch(`/api/checkout/orders/${orderIdOrNo}/pay${qs}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      // P5-T03：可选 provider（如 bnpl）；BFF 透传给后端做 flag+币种前置校验
+      body: JSON.stringify(provider ? { provider } : {}),
+    })
     const data = (await res.json()) as { sessionUrl: string; provider: string }
     if (!res.ok) throw new Error((data as unknown as { message?: string })?.message || 'payment failed')
     return data

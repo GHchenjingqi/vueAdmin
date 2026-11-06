@@ -53,15 +53,15 @@ useSeo({
       <div v-for="n in 8" :key="n" class="aspect-square animate-pulse rounded-xl bg-stone-100" />
     </div>
 
-    <div v-else-if="error" class="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-600">
-      {{ error }} — try adjusting filters.
-    </div>
+    <div v-else-if="error" class="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-600">{{ error }} — try adjusting filters.</div>
 
     <template v-else>
       <div v-if="(data?.list?.length ?? 0) === 0" class="rounded-xl border border-stone-200 p-12 text-center">
         <p class="text-sm font-medium text-stone-900">No products found</p>
         <p class="mt-1 text-sm text-stone-500">Try adjusting filters or browse all categories.</p>
-        <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">Back to home</NuxtLink>
+        <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
+          Back to home
+        </NuxtLink>
       </div>
       <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <ProductCard v-for="p in data?.list ?? []" :key="p.id" :product="p" />

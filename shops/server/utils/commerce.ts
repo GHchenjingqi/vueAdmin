@@ -29,6 +29,9 @@ export function getCommerceSource(): CommerceSource {
   return raw === 'real' || raw === 'mock' ? raw : 'auto'
 }
 
+import { request as httpsRequest } from 'node:https'
+import { request as httpRequest } from 'node:http'
+
 export interface RealFetchResult {
   ok: boolean
   status: number
@@ -38,30 +41,38 @@ export interface RealFetchResult {
 }
 
 /** 调用现有后台 storefront 接口（转发 Cookie + requestId；dev 自签名证书开关 NUXT_API_INSECURE_TLS=1） */
-export async function commerceRealFetch(path: string, init: { method?: string; body?: unknown; cookie?: string; rawBody?: string; requestId?: string; authorization?: string } = {}): Promise<RealFetchResult> {
+export async function commerceRealFetch(
+  path: string,
+  init: { method?: string; body?: unknown; cookie?: string; rawBody?: string; requestId?: string; authorization?: string; locale?: string } = {},
+): Promise<RealFetchResult> {
   if (process.env.NUXT_API_INSECURE_TLS === '1') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
   const apiBase = useRuntimeConfig().apiBase as string
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (init.cookie) headers.cookie = init.cookie
   if (init.requestId) headers['x-request-id'] = init.requestId
   if (init.authorization) headers.authorization = init.authorization
+  if (init.locale) headers['x-store-locale'] = init.locale
   try {
-    const res = await fetch(`${apiBase}/api/storefront/v1/${path}`, {
+    const res = await rawRequest(`${apiBase}/api/storefront/v1/${path}`, {
       method: init.method || 'GET',
       headers,
       body: init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
-      signal: AbortSignal.timeout(8000),
     })
-    const text = await res.text()
     let body: unknown = null
     try {
-      body = text ? JSON.parse(text) : null
+      body = res.text ? JSON.parse(res.text) : null
     } catch {
-      body = { code: res.status, message: text.slice(0, 200) }
+      body = { code: res.statusCode, message: res.text.slice(0, 200) }
     }
-    const setCookie = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : undefined
-    return { ok: res.ok, status: res.status, body, setCookie }
-  } catch {
+    return { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body, setCookie: res.setCookie }
+  } catch (err) {
+    console.error(
+      `[commerce] fetch ${path} failed:`,
+      err instanceof Error ? err.message : err,
+      err instanceof Error && err.cause
+        ? '| cause: ' + String((err as { cause?: { message?: string } }).cause?.message ?? (err as { cause?: unknown }).cause).slice(0, 160)
+        : '',
+    )
     return { ok: false, status: 0, body: null, networkError: true }
   }
 }
@@ -103,7 +114,7 @@ export function adaptCartView(real: Record<string, unknown>): Cart {
       stockNote: available <= 0 ? 'out-of-stock' : available < 5 ? 'low-stock' : undefined,
     }
   })
-  return { token: str(real.token, ''), items: mapped, currency, itemCount: mapped.reduce((n, i) => n + i.qty, 0) }
+  return { token: str(real.token, ''), items: mapped, currency, locale: str(real.locale, ''), itemCount: mapped.reduce((n, i) => n + i.qty, 0) }
 }
 
 export function adaptQuote(real: Record<string, unknown>, extraWarnings: string[] = []): Quote {
@@ -132,6 +143,15 @@ export function adaptQuote(real: Record<string, unknown>, extraWarnings: string[
     shippingRates: [],
     appliedCoupon: null,
     warnings: extraWarnings,
+    // P5-T04：按仓配送承诺透传
+    deliveryCommitment: (real.deliveryCommitment as Record<string, unknown> | null | undefined)
+      ? {
+          warehouseId: num((real.deliveryCommitment as Record<string, unknown>).warehouseId),
+          warehouseName: str((real.deliveryCommitment as Record<string, unknown>).warehouseName, ''),
+          warehouseType: str((real.deliveryCommitment as Record<string, unknown>).warehouseType, ''),
+          deliveryEstimateDays: num((real.deliveryCommitment as Record<string, unknown>).deliveryEstimateDays),
+        }
+      : null,
   }
 }
 
@@ -196,4 +216,40 @@ export async function simulateMockProviderWebhook(orderNo: string, providerRef: 
 async function digest(secret: string, payload: string): Promise<string> {
   const { createHmac } = await import('node:crypto')
   return createHmac('sha256', secret).update(payload, 'utf8').digest('hex')
+}
+
+/** 原生 http/https 请求（显式 rejectUnauthorized，不依赖运行时 env 时序） */
+function rawRequest(
+  url: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string },
+): Promise<{ statusCode: number; text: string; setCookie?: string[] }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url)
+    const isHttps = u.protocol === 'https:'
+    const req = (isHttps ? httpsRequest : httpRequest)(
+      {
+        hostname: u.hostname,
+        port: u.port || (isHttps ? 443 : 80),
+        path: u.pathname + u.search,
+        method: init.method || 'GET',
+        headers: { ...init.headers, 'content-length': init.body ? Buffer.byteLength(init.body) : 0 },
+        ...(isHttps ? { rejectUnauthorized: process.env.NUXT_API_INSECURE_TLS !== '1' } : {}),
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c: Buffer) => chunks.push(c))
+        res.on('end', () =>
+          resolve({
+            statusCode: res.statusCode ?? 0,
+            text: Buffer.concat(chunks).toString('utf8'),
+            setCookie: res.headers['set-cookie'],
+          }),
+        )
+      },
+    )
+    req.setTimeout(8000, () => req.destroy(new Error('upstream timeout')))
+    req.on('error', reject)
+    if (init.body) req.write(init.body)
+    req.end()
+  })
 }

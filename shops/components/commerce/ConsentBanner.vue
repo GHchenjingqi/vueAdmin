@@ -33,13 +33,18 @@ function decide(analytics: boolean): void {
   >
     <p class="text-xs leading-relaxed text-stone-600">
       我们使用必要 Cookie 保障站点运行，并希望在{{ cfg.market.value.language === 'zh-CN' ? '你' : '您' }}同意后使用统计与营销 Cookie 优化体验。详见
-      <NuxtLink to="/policies/privacy" class="underline hover:text-stone-800">隐私政策</NuxtLink>。
+      <NuxtLink to="/policies/privacy" class="underline hover:text-stone-800">隐私政策</NuxtLink>
+      。
     </p>
     <div class="mt-3 flex gap-2">
       <button type="button" class="flex-1 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700" @click="decide(true)">
         全部接受
       </button>
-      <button type="button" class="flex-1 rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-stone-500" @click="decide(false)">
+      <button
+        type="button"
+        class="flex-1 rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-stone-500"
+        @click="decide(false)"
+      >
         仅必要
       </button>
     </div>

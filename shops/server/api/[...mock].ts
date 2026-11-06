@@ -1,13 +1,6 @@
 import { mockStore } from '@shared/mock/store'
-import {
-  adaptCartView,
-  adaptOrderView,
-  adaptQuote,
-  commerceRealFetch,
-  getCommerceSource,
-  simulateMockProviderWebhook,
-  unwrapEnvelope,
-} from '../utils/commerce'
+import { MOCK_BLOG_POSTS } from '@shared/mock/fixtures'
+import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
 
 /**
  * BFF 商务路由（cart / checkout / orders）：前端接线层。
@@ -24,9 +17,11 @@ export default defineEventHandler(async (event) => {
   const source = getCommerceSource()
   const cookie = event.node.req.headers.cookie
   const authorization = event.node.req.headers.authorization as string | undefined
+  // P5-T01：从 store_locale cookie 读取当前语言（单源），透传给真实后台/mock（x-store-locale）
+  const locale = localeFrom(cookie)
 
   // ---- 直通域（并行后端已交付的扩展能力；auto/real 下透传，4xx 业务错误原样返回） ----
-  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses)\b/.exec(url)
+  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses|referrals|experiments)\b/.exec(url)
   if (extMatch && source !== 'mock') {
     const res = await commerceRealFetch(url, {
       method,
@@ -43,34 +38,36 @@ export default defineEventHandler(async (event) => {
   // ---- GET/PATCH/DELETE /api/addresses/:id（单条：404 业务语义透传；auto 网络失败回退 mock 列表兜底） ----
   const addrIdMatch = /^(addresses\/(\d+))(\?.*)?$/.exec(url)
   if (addrIdMatch && source !== 'mock') {
-    const real = await handleReal('addresses/' + addrIdMatch[1], method, event, cookie, authorization)
+    const real = await handleReal('addresses/' + addrIdMatch[1], method, event, cookie, authorization, locale)
     if (real !== null) return real
   }
 
-  const isCommercePath =
-    url === 'cart' ||
-    url.startsWith('cart/') ||
-    url === 'checkout/quote' ||
-    url.startsWith('checkout/orders') ||
-    url.startsWith('orders/')
+  const isCommercePath = url === 'cart' || url.startsWith('cart/') || url === 'checkout/quote' || url.startsWith('checkout/orders') || url.startsWith('orders/')
 
   if (isCommercePath && source !== 'mock') {
-    const real = await handleReal(url, method, event, cookie, authorization)
+    const real = await handleReal(url, method, event, cookie, authorization, locale)
     if (real !== null) return real
     // auto + 网络级失败 → 落入 mock；real + 失败已在 handleReal 返回错误
   }
 
-  return mockHandle(url, method, event)
+  return mockHandle(url, method, event, locale)
 })
 
 /** 真实后台处理；返回 null 表示「网络级失败且允许回退 mock」 */
-async function handleReal(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], cookie?: string, authorization?: string): Promise<unknown | null> {
+async function handleReal(
+  url: string,
+  method: string,
+  event: Parameters<Parameters<typeof defineEventHandler>[0]>[0],
+  cookie?: string,
+  authorization?: string,
+  locale?: string,
+): Promise<unknown | null> {
   const source = getCommerceSource()
   const requestId = event.context.requestId as string | undefined
 
   // ---- GET /api/cart ----
   if (url === 'cart' && method === 'GET') {
-    const res = await commerceRealFetch('cart', { cookie, requestId })
+    const res = await commerceRealFetch('cart', { cookie, requestId, locale })
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
     if (!res.ok) return upstreamFail(event, res)
     if (res.setCookie) for (const c of res.setCookie) appendHeader(event, 'set-cookie', c)
@@ -80,7 +77,7 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
   // ---- POST /api/cart/items ----
   if (url === 'cart/items' && method === 'POST') {
     const body = await readBody(event)
-    const res = await commerceRealFetch('cart/items', { method: 'POST', body: { skuId: body.skuId, qty: body.qty }, cookie, authorization, requestId })
+    const res = await commerceRealFetch('cart/items', { method: 'POST', body: { skuId: body.skuId, qty: body.qty }, cookie, authorization, requestId, locale })
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
     if (!res.ok) return upstreamFail(event, res)
     if (res.setCookie) for (const c of res.setCookie) appendHeader(event, 'set-cookie', c)
@@ -97,6 +94,7 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
       body: realMethod === 'PATCH' ? { qty: body?.qty } : undefined,
       cookie,
       requestId,
+      locale,
     })
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
     if (!res.ok) return upstreamFail(event, res)
@@ -179,7 +177,14 @@ async function handleReal(url: string, method: string, event: Parameters<Paramet
     const key = payMatch[1]
     const t = queryToken(url)
     if (!/^\d+$/.test(key)) return null // 非数字（mock 单号）→ mock 层
-    const sessionRes = await commerceRealFetch('payments/session', { method: 'POST', body: { orderId: Number(key) }, cookie, requestId })
+    // P5-T03：透传可选 provider（如 bnpl），后端经 Provider 注册表做 flag+币种前置校验
+    const payBody = await readBody(event).catch(() => undefined)
+    const sessionRes = await commerceRealFetch('payments/session', {
+      method: 'POST',
+      body: { orderId: Number(key), provider: payBody?.provider },
+      cookie,
+      requestId,
+    })
     if (sessionRes.networkError) return source === 'auto' ? null : upstreamFail(event, sessionRes)
     if (!sessionRes.ok) return upstreamFail(event, sessionRes)
     const session = unwrapEnvelope(sessionRes.body) as Record<string, unknown>
@@ -228,26 +233,78 @@ function cartTokenFrom(cookie: string | undefined): string | undefined {
   return m ? decodeURIComponent(m[1]) : undefined
 }
 
+/** P5-T01：从 store_locale cookie 提取当前语言（与币种解耦；无效/缺失返回 undefined 交由后端默认） */
+function localeFrom(cookie: string | undefined): string | undefined {
+  if (!cookie) return undefined
+  const m = /(?:^|;\s*)store_locale=([^;]+)/.exec(cookie)
+  if (!m) return undefined
+  const v = decodeURIComponent(m[1])
+  return v === 'en-US' || v === 'zh-CN' ? v : undefined
+}
+
 function upstreamFail(event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], res: { status: number; body: unknown }): unknown {
   setResponseStatus(event, res.status || 502)
   return res.body ?? { code: 'UPSTREAM_ERROR', message: 'commerce upstream error', requestId: event.context.requestId }
 }
 
 /** mock 契约层（后端不可用时的独立数据源） */
-async function mockHandle(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0]): Promise<unknown> {
+async function mockHandle(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], locale?: string): Promise<unknown> {
+  // P5-T06 mock 兜底：博客列表/详情（真实模式走 BFF 直通 /storefront/v1/cms/articles）
+  if (url === 'cms/articles' && method === 'GET') {
+    const page = Number(new URLSearchParams(url.split('?')[1] ?? '').get('page') ?? 1) || 1
+    const pageSize = Number(new URLSearchParams(url.split('?')[1] ?? '').get('pageSize') ?? 10) || 10
+    const items = MOCK_BLOG_POSTS.slice((page - 1) * pageSize, page * pageSize).map((p) => ({
+      id: 0,
+      title: p.title,
+      slug: p.slug,
+      summary: p.excerpt,
+      coverImage: null,
+      authorName: null,
+      tags: null,
+      publishedAt: p.date,
+    }))
+    return { items, total: MOCK_BLOG_POSTS.length, page, pageSize }
+  }
+  const articleMatch = /^cms\/articles\/([^/?]+)(\?.*)?$/.exec(url)
+  if (articleMatch && method === 'GET') {
+    const post = MOCK_BLOG_POSTS.find((p) => p.slug === decodeURIComponent(articleMatch[1]))
+    if (!post) {
+      setResponseStatus(event, 404)
+      return { code: 'NOT_FOUND', message: 'post not found' }
+    }
+    return {
+      id: 0,
+      title: post.title,
+      slug: post.slug,
+      summary: post.excerpt,
+      coverImage: null,
+      authorName: null,
+      tags: null,
+      publishedAt: post.date,
+      content: post.body,
+      updatedAt: null,
+      structuredData: {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description: post.excerpt,
+        datePublished: post.date,
+      },
+    }
+  }
   if (url === 'cart' && method === 'GET') {
-    return mockStore.presentCart(mockStore.getOrCreateCart('guest', 'USD'))
+    return mockStore.presentCart(mockStore.getOrCreateCart('guest', 'USD', locale))
   }
   if (url === 'cart/items' && method === 'POST') {
     const body = await readBody(event)
-    return mockStore.addItem('guest', 'USD', Number(body.skuId), Number(body.qty ?? 1))
+    return mockStore.addItem('guest', 'USD', Number(body.skuId), Number(body.qty ?? 1), locale)
   }
   if (url.startsWith('cart/items/') && method === 'PATCH') {
     const body = await readBody(event)
-    return mockStore.updateItem('guest', 'USD', Number(url.split('/')[2]), Number(body.qty))
+    return mockStore.updateItem('guest', 'USD', Number(url.split('/')[2]), Number(body.qty), locale)
   }
   if (url.startsWith('cart/items/') && method === 'DELETE') {
-    return mockStore.updateItem('guest', 'USD', Number(url.split('/')[2]), 0)
+    return mockStore.updateItem('guest', 'USD', Number(url.split('/')[2]), 0, locale)
   }
   if (url === 'checkout/quote' && method === 'POST') {
     const body = await readBody(event)
@@ -256,7 +313,10 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
   if (url === 'checkout/orders' && method === 'POST') {
     const body = await readBody(event)
     return mockStore.createOrder('guest', 'USD', (event.node.req.headers['idempotency-key'] as string | undefined) ?? null, {
-      email: body.email, address: body.address, shippingRateId: body.shippingRateId, couponCode: body.couponCode,
+      email: body.email,
+      address: body.address,
+      shippingRateId: body.shippingRateId,
+      couponCode: body.couponCode,
     })
   }
   // P4-T03 mock 兜底：游客无归属订单列表，返回空分页（真实模式走 BFF 直通）

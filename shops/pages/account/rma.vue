@@ -66,7 +66,11 @@ useSeo({ title: '退货申请', description: 'RMA', path: '/account/rma' })
       <textarea v-model="reason" rows="2" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" placeholder="退货原因（可选）" />
       <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
       <p v-if="message" class="text-xs text-emerald-700">{{ message }}</p>
-      <button type="submit" class="w-full rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50" :disabled="busy">
+      <button
+        type="submit"
+        class="w-full rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50"
+        :disabled="busy"
+      >
         {{ busy ? '提交中…' : '提交退货申请' }}
       </button>
     </form>
@@ -75,9 +79,7 @@ useSeo({ title: '退货申请', description: 'RMA', path: '/account/rma' })
       <h2 class="mb-3 text-sm font-semibold">我的申请</h2>
       <p v-if="(rmas?.length ?? 0) === 0" class="text-sm text-stone-500">暂无退货申请。</p>
       <ul v-else class="space-y-2 text-sm">
-        <li v-for="(r, idx) in rmas ?? []" :key="idx" class="rounded-lg border border-stone-100 px-3 py-2">
-          {{ JSON.stringify(r).slice(0, 120) }}…
-        </li>
+        <li v-for="(r, idx) in rmas ?? []" :key="idx" class="rounded-lg border border-stone-100 px-3 py-2">{{ JSON.stringify(r).slice(0, 120) }}…</li>
       </ul>
     </section>
   </div>

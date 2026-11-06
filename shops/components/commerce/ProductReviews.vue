@@ -28,9 +28,7 @@ const notice = ref('')
 
 onMounted(async () => {
   try {
-    const res = await $fetch<{ code: number; data: { items: ReviewItem[]; summary?: { average: number; count: number } } }>(
-      `/api/reviews?spuId=${props.spuId}`,
-    )
+    const res = await $fetch<{ code: number; data: { items: ReviewItem[]; summary?: { average: number; count: number } } }>(`/api/reviews?spuId=${props.spuId}`)
     list.value = res.data.items ?? []
     summary.value = res.data.summary ?? null
   } catch {
@@ -66,7 +64,7 @@ async function submit(): Promise<void> {
   <section class="mt-10 border-t border-stone-200 pt-8">
     <h2 class="text-lg font-semibold">
       评价
-      <span v-if="summary" class="ml-2 text-sm font-normal text-stone-500">{{ summary.average.toFixed(1)}} / 5（{{ summary.count }} 条）</span>
+      <span v-if="summary" class="ml-2 text-sm font-normal text-stone-500">{{ summary.average.toFixed(1) }} / 5（{{ summary.count }} 条）</span>
     </h2>
 
     <div v-if="loading" class="mt-4 text-sm text-stone-500">加载中…</div>

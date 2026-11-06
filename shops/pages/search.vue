@@ -11,11 +11,9 @@ const catalog = useCatalog()
 const q = computed(() => String(route.query.q ?? '').slice(0, 100))
 const page = computed(() => Number(route.query.page ?? 1) || 1)
 
-const { data, pending } = await useAsyncData(
-  `search-${q.value}-${page.value}`,
-  () => catalog.listProducts({ page: page.value, pageSize: 24 }),
-  { watch: [q, page] },
-)
+const { data, pending } = await useAsyncData(`search-${q.value}-${page.value}`, () => catalog.listProducts({ page: page.value, pageSize: 24 }), {
+  watch: [q, page],
+})
 
 const results = computed(() => {
   const term = q.value.toLowerCase()
@@ -41,7 +39,9 @@ useHead({ title: 'Search · Aurora Hair Studio', meta: [{ name: 'robots', conten
     <div v-else-if="q && results.length === 0" class="rounded-xl border border-stone-200 p-12 text-center">
       <p class="text-sm font-medium text-stone-900">No results for "{{ q }}"</p>
       <p class="mt-1 text-sm text-stone-500">Check spelling or try a more general term.</p>
-      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">Browse collections</NuxtLink>
+      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
+        Browse collections
+      </NuxtLink>
     </div>
 
     <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

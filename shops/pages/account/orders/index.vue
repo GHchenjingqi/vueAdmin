@@ -53,12 +53,22 @@ function goPage(p: number): void {
 }
 
 const statusText: Record<string, string> = {
-  created: '已创建', processing: '处理中', paid: '已支付', fulfilled: '已履约',
-  shipped: '已发货', done: '已完成', cancelled: '已取消',
+  created: '已创建',
+  processing: '处理中',
+  paid: '已支付',
+  fulfilled: '已履约',
+  shipped: '已发货',
+  done: '已完成',
+  cancelled: '已取消',
 }
 const paymentText: Record<string, string> = {
-  none: '未支付', pending: '待支付', authorized: '已授权', captured: '已扣款',
-  refunding: '退款中', refunded: '已退款', failed: '支付失败',
+  none: '未支付',
+  pending: '待支付',
+  authorized: '已授权',
+  captured: '已扣款',
+  refunding: '退款中',
+  refunded: '已退款',
+  failed: '支付失败',
 }
 function fmtDate(v: string): string {
   const d = new Date(v)

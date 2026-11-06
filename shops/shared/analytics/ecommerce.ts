@@ -50,7 +50,11 @@ export function trackAddPaymentInfo(items: { skuId: number; title: string; qty: 
 }
 
 /** purchase：仅由服务端订单事实触发（paymentStatus=captured 才调用；金额/币种取订单快照） */
-export function trackPurchase(order: { orderNo: string; totals: { total: MoneyParam }; items: { skuId: number; title: string; qty: number; unit: MoneyParam }[] }): void {
+export function trackPurchase(order: {
+  orderNo: string
+  totals: { total: MoneyParam }
+  items: { skuId: number; title: string; qty: number; unit: MoneyParam }[]
+}): void {
   trackEvent('purchase', {
     transaction_id: order.orderNo,
     currency: order.totals.total.currency,

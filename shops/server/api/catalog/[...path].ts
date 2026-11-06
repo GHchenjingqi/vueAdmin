@@ -131,10 +131,27 @@ export default defineEventHandler(async (event) => {
   if (catMatch) qs.set('categoryId', catMatch[1])
 
   setResponseHeaders(event, { 'cache-control': 'public, max-age=30, stale-while-revalidate=30' })
+
+  // P5-T09（G5 回归）：catalog 与 commerce 共用同一数据源开关。
+  // commerceSource=mock 时直接服务 mock fixtures，避免「目录=真实库测试商品、购物车=mockStore」导致
+  // SKU 不一致（variant not found / CART_EMPTY），保证 mock 独立开发模式自洽、前端主链路可端到端验证。
+  if (getCommerceSource() === 'mock') {
+    const mock = mockCatalog(path, query)
+    if (mock === null) {
+      setResponseStatus(event, 404)
+      return { code: 'PRODUCT_NOT_FOUND', message: 'product not found' }
+    }
+    return mock
+  }
+
   const apiBase = useRuntimeConfig().apiBase as string
 
   try {
-    const raw = await apiFetch<RawEnvelope<unknown>>(`${apiBase}/api/storefront/v1/${path}?${qs}`, { timeoutMs: 6000, retries: 0, requestId: event.context.requestId as string | undefined })
+    const raw = await apiFetch<RawEnvelope<unknown>>(`${apiBase}/api/storefront/v1/${path}?${qs}`, {
+      timeoutMs: 6000,
+      retries: 0,
+      requestId: event.context.requestId as string | undefined,
+    })
     if (raw && typeof raw === 'object' && 'code' in raw && (raw as RawEnvelope<unknown>).code === 0) {
       const data = (raw as RawEnvelope<unknown>).data
       if (path === 'categories' && Array.isArray(data) && data.length > 0) {
@@ -156,7 +173,11 @@ export default defineEventHandler(async (event) => {
       const idGuess = /^products\/(\d+)/.exec(path)
       if (idGuess) {
         try {
-          const retry = await apiFetch<RawEnvelope<unknown>>(`${apiBase}/api/storefront/v1/products/${idGuess[1]}?${qs}`, { timeoutMs: 6000, retries: 0, requestId: event.context.requestId as string | undefined })
+          const retry = await apiFetch<RawEnvelope<unknown>>(`${apiBase}/api/storefront/v1/products/${idGuess[1]}?${qs}`, {
+            timeoutMs: 6000,
+            retries: 0,
+            requestId: event.context.requestId as string | undefined,
+          })
           if (retry && typeof retry === 'object' && 'code' in retry && (retry as RawEnvelope<unknown>).code === 0) {
             const data2 = (retry as RawEnvelope<unknown>).data
             if (data2 && typeof data2 === 'object' && 'id' in (data2 as Record<string, unknown>)) {

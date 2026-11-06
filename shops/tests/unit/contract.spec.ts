@@ -5,12 +5,20 @@ import { cartSchema, quoteSchema, storeConfigSchema } from '../../shared/schemas
 /** P1-T14 契约测试骨架：store-config / cart / quote schema 校验（P3-T04 mock 报价整数分运算） */
 describe('contract schemas', () => {
   it('store-config mock passes schema', () => {
-    const cfg = { currency: { code: 'USD', symbol: '$', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-US' }, market: { country: 'US', language: 'en-US' }, version: 'mock' }
+    const cfg = {
+      currency: { code: 'USD', symbol: '$', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-US' },
+      market: { country: 'US', language: 'en-US' },
+      version: 'mock',
+    }
     expect(() => storeConfigSchema.parse(cfg)).not.toThrow()
   })
 
   it('rejects invalid currency code', () => {
-    const cfg = { currency: { code: 'us', symbol: '$', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-US' }, market: { country: 'US', language: 'en-US' }, version: 'mock' }
+    const cfg = {
+      currency: { code: 'us', symbol: '$', decimalDigits: 2, symbolPosition: 'before', thousandsSeparator: ',', decimalSeparator: '.', locale: 'en-US' },
+      market: { country: 'US', language: 'en-US' },
+      version: 'mock',
+    }
     expect(() => storeConfigSchema.parse(cfg)).toThrow()
   })
 })

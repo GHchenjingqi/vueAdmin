@@ -12,6 +12,7 @@ interface MockCartRow {
   token: string
   items: CartItem[]
   currency: string
+  locale?: string
 }
 
 interface MockOrderRow extends OrderDetail {
@@ -34,21 +35,23 @@ export class MockStore {
     return null
   }
 
-  getOrCreateCart(token: string, currency: string): MockCartRow {
+  getOrCreateCart(token: string, currency: string, locale?: string): MockCartRow {
     let cart = this.carts.get(token)
     if (!cart) {
-      cart = { token, items: [], currency }
+      cart = { token, items: [], currency, locale }
       this.carts.set(token, cart)
+    } else if (locale) {
+      cart.locale = locale
     }
     return cart
   }
 
   presentCart(cart: MockCartRow): Cart {
-    return { token: cart.token, items: cart.items, currency: cart.currency, itemCount: cart.items.reduce((n, i) => n + i.qty, 0) }
+    return { token: cart.token, items: cart.items, currency: cart.currency, locale: cart.locale, itemCount: cart.items.reduce((n, i) => n + i.qty, 0) }
   }
 
-  addItem(token: string, currency: string, skuId: number, qty: number): Cart {
-    const cart = this.getOrCreateCart(token, currency)
+  addItem(token: string, currency: string, skuId: number, qty: number, locale?: string): Cart {
+    const cart = this.getOrCreateCart(token, currency, locale)
     const found = this.findVariant(skuId)
     if (!found) throw Object.assign(new Error('variant not found'), { code: 'PRODUCT_NOT_FOUND' })
     if (!found.variant.inStock) throw Object.assign(new Error('out of stock'), { code: 'INSUFFICIENT_STOCK' })
@@ -74,8 +77,8 @@ export class MockStore {
     return this.presentCart(cart)
   }
 
-  updateItem(token: string, currency: string, itemId: number, qty: number): Cart {
-    const cart = this.getOrCreateCart(token, currency)
+  updateItem(token: string, currency: string, itemId: number, qty: number, locale?: string): Cart {
+    const cart = this.getOrCreateCart(token, currency, locale)
     if (qty <= 0) {
       cart.items = cart.items.filter((i) => i.id !== itemId)
     } else {

@@ -26,9 +26,7 @@ export const MOCK_CATEGORIES: CatalogCategory[] = [
     name: 'Apparel',
     level: 1,
     kind: 'apparel',
-    children: [
-      { id: 21, slug: 'dresses', name: 'Dresses', level: 2, kind: 'apparel', children: [] },
-    ],
+    children: [{ id: 21, slug: 'dresses', name: 'Dresses', level: 2, kind: 'apparel', children: [] }],
   },
 ]
 
@@ -58,8 +56,7 @@ export const MOCK_PRODUCTS: CatalogProduct[] = [
     id: 101,
     slug: '101-hd-lace-glueless-body-wave-wig',
     title: 'HD Lace Glueless Body Wave Wig 180% Density',
-    description:
-      'Pre-cut HD lace, glueless install in 3 minutes. 100% human hair, 180% density, natural hairline with pre-plucked baby hair.',
+    description: 'Pre-cut HD lace, glueless install in 3 minutes. 100% human hair, 180% density, natural hairline with pre-plucked baby hair.',
     cover: null,
     images: [],
     category: { id: 11, name: 'HD Lace', slug: 'hd-lace' },
@@ -95,7 +92,15 @@ export const MOCK_PRODUCTS: CatalogProduct[] = [
     variants: (['XS', 'S', 'M', 'L', 'XL'] as const).map((size, i) => ({
       id: 20100 + i,
       code: `AP-201-${size}`,
-      spec: { sizeSystem: 'US', size, color: 'champagne', fabric: '95% polyester 5% elastane', fit: 'regular', measurements: 'Bust 82-88cm, Length 92cm', tryOnInfo: 'Model 175cm wears S' },
+      spec: {
+        sizeSystem: 'US',
+        size,
+        color: 'champagne',
+        fabric: '95% polyester 5% elastane',
+        fit: 'regular',
+        measurements: 'Bust 82-88cm, Length 92cm',
+        tryOnInfo: 'Model 175cm wears S',
+      },
       price: usd(4900 + (i > 2 ? 500 : 0)),
       inStock: i !== 4,
     })),
@@ -110,6 +115,18 @@ export const MOCK_POLICY_PAGES: Record<string, { title: string; body: string }> 
 }
 
 export const MOCK_BLOG_POSTS = [
-  { slug: 'how-to-install-glueless-wig', title: 'How to Install a Glueless Wig in 3 Minutes', date: '2026-10-20', excerpt: 'Step-by-step guide with no glue, no damage...', body: 'Glueless wigs use combs and an adjustable band...' },
-  { slug: 'wig-care-101', title: 'Wig Care 101: Make Your Wig Last a Year', date: '2026-10-05', excerpt: 'Washing, deep conditioning and storage tips...', body: 'Wash every 8-10 wears with sulfate-free shampoo...' },
+  {
+    slug: 'how-to-install-glueless-wig',
+    title: 'How to Install a Glueless Wig in 3 Minutes',
+    date: '2026-10-20',
+    excerpt: 'Step-by-step guide with no glue, no damage...',
+    body: 'Glueless wigs use combs and an adjustable band...',
+  },
+  {
+    slug: 'wig-care-101',
+    title: 'Wig Care 101: Make Your Wig Last a Year',
+    date: '2026-10-05',
+    excerpt: 'Washing, deep conditioning and storage tips...',
+    body: 'Wash every 8-10 wears with sulfate-free shampoo...',
+  },
 ]

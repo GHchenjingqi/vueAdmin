@@ -61,11 +61,7 @@ export function collectAttribution(): OrderAttribution | undefined {
   } catch {
     /* 缓存损坏则重新解析 */
   }
-  const parsed = parseAttribution(
-    window.location.search,
-    document.referrer,
-    window.location.pathname + window.location.search,
-  )
+  const parsed = parseAttribution(window.location.search, document.referrer, window.location.pathname + window.location.search)
   if (parsed && hasUtm(parsed)) {
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))

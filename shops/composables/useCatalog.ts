@@ -24,7 +24,9 @@ export function useCatalog() {
     return categories.value
   }
 
-  async function listProducts(params: { category?: string; sort?: string; page?: number; pageSize?: number; attr?: Record<string, string> } = {}): Promise<ProductListResult> {
+  async function listProducts(
+    params: { category?: string; sort?: string; page?: number; pageSize?: number; attr?: Record<string, string> } = {},
+  ): Promise<ProductListResult> {
     const qs = new URLSearchParams()
     if (params.category) qs.set('category', params.category)
     if (params.sort) qs.set('sort', params.sort)

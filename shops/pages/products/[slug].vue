@@ -6,6 +6,7 @@ import VariantSelector from '~/components/commerce/VariantSelector.vue'
 import { useStoreConfig } from '~/composables/useStoreConfig'
 import { trackViewItem, trackAddToCart } from '@shared/analytics/ecommerce'
 import ProductReviews from '~/components/commerce/ProductReviews.vue'
+import type { CatalogProduct } from '@shared/types/api'
 
 /**
  * 商品详情页（P2-T04/T05/T06）：变体选择、价格、库存、配送承诺、退货摘要。
@@ -68,6 +69,22 @@ useSeo({
   description: product.value?.description ?? '',
   path: `/products/${route.params.slug}`,
 })
+
+// P5-T08：product_recommendation 业务实验——控制推荐数量（control=4 / variant_b=8 / variant_c=12）；
+// 关闭/未知 fail-closed → control。推荐仅浏览行为，不碰报价与库存。
+const { assign: assignExperiment } = useExperiment()
+const related = ref<CatalogProduct[]>([])
+onMounted(async () => {
+  const a = await assignExperiment('product_recommendation')
+  const count = a.enabled && a.variant === 'variant_c' ? 12 : a.enabled && a.variant === 'variant_b' ? 8 : 4
+  try {
+    const res = await catalog.listProducts({ category: product.value?.category?.slug, page: 1, pageSize: count + 1 })
+    // 排除当前商品后取 count 条
+    related.value = res.list.filter((p) => p.slug !== product.value?.slug).slice(0, count)
+  } catch {
+    related.value = []
+  }
+})
 </script>
 
 <template>
@@ -75,7 +92,7 @@ useSeo({
     <JsonLd v-if="product" :product="product" />
     <nav class="mb-4 text-xs text-stone-500" aria-label="Breadcrumb">
       <NuxtLink to="/" class="hover:underline">Home</NuxtLink>
-      <span aria-hidden="true"> / </span>
+      <span aria-hidden="true">/</span>
       <NuxtLink v-if="product?.category" :to="`/c/${product.category.slug}`" class="hover:underline">{{ product.category.name }}</NuxtLink>
     </nav>
 
@@ -130,5 +147,26 @@ useSeo({
 
       <ProductReviews v-if="product" :spu-id="product.id" class="lg:col-span-2" />
     </div>
+
+    <!-- P5-T08：product_recommendation 变体 → 推荐数量（control=4 / variant_b=8 / variant_c=12） -->
+    <section v-if="related.length" class="mt-14" aria-label="You may also like">
+      <h2 class="mb-5 text-lg font-semibold">You may also like</h2>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <NuxtLink
+          v-for="p in related"
+          :key="p.slug"
+          :to="`/products/${p.slug}`"
+          class="group overflow-hidden rounded-xl border border-stone-200 transition hover:border-stone-400"
+        >
+          <div class="aspect-square w-full bg-stone-100">
+            <img v-if="p.cover" :src="p.cover" :alt="p.title" loading="lazy" width="600" height="600" class="h-full w-full object-cover" />
+          </div>
+          <div class="p-3">
+            <p class="truncate text-sm font-medium">{{ p.title }}</p>
+            <p v-if="p.price" class="mt-1 text-xs tabular-nums text-stone-600">{{ cfg.format(p.price.amount) }}</p>
+          </div>
+        </NuxtLink>
+      </div>
+    </section>
   </div>
 </template>
