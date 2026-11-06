@@ -1,6 +1,7 @@
 import { Op } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
+import sequelize from '../../../config/database.js'
 import { ShopOrder, ShopAnalyticsEvent } from '../../shop/models/index.js'
 import type { DispatchStatus } from '../../shop/models/ShopAnalyticsEvent.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
@@ -179,6 +180,38 @@ export async function recordEvent(site: StorefrontSite, input: TrackEventInput):
 
   // 6) 仅服务端事实事件 + 已同意 + 已注入 provider 时派发 CAPI
   if (isFactEvent && consent && capiProvider) {
+    // eventId 由客户端生成，不能作为「同一订单只转化一次」的依据：换一个 id 即可
+    // 把同一笔 purchase/refund 重复外发。以订单行 FOR UPDATE 串行化派发权认领，
+    // 用 dispatchStatus 做 CAS 占位（'sending' 为内部占位态，不对外返回；
+    // failed 不算占用，保留失败后的重试能力）。不新增列、不建迁移。
+    const claimed = await sequelize.transaction(async (t) => {
+      const locked = await ShopOrder.findOne({
+        where: { id: orderId ?? 0, tenantId: tId },
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      })
+      if (!locked) return false
+      const occupied = await ShopAnalyticsEvent.findOne({
+        where: {
+          tenantId: tId,
+          orderId: orderId ?? 0,
+          eventName,
+          dispatchStatus: { [Op.in]: ['sent', 'sending'] },
+        } as never,
+        transaction: t,
+      })
+      if (occupied) return false
+      const [affected] = await ShopAnalyticsEvent.update(
+        { dispatchStatus: 'sending' } as never,
+        { where: { id: row.id, tenantId: tId, dispatchStatus: 'local_only' }, transaction: t },
+      )
+      return affected === 1
+    })
+    if (!claimed) {
+      // 同一订单同一事实事件已被认领：本行仍只落库留痕，不再外发
+      return { eventId, accepted: true, dispatchStatus }
+    }
+
     try {
       await capiProvider({
         eventId,
