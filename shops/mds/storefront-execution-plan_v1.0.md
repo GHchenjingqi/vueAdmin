@@ -330,7 +330,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 
 | ID | 任务 | 关键产出 | 验收标准 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| X-T01 | 文档同步机制：契约或状态机变更必须同 PR 更新文档 | 贡献规范 | CI 检查文档链接有效；过期文档有标记 | — | [x] ✅ 2026-11-04 · 证据：scripts/check-doc-links.mjs（15 引用全通过，已修复 3 处真实漂移）；CI 接线一行待并行方合入 |
+| X-T01 | 文档同步机制：契约或状态机变更必须同 PR 更新文档 | 贡献规范 | CI 检查文档链接有效；过期文档有标记 | — | [x] ✅ 2026-11-04 · 证据：scripts/check-doc-links.mjs（初测 15 引用全通过、已修复 3 处真实漂移；2026-11-06 复跑 28 引用全通过）；**CI 接线已补齐 2026-11-06**：`.github/workflows/ci.yml` 的 lint job 增加 `node scripts/check-doc-links.mjs` 步骤，链接失效阻断合并。注：workflow 的 push 触发分支仍为 main/master/dev/develop（未含 `master_shop`），是否加入由 CI 负责人决定；「过期文档标记」机制尚未定义，该子项不代勾 |
 | X-T02 | 依赖版本锁定与漏洞扫描 | lockfile + 扫描任务 | 高危漏洞为零；升级有记录 | P1-T01 | [x] ✅ 2026-11-05 · 证据：zod@4.6.7 + vitest@5.1.0 升级（28/28 过）+ npm audit high/critical 清零（残余 14 moderate 均为 dev 链传递依赖） |
 | X-T03 | 审计日志：订单/支付/库存/退款/币种配置变更全留痕 | 审计表 + 查询入口 | 任一订单可回溯完整状态变更链；币种变更可追溯到操作人 | P0-T14 | [x] ✅ 2026-11-05 · 证据：迁移 `20261105_000065` 建 `audit_logs`（tenantId/actorType/actorId/action/entityType/entityId/beforeState/afterState + 索引）；`AuditLog` 模型；`auditLogService.record`（失败仅告警不阻断主流程，可随业务事务原子提交）/ `listByEntity`（按实体倒序回溯）；支付 Webhook（订单→paid / 失败）、库存 occupy/release、退款 createRefund 三处状态变更已埋点；`GET /api/v1/shop/audit-logs`（admin 限定）查询端点；币种配置审计沿用既有 `config_changes`（operatorId/operatorName 可追溯）；`audit-log.test.ts` 4 例（写入/倒序回溯/JSON 快照/租户隔离） |
 | X-T04 | Feature Flag 机制（新功能可灰度可回滚） | Flag 配置 | 关键新功能默认关闭；关闭后无副作用 | P1-T04 | [x] ✅ 2026-11-04 · 证据：`modules/featureflags/featureFlags.ts`（`FLAG_DEFS` 注册 5 个关键新功能全部 `defaultEnabled=false` + `isFeatureEnabled` fail-closed + `setFlag` 持久化 `feature.flags` 并写审计 + `requireFeature` 守卫关闭→403 不执行）；admin 路由 `GET/PUT /api/v1/flags`（`requireAdmin`）+ 公开 `GET /api/storefront/v1/flags/:key`；`featureFlags.test.ts` 6 例（默认关/开与回滚/未知 key fail-closed/列表/FLAG_NOT_FOUND/守卫 403 与放行）全绿 |
@@ -455,6 +455,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.22 | 2026-11-06 | **P5-T09 G5 回归报告**：`docs/reports/g5-regression-report.md`（后端全量 630/630、前端 45/45；三组针对性回归 交易 69/69 · 币种 57/57 · 缓存 SEO 47/47，扩展隔离 27/27；浏览器冒烟 2/3，第 3 项因运行中 Nuxt 旧构建 chunk 缺失致 `/checkout` 500 阻断，非代码回归）。修 `shops/tests/e2e/smoke.spec.ts`：详情/下单改用首页动态取在售商品（兼容 mock 与真实数据源、跳过缺货卡片）；G5 保持 `[ ]` 不代勾 | AI |
 | v1.23 | 2026-11-06 | **P3-T19 G3 门禁检查记录**：`docs/reports/g3-gate-checklist.md`（四类场景逐项：重复回调/库存异常/币种配置变更证据充分；支付回调乱序未通过，`payment.failed` 缺 captured 终态保护，附源码行号、后果、修复方案与 4 例待补用例）。任务行备注更新（T-12 已随 P5-T02 闭环）+ §11 风险登记；保持 `[~]` 不代勾。当前工作树全量 94 例失败全因并行方 `000069` 迁移未执行的 `Unknown column 'referralCode'`，未擅自执行其迁移 | AI |
 | v1.24 | 2026-11-06 | **P3-T19 支付回调乱序缺陷修复**：`paymentService.ts` 新增 `SETTLED_PAYMENT_STATUSES` 终态保护（succeeded 幂等扩到 captured/refunding/refunded）+ 迟到 failed 仅 warn 与 `payment.stale_failed_ignored` 独立审计；`reservationService.releaseReservation` 对 committed 预占幂等；新增 `payment-callback-order.test.ts` 6 例（含正常失败路径回归保护）。`g3-gate-checklist.md` 12:00 复测回填：并行方 `000069` 已执行、绿基线恢复，**后端全量 651/651（71 文件）+ server typecheck 0 错误**。修复以隔离方式提交，未夹带并行方 P5-T03 WIP；门禁保持 `[~]` 不代勾 | AI |
+| v1.25 | 2026-11-06 | **X-T01 CI 接线补齐**：`.github/workflows/ci.yml` 的 lint job 增加 `Check doc links` 步骤（`node scripts/check-doc-links.mjs`，本地复跑 28/28 引用有效、退出码 0）；脚本仅用 Node 内置模块，无需新增依赖。触发分支未含 `master_shop` 及「过期文档标记」机制保留给 CI 负责人/后续定义，不擅自扩大改动 | AI |
 
 ---
 
