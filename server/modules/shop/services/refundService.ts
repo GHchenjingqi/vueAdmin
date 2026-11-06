@@ -125,6 +125,23 @@ export async function listRefunds(orderId: number): Promise<RefundView[]> {
 export async function createRefund(params: CreateRefundParams): Promise<RefundView> {
   const tId = tid()
   const idempotencyKey = (params.idempotencyKey ?? crypto.randomBytes(16).toString('hex')).slice(0, 64)
+  // 退款单号在死锁重试之外生成：重试必须复用同一个外部通道幂等键，
+  // 否则每轮重试都会换一个 refundNo，provider 侧无法自行去重。
+  const refundNo = genRefundNo()
+
+  /**
+   * 外部支付通道的副作用在 withDeadlockRetry 重放整个事务时**最多只能发生一次**。
+   * 原实现把 provider 调用放在事务内：若 provider 已退款、随后事务因死锁回滚，
+   * 重试会再次调用 provider，最终库里只有一条退款流水而外部已退两笔钱。
+   * 用跨重试共享的 promise 记住首次调用结果，事务回滚后重试直接复用。
+   */
+  let providerPromise: Promise<{ providerRef?: string } | void> | null = null
+  const invokeProviderOnce = (ctx: RefundProviderContext): Promise<{ providerRef?: string } | void> => {
+    const fn = refundProvider
+    if (!fn) return Promise.resolve()
+    if (!providerPromise) providerPromise = Promise.resolve().then(() => fn(ctx))
+    return providerPromise
+  }
 
   const existing = await ShopOrderRefund.findOne({ where: { idempotencyKey, tenantId: tId } })
   if (existing) return notifyRefund(toView(existing))
@@ -163,11 +180,10 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
           throw new AppError(400, `REFUND_EXCEEDS_PAID: 最多可退 ${remaining} 分`)
         }
 
-        const refundNo = genRefundNo()
         let providerRef: string | null = null
         if (refundProvider) {
           try {
-            const result = await refundProvider({ refundNo, orderNo: order.orderNo, amountCents, currency: order.currency })
+            const result = await invokeProviderOnce({ refundNo, orderNo: order.orderNo, amountCents, currency: order.currency })
             providerRef = (result as { providerRef?: string } | undefined)?.providerRef ?? null
           } catch (err) {
             throw new AppError(502, `REFUND_PROVIDER_FAILED: ${err instanceof Error ? err.message : String(err)}`)

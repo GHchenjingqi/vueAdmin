@@ -75,6 +75,15 @@ function createDefaultTaxProvider(): TaxProvider {
         // fail-closed：未配置税率时阻断报价，不静默免税
         throw new AppError(422, `TAX_UNAVAILABLE: 未配置目的国 ${ctx.country} 的税率，已阻断报价以防漏税`)
       }
+      // fail-closed：rate 契约是 0..1 的小数。DECIMAL(5,4) 允许 9.9999，
+      // 运维把 19% 误填成 19 会被存成 9.9999 并算出约 10 倍税费；
+      // 配置异常必须阻断报价，不能把误收税转嫁给买家。
+      if (!Number.isFinite(found.rate) || found.rate < 0 || found.rate > 1) {
+        throw new AppError(
+          422,
+          `TAX_RATE_INVALID: 目的国 ${ctx.country} 的税率 ${found.rate} 超出 0..1 范围，已阻断报价以防误收税`,
+        )
+      }
       const taxCents = Math.round(ctx.subtotalCents * found.rate)
       return { rate: found.rate, taxCents, currency: ctx.currency, reason: found.source }
     },

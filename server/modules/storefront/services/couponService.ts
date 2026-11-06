@@ -1,4 +1,4 @@
-import { UniqueConstraintError } from 'sequelize'
+import { UniqueConstraintError, type Transaction } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import sequelize from '../../../config/database.js'
@@ -102,11 +102,28 @@ export async function evaluateCoupon(
  */
 export async function redeemCoupon(evaluation: CouponEvaluation, orderNo: string): Promise<void> {
   const tId = tid()
+
+  /**
+   * 幂等重放必须核对券一致。原先只要 (tenantId, orderNo) 有记录就静默成功：
+   * 同一订单改用另一张券重放（或并发两请求用了不同券）时，订单按新券折扣展示，
+   * 但核销流水与 coupons.usedCount 仍记在旧券上，优惠券对账口径分裂。
+   */
+  const assertSameCoupon = async (tx?: Transaction): Promise<boolean> => {
+    const existing = await ShopCouponRedemption.findOne({
+      where: { tenantId: tId, orderNo },
+      transaction: tx,
+    })
+    if (!existing) return false
+    if (Number(existing.couponId) !== Number(evaluation.couponId)) {
+      throw new AppError(409, `COUPON_REDEMPTION_CONFLICT: 订单 ${orderNo} 已核销其它优惠券`)
+    }
+    return true
+  }
+
   try {
     await withDeadlockRetry(() =>
       sequelize.transaction(async (tx) => {
-        const existing = await ShopCouponRedemption.findOne({ where: { tenantId: tId, orderNo }, transaction: tx })
-        if (existing) return
+        if (await assertSameCoupon(tx)) return
 
         await ShopCouponRedemption.create(
           {
@@ -137,8 +154,11 @@ export async function redeemCoupon(evaluation: CouponEvaluation, orderNo: string
       }),
     )
   } catch (err) {
-    // 并发下同一订单已被占用：视为幂等成功，不再重复递增
-    if (err instanceof UniqueConstraintError) return
+    // 并发下同一订单已被占用：仅当胜出者核销的是同一张券才算幂等成功
+    if (err instanceof UniqueConstraintError) {
+      if (await assertSameCoupon()) return
+      throw new AppError(409, `COUPON_REDEMPTION_CONFLICT: 订单 ${orderNo} 并发核销了不同优惠券`)
+    }
     throw err
   }
 }
