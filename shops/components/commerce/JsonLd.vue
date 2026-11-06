@@ -5,6 +5,8 @@ import { useStoreConfig } from '~/composables/useStoreConfig'
 /**
  * JSON-LD 结构化数据（P2-T11）：Product offers.priceCurrency 取 store config（禁止写死 C1/C4）。
  * 价格与页面可见价格同源（同一 product.price 数据源）。
+ * 注入方式：useHead（@unhead）——模板内 <script> 带副作用会被 Vue 编译器忽略，
+ * 故不使用 SFC <template> 中的 <script type="application/ld+json"> 写法。
  */
 const props = defineProps<{ product: CatalogProduct }>()
 const { currency } = useStoreConfig()
@@ -34,9 +36,17 @@ const breadcrumbJsonLd = computed(() => ({
     ...(props.product.category ? [{ '@type': 'ListItem', position: 2, name: props.product.category.name, item: `/c/${props.product.category.slug}` }] : []),
   ],
 }))
-</script>
 
-<template>
-  <script v-if="productJsonLd" type="application/ld+json" v-html="JSON.stringify(productJsonLd)" />
-  <script v-if="breadcrumbJsonLd" type="application/ld+json" v-html="JSON.stringify(breadcrumbJsonLd)" />
-</template>
+useHead({
+  script: computed(() => {
+    const list: { type: string; innerHTML: string }[] = []
+    if (productJsonLd.value) {
+      list.push({ type: 'application/ld+json', innerHTML: JSON.stringify(productJsonLd.value) })
+    }
+    if (breadcrumbJsonLd.value) {
+      list.push({ type: 'application/ld+json', innerHTML: JSON.stringify(breadcrumbJsonLd.value) })
+    }
+    return list
+  }),
+})
+</script>
