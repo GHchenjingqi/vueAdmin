@@ -36,6 +36,11 @@ import {
   createRefundSchema,
   rmaRejectSchema,
 } from '../../../shared/schemas/shop.js'
+import {
+  articleAdminListQuerySchema,
+  articleCreateSchema,
+  articleUpdateSchema,
+} from '../../../shared/schemas/cmsAdmin.js'
 import * as categoryController from '../controllers/categoryController.js'
 import * as brandController from '../controllers/brandController.js'
 import * as attributeController from '../controllers/attributeController.js'
@@ -53,6 +58,7 @@ import * as analyticsController from '../controllers/analyticsController.js'
 import * as currencyConfigController from '../controllers/currencyConfigController.js'
 import * as refundController from '../controllers/refundController.js'
 import * as orderMailController from '../controllers/orderMailController.js'
+import * as articleAdminController from '../controllers/articleAdminController.js'
 import * as rmaAdminController from '../controllers/rmaAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
 import { updateCurrencySchema, rollbackCurrencySchema } from '../../../shared/schemas/storefront-commerce.js'
@@ -208,7 +214,14 @@ router.put('/settings/currency', authMiddleware, requireAdmin, validate(updateCu
 router.post('/settings/currency/rollback', authMiddleware, requireAdmin, validate(rollbackCurrencySchema), currencyConfigController.rollbackCurrency)
 router.get('/config-changes', authMiddleware, requireAdmin, currencyConfigController.listConfigChanges)
 
-// X-T03 审计日志查询（仅 admin 可读，用于回溯订单/支付/库存/退款状态变更链）
+// X-T03 审计日志查询（仅 admin 可读，用于回溯订单/支付/库存/退款/文章状态变更链）
 router.get('/audit-logs', authMiddleware, requireAdmin, auditLogController.listAuditLogs)
+
+// P5-T06 CMS 后台写入（复用 shop_articles；发布/下线触发缓存失效 + X-T03 审计）
+router.get('/articles', authMiddleware, requireAdmin, validate(articleAdminListQuerySchema, 'query'), articleAdminController.list)
+router.post('/articles', authMiddleware, requireAdmin, validate(articleCreateSchema), articleAdminController.create)
+router.put('/articles/:id', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), validate(articleUpdateSchema), articleAdminController.update)
+router.post('/articles/:id/publish', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), articleAdminController.publish)
+router.post('/articles/:id/unpublish', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), articleAdminController.unpublish)
 
 export default router

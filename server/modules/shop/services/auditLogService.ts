@@ -14,7 +14,7 @@ import AuditLog from '../models/AuditLog.js'
 import { getTenantContext } from '../../tenant/context.js'
 
 export type AuditActorType = 'admin' | 'customer' | 'system'
-export type AuditEntityType = 'order' | 'payment' | 'inventory' | 'refund' | 'config'
+export type AuditEntityType = 'order' | 'payment' | 'inventory' | 'refund' | 'config' | 'article'
 
 export interface AuditRecordInput {
   tenantId?: number

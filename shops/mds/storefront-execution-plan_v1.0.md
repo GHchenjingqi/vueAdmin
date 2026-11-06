@@ -315,7 +315,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P5-T03 | 区域支付方式与 BNPL | 新 Provider 适配 | 不影响既有支付链路；Webhook 复用同一验签与幂等框架；币种能力校验前置 | P5-T02, P3-T12 | 4 | [ ] |
 | P5-T04 | 多仓与更精细配送策略 | 仓库路由规则 | 同一 SKU 多仓发货时库存口径一致；配送承诺按仓计算 | G4, P3-T08 | 4 | [ ] |
 | P5-T05 | Bundle / 搭配购 / 推荐位 | 促销扩展 | 组合商品报价仍走服务端 Quote；库存按组件 SKU 扣减 | P5-T04 | 3 | [ ] |
-| P5-T06 | 博客 CMS 与内容 SEO | `pages/blog/**` | 发布触发缓存失效；文章有唯一 slug 与结构化数据 | G4, P2-T10 | 3 | [ ] |
+| P5-T06 | 博客 CMS 与内容 SEO | `pages/blog/**` | 发布触发缓存失效；文章有唯一 slug 与结构化数据 | G4, P2-T10 | 3 | [~] ✅后端治理闭环已交付 2026-11-06 · 证据：`cmsCacheService`（站点级 revision + 可插拔失效器；创建/编辑/发布/下线均触发，失效器异常仅 warn 不阻断）+ 公开列表/详情 ETag 与 304（发布后旧 ETag 立即失效、下线时 404 优先于 304）+ admin `GET/POST /shop/articles`、`PUT /:id`、`POST /:id/{publish,unpublish}`（requireAdmin，状态变更只走专门端点）+ `shop_articles` 唯一索引 (tenantId,siteId,slug) 冲突→409 + `BlogPosting` 结构化数据（服务端 `structuredData` 契约 + `pages/blog/[slug].vue` 注入）+ X-T03 审计 `article.*`；`cms-admin.test.ts` 7 例、既有 `storefront-cms.test.ts` 5 例全绿，前端 45/45、后端 610/611（唯一失败为并行方 WIP 的 bnpl 断言，见 §11）。**前端页面仍用 mock 数据，真实 API 接线随并行方 P5-T01 收口后勾** |
 | P5-T07 | Referral / Affiliate | 归因与结算规则 | 归因窗口明确；与优惠券叠加规则明确；佣金币种与结算币种一致 | P5-T02 | 3 | [ ] |
 | P5-T08 | A/B 测试与个性化 | 实验框架 | 实验不影响报价与库存正确性；可一键关闭 | P5-T05 | 3 | [~] ✅框架已交付 2026-11-06 · 证据：`server/modules/experiments/experimentService.ts`（FNV-1a 确定性分桶 + 权重校验 + `ab_test` flag 关闭态降级 control 且不计算分桶/不触发曝光 hook）、admin `GET /api/v1/experiments`（requireAdmin）+ 公开 `GET /api/storefront/v1/experiments/:key/assign`（private,no-store）；`experiments.test.ts` 8 例（确定性/权重分布/fail-closed/零副作用/一键关闭/定义校验）。框架纯只读不碰报价与库存；**业务实验接入与 G5 主链路回归待做，保持未勾** |
 | P5-T09 | **G5 门禁**：扩展未破坏主链路回归 | 回归测试报告 | 主市场交易 E2E 全绿；币种切换回归通过；缓存与 SEO 无回归 | P5-T01 ~ P5-T08 | 1 | [ ] |
@@ -448,6 +448,8 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.16 | 2026-11-05 | **P4-T17 G4 门禁清单整理**：`docs/reports/g4-gate-checklist.md`（政策审核/客服履约/埋点验证三类逐项登记证据与缺口：admin RMA 审批端点缺、analytics events 对账查询端点缺为两个可执行技术缺口；政策文本专业审核、权限分配、真实环境对账为业务决策项）。任务行保持 [ ] 不代勾 | AI |
 | v1.17 | 2026-11-05 | **P4-T17 两个技术缺口补齐**：① `rmaAdminService` + admin `GET /shop/rmas`（status/orderId 过滤分页）、`POST /shop/rmas/:id/approve`、`POST /shop/rmas/:id/reject`（rmaRejectSchema 强制原因，仅 pending；租户隔离，与顾客侧状态机对齐）；② `analyticsService.listEventsForReconcile` + admin `GET /shop/analytics/events`（eventName/dispatchStatus/orderId 过滤，limit 钳 1..500，倒序）。新增 6 例单测；后端全量 **592 passed（63 文件）**、server typecheck 0 错误；清单与任务行同步回填，任务行保持 [ ]（业务签字项未代勾） | AI |
 | v1.20 | 2026-11-06 | **P5-T08 A/B 实验框架**：`server/modules/experiments/`（FNV-1a 确定性分桶 + 权重校验 + `ab_test` flag 关闭态降级 control 且不计算分桶/不触发曝光 hook，零副作用）+ admin `GET /api/v1/experiments`（requireAdmin）+ 公开 `GET /api/storefront/v1/experiments/:key/assign`（private,no-store）；`experiments.test.ts` 8 例（mock flag 规避 X-T04 共享 Setting 的并发覆盖）；server typecheck 0 错误、全量 603/604（唯一失败为并行方 WIP 的 bnpl 断言，见 §11）；P5-T08 [ ]→[~]。**并发隔离说明**：编号顺延避开并行方工作树中未提交的 v1.18/v1.19；本提交树经「备份混合版→还原 HEAD→只重放本会话改动→恢复混合版」隔离，零夹带 | AI |
+
+| v1.21 | 2026-11-06 | **P5-T06 博客 CMS 治理闭环**：复用 `shop_articles`/`cmsService` 不建第二套后端。新增 `cmsCacheService`（站点级 revision + 可插拔失效器，写操作逐次触发、失效器异常仅告警）、公开列表/详情 ETag 与 304（发布使旧 ETag 失效；下线 404 优先于 304）、admin 文章 CRUD 与 publish/unpublish（requireAdmin + 独立 `shared/schemas/cmsAdmin.ts`，避免动并行方持有的 storefront.ts）、slug 唯一冲突 409、`BlogPosting` 结构化数据（服务端契约 + 前端 blog 详情页注入）、状态变更写 X-T03 审计（entityType 扩 `article`）。`cms-admin.test.ts` 7 例 + 既有 CMS 5 例全绿；server typecheck 0 错误、后端全量 610/611（唯一失败为并行方 WIP bnpl 断言）、前端 45/45；P5-T06 [ ]→[~]。**并发隔离**：编号顺延避开并行方未提交的 v1.18/v1.19，提交树零夹带 | AI |
 
 ---
 
