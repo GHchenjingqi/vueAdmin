@@ -272,7 +272,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | P3-T16 | 订单详情与安全访问（防订单枚举） | `GET /orders/:id` + 访问凭证 | 仅凭订单号无法访问；凭证可过期可撤销；越权返回 404 而非 403 | P3-T10, P0-T10 | 2 | [x] ✅ 2026-11-04 · 证据：订单访问防枚举：数字 id + accessToken 双要素，越权 404（docs/reports/real-integration.md（真实 E2E 实证） §2-6） |
 | P3-T17 | 订单邮件通知（确认、发货、退款），金额按订单快照币种渲染 | 邮件模板 + 发送队列 | 发送失败可重试；邮件不含完整支付信息；历史订单邮件币种不随后台配置变化 | P3-T13, P1-T11 | 2 | [x] ✅ 2026-11-05 · 证据：`019d7ae` / 迁移 000063 — `orderMailService` outbox（入队即固化正文与订单快照币种，重试不读站点配置）+ 支付 Webhook / 发货 / 退款三处幂等入队 + 有界退避重试与 `retryMail` + 后台 `order-mails` 查询/投递/重发；`storefront-order-mail.test.ts` 11 例、trade-gate T-12 真实断言。真实 SMTP 投递与 drain 调度属上线配置。联调提示：`tsx app.ts` 无热重载，新 admin `/shop/order-mails` 路由需**重启后端进程**才加载；未重启时该路径探测挂起（HTTP 000），与 T-09 已知现象一致，非代码缺陷 |
 | P3-T18 | 交易 E2E 与异常测试（覆盖 §9 全部 12 项） | 测试报告 | 12 项逐条通过并留证据；并发与重复提交有压测记录 | P3-T01 ~ P3-T17 | 4 | [x] ✅ 2026-11-04 · 证据：交易 E2E（真实链路 7 步 + T-02/T-03/T-05/T-10 实证；T-06/07/08/12 依赖后台规则数据待补）（docs/reports/real-integration.md（真实 E2E 实证）） |
-| P3-T19 | **G3 门禁**：沙箱闭环 + 异常路径通过 | 门禁检查记录 | 支付回调乱序、重复回调、库存异常、币种配置变更四类场景有测试证据 | P3-T18 | 1 | [~] 进行中 ✅部分 2026-11-04 · 证据：docs/reports/real-integration.md（真实 E2E 实证）（T-12 币种切换回归待后台规则界面，随 P5-T02 收口） |
+| P3-T19 | **G3 门禁**：沙箱闭环 + 异常路径通过 | 门禁检查记录 | 支付回调乱序、重复回调、库存异常、币种配置变更四类场景有测试证据 | P3-T18 | 1 | [~] 进行中 · 门禁检查记录已产出 `docs/reports/g3-gate-checklist.md`（四类逐项盘点）：**T-12 币种切换已随 P5-T02 闭环**（原备注「待后台规则界面」过期）；重复回调/库存异常/币种配置变更三类证据充分；**支付回调乱序未通过**——`paymentService.ts:171-179` 的 `payment.failed` 无 `captured` 终态保护，迟到失败回调会把已支付订单回退为 `failed` 并重复释放已提交预占，且全仓无专门用例。修复需等并行方释放该文件（P5-T03 WIP），不代勾 |
 
 ---
 
@@ -421,6 +421,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 2026-11-05 | — | G4 菜单权限复核、CDN 按响应头透传、P0-T05b 业务正式签字 | 上线检查 / 业务决策 | 运营 / 业务 / 运维 | 待对应责任方确认，非代码实现缺口；按 §0.2 不代勾 |
 | 2026-11-06 | X-T04 | `setFlag` 对 `Setting('feature.flags')` 做「全量 JSON 读改写 + 进程内缓存」，多写者并发时后写会覆盖先写的其它 key（多测试文件/多实例同时改不同 flag 即复现） | 灰度开关可能丢失；并发测试互相干扰 | 后端 | 🟡 已发现未修：本轮 P5-T08 测试改为 mock flag（不写 DB）规避；修复建议 setFlag 写入前重读 DB 最新值并合并（或改按 key 独立存储）。因 `featureFlags.ts` 正被并行方编辑（P5-T03 bnpl flag 未提交），本会话不夹带修改 |
 | 2026-11-06 | P5-T03 | 并行方 WIP：`featureFlags.test.ts` 新增 bnpl 默认关闭断言，但 dev 库 `feature.flags` 残留 `bnpl:true`（P5-T03 联调开启），该用例单跑即失败 | 全量套件 1 例失败（603/604），非本会话代码缺陷 | 并行方 / 后端 | 🟡 待并行方收口：联调后恢复 bnpl=false 或在 beforeEach 重置；本会话不改其联调状态 |
+| 2026-11-06 | P3-T19 | **支付回调乱序状态回退**：`paymentService.ts:171-179` 的 `payment.failed` 分支无终态保护（`payment.succeeded` 有 captured 幂等保护，第 159 行）；已支付订单收到迟到/重投的失败回调会被改回 `failed`、`releaseReservation` 重复释放已 committed 预占、审计链冲突。去重仅按 `provider+providerRef`（第 145 行）故乱序可达 | G3 门禁第 1 项未通过；乱序可致订单状态自相矛盾与超卖风险 | 后端 / 并行方 | 修复方案与 4 例待补用例见 `docs/reports/g3-gate-checklist.md` §3；**因 `paymentService.ts` 正被并行方 P5-T03 WIP 持有，本会话未代改**，待其提交后修 |
 
 ---
 
@@ -452,6 +453,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.21 | 2026-11-06 | **P5-T06 博客 CMS 治理闭环**：复用 `shop_articles`/`cmsService` 不建第二套后端。新增 `cmsCacheService`（站点级 revision + 可插拔失效器，写操作逐次触发、失效器异常仅告警）、公开列表/详情 ETag 与 304（发布使旧 ETag 失效；下线 404 优先于 304）、admin 文章 CRUD 与 publish/unpublish（requireAdmin + 独立 `shared/schemas/cmsAdmin.ts`，避免动并行方持有的 storefront.ts）、slug 唯一冲突 409、`BlogPosting` 结构化数据（服务端契约 + 前端 blog 详情页注入）、状态变更写 X-T03 审计（entityType 扩 `article`）。`cms-admin.test.ts` 7 例 + 既有 CMS 5 例全绿；server typecheck 0 错误、后端全量 610/611（唯一失败为并行方 WIP bnpl 断言）、前端 45/45；P5-T06 [ ]→[~]。**并发隔离**：编号顺延避开并行方未提交的 v1.18/v1.19，提交树零夹带 | AI |
 
 | v1.22 | 2026-11-06 | **P5-T09 G5 回归报告**：`docs/reports/g5-regression-report.md`（后端全量 630/630、前端 45/45；三组针对性回归 交易 69/69 · 币种 57/57 · 缓存 SEO 47/47，扩展隔离 27/27；浏览器冒烟 2/3，第 3 项因运行中 Nuxt 旧构建 chunk 缺失致 `/checkout` 500 阻断，非代码回归）。修 `shops/tests/e2e/smoke.spec.ts`：详情/下单改用首页动态取在售商品（兼容 mock 与真实数据源、跳过缺货卡片）；G5 保持 `[ ]` 不代勾 | AI |
+| v1.23 | 2026-11-06 | **P3-T19 G3 门禁检查记录**：`docs/reports/g3-gate-checklist.md`（四类场景逐项：重复回调/库存异常/币种配置变更证据充分；支付回调乱序未通过，`payment.failed` 缺 captured 终态保护，附源码行号、后果、修复方案与 4 例待补用例）。任务行备注更新（T-12 已随 P5-T02 闭环）+ §11 风险登记；保持 `[~]` 不代勾。当前工作树全量 94 例失败全因并行方 `000069` 迁移未执行的 `Unknown column 'referralCode'`，未擅自执行其迁移 | AI |
 
 ---
 
