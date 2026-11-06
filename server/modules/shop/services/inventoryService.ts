@@ -4,6 +4,7 @@ import sequelize from '../../../config/database.js'
 import { ShopInventory, ShopInventoryLog, ShopSku } from '../models/index.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
 import * as auditLogService from './auditLogService.js'
+import { withDeadlockRetry } from './deadlockRetry.js'
 
 /**
  * 库存补货钩子：入库（delta > 0）提交后触发，用于通知「到货提醒」订阅者。
@@ -29,48 +30,7 @@ function tenantId(): number {
   return getTenantContext()?.tenantId ?? 1
 }
 
-/**
- * MySQL 死锁是可重试的瞬态错误（并发事务在索引间隙锁上相互等待）。
- * 优先用驱动透出的原生错误码判定：Sequelize 对 ER_LOCK_DEADLOCK 可能包装成
- * SequelizeDatabaseError / SequelizeTransactionError 等不同类型，仅靠 name 会漏判。
- */
-function isDeadlock(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false
-  const e = err as {
-    name?: string
-    message?: string
-    parent?: { code?: string; errno?: number }
-    original?: { code?: string; errno?: number }
-  }
-  const native = e.parent ?? e.original
-  if (native?.code === 'ER_LOCK_DEADLOCK' || native?.errno === 1213) return true
-  return (
-    /deadlock/i.test(e.message ?? '') &&
-    (e.name === 'SequelizeDatabaseError' ||
-      e.name === 'SequelizeTransactionError' ||
-      e.name === 'SequelizeTimeoutError')
-  )
-}
-
-/** 在死锁时以有限次数重试整个事务（事务已回滚，重试安全）；带退避与抖动避免高并发反复相撞 */
-async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 5): Promise<T> {
-  let lastErr: unknown
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await fn()
-    } catch (e) {
-      if (isDeadlock(e) && i < tries - 1) {
-        lastErr = e
-        const backoffMs = 10 * 2 ** i + Math.floor(Math.random() * 15)
-        await new Promise((resolve) => setTimeout(resolve, backoffMs))
-        continue
-      }
-      throw e
-    }
-  }
-  throw lastErr
-}
-
+/** 死锁重试统一走 deadlockRetry.ts（原生错误码判定 + 指数退避） */
 async function findOrCreateRow(skuId: number, warehouseId: number, t?: Transaction) {
   const tId = tenantId()
   // 这里的 FOR UPDATE 有意保留：对「尚不存在的行」加间隙锁能把并发首次入库串行化，

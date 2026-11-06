@@ -6,6 +6,7 @@ import sequelize from '../../../config/database.js'
 import { ShopOrderRefund } from '../models/index.js'
 import { tryEnqueue } from './orderMailService.js'
 import * as auditLogService from './auditLogService.js'
+import { withDeadlockRetry } from './deadlockRetry.js'
 
 /**
  * 订单退款（T-09 / P3-T14）
@@ -76,30 +77,7 @@ function toView(row: ShopOrderRefund): RefundView {
   }
 }
 
-function isDeadlock(err: unknown): boolean {
-  return (
-    !!err &&
-    typeof err === 'object' &&
-    (err as { name?: string }).name === 'SequelizeDatabaseError' &&
-    /deadlock/i.test((err as { message?: string }).message ?? '')
-  )
-}
-
-async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
-  let lastErr: unknown
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await fn()
-    } catch (err) {
-      if (isDeadlock(err) && i < tries - 1) {
-        lastErr = err
-        continue
-      }
-      throw err
-    }
-  }
-  throw lastErr
-}
+/** 死锁重试统一走 deadlockRetry.ts（原生错误码判定 + 指数退避） */
 
 /** P3-T17：退款邮件以退款单号去重；入队失败不影响退款结果 */
 async function notifyRefund(view: RefundView): Promise<RefundView> {

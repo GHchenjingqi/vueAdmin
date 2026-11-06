@@ -3,6 +3,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import sequelize from '../../../config/database.js'
 import { ShopCoupon, ShopCouponRedemption } from '../../shop/models/index.js'
+import { withDeadlockRetry } from '../../shop/services/deadlockRetry.js'
 
 /**
  * 优惠券校验与占用（T-07 / P3-T07）
@@ -23,31 +24,7 @@ export interface CouponEvaluation {
   currency: string
 }
 
-/** MySQL 死锁为可重试瞬态错误（并发占用同一券的行锁） */
-function isDeadlock(err: unknown): boolean {
-  return (
-    !!err &&
-    typeof err === 'object' &&
-    (err as { name?: string }).name === 'SequelizeDatabaseError' &&
-    /deadlock/i.test((err as { message?: string }).message ?? '')
-  )
-}
-
-async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
-  let lastErr: unknown
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await fn()
-    } catch (err) {
-      if (isDeadlock(err) && i < tries - 1) {
-        lastErr = err
-        continue
-      }
-      throw err
-    }
-  }
-  throw lastErr
-}
+/** 死锁重试统一走 deadlockRetry.ts（原生错误码判定 + 指数退避） */
 
 /**
  * 校验券码并计算优惠金额（纯读，不产生副作用）。
