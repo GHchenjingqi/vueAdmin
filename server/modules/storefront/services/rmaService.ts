@@ -1,4 +1,5 @@
 import { AppError } from '../../../middleware/errorHandler.js'
+import sequelize from '../../../config/database.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopRmaRequest, ShopOrder, ShopOrderItem } from '../../shop/models/index.js'
 import type { OrderStatus } from '../../shop/models/ShopOrder.js'
@@ -78,54 +79,78 @@ export async function submitRma(
   auth: RmaAuth,
 ): Promise<RmaSubmitResult> {
   const tId = tid()
-  const order = await ShopOrder.findOne({ where: { id: input.orderId, tenantId: tId } })
-  if (!order) throw new AppError(404, `订单 ${input.orderId} 不存在`)
-  if (order.email !== auth.email) throw new AppError(403, '该订单不属于当前登录顾客')
-  if (!RETURNABLE.includes(order.status)) {
-    throw new AppError(400, '该订单当前状态不可申请退货')
-  }
-
-  if (!Array.isArray(input.items) || input.items.length === 0) {
-    throw new AppError(400, '退货明细不能为空')
-  }
-
-  const orderItems = await ShopOrderItem.findAll({ where: { orderId: order.id, tenantId: tId } })
-  const itemMap = new Map(orderItems.map((it) => [it.id, it]))
-  const snapshot: RmaListItem['items'] = []
-  let refundCents = 0
-  for (const it of input.items) {
-    if (!Number.isInteger(it.qty) || it.qty < 1) {
-      throw new AppError(400, '退货数量必须为正整数')
+  // 同一订单的退货申请放同一事务：锁订单行串行化并发提交，
+  // 否则两个请求各自读到「尚无历史申请」都能通过累计校验，合计退款仍会超过订单实付。
+  return sequelize.transaction(async (t) => {
+    const order = await ShopOrder.findOne({
+      where: { id: input.orderId, tenantId: tId },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    })
+    if (!order) throw new AppError(404, `订单 ${input.orderId} 不存在`)
+    if (order.email !== auth.email) throw new AppError(403, '该订单不属于当前登录顾客')
+    if (!RETURNABLE.includes(order.status)) {
+      throw new AppError(400, '该订单当前状态不可申请退货')
     }
-    const oi = itemMap.get(it.orderItemId)
-    if (!oi || oi.skuId !== it.skuId) {
-      throw new AppError(400, `订单明细 ${it.orderItemId} 不属于该订单`)
-    }
-    if (it.qty > oi.qty) {
-      throw new AppError(400, `退货数量超过已购数量（${oi.qty}）`)
-    }
-    refundCents += Number(oi.unitAmountCents) * it.qty
-    snapshot!.push({ orderItemId: oi.id, skuId: oi.skuId, qty: it.qty, title: oi.title })
-  }
 
-  const row = await ShopRmaRequest.create({
-    tenantId: tId,
-    siteId: _site.shopId ?? 0,
-    orderId: order.id,
-    customerId: auth.customerId,
-    email: auth.email,
-    status: 'pending',
-    reason: input.reason ?? null,
-    items: snapshot,
-    refundAmountCents: refundCents,
-    refundCurrency: order.currency,
+    if (!Array.isArray(input.items) || input.items.length === 0) {
+      throw new AppError(400, '退货明细不能为空')
+    }
+
+    const orderItems = await ShopOrderItem.findAll({ where: { orderId: order.id, tenantId: tId }, transaction: t })
+    const itemMap = new Map(orderItems.map((it) => [it.id, it]))
+
+    // 历史有效申请按明细累计（cancelled / rejected 放行重提，不占用额度）
+    const prior = await ShopRmaRequest.findAll({ where: { tenantId: tId, orderId: order.id }, transaction: t })
+    const claimed = new Map<number, number>()
+    for (const r of prior) {
+      if (r.status === 'cancelled' || r.status === 'rejected') continue
+      for (const it of (r.items ?? []) as { orderItemId: number; qty: number }[]) {
+        claimed.set(it.orderItemId, (claimed.get(it.orderItemId) ?? 0) + Number(it.qty))
+      }
+    }
+
+    const snapshot: RmaListItem['items'] = []
+    const requested = new Map<number, number>()
+    let refundCents = 0
+    for (const it of input.items) {
+      if (!Number.isInteger(it.qty) || it.qty < 1) {
+        throw new AppError(400, '退货数量必须为正整数')
+      }
+      const oi = itemMap.get(it.orderItemId)
+      if (!oi || oi.skuId !== it.skuId) {
+        throw new AppError(400, `订单明细 ${it.orderItemId} 不属于该订单`)
+      }
+      // 同一明细在本次请求重复出现时按累计数量校验，防止单笔申请把退款金额放大
+      const nextQty = (requested.get(it.orderItemId) ?? 0) + it.qty
+      const already = claimed.get(it.orderItemId) ?? 0
+      if (already + nextQty > Number(oi.qty)) {
+        throw new AppError(400, `退货数量超过可退数量（明细 ${it.orderItemId}：已申请 ${already}，本次 ${nextQty}，已购 ${oi.qty}）`)
+      }
+      requested.set(it.orderItemId, nextQty)
+      refundCents += Number(oi.unitAmountCents) * it.qty
+      snapshot!.push({ orderItemId: oi.id, skuId: oi.skuId, qty: it.qty, title: oi.title })
+    }
+
+    const row = await ShopRmaRequest.create({
+      tenantId: tId,
+      siteId: _site.shopId ?? 0,
+      orderId: order.id,
+      customerId: auth.customerId,
+      email: auth.email,
+      status: 'pending',
+      reason: input.reason ?? null,
+      items: snapshot,
+      refundAmountCents: refundCents,
+      refundCurrency: order.currency,
+    }, { transaction: t })
+    return {
+      id: row.id,
+      status: row.status,
+      refundAmountCents: Number(row.refundAmountCents),
+      refundCurrency: row.refundCurrency,
+    }
   })
-  return {
-    id: row.id,
-    status: row.status,
-    refundAmountCents: Number(row.refundAmountCents),
-    refundCurrency: row.refundCurrency,
-  }
 }
 
 /** 当前顾客的退货申请列表（按创建时间倒序） */
