@@ -1,0 +1,148 @@
+diff --git a/server/modules/storefront/services/quoteService.ts b/server/modules/storefront/services/quoteService.ts
+--- a/server/modules/storefront/services/quoteService.ts
++++ b/server/modules/storefront/services/quoteService.ts
+@@ -189,7 +189,12 @@
+   // T-07：券码由服务端校验并重算折扣，前端传入的任何折扣金额一律忽略
+   const coupon = await evaluateCoupon(input.couponCode, { currency, subtotalCents })
+   const couponDiscountCents = coupon?.discountCents ?? 0
+-  const discountCents = bundleDiscountCents + couponDiscountCents
++  // P5-T05 修复：bundle 优惠已在 L165-171 折入行单价并重算 subtotalCents，
++  // 因此 discountCents 只表示「从折后小计额外扣减的券折」。
++  // 原实现把 bundleDiscountCents 再次计入 discountCents，导致同一笔优惠被扣两次
++  // （订单明细合计 != amountCents，商户每单多让利一倍优惠）。
++  // bundle 优惠仍由 bundleDiscountCents / bundle 字段单独暴露给前端展示。
++  const discountCents = couponDiscountCents
+   const amountCents = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents)
+ 
+   // P5-T04：订单级配送承诺 = 各 SKU 主仓承诺的最大值（取最不利/最长），无库存记录为 null
+diff --git a/server/modules/storefront/services/paymentService.ts b/server/modules/storefront/services/paymentService.ts
+--- a/server/modules/storefront/services/paymentService.ts
++++ b/server/modules/storefront/services/paymentService.ts
+@@ -119,7 +119,12 @@
+  * 返回 { ok, status } 供 controller 转化为 HTTP 响应；验签失败抛 401，且不产生任何副作用。
+  */
+ export async function handleWebhook(provider: string, rawBody: Buffer, signature: string | undefined): Promise<WebhookResult> {
+-  const secret = config.payment?.webhookSecret ?? 'storefront_mock_webhook_secret'
++  // P5-T03 修复 1/4：provider 必须已注册；未知 provider 在验签/解析前直接拒绝，
++  // 避免任意路径参数都能进入支付状态机。
++  const def = getProvider(provider)
++  if (!def) return { ok: false, status: 400, message: `未注册的支付 Provider: ${provider}` }
++  // P5-T03 修复 4/4：优先使用 Provider 声明的独立 webhook 密钥。
++  const secret = def.webhookSecret ?? config.payment?.webhookSecret ?? 'storefront_mock_webhook_secret'
+ 
+   // 1) 验签（时序安全比较）
+   if (!signature) return { ok: false, status: 401, message: '缺少签名' }
+@@ -145,14 +150,25 @@
+ 
+   if (!providerRef || !orderNo) return { ok: false, status: 400, message: '缺少 providerRef / orderNo' }
+ 
+-  // 3) 去重：同一 provider+providerRef 已存在则直接返回成功（幂等）
+-  const prev = await ShopOrderPayment.findOne({ where: { provider, providerRef, tenantId: tId } as never })
++  // P5-T03 修复 3/4：以 providerRef 查绑定记录，换 provider 重投必须拒绝，
++  // 否则同一 providerRef 换一个 provider 就能绕开 (provider,providerRef) 幂等去重。
++  // 兼容策略：无历史支付记录的订单放行（内部建单/回归夹具）；
++  // 是否收紧为「一律拒绝」需业务确认，见 docs/reports/p5-fix-readiness.md。
++  const prev = await ShopOrderPayment.findOne({ where: { providerRef, tenantId: tId } as never })
++  if (prev && prev.provider !== provider) {
++    return { ok: false, status: 400, message: `providerRef 已绑定其它 Provider: ${prev.provider}` }
++  }
+   if (prev && prev.status !== 'initiated') {
+     return { ok: true, alreadyProcessed: true, status: 200 }
+   }
+ 
+   const order = await ShopOrder.findOne({ where: { orderNo, tenantId: tId } })
+   if (!order) return { ok: false, status: 404, message: '订单不存在' }
++
++  // P5-T03 修复 2/4：flag 关闭 / 币种不支持的 Provider 不得通过回调改单（关闭态零副作用）。
++  if (!(await isProviderUsable(def, order.currency))) {
++    return { ok: false, status: 403, message: `Provider ${provider} 不可用（flag 关闭或币种不支持）` }
++  }
+ 
+   // 回调币种若与订单快照不一致，以订单快照为准，记录告警（此处仅日志，不改单）
+   if (typeof payload?.currency === 'string' && payload.currency !== order.currency) {
+diff --git a/server/migrations/20261106_000069_add-referral-system.ts b/server/migrations/20261106_000069_add-referral-system.ts
+--- a/server/migrations/20261106_000069_add-referral-system.ts
++++ b/server/migrations/20261106_000069_add-referral-system.ts
+@@ -63,6 +63,13 @@
+   })
+   await queryInterface.addIndex('referral_commissions', ['tenantId', 'referrerCustomerId'])
+   await queryInterface.addIndex('referral_commissions', ['tenantId', 'status'])
++  // P5-T07 修复：模型声明的 (tenantId, orderId) 唯一约束必须落到迁移。
++  // 项目走 Umzug 而非 sequelize.sync()，模型 indexes 不会自动生效。
++  // 前置：执行前须清理历史重复台账，否则 addIndex(unique) 会失败。
++  await queryInterface.addIndex('referral_commissions', ['tenantId', 'orderId'], {
++    unique: true,
++    name: 'uq_referral_tenant_order',
++  })
+ }
+ 
+ export async function down(queryInterface: QueryInterface): Promise<void> {
+diff --git a/server/modules/storefront/services/referralService.ts b/server/modules/storefront/services/referralService.ts
+--- a/server/modules/storefront/services/referralService.ts
++++ b/server/modules/storefront/services/referralService.ts
+@@ -89,12 +89,29 @@
+   if (!referrer) return null
+ 
+   const netCents = Math.round(params.orderNetCents)
+-  const touchAt = params.referralTouchAt ? new Date(params.referralTouchAt) : new Date()
++  // P5-T07 修复：触点时间不得由调用方任意延长窗口。
++  // 未来时间 / Invalid Date 一律 fail-closed（视作 void 不计佣），
++  // 避免 NaN 比较把非法日期误判成「未过期」而计佣。
++  const now = Date.now()
++  const rawTouch = params.referralTouchAt ? new Date(params.referralTouchAt).getTime() : now
++  const touchMs = Number.isFinite(rawTouch) && rawTouch <= now ? rawTouch : now
++  const touchAt = new Date(touchMs)
+   const windowExpiredAt = new Date(touchAt.getTime() + REFERRAL_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+-  const expired = Date.now() > windowExpiredAt.getTime()
++  const expired = !Number.isFinite(rawTouch) || rawTouch > now || now > windowExpiredAt.getTime()
+ 
+   const commissionCents = expired ? 0 : computeCommissionCents(netCents, REFERRAL_RATE_PERCENT)
+   const status: 'pending' | 'void' = expired ? 'void' : 'pending'
++
++  // 幂等：同一订单只保留一条台账（数据库唯一索引为最终兜底）。
++  const existing = await ShopReferralCommission.findOne({ where: { tenantId: tId, orderId: params.orderId } })
++  if (existing) {
++    return {
++      status: existing.status === 'pending' ? 'pending' : 'void',
++      commissionCents: Number(existing.commissionCents),
++      orderCurrency: existing.orderCurrency,
++      windowExpiredAt: existing.windowExpiredAt,
++    }
++  }
+   const row = await ShopReferralCommission.create({
+     tenantId: tId,
+     orderId: params.orderId,
+diff --git a/server/modules/shop/services/warehouseRoutingService.ts b/server/modules/shop/services/warehouseRoutingService.ts
+--- a/server/modules/shop/services/warehouseRoutingService.ts
++++ b/server/modules/shop/services/warehouseRoutingService.ts
+@@ -68,21 +68,26 @@
+   return rows
+ }
+ 
++/** P5-T04 修复：承诺仓与发货仓共用同一选仓口径（首个有货仓；全无货时回退 rows[0]） */
++function primaryWarehouse(rows: RoutedWarehouse[]): RoutedWarehouse | undefined {
++  return rows.find((r) => r.available > 0) ?? rows[0]
++}
++
+ /** 为某 SKU 选取路由后的主仓（优先有货且区域命中的仓库） */
+ export async function pickWarehouse(skuId: number, country?: string | null): Promise<number> {
+   const rows = await routeWarehouses(skuId, country)
+-  const withStock = rows.find((r) => r.available > 0)
+-  if (!withStock) throw new AppError(400, `SKU ${skuId} 无可用库存`)
++  const withStock = primaryWarehouse(rows)
++  if (!withStock || withStock.available <= 0) throw new AppError(400, `SKU ${skuId} 无可用库存`)
+   return withStock.warehouseId
+ }
+ 
+-/** 按仓配送承诺：取路由后的主仓（区域命中 + 优先级 + 可用量） */
++/** 按仓配送承诺：取路由后的主仓（区域命中 + 优先级 + 可用量），与实际发货仓一致 */
+ export async function getDeliveryCommitment(
+   skuId: number,
+   country?: string | null,
+ ): Promise<DeliveryCommitment | null> {
+   const rows = await routeWarehouses(skuId, country)
+-  const primary = rows[0]
++  const primary = primaryWarehouse(rows)
+   if (!primary) return null
+   return {
+     warehouseId: primary.warehouseId,

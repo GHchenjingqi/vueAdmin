@@ -1,0 +1,4 @@
+# 补丁与用例模板必须按原始字节保存：仓库 core.autocrlf=true 会把
+# 混合行尾（CRLF 文件 hunk + LF 文件 hunk）统一规范化，导致 git apply 上下文失配。
+*.patch -text
+*.txt -text
