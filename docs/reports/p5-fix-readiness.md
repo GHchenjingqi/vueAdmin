@@ -88,6 +88,24 @@ npx tsc -p tsconfig.json --noEmit
 
 补丁应用与撤销全程使用 `git apply` / `git apply -R`，只改补丁涉及的 hunk，不整文件覆盖；`git apply` 在 Windows 上把两个 LF 文件规范化成 CRLF，撤销后已逐字节转回。**六个源文件最终 SHA-256 与补丁前完全一致**，临时测试文件已删除，并行方工作树中的 WIP 未被修改或暂存。本轮提交只包含 `docs/` 下的报告、补丁、用例与计划文档。
 
+## 8. 复核记录（2026-11-06 16:15，B 线解锁前例行复核）
+
+本轮不修改任何 WIP 文件、不代勾门禁，只复核「补丁是否仍可落地」。
+
+| 复核项 | 结果 |
+| --- | --- |
+| 分支同步 | `4633dad`（JsonLd 改用 `useHead`）已推送，`master_shop` 与 `origin` 同步（ahead/behind 0/0）；此前因网络滞留的 `538ebe8`、`7911aee` 均已入库 |
+| P5 解锁状态 | **未解锁**：`storefront/payments/`、`bundleService.ts`、`referralService.ts`、`warehouseRoutingService.ts`、迁移 `000066`~`000069` 及三个扩展测试仍是未跟踪 WIP（工作树约 55 项变更） |
+| 补丁可套用性 | `git apply --check --verbose docs/patches/p5-fix-readiness.patch` 退出 0，5 个文件全部通过；上下文未漂移，行号偏移由 git 自行处理 |
+| 17 例用例契约 | 静态核对通过：`paymentService.ts` 已 import `getProvider` / `isProviderUsable`；`PaymentProviderDef.webhookSecret?` 已声明；`RecordCommissionParams` / `CommissionResult` 字段与补丁返回值一致；`Quote` / `OrderView` 含 `discountCents` / `amountCents` / `bundleDiscountCents` / `lineTotalCents`；`DeliveryCommitment` 含 `warehouseId` / `deliveryEstimateDays` / `available`；8 个模型均从 `shop/models/index.ts` 导出 |
+| 类型检查 | `cd server && npx tsc -p tsconfig.json --noEmit` 退出 0（当前 HEAD + 工作树 WIP 基线） |
+
+### 新增残留风险：账面承诺仓 ≠ 物理发货仓（不纳入本补丁）
+
+复核调用链发现：`checkoutService.ts` 经 `reservationService.pickWarehouse` 选仓，后者（`:31-33`）只是转发到 `warehouseRouting.pickWarehouse`，因此补丁 E 生效后**账面**承诺仓与选仓口径一致。但 `reserveItems` 内部调用 `inventoryService.occupy(skuId, qty, ref)`（`:45`）**不按 `warehouseId` 指定物理仓**，`ShopInventoryReservation.warehouseId` 仅是账面代表仓，真实履约仍可能从其它有货仓发货。这属于跨仓库存口径的架构契约，需仓储/业务决策（是否按选仓强制定向扣减），不在本补丁 6 个 hunk 的覆盖范围内；决策落地前，D1~D3 只保证「路由层自洽」，不保证「履约层一致」。
+
+**结论**：B 线就绪包保持有效，落地前置条件未变（等待并行方提交 P5 批次）；本轮零源码改动、零 WIP 暂存。
+
 ---
 
 *修复与门禁状态变更须由 P5 各责任方在提交后回填；本报告不代勾任何任务行。*
