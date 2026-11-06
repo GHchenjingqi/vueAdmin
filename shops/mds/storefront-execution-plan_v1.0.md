@@ -404,7 +404,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 2026-11-04 | P0-T07 | 后台币种配置存在哪张表/字段未知 | Store Config 接口无法实现 | 后端 | ✅ 已核验 2026-11-05：`settings.optionKey='shop.currency'`（JSON）为唯一数据源，见 `server/modules/storefront/services/currencyConfig.ts`、docs/CURRENCY_CONFIG_SPEC.md；Store Config 端点已上线 |
 | 2026-11-04 | P0-T05b | 切币种是否自动换算未定 | 存在 $1,299 → ¥1,299 的价格事故风险 | 业务 / 运营 | 🟡 实现层已按「**不换算**」闭环（C5）：后台双 literal 确认 + T-12 实测旧购物车 `409 CURRENCY_CHANGED` 要求重建（docs/reports/t12-currency-switch.md）；**业务正式签字仍需补**，暂不标完全关闭 |
 | 2026-11-04 | P0-T04 | 支付服务商支持的币种集合未核验 | 配了 CNY 却无法收款 | 支付 / 财务 | 待核验 |
-| 2026-11-04 | P0-T08 | `inventory.locked` 语义未核验 | 库存预占方案不可实现 | 后端 | 待核验 |
+| 2026-11-04 | P0-T08 | `inventory.locked` 语义未核验 | 库存预占方案不可实现 | 后端 | ✅ 已核验 2026-11-06：`locked` 为预占量、`available = Σ(quantity - locked)`；`adjust/occupy/release/deduct` 均在事务内 `FOR UPDATE` 加锁。本轮补齐死锁重试识别与固定加锁顺序，并以 `inventory-concurrency.test.ts` 3 例并发实证（重复行 / 数量守恒 / locked 非负）。证据见 `docs/BACKEND_AUDIT.md` §3 与本轮提交 |
 | 2026-11-04 | P0-T14 | 支付状态机缺失 | 重复扣款、漏单风险 | 后端 / 支付 | ✅ 已交付 2026-11-05：docs/ORDER_PAYMENT_STATE_MACHINE.md + 步骤 4 支付会话/Webhook 幂等落地（`9f941f6`）；T-02/T-03 自动化证据待 §9 回填 |
 | 2026-11-04 | P0-T05 | 税费方案与责任主体未定 | 价格错误与合规风险 | 业务 / 财务 | 待决策 |
 | 2026-11-04 | P4-T05 | 退货规则未经市场专业人士审核 | 客诉与法律风险 | 运营 / 法务 | 待审核 |
@@ -428,6 +428,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | 2026-11-06 | P5-T07 | **佣金台账唯一索引未落库**：`ShopReferralCommission` 模型声明 `uq_referral_tenant_order`，但迁移 `000069` 的 `up()` 未建；`SHOW INDEX FROM referral_commissions` 实查缺失，同 `(tenantId,orderId)` 连续插入两条佣金均成功 | `recordCommission` 无幂等，建单重入/回调重放可重复计佣并重复结算 | 后端 / 并行方 | 🟠 已查库 + 插入复现；建议新增 `000070` 补唯一索引（补前须清历史重复数据）+ service 幂等，见报告 §3 |
 | 2026-11-06 | P5-T07 | **归因窗口起点客户端可控**：`referralTouchAt` 由请求体提供（`shared/schemas/storefront.ts:122` 仅校验 ISO 格式），`checkoutService` 原样快照并透传，`referralService` 据此算 30 天窗口；实测传一年后的未来时间 schema 通过，全仓无服务端首次触点记录 | 客户端每次传 now 即可让窗口永不失效、佣金可被无限期套取；Invalid Date 时 `Date.now() > NaN` 为 false 还会 fail-open 计佣 | 后端 / 业务 | 🟠 建议服务端落首次触点并忽略客户端值；最低限度加 `touchAt<=now` 与 Invalid Date fail-closed，见报告 §4 |
 | 2026-11-06 | P5-T04 | **配送承诺仓 ≠ 发货仓**：`getDeliveryCommitment` 取 `rows[0]` 不过滤 `available>0`，`pickWarehouse` 取首个有货仓；实测主仓 0 库存时承诺 1 天仓、实际从 10 天仓发货 | 主仓缺货时报价与订单级承诺必然失真 | 后端 / 并行方 | 🟡 建议抽 `primaryWarehouse()` 供两处共用，全部无货返回 null，见报告 §5 |
+| 2026-11-06 | P0-T08 | **`inventory` 表缺 `(tenantId,skuId,warehouseId)` 唯一约束**：迁移 `000021` 只建 `idx_inv_tenant_sku` / `idx_inv_tenant_wh` 两个普通索引；`findOrCreateRow` 实际靠「对不存在行加 FOR UPDATE 间隙锁」串行化并发首次入库，这既是全量偶发死锁的根因（上一轮首轮 2 文件失败于 `inventoryService.ts:74`），也是潜在重复库存行风险（本轮查库确认 dev 库当前无重复行） | 死锁 flake；若日后去掉间隙锁或并发路径变化，可能插入重复库存行致库存口径分裂 | 后端 / 并行方 | 🟡 本轮已在 `inventoryService.ts` 增强死锁识别（原生 `ER_LOCK_DEADLOCK` / errno 1213）、重试 3→5 次并加指数退避抖动、三处多行 `FOR UPDATE` 固定按主键升序加锁，新增 3 例并发回归；**唯一索引未补**（需新迁移且可能与并行方迁移编号冲突），等责任方补索引后可改「无锁探测 + 唯一冲突重读」彻底消除该死锁源 |
 
 ---
 
@@ -465,6 +466,7 @@ Nuxt BFF / 服务端渲染（runtimeConfig 不参与币种决策）
 | v1.26 | 2026-11-06 | **X-T04 `setFlag` 并发覆盖修复**：事务内 `FOR UPDATE` 读最新 JSON → 合并 → upsert，提交后失效缓存；`parseOverrides` 兜底非法 JSON。新增 4 例并发/缓存回归（并入 `featureFlags.test.ts` 同 worker 串行，避免 flake）；两轮后端全量 **655/655（71 文件）** + typecheck 0 错误。修复以补丁方式仅送入 index，未夹带并行方 P5-T03 bnpl WIP | AI |
 | v1.27 | 2026-11-06 | **P5-T03 Webhook 安全审计 + G5 冒烟复核**：新增 `docs/reports/p5t03-webhook-audit.md`（回调侧 4 类校验缺失、写库复现未注册 provider 可改单、修复方案与 5 例待补用例、不代改原因）与 `docs/reports/g5-e2e-recheck.md`（E2E 2/3、`/checkout` 500 精确 chunk 根因、Playwright 须从 `shops/` cwd 运行）。同期只读基线：后端全量 **655/655（71 文件）**、扩展三件套 **21/21（3 文件）**。两条风险登记 §11；P5-T03 / P5-T09 均保持未勾 | AI |
 | v1.28 | 2026-11-06 | **P5 扩展模块正确性审计**：新增 `docs/reports/p5-extension-audit.md`，只读审查 + 写库复现坐实 4 个缺口（P0 Bundle 折扣双重扣减、P1 佣金唯一索引未落库、P1 归因窗口起点客户端可绕过、P2 配送承诺仓≠发货仓），附精确行号、复现输出、修复方案与 12 例待补用例、不代改原因（多为未跟踪新 WIP 且涉业务口径）。§11 四条风险登记；P5-T04/T05/T07 保持未勾。只读基线：全量首轮 2 文件 `inventoryService` 并发死锁 flake、原样复跑 **655/655（71 文件）**，doc-links 31/31；临时复现脚本与自建数据已清理 | AI |
+| v1.29 | 2026-11-06 | **库存并发死锁 flake 修复**：`inventoryService.ts` 的 `isDeadlock` 增原生错误码判定（`ER_LOCK_DEADLOCK` / errno 1213，覆盖 `SequelizeTransactionError` 等包装类型）、`withDeadlockRetry` 3→5 次并加指数退避 + 抖动、`occupy/release/deduct` 三处多行 `FOR UPDATE` 固定按主键升序加锁（消除相反顺序互等）、`findOrCreateRow` 补注释说明间隙锁系有意保留（防重复库存行）。新增 `inventory-concurrency.test.ts` 3 例（独立 tenantId 987654 隔离，零共享行）：并发首次入库不重复且数量守恒、多仓并发调整守恒、并发释放 locked 非负。§11 P0-T08 标记已核验 + 登记「inventory 无唯一索引」残留风险。**两轮后端全量 658/658（72 文件）+ 库存相关 63/63 + server typecheck 0 错误** | AI |
 
 ---
 

@@ -29,18 +29,31 @@ function tenantId(): number {
   return getTenantContext()?.tenantId ?? 1
 }
 
-/** MySQL 死锁是可重试的瞬态错误（并发事务在索引间隙锁上相互等待） */
+/**
+ * MySQL 死锁是可重试的瞬态错误（并发事务在索引间隙锁上相互等待）。
+ * 优先用驱动透出的原生错误码判定：Sequelize 对 ER_LOCK_DEADLOCK 可能包装成
+ * SequelizeDatabaseError / SequelizeTransactionError 等不同类型，仅靠 name 会漏判。
+ */
 function isDeadlock(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as {
+    name?: string
+    message?: string
+    parent?: { code?: string; errno?: number }
+    original?: { code?: string; errno?: number }
+  }
+  const native = e.parent ?? e.original
+  if (native?.code === 'ER_LOCK_DEADLOCK' || native?.errno === 1213) return true
   return (
-    !!err &&
-    typeof err === 'object' &&
-    (err as { name?: string; message?: string }).name === 'SequelizeDatabaseError' &&
-    /deadlock/i.test((err as { message?: string }).message ?? '')
+    /deadlock/i.test(e.message ?? '') &&
+    (e.name === 'SequelizeDatabaseError' ||
+      e.name === 'SequelizeTransactionError' ||
+      e.name === 'SequelizeTimeoutError')
   )
 }
 
-/** 在死锁时以有限次数重试整个事务（事务已回滚，重试安全） */
-async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+/** 在死锁时以有限次数重试整个事务（事务已回滚，重试安全）；带退避与抖动避免高并发反复相撞 */
+async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 5): Promise<T> {
   let lastErr: unknown
   for (let i = 0; i < tries; i++) {
     try {
@@ -48,6 +61,8 @@ async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T>
     } catch (e) {
       if (isDeadlock(e) && i < tries - 1) {
         lastErr = e
+        const backoffMs = 10 * 2 ** i + Math.floor(Math.random() * 15)
+        await new Promise((resolve) => setTimeout(resolve, backoffMs))
         continue
       }
       throw e
@@ -58,6 +73,10 @@ async function withDeadlockRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T>
 
 async function findOrCreateRow(skuId: number, warehouseId: number, t?: Transaction) {
   const tId = tenantId()
+  // 这里的 FOR UPDATE 有意保留：对「尚不存在的行」加间隙锁能把并发首次入库串行化，
+  // 避免两个事务各自 INSERT 出重复库存行（inventory 表目前无 (tenantId,skuId,warehouseId) 唯一约束）。
+  // 代价是间隙锁可能引发死锁，由 withDeadlockRetry 兜底；若日后补了唯一索引，
+  // 可改为「无锁探测 → create → 捕获唯一冲突重读」以彻底消除该死锁源。
   let row = await ShopInventory.findOne({ where: { skuId, warehouseId, tenantId: tId }, transaction: t, lock: t ? t.LOCK.UPDATE : undefined } as any)
   if (!row) {
     row = await ShopInventory.create({ skuId, warehouseId, quantity: 0, locked: 0, tenantId: tId } as never, { transaction: t })
@@ -107,7 +126,13 @@ export async function occupy(skuId: number, qty: number, ref: string): Promise<v
   await withDeadlockRetry(() =>
     sequelize.transaction(async (t) => {
       // 跨仓聚合可用量（加锁避免并发超卖）
-      const rows = await ShopInventory.findAll({ where: { skuId, tenantId: tId }, transaction: t, lock: t.LOCK.UPDATE } as any)
+      // 固定加锁顺序（主键升序）：避免不同事务以相反顺序锁同一组仓行而互等死锁
+      const rows = await ShopInventory.findAll({
+        where: { skuId, tenantId: tId },
+        order: [['id', 'ASC']],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      } as any)
       let available = 0
       for (const r of rows) available += r.quantity - r.locked
       if (available < qty) {
@@ -145,7 +170,13 @@ export async function release(skuId: number, qty: number, ref: string): Promise<
   const tId = tid()
   await withDeadlockRetry(() =>
     sequelize.transaction(async (t) => {
-      const rows = await ShopInventory.findAll({ where: { skuId, tenantId: tId }, transaction: t, lock: t.LOCK.UPDATE } as any)
+      // 固定加锁顺序（主键升序）：避免不同事务以相反顺序锁同一组仓行而互等死锁
+      const rows = await ShopInventory.findAll({
+        where: { skuId, tenantId: tId },
+        order: [['id', 'ASC']],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      } as any)
       let remain = qty
       for (const r of rows) {
         if (remain <= 0) break
@@ -180,7 +211,13 @@ export async function deduct(skuId: number, qty: number, ref: string): Promise<v
   const tId = tid()
   await withDeadlockRetry(() =>
     sequelize.transaction(async (t) => {
-      const rows = await ShopInventory.findAll({ where: { skuId, tenantId: tId }, transaction: t, lock: t.LOCK.UPDATE } as any)
+      // 固定加锁顺序（主键升序）：避免不同事务以相反顺序锁同一组仓行而互等死锁
+      const rows = await ShopInventory.findAll({
+        where: { skuId, tenantId: tId },
+        order: [['id', 'ASC']],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      } as any)
       let remain = qty
       for (const r of rows) {
         if (remain <= 0) break
