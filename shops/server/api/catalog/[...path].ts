@@ -47,6 +47,8 @@ interface RawDetail {
   currency: string
   price: { min: number; max: number } | null
   variants: { id: number; code: string; spec: Record<string, string> | null; price: number | null; inStock: boolean }[] | null
+  /** 后台 per-product SEO（title/description）；缺失或形状不符按 null 透传 */
+  seo?: { title?: unknown; description?: unknown } | null
 }
 
 const toCents = (v: number): number => Math.round(v * 100)
@@ -92,6 +94,10 @@ function adaptDetail(raw: RawDetail): CatalogProduct {
     price: raw.price ? { amount: toCents(raw.price.min), currency: raw.currency } : null,
     inStock: variants.some((v) => v.inStock),
     variants,
+    seo:
+      raw.seo && typeof raw.seo.title === 'string' && typeof raw.seo.description === 'string'
+        ? { title: raw.seo.title, description: raw.seo.description }
+        : null,
   }
 }
 

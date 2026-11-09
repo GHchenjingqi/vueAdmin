@@ -60,7 +60,9 @@ const humanize = (s: string) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.t
 
 useSeo({
   title: () => CATEGORY_SEO[category.value]?.name ?? humanize(category.value),
-  description: () => CATEGORY_SEO[category.value]?.desc ?? t('category.adjust'),
+  description: () =>
+    CATEGORY_SEO[category.value]?.desc ??
+    `Shop ${humanize(category.value)} at Aurora Hair Studio. Free standard shipping over $99, 30-day returns.`,
   keywords: () => CATEGORY_SEO[category.value]?.keywords ?? category.value.replace(/-/g, ', '),
   path: `/c/${category.value}`,
 })

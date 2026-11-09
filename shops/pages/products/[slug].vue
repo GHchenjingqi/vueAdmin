@@ -66,16 +66,18 @@ watchEffect(() => {
   }
 })
 
-// 跨境 TDK：Title 用纯产品名（品牌由全局 titleTemplate 追加）；产品名超 42 字符截断保总长 ≤60；
+// 跨境 TDK：Title/Description 优先消费后台 per-product SEO 字段（product.seo，后台可配置），
+// 缺省回退产品名/描述；Title 用纯文本（品牌由全局 titleTemplate 追加），超 42 字符截断保总长 ≤60；
 // description 截断 155；og:type=product；og:image 用产品图。
 const productTitle = computed(() => {
-  const p = product.value?.title ?? t('product.notFound')
+  const seoTitle = product.value?.seo?.title?.trim()
+  const p = (seoTitle || product.value?.title || t('product.notFound')) as string
   return p.length <= 42 ? p : `${p.slice(0, 39)}…`
 })
 
 useSeo({
   title: () => productTitle.value,
-  description: () => (product.value?.description ?? '').slice(0, 155),
+  description: () => ((product.value?.seo?.description?.trim() || product.value?.description) ?? '').slice(0, 155),
   keywords: () =>
     product.value ? `${product.value.title}, human hair wig, glueless lace wig, HD lace wig, Aurora Hair Studio` : '',
   ogType: 'product',

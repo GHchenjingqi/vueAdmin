@@ -34,6 +34,8 @@ export interface CatalogProduct {
   inStock: boolean
   variants: CatalogVariant[]
   categoryKind?: 'wig' | 'apparel'
+  /** 后台 per-product SEO 字段（真实后端契约提供；mock fixtures 可缺省） */
+  seo?: { title: string; description: string } | null
 }
 
 export interface CatalogVariant {
