@@ -2,7 +2,7 @@
 
 > 生成：2026-11-09 · 交付物：`scripts/gate-preflight.mjs`、`shops/tests/e2e/gate-smoke.playwright.config.ts`、`docs/reports/gate-preflight-result.json`、`.github/workflows/ci.yml`
 > 定位：把 **4 个门禁 + 17 项签字 + 3 类阻塞**里所有「能用代码完成」的部分一次性落地，把签字方需要手工收集证据的工作量压到最小。
-> **强约束**：不代勾门禁状态、不代替责任方签字、不回填 `shops/mds/storefront-execution-plan_v1.0.md` 的任务行。签字包 `docs/reports/gate-signoff-pack.md` 原件保持不动（17 个 `[ ]` 一个未动）。
+> **强约束**：不代勾门禁状态、不代替责任方签字、不回填 `shops/mds/storefront-execution-plan_v1.0.md` 的任务行。签字包 `docs/reports/gate-signoff-pack.md` 对本自动化始终只读；责任方后续签字由其自行勾选，本包不判定签字有效性（2026-11-09 业务方签字见该文件「签字记录」）。
 
 ---
 
@@ -42,7 +42,7 @@
 | `EXTERNAL_ENV` | **9** | 需外部账号 / 真实环境 / 第三方（Search Console、法务审核、生产抽样、真实 CDN、staging 与备份演练等） | **不能**，须外部条件先具备 |
 | `HUMAN_DECISION` | **4** | 需人工试用或业务决策（沙箱 E2E 确认、RMA 权限分配、admin 试用、RTO/RPO 口径） | **不能**，须责任方决策 |
 
-- 签字栏自检：脚本每次运行会校验签字包仍为 **17 项未勾 / 0 项已勾**；若发现被代勾直接报 `FAIL`。
+- 签字栏自检：脚本只读校验签字栏数量与实际勾选数，并如实汇总「已签 / 待签」。全部未勾 → `PASS`；有勾选且签字包含「签字记录」→ `WARN`（须人工核对签署来源，脚本**不判定签字有效性**）；有勾选但无签字记录 → `FAIL`（疑似被代勾）。`--strict` 只对 `FAIL` 返回非零，责任方真实签字不会误阻断 CI。
 - 逐项明细：运行 `node scripts/gate-preflight.mjs` 输出完整表格，或查看 `docs/reports/gate-preflight-result.json` 的 `signoff` 数组。
 
 ---

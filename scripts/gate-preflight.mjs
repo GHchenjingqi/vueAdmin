@@ -9,7 +9,9 @@
  *
  * 强约束：
  *   - 本脚本**只读**，不修改签字包、不修改执行计划、不代勾任何 [x] / 签字栏；
- *   - 自检会校验 `gate-signoff-pack.md` 仍为 17 项未勾，如发现代勾则报 FAIL；
+ *   - 自检会校验 `gate-signoff-pack.md` 的勾选状态：全部未勾 → PASS；
+ *     有勾选且签字包含「签字记录」→ WARN（如实汇总，须人工核对签署来源，脚本不判定有效性）；
+ *     有勾选但无签字记录 → FAIL（疑似被代勾）；
  *   - 签字状态只标记 EVIDENCE_READY / EXTERNAL_ENV / HUMAN_DECISION，不产生"已通过"结论。
  *
  * 用法：
@@ -293,27 +295,44 @@ function checkCiBranch() {
   return checks
 }
 
+/** 只读解析签字栏，供完整性自检与摘要共用；文件不存在返回 null */
+function readSignoffBoxes() {
+  if (!existsSync(SIGNOFF_PACK)) return null
+  const text = readFileSync(SIGNOFF_PACK, 'utf8')
+  const boxes = [...text.matchAll(/^- \[([ xX])\] /gm)].map((m) => m[1])
+  return {
+    total: boxes.length,
+    signed: boxes.filter((b) => b.trim() !== '').length,
+    hasRecord: /^###\s+签字记录/m.test(text),
+  }
+}
+
 function checkSignoffIntegrity() {
-  if (!existsSync(SIGNOFF_PACK)) {
+  const s = readSignoffBoxes()
+  if (!s) {
     return {
       id: 'signoff.integrity', status: 'SKIP',
       detail: '签字包未纳入版本库（工作区 WIP），跳过勾选状态校验；本脚本从不写入该文件',
     }
   }
-  const text = readFileSync(SIGNOFF_PACK, 'utf8')
-  const boxes = [...text.matchAll(/^- \[([ xX])\] /gm)].map((m) => m[1])
-  const signed = boxes.filter((b) => b.trim() !== '').length
-  const pending = boxes.length - signed
-  if (boxes.length !== 17) {
-    return { id: 'signoff.integrity', status: 'WARN', detail: `签字栏计数 ${boxes.length}，预期 17` }
+  if (s.total !== 17) {
+    return { id: 'signoff.integrity', status: 'WARN', detail: `签字栏计数 ${s.total}，预期 17` }
   }
-  if (signed !== 0) {
+  const pending = s.total - s.signed
+  if (s.signed === 0) {
+    return { id: 'signoff.integrity', status: 'PASS', detail: `17 项签字栏全部未勾（pending=${pending}），未被自动化代勾` }
+  }
+  // 责任方真实签字是合法状态；脚本只读，不判定签字有效性，交人工核对签署来源。
+  if (s.hasRecord) {
     return {
-      id: 'signoff.integrity', status: 'FAIL',
-      detail: `检测到 ${signed} 项已被勾选；签字须由责任方填写，自动化不得代勾`,
+      id: 'signoff.integrity', status: 'WARN',
+      detail: `${s.signed} 项已勾（签字包含「签字记录」章节），${pending} 项待勾；自动化不判定签字有效性，须人工核对签署来源`,
     }
   }
-  return { id: 'signoff.integrity', status: 'PASS', detail: `17 项签字栏全部未勾（pending=${pending}），未被自动化代勾` }
+  return {
+    id: 'signoff.integrity', status: 'FAIL',
+    detail: `检测到 ${s.signed} 项已被勾选且无可核对的签字记录；签字须由责任方填写，自动化不得代勾`,
+  }
 }
 
 function checkCommand(id, label, cmd) {
@@ -405,6 +424,9 @@ async function collectChecks(full) {
 // 汇总与输出
 // ---------------------------------------------------------------------------
 function buildReport(checks, git) {
+  const boxes = readSignoffBoxes()
+  const signoffTotal = boxes?.total ?? 17
+  const signoffSigned = boxes?.signed ?? 0
   const byCategory = { EVIDENCE_READY: 0, EXTERNAL_ENV: 0, HUMAN_DECISION: 0 }
   for (const item of SIGNOFF_ITEMS) byCategory[item.category]++
   const gates = GATES.map((g) => {
@@ -428,7 +450,7 @@ function buildReport(checks, git) {
       statement: '本脚本只读；不代勾 [x]、不代替签字、不回填执行计划任务行。',
       gateRule: '每个门禁须其签字项由责任方逐项勾选后，方可在 storefront-execution-plan_v1.0.md 回填 [x]。',
     },
-    summary: { checks: statuses, signoffTotal: 17, signoffSigned: 0, signoffPending: 17, byCategory },
+    summary: { checks: statuses, signoffTotal, signoffSigned, signoffPending: signoffTotal - signoffSigned, byCategory },
     checks,
     gates,
     signoff: SIGNOFF_ITEMS,

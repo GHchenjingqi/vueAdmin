@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { UniqueConstraintError } from 'sequelize'
 import sequelize from '../../../config/database.js'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
@@ -76,7 +77,13 @@ export async function getOrCreateCart(site: StorefrontSite, token?: string, cust
   return cart
 }
 
-/** 加购 / 更新数量（同一 SKU 行内唯一，重复加购累加数量） */
+/**
+ * 加购 / 更新数量（同一 SKU 行内唯一，重复加购累加数量）
+ *
+ * 并发安全：明细唯一键 (tenantId, cartId, skuId) 是唯一真相源。
+ * 未命中时 create，撞唯一键说明并发方已建行，转为原子累加；
+ * 命中时用 SQL `SET qty = qty + n` 原子累加，避免读后写丢更新。
+ */
 export async function addItem(
   site: StorefrontSite,
   token: string | undefined,
@@ -98,21 +105,31 @@ export async function addItem(
   const unitAmountCents = priceRow ? Math.round(Number(priceRow.amount) * 100) : 0
 
   const existing = await ShopCartItem.findOne({ where: { cartId: cart.id, skuId: sku.id, tenantId: tId } })
-  if (existing) {
-    await existing.update({ qty: existing.qty + input.qty } as never)
-  } else {
-    await ShopCartItem.create({
-      tenantId: tId,
-      cartId: cart.id,
-      skuId: sku.id,
-      spuId: sku.spuId,
-      qty: input.qty,
-      unitAmountCents,
-      currency: cart.currency,
-      titleSnapshot: spu ? localize(spu.name, site.defaultLocale) : null,
-      specSnapshot: sku.spec ?? null,
-    } as never)
+  if (!existing) {
+    try {
+      await ShopCartItem.create({
+        tenantId: tId,
+        cartId: cart.id,
+        skuId: sku.id,
+        spuId: sku.spuId,
+        qty: input.qty,
+        unitAmountCents,
+        currency: cart.currency,
+        titleSnapshot: spu ? localize(spu.name, site.defaultLocale) : null,
+        specSnapshot: sku.spec ?? null,
+      } as never)
+      return cart
+    } catch (err) {
+      // 并发加购同一 SKU：唯一索引挡住第二个 INSERT，本次数量仍需累加，不能丢也不能报 500
+      if (!(err instanceof UniqueConstraintError)) throw err
+    }
   }
+
+  // 原子累加（MySQL 行锁内 `qty = qty + n`），替代原有的 findOne → qty + n → update 读后写
+  await ShopCartItem.increment(
+    { qty: input.qty },
+    { where: { tenantId: tId, cartId: cart.id, skuId: sku.id } },
+  )
   return cart
 }
 
