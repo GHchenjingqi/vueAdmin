@@ -28,6 +28,22 @@ export default defineEventHandler(async (event) => {
     return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'payment providers upstream error' })
   }
 
+  // ---- POST /api/payments/capture（回跳后主动确认：PayPal capture 等） ----
+  if (/^payments\/capture$/.test(url) && method === 'POST' && source !== 'mock') {
+    const body = await readBody(event).catch(() => ({}))
+    const res = await commerceRealFetch('payments/capture', { method, body, cookie, requestId: event.context.requestId as string | undefined })
+    setResponseStatus(event, res.status)
+    return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'payment capture upstream error' })
+  }
+
+  // ---- GET /api/payments/order-by-return-token/:token（网关回跳免 token 状态查询） ----
+  const rtMatch = /^payments\/order-by-return-token\/([^/?]+)(\?.*)?$/.exec(url)
+  if (rtMatch && method === 'GET' && source !== 'mock') {
+    const res = await commerceRealFetch(`payments/order-by-return-token/${rtMatch[1]}`, { method, cookie, requestId: event.context.requestId as string | undefined })
+    setResponseStatus(event, res.status)
+    return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'order status upstream error' })
+  }
+
   // ---- 直通域（并行后端已交付的扩展能力；auto/real 下透传，4xx 业务错误原样返回） ----
   const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses|referrals|experiments)\b/.exec(url)
   if (extMatch && source !== 'mock') {

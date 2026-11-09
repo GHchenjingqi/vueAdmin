@@ -13,7 +13,7 @@ import { getGateway, assertGatewayConfigured } from '../payments/gatewayRegistry
 import { notifyUrl } from '../payments/gateways/common.js'
 import config from '../../../config/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
-import type { GatewayAction, GatewayNotifyContext } from '../payments/types.js'
+import type { GatewayAction, GatewayEvent, GatewayNotifyContext } from '../payments/types.js'
 
 /**
  * 支付服务（阶段 5 步骤 4 / P3-T11 / P3-T12）
@@ -43,6 +43,8 @@ export interface PaymentSession {
   qrCode?: string
   form?: { url: string; method: 'GET' | 'POST'; fields: Record<string, string> }
   clientParams?: Record<string, string>
+  /** 免登录回跳凭证（网关跳转回结果页时换取订单状态用） */
+  returnToken?: string
 }
 
 /** 创建支付会话：金额与币种取自订单快照；provider 可选（缺省用默认，P5-T03 区域支付/BNPL） */
@@ -71,6 +73,8 @@ export async function createSession(site: StorefrontSite, orderId: number, reque
   const sessionId = `sess_${crypto.randomBytes(12).toString('hex')}`
   // 网关商户订单号：纯字母数字，供 out_trade_no / invoice_id / orderId 使用
   const gatewayOrderNo = `P${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(5).toString('hex').toUpperCase()}`
+  // 免登录回跳凭证：网关跳转回结果页时只带 orderNo+provider，前端用它换订单状态
+  const returnToken = makeReturnToken(order.orderNo, provider)
 
   let gatewayResult: {
     action: GatewayAction
@@ -91,7 +95,7 @@ export async function createSession(site: StorefrontSite, orderId: number, reque
       providerRef,
       gatewayOrderNo,
       notifyUrl: notifyUrl(provider),
-      returnUrl: base ? `${base}/checkout/result?orderNo=${encodeURIComponent(order.orderNo)}&provider=${provider}` : '',
+      returnUrl: base ? `${base}/checkout/result?orderNo=${encodeURIComponent(order.orderNo)}&provider=${provider}&rt=${encodeURIComponent(returnToken)}` : '',
       subject: `订单 ${order.orderNo}`,
       tenantId: tId,
     })
@@ -127,6 +131,7 @@ export async function createSession(site: StorefrontSite, orderId: number, reque
     qrCode: gatewayResult.qrCode,
     form: gatewayResult.form,
     clientParams: gatewayResult.clientParams,
+    returnToken,
   }
 }
 
@@ -160,7 +165,7 @@ const SETTLED_PAYMENT_STATUSES = new Set(['captured', 'refunding', 'refunded'])
 
 /**
  * 处理支付 Webhook（原始 body + 签名头）。
- * 返回 { ok, status } 供 controller 转化为 HTTP 响应；验签失败抛 401，且不产生任何副作用。
+ * 验签与事件解析委派各网关适配器，解析后的统一事件交给 applyGatewayEvent 落地。
  */
 export async function handleWebhook(
   provider: string,
@@ -189,7 +194,17 @@ export async function handleWebhook(
     }
     throw err
   }
+  return applyGatewayEvent(provider, event)
+}
 
+/**
+ * 应用统一支付事件到订单状态机（Webhook / 主动 capture / 查单补单共用）。
+ * 包含 (provider, providerRef) 幂等去重、订单绑定校验、币种可用性校验与
+ * paymentStatus CAS 认领；副作用（预占 commit / 释放、审计、邮件）仅赢家产生。
+ */
+export async function applyGatewayEvent(provider: string, event: GatewayEvent): Promise<WebhookResult> {
+  const def = getProvider(provider)
+  if (!def) return { ok: false, status: 400, message: `未注册的支付 Provider: ${provider}` }
   const tId = tid()
   const payload = event.raw
   let providerRef: string | undefined = event.providerRef
@@ -309,4 +324,57 @@ export async function handleWebhook(
   }
 
   return { ok: false, status: 400, message: `不支持的事件类型: ${eventType ?? 'unknown'}` }
+}
+
+/**
+ * 网关要求用户在回跳后由服务端主动确认（如 PayPal Orders v2 先 authorize 再 capture）。
+ * 幂等：重复调用等同于重复 webhook，仅靠 applyGatewayEvent 的 CAS 认领产生一次副作用。
+ * 仅对配置了 capture 的真实网关生效；mock/bnpl 无此环节直接透传。
+ */
+export async function capturePayment(orderNo: string, provider: string): Promise<WebhookResult> {
+  const def = getProvider(provider)
+  if (!def || !def.real) return { ok: false, status: 422, message: '支付方式不支持主动确认' }
+  const gateway = getGateway(provider)
+  if (!gateway?.capture) return { ok: false, status: 422, message: `支付通道 ${provider} 不支持主动确认` }
+  const tId = tid()
+  const payment = await ShopOrderPayment.findOne({ where: { orderNo, tenantId: tId } as never })
+  if (!payment) return { ok: false, status: 404, message: '支付记录不存在' }
+  if (payment.provider !== provider) return { ok: false, status: 400, message: '支付通道不匹配' }
+  if (payment.status !== 'initiated') return { ok: true, alreadyProcessed: true, status: 200 }
+  const event = await gateway.capture({ gatewayRef: payment.gatewayRef ?? '', config: { providerId: provider } })
+  return applyGatewayEvent(provider, event)
+}
+
+const RETURN_TOKEN_TTL_MS = 15 * 60 * 1000
+
+function returnTokenSecret(): string {
+  return config.payment?.webhookSecret ?? 'storefront_mock_webhook_secret'
+}
+
+/**
+ * 生成免登录回跳凭证（无状态签名 token）：网关跳转回结果页时只带 orderNo + provider，
+ * 前端用此 token 换订单状态，避免把 accessToken 暴露在跳转 URL 或依赖 webhook 时序。
+ * TTL 15 分钟；token 仅用于只读状态查询，不含任何写权限。
+ */
+export function makeReturnToken(orderNo: string, provider: string): string {
+  const exp = Date.now() + RETURN_TOKEN_TTL_MS
+  const body = Buffer.from(`${orderNo}.${provider}.${exp}`).toString('base64url')
+  const sig = createHmac('sha256', returnTokenSecret()).update(body).digest('base64url')
+  return `${body}.${sig}`
+}
+
+/** 校验回跳凭证：签名不符 / 已过期返回 null */
+export function verifyReturnToken(token: string): { orderNo: string; provider: string } | null {
+  const parts = token.split('.')
+  if (parts.length !== 2) return null
+  const [body, sig] = parts
+  const expected = createHmac('sha256', returnTokenSecret()).update(body).digest('base64url')
+  const a = Buffer.from(sig)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null
+  const decoded = Buffer.from(body, 'base64url').toString('utf8')
+  const [orderNo, provider, exp] = decoded.split('.')
+  if (!orderNo || !provider || !exp) return null
+  if (Date.now() > Number(exp)) return null
+  return { orderNo, provider }
 }

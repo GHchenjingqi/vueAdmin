@@ -10,7 +10,7 @@ import { trackPurchase } from '@shared/analytics/ecommerce'
  */
 const { t } = useI18n()
 const route = useRoute()
-const { getOrder, pay, listProviders } = useCheckout()
+const { getOrder, pay, listProviders, getOrderByReturnToken, capturePayment } = useCheckout()
 
 const channels = ref<PaymentChannel[]>([])
 const selectedProvider = ref('')
@@ -36,6 +36,8 @@ function autoSubmitForm(form: NonNullable<PaymentSessionView['form']>): void {
 const orderNo = computed(() => String(route.query.order ?? ''))
 const orderId = computed(() => String(route.query.id ?? ''))
 const token = computed(() => String(route.query.t ?? ''))
+const returnToken = computed(() => String(route.query.rt ?? ''))
+const provider = computed(() => String(route.query.provider ?? ''))
 
 interface OrderResponse {
   orderNo: string
@@ -50,6 +52,14 @@ interface OrderResponse {
 const { data: order, refresh } = await useAsyncData(
   'order-result',
   async (): Promise<OrderResponse | null> => {
+    // 网关回跳场景：只带 orderNo+provider+rt（无 accessToken），用回跳凭证换订单状态
+    if (returnToken.value) {
+      try {
+        return (await getOrderByReturnToken(returnToken.value)) as OrderResponse | null
+      } catch {
+        return null
+      }
+    }
     const key = orderId.value || orderNo.value
     if (!key || !token.value) return null
     try {
@@ -123,6 +133,17 @@ onMounted(() => {
     selectedProvider.value = list[0]?.id ?? ''
   }).catch(() => { channels.value = [] })
   if (order.value && !paid.value) {
+    // 网关回跳且通道需服务端主动确认（PayPal 类 authorize→capture）：先确认再展示
+    if (returnToken.value && provider.value) {
+      void (async () => {
+        try {
+          await capturePayment(orderNo.value, provider.value, returnToken.value)
+        } catch {
+          /* 确认失败不阻塞；webhook / 定时查单会兜底 */
+        }
+        await refresh()
+      })()
+    }
     polling.value = true
     let elapsed = 0
     pollTimer = setInterval(async () => {

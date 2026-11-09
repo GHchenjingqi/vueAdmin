@@ -12,6 +12,8 @@ const router = Router()
 
 router.get('/providers', paymentController.listPaymentProviders)
 router.post('/session', validate(createPaymentSessionSchema, 'body'), paymentController.createSession)
+router.post('/capture', paymentController.capturePayment)
+router.get('/order-by-return-token/:token', paymentController.orderByReturnToken)
 router.post('/webhooks/:provider', express.raw({ type: 'application/json', limit: '1mb' }), paymentController.webhook)
 
 export default router

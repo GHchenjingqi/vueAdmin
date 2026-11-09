@@ -78,6 +78,31 @@ export function useCheckout() {
     return data
   }
 
+  /**
+   * 网关跳转回结果页时只带 orderNo+provider（无 accessToken）。
+   * 用回跳凭证换取订单只读状态；凭证无效返回 null（前端按未找到处理）。
+   */
+  async function getOrderByReturnToken(token: string): Promise<OrderDetail | null> {
+    const res = await fetch(`/api/payments/order-by-return-token/${encodeURIComponent(token)}`)
+    const data = (await res.json()) as { code?: number; data?: OrderDetail | null; message?: string }
+    if (!res.ok) throw new Error(data.message || 'order status lookup failed')
+    return data.data ?? null
+  }
+
+  /**
+   * 网关要求用户在回跳后由服务端主动确认（如 PayPal capture）。
+   * 必须由回跳凭证授权，成功幂等落到订单状态机。
+   */
+  async function capturePayment(orderNo: string, provider: string, returnToken: string): Promise<void> {
+    const res = await fetch('/api/payments/capture', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderNo, provider, returnToken }),
+    })
+    const data = (await res.json()) as { code?: number; message?: string }
+    if (!res.ok || (data.code !== undefined && data.code !== 0)) throw new Error(data.message || 'capture failed')
+  }
+
   /** P4-T03：当前顾客订单列表（Bearer 顾客 JWT，金额按订单快照币种展示） */
   async function listOrders(page = 1, pageSize = 10): Promise<{ items: OrderDraft[]; total: number; page: number; pageSize: number }> {
     const { getToken } = await import('@shared/customer/auth')
@@ -90,5 +115,5 @@ export function useCheckout() {
     return { items: data.items ?? [], total: data.total ?? 0, page: data.page ?? page, pageSize: data.pageSize ?? pageSize }
   }
 
-  return { order, loading, placeOrder, pay, getOrder, listOrders, listProviders }
+  return { order, loading, placeOrder, pay, getOrder, getOrderByReturnToken, capturePayment, listOrders, listProviders }
 }

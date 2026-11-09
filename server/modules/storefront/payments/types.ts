@@ -80,7 +80,7 @@ export interface PaymentGateway {
   /** 网关要求「用户返回后服务端主动确认」时实现（PayPal capture） */
   capture?(ctx: { gatewayRef: string; config: Record<string, string> }): Promise<GatewayEvent>
   /** 主动查单（通知丢失时补单） */
-  query?(ctx: { orderNo: string; providerRef: string; config: Record<string, string> }): Promise<GatewayEvent | null>
+  query?(ctx: { orderNo: string; providerRef: string; gatewayRef?: string; config: Record<string, string> }): Promise<GatewayEvent | null>
   refund?(ctx: GatewayRefundContext & { config: Record<string, string> }): Promise<{ providerRef?: string }>
   /** 通知成功应答体（支付宝要求纯文本 success，微信要求 JSON） */
   successResponse?(): { contentType: string; body: string }

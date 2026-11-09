@@ -123,6 +123,21 @@ export const paypalGateway: PaymentGateway = {
     }
   },
 
+  async query({ providerRef, gatewayRef, config }) {
+    const cfg = { ...envConfig('PAYPAL', KEYS), ...config }
+    const access = await token(cfg)
+    // PayPal 查单主键是 order id（落在 payment.gatewayRef），providerRef 仅本地幂等键
+    const orderId = gatewayRef || providerRef
+    const raw = await fetchJson<Record<string, unknown>>(`${apiBase(cfg)}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${access}` },
+    })
+    const status = String(raw.status ?? '')
+    if (status === 'COMPLETED') return { type: 'payment.succeeded', gatewayRef: orderId, raw }
+    if (status === 'VOIDED') return { type: 'payment.failed', gatewayRef: orderId, raw }
+    return null
+  },
+
   async refund({ refundNo, amountCents, currency, gatewayRef, config }) {
     const cfg = { ...envConfig('PAYPAL', KEYS), ...config }
     const access = await token(cfg)

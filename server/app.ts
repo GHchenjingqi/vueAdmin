@@ -201,6 +201,18 @@ void (async () => {
   }
 })()
 
+// ---------- 支付对账 / 补单 / 超时关单扫描器（默认每 5 分钟一次）----------
+// 扫描仍处于 initiated 的支付单据：支持查单的网关主动补单；超硬上限（24h）或
+// 不支持查单的通道直接关单并释放库存预占。复用既有 CAS 状态机，副作用仅赢家产生。
+void (async () => {
+  try {
+    const { startPaymentReconcileScanner } = await import('./modules/storefront/services/paymentReconcileService.js')
+    startPaymentReconcileScanner(5 * 60 * 1000)
+  } catch (err) {
+    logInfo(`支付对账扫描器启动失败: ${(err as Error).message}`)
+  }
+})()
+
 // ---------- 优雅关闭（处理 SIGTERM/SIGINT）----------
 process.on('SIGTERM', async () => {
   await closeRedis()

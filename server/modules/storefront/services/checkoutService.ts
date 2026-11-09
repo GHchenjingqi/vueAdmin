@@ -10,6 +10,7 @@ import * as referralService from './referralService.js'
 import { extractCountry } from './shippingService.js'
 import type { OrderAttribution } from '../../../shared/schemas/storefront.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
+import { verifyReturnToken } from './paymentService.js'
 
 /**
  * 建单服务（阶段 5 步骤 4 / P3-T10）
@@ -26,7 +27,9 @@ function genOrderNo(): string {
   const d = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   const ts = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
-  return `SO${ts}${Math.floor(Math.random() * 1e4).toString().padStart(4, '0')}`
+  return `SO${ts}${Math.floor(Math.random() * 1e4)
+    .toString()
+    .padStart(4, '0')}`
 }
 
 function genAccessToken(): string {
@@ -260,6 +263,19 @@ export async function getOrderWithToken(orderId: number, accessToken: string): P
   return toOrderView(order, false)
 }
 
+/**
+ * 网关跳转回结果页时只带 orderNo+provider，无 accessToken。
+ * 凭回跳凭证（无状态签名 + 15 分钟 TTL）换订单状态；凭证无效 / 过期 / orderNo 不匹配返回 null。
+ * 仅用于只读状态查询，无任何写权限。
+ */
+export async function getOrderByReturnToken(token: string): Promise<OrderView | null> {
+  const parsed = verifyReturnToken(token)
+  if (!parsed) return null
+  const order = await ShopOrder.findOne({ where: { orderNo: parsed.orderNo, tenantId: tid() } })
+  if (!order) return null
+  return toOrderView(order, false)
+}
+
 /** 取消订单：释放预占与库存占用（已支付 / 已发货不可取消） */
 export async function cancelOrder(orderId: number, accessToken: string): Promise<OrderView> {
   const order = await ShopOrder.findOne({ where: { id: orderId, accessToken, tenantId: tid() } })
@@ -287,11 +303,7 @@ export interface OrderListResult {
  * - 订单归属在创建时写入 buyer.customerId（JSON），此处用 JSON_EXTRACT 精确匹配，不依赖可枚举的 orderNo；
  * - 金额一律取订单快照币种展示（toOrderView 已从快照读取 currency / 各金额分）。
  */
-export async function listMyOrders(
-  owner: { tenantId: number; customerId: number },
-  page = 1,
-  pageSize = 10,
-): Promise<OrderListResult> {
+export async function listMyOrders(owner: { tenantId: number; customerId: number }, page = 1, pageSize = 10): Promise<OrderListResult> {
   const p = page > 0 ? page : 1
   const ps = Math.min(pageSize > 0 ? pageSize : 10, 50)
   const where = {

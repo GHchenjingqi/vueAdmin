@@ -6,6 +6,8 @@ import * as monitoring from '../services/monitoringService.js'
 import { listProviders, publicProvider } from '../payments/providerRegistry.js'
 import { getGateway } from '../payments/gatewayRegistry.js'
 import type { CreatePaymentSessionInput } from '../../../shared/schemas/storefront.js'
+import * as checkoutService from '../services/checkoutService.js'
+import { verifyReturnToken } from '../services/paymentService.js'
 
 export const createSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -57,6 +59,39 @@ export const webhook = async (req: Request, res: Response, next: NextFunction) =
     res.status(result.status).json({ code: result.ok ? 0 : result.status, message: result.message ?? 'ok', alreadyProcessed: result.alreadyProcessed ?? false })
   } catch (err) {
     monitoring.recordLatency('webhook_latency_ms', Date.now() - startedAt)
+    next(err)
+  }
+}
+
+/**
+ * 网关要求用户在回跳后由服务端主动确认（如 PayPal capture）。
+ * 必须由回跳凭证授权（避免无鉴权 capture 被滥用），成功后幂等落到订单状态机。
+ */
+export const capturePayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orderNo, provider, returnToken } = req.body as { orderNo?: string; provider?: string; returnToken?: string }
+    if (!orderNo || !provider || !returnToken) throw new AppError(400, '缺少 orderNo / provider / returnToken')
+    const parsed = verifyReturnToken(returnToken)
+    if (!parsed || parsed.orderNo !== orderNo || parsed.provider !== provider) {
+      throw new AppError(401, '回跳凭证无效')
+    }
+    const result = await paymentService.capturePayment(orderNo, provider)
+    res.status(result.status).json({ code: result.ok ? 0 : result.status, message: result.message ?? 'ok', alreadyProcessed: result.alreadyProcessed ?? false })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * 网关跳转回结果页时只带 orderNo+provider（无 accessToken），凭回跳凭证换取订单只读状态。
+ * 凭证无效 / 过期 / 不匹配返回 data:null，由前端按「未找到」处理。
+ */
+export const orderByReturnToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = String(req.params.token ?? '')
+    const order = await checkoutService.getOrderByReturnToken(token)
+    res.json({ code: 0, data: order })
+  } catch (err) {
     next(err)
   }
 }
