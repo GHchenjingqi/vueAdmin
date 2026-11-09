@@ -13,6 +13,8 @@ class Menu extends Model<InferAttributes<Menu>, InferCreationAttributes<Menu>> {
   declare permission: string | null
   declare status: CreationOptional<number>
   declare hidden: CreationOptional<number>
+  declare copyable: CreationOptional<number>
+  declare tenantId: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -81,11 +83,24 @@ Menu.init(
       defaultValue: 0,
       comment: '是否隐藏: 1=隐藏, 0=显示',
     },
+    copyable: {
+      type: DataTypes.TINYINT,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户开通时是否复制该菜单: 1=复制, 0=平台专属（不随模板下发）',
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      // 故意不设模型默认值：设了会覆盖租户钩子的写入侧盖章，租户管理员新建菜单将落进
+      // 平台模板作用域（tenantId=0）。留空时由钩子盖当前租户，平台侧写入走 DB 默认 0。
+      comment: '租户ID，0 为平台菜单模板',
+    },
   } as any,
   {
     sequelize,
     tableName: 'menus',
-    indexes: [{ fields: ['parentId'] }, { fields: ['status'] }, { fields: ['hidden'] }],
+    indexes: [{ fields: ['parentId'] }, { fields: ['status'] }, { fields: ['hidden'] }, { fields: ['tenantId'] }],
   },
 )
 

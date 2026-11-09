@@ -10,6 +10,7 @@ class Department extends Model<InferAttributes<Department>, InferCreationAttribu
   declare phone: string | null
   declare email: string | null
   declare status: CreationOptional<number>
+  declare tenantId: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -59,6 +60,12 @@ Department.init(
       allowNull: false,
       defaultValue: 1,
       comment: '状态: 1=启用, 0=禁用',
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
   } as any,
   {

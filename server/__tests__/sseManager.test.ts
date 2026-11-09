@@ -93,6 +93,40 @@ describe('sseManager', () => {
     it('无用户在线时不报错', () => {
       expect(() => broadcast('notice', {})).not.toThrow()
     })
+
+    it('带 tenantId 时只推送给同租户连接（公告正文不跨租户下发）', () => {
+      const inTenant = mockRes()
+      const otherTenant = mockRes()
+      const untagged = mockRes()
+      addClient(1001, inTenant, 7)
+      addClient(1002, otherTenant, 8)
+      addClient(1003, untagged)
+
+      broadcast('notice-published', { title: '仅租户 7' }, 7)
+
+      expect(inTenant.write).toHaveBeenCalled()
+      expect(otherTenant.write).not.toHaveBeenCalled()
+      expect(untagged.write).not.toHaveBeenCalled()
+
+      inTenant.triggerClose()
+      otherTenant.triggerClose()
+      untagged.triggerClose()
+    })
+
+    it('不带 tenantId 的平台级事件仍全量下发', () => {
+      const a = mockRes()
+      const b = mockRes()
+      addClient(1004, a, 7)
+      addClient(1005, b, 8)
+
+      broadcast('heartbeat-ping', {})
+
+      expect(a.write).toHaveBeenCalled()
+      expect(b.write).toHaveBeenCalled()
+
+      a.triggerClose()
+      b.triggerClose()
+    })
   })
 
   describe('getOnlineCount', () => {

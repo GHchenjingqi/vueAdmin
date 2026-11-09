@@ -579,3 +579,62 @@ describe('searchApi', () => {
     expect(mockGet).toHaveBeenCalledWith('/search', { params: { keyword: 'test' } })
   })
 })
+
+describe('tenantApi', () => {
+  it('list() calls GET /tenants with query params', async () => {
+    const { tenantApi } = await import('@/api/tenant')
+    tenantApi.list({ page: 2, pageSize: 20, status: 1 })
+    expect(mockGet).toHaveBeenCalledWith('/tenants', { params: { page: 2, pageSize: 20, status: 1 } })
+  })
+
+  it('getById() calls GET /tenants/:id', async () => {
+    const { tenantApi } = await import('@/api/tenant')
+    tenantApi.getById(3)
+    expect(mockGet).toHaveBeenCalledWith('/tenants/3')
+  })
+
+  it('provision() calls POST /tenants', async () => {
+    const { tenantApi } = await import('@/api/tenant')
+    const payload = { name: '极风', code: 'acme', admin: { username: 'acme_admin', password: 'Abc12345!' } }
+    tenantApi.provision(payload)
+    expect(mockPost).toHaveBeenCalledWith('/tenants', payload)
+  })
+
+  it('update() calls PUT /tenants/:id', async () => {
+    const { tenantApi } = await import('@/api/tenant')
+    tenantApi.update(3, { name: '新名字' })
+    expect(mockPut).toHaveBeenCalledWith('/tenants/3', { name: '新名字' })
+  })
+
+  it('setStatus() calls PATCH /tenants/:id/status', async () => {
+    const { tenantApi } = await import('@/api/tenant')
+    tenantApi.setStatus(3, 2)
+    expect(mockPatch).toHaveBeenCalledWith('/tenants/3/status', { status: 2 })
+  })
+
+  it('current() calls GET /tenants/current', async () => {
+    const { tenantApi } = await import('@/api/tenant')
+    tenantApi.current()
+    expect(mockGet).toHaveBeenCalledWith('/tenants/current')
+  })
+})
+
+describe('billingApi', () => {
+  it('getQuotaSnapshot() calls GET /billing/usage', async () => {
+    const { billingApi } = await import('@/api/billing')
+    billingApi.getQuotaSnapshot()
+    expect(mockGet).toHaveBeenCalledWith('/billing/usage')
+  })
+
+  it('getPlans() calls GET /billing/plans', async () => {
+    const { billingApi } = await import('@/api/billing')
+    billingApi.getPlans()
+    expect(mockGet).toHaveBeenCalledWith('/billing/plans')
+  })
+
+  it('subscribe() calls POST /billing/subscribe', async () => {
+    const { billingApi } = await import('@/api/billing')
+    billingApi.subscribe(2)
+    expect(mockPost).toHaveBeenCalledWith('/billing/subscribe', { planId: 2 })
+  })
+})

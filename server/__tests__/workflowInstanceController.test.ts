@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Request, Response } from 'express'
+import { Op } from 'sequelize'
 
 const mockInstanceFindAndCountAll = vi.fn()
 const mockInstanceFindByPk = vi.fn()
 const mockInstanceFindOne = vi.fn()
+const mockInstanceFindAll = vi.fn()
 const mockInstanceUpdate = vi.fn()
 const mockLogFindAll = vi.fn()
 const mockApprovalFindAll = vi.fn()
@@ -13,6 +15,7 @@ const mockApprovalUpdate = vi.fn()
 vi.mock('../models/WorkflowInstance.js', () => ({
   default: {
     findAndCountAll: (...args: any[]) => mockInstanceFindAndCountAll(...args),
+    findAll: (...args: any[]) => mockInstanceFindAll(...args),
     findByPk: (...args: any[]) => mockInstanceFindByPk(...args),
     findOne: (...args: any[]) => mockInstanceFindOne(...args),
     update: (...args: any[]) => mockInstanceUpdate(...args),
@@ -45,9 +48,14 @@ vi.mock('../utils/logger.js', () => ({ logOperation: vi.fn() }))
 import * as workflowInstanceController from '../controllers/workflowInstanceController.js'
 import { runInTenant } from '../modules/tenant/context.js'
 
-function mockReqRes(query: Record<string, unknown> = {}, params: Record<string, string> = {}, body: Record<string, unknown> = {}) {
-  const res: any = { json: vi.fn(), status: vi.fn().mockReturnThis() }
-  return [{ query, params, body, user: { id: 1 } } as unknown as Request, res as unknown as Response, vi.fn()] as const
+function mockReqRes(
+  query: Record<string, unknown> = {},
+  params: Record<string, string> = {},
+  body: Record<string, unknown> = {},
+  user: Record<string, unknown> = { id: 1 },
+) {
+  const res: any = { json: vi.fn(), status: vi.fn().mockReturnThis(), send: vi.fn(), setHeader: vi.fn() }
+  return [{ query, params, body, user } as unknown as Request, res as unknown as Response, vi.fn()] as const
 }
 
 describe('workflowInstanceController', () => {
@@ -56,6 +64,7 @@ describe('workflowInstanceController', () => {
     mockInstanceFindAndCountAll.mockResolvedValue({ rows: [], count: 0 })
     mockInstanceFindByPk.mockResolvedValue(null)
     mockInstanceFindOne.mockResolvedValue(null)
+    mockInstanceFindAll.mockResolvedValue([])
     mockLogFindAll.mockResolvedValue([])
     mockApprovalFindAll.mockResolvedValue([])
     mockApprovalUpdate.mockResolvedValue([1])
@@ -178,6 +187,42 @@ describe('workflowInstanceController', () => {
       await runInTenant({ tenantId: 2, userId: 1 }, () => workflowInstanceController.retryInstance(req, res, next))
       expect(next).toHaveBeenCalled()
       expect(res.json).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('部门数据权限（T02）', () => {
+    it('受限用户：starter include 带上可见部门并改为内连接', async () => {
+      const [req, res, next] = mockReqRes({ page: '1', pageSize: '10' }, {}, {}, { id: 5, dataScope: 2, deptId: 11 })
+      await workflowInstanceController.listInstances(req, res, next)
+      const starter = mockInstanceFindAndCountAll.mock.calls[0][0].include[1]
+      expect(starter.required).toBe(true)
+      expect(starter.where.deptId[Op.in]).toEqual([11])
+    })
+
+    it('不受限用户：保持原有 include（发起人被删除的实例仍可见）', async () => {
+      const [req, res, next] = mockReqRes({ page: '1', pageSize: '10' }, {}, {}, { id: 5, dataScope: 1, deptId: 11 })
+      await workflowInstanceController.listInstances(req, res, next)
+      const starter = mockInstanceFindAndCountAll.mock.calls[0][0].include[1]
+      expect(starter.where).toBeUndefined()
+      expect(starter.required).toBeUndefined()
+    })
+
+    it('详情/重试/终止同样按发起人部门受限（范围外查不到即 404）', async () => {
+      const [req, res, next] = mockReqRes({}, { id: '7' }, {}, { id: 5, dataScope: 3, deptId: 11, deptIds: [11, 111] })
+      await workflowInstanceController.getInstanceDetail(req, res, next)
+      const starter = mockInstanceFindOne.mock.calls[0][0].include[1]
+      expect(starter.where.deptId[Op.in]).toEqual([11, 111])
+
+      const [req2, res2, next2] = mockReqRes({}, { id: '7' }, {}, { id: 5, dataScope: 3, deptId: 11, deptIds: [11, 111] })
+      await workflowInstanceController.retryInstance(req2, res2, next2)
+      expect(mockInstanceFindOne.mock.calls[1][0].include[0].required).toBe(true)
+    })
+
+    it('导出不得绕过部门范围', async () => {
+      const [req, res, next] = mockReqRes({}, {}, {}, { id: 5, dataScope: 2, deptId: 11 })
+      await workflowInstanceController.exportInstances(req, res, next)
+      const starter = mockInstanceFindAll.mock.calls[0][0].include[1]
+      expect(starter.where.deptId[Op.in]).toEqual([11])
     })
   })
 })

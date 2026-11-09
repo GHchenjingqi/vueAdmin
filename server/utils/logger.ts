@@ -20,6 +20,7 @@ export const logLogin = async (user, req) => {
       details: '登录成功',
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
+      tenantId: user.tenantId,
     })
   } catch (err) {
     console.error('记录登录日志失败:', err.message)
@@ -31,8 +32,9 @@ export const logLogin = async (user, req) => {
  * @param {string} username - 用户名
  * @param {string} reason - 失败原因
  * @param {import('express').Request} req - 请求对象
+ * @param {number} [tenantId] - 归属租户；登录接口无租户上下文，需由已知用户显式传入
  */
-export const logLoginFailure = async (username, reason, req) => {
+export const logLoginFailure = async (username, reason, req, tenantId?: number) => {
   try {
     await Log.create({
       type: 'login',
@@ -41,6 +43,7 @@ export const logLoginFailure = async (username, reason, req) => {
       details: reason || '密码错误',
       ipAddress: req?.ip,
       userAgent: req?.headers?.['user-agent'],
+      tenantId,
     })
   } catch (err) {
     console.error('记录登录失败日志失败:', err.message)

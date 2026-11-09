@@ -12,6 +12,7 @@ import { logOperation } from '../utils/logger.js'
 import { exportExcel } from '../utils/exportExcel.js'
 import { normalizeIds, prepareChangeLog } from '../utils/helpers.js'
 import { applyDataScopeWhere, isTargetInScope } from '../utils/dataScope.js'
+import { invalidateUserGrants } from './permissionService.js'
 import { createCache, stableKey } from '../utils/cache.js'
 import User from '../models/User.js'
 import Department from '../models/Department.js'
@@ -115,10 +116,16 @@ export async function createUser(
     deptId: number
     roleIds?: number[] | number
   },
-  reqUser: { id: number; username: string },
+  reqUser: { id: number; username: string; dataScope?: number; deptId?: number; deptIds?: number[] },
 ) {
   const { username, nickname, email, phone, password, status, deptId } = data
   const roleIds = normalizeIds(data.roleIds)
+
+  // 写入侧同样受数据权限约束：部门主管只能在可见部门内建号，
+  // 否则可以把自己管不到的部门塞进人，再借后续流程绕回可见范围
+  if (!isTargetInScope(deptId, reqUser)) {
+    throw new AppError(403, '无权在该部门下创建用户')
+  }
 
   const existing = await User.findOne({ where: { username } })
   if (existing) throw new AppError(409, '用户名已存在')
@@ -142,6 +149,7 @@ export async function createUser(
   }
 
   await userListCache.clear()
+  invalidateUserGrants(user.id)
   return { id: user.id }
 }
 
@@ -171,6 +179,11 @@ export async function updateUser(
   const { username, nickname, email, phone, avatar, status, deptId } = data
   const roleIds = normalizeIds(data.roleIds)
 
+  // 改部门等价于把用户移交出/入子树，目标部门同样必须在可见范围内
+  if (deptId !== undefined && deptId !== (user as any).deptId && !isTargetInScope(deptId, reqUser)) {
+    throw new AppError(403, '无权将该用户调整至该部门')
+  }
+
   const updateData = { username, nickname, email, phone, avatar, status, deptId }
   const trackFields = ['username', 'nickname', 'email', 'phone', 'status', 'deptId']
   const { changes, summary } = prepareChangeLog(user, updateData, trackFields)
@@ -188,6 +201,7 @@ export async function updateUser(
   }
 
   await userListCache.clear()
+  invalidateUserGrants(userId)
   return { changes, summary }
 }
 
@@ -245,6 +259,7 @@ export async function deleteUser(userId: number, reqUser?: { dataScope?: number;
   await UserRole.destroy({ where: { userId } })
   await user.destroy()
   await userListCache.clear()
+  invalidateUserGrants(userId)
 
   return { id: userId, username }
 }
@@ -265,6 +280,7 @@ export async function batchDeleteUsers(ids: number[], reqUser?: { dataScope?: nu
   await UserRole.destroy({ where: { userId: { [Op.in]: ids } } })
   const count = await User.destroy({ where: { id: { [Op.in]: ids } } })
   await userListCache.clear()
+  ids.forEach((id) => invalidateUserGrants(id))
 
   return { count, ids }
 }
@@ -336,7 +352,7 @@ export async function downloadTemplate(): Promise<ExcelJS.Buffer> {
  */
 export async function importUsers(
   filePath: string,
-  reqUser: { id: number; username: string },
+  reqUser: { id: number; username: string; dataScope?: number; deptId?: number; deptIds?: number[] },
 ): Promise<{ total: number; success: number; failed: { row: number; msg: string }[] }> {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.readFile(filePath)
@@ -372,6 +388,10 @@ export async function importUsers(
       result.failed.push({ row: i, msg: '部门ID必须是数字' })
       continue
     }
+    if (!isTargetInScope(deptId, reqUser)) {
+      result.failed.push({ row: i, msg: '无权在部门 ' + deptId + ' 下创建用户' })
+      continue
+    }
 
     const roleIds = roleIdsStr
       ? roleIdsStr
@@ -405,6 +425,7 @@ export async function importUsers(
           roleIds.map((roleId) => ({ userId: user.id, roleId })),
           { ignoreDuplicates: true },
         )
+        invalidateUserGrants(user.id)
       }
 
       result.success++

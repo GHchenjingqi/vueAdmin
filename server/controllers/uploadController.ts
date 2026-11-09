@@ -123,7 +123,10 @@ export const uploadFile = async (req, res, next) => {
         }
       })
       const tenantId = req.user?.tenantId
-      if (tenantId) incrUsage(tenantId, 'files', files.length).catch(() => {})
+      if (tenantId) {
+        incrUsage(tenantId, 'files', files.length).catch(() => {})
+        incrUsage(tenantId, 'storage', Math.ceil(files.reduce((sum, f) => sum + f.size, 0) / 1048576)).catch(() => {})
+      }
       return res.json({ code: 0, data: files, message: `成功上传 ${files.length} 个文件` })
     })
   }
@@ -141,7 +144,10 @@ export const uploadFile = async (req, res, next) => {
     }
     const relPath = relative(UPLOAD_DIR, req.file.path)
     const tenantId = req.user?.tenantId
-    if (tenantId) incrUsage(tenantId, 'files').catch(() => {})
+    if (tenantId) {
+      incrUsage(tenantId, 'files').catch(() => {})
+      incrUsage(tenantId, 'storage', Math.ceil(req.file.size / 1048576)).catch(() => {})
+    }
     res.json({
       code: 0,
       data: {

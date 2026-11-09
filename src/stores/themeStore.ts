@@ -11,6 +11,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 // 预设主色
+export const DEFAULT_PRIMARY_COLOR = '#1890ff'
+
 export const presetPrimaryColors = [
   { name: '科技蓝', value: '#0081fa' },
   { name: '活力橙', value: '#fa8c16' },
@@ -76,7 +78,7 @@ export const useThemeStore = defineStore(
     const theme = ref<'light' | 'dark'>('light')
 
     /** 主色（自定义品牌色） */
-    const primaryColor = ref<string>('#1890ff')
+    const primaryColor = ref<string>(DEFAULT_PRIMARY_COLOR)
 
     // ==================== Actions ====================
 
@@ -172,7 +174,7 @@ export const useThemeStore = defineStore(
      */
     function reset(): void {
       theme.value = 'light'
-      primaryColor.value = '#1890ff'
+      primaryColor.value = DEFAULT_PRIMARY_COLOR
       applyPrimaryColorToDom(primaryColor.value)
     }
 

@@ -86,7 +86,8 @@
 
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import { authApi } from '@/api'
+import { authApi, tenantApi } from '@/api'
+import { DEFAULT_PRIMARY_COLOR } from '@/stores/themeStore'
 import { getErrorMessage } from '@/utils/error'
 import { debounce } from '@/utils/debounce'
 import { useUserStore, useSettingStore, useMenuStore } from '@/stores'
@@ -175,6 +176,18 @@ const fetchSettings = async (): Promise<void> => {
   const logo = settingStore.getString('site_logo')
   if (title) appStore.setSiteInfo({ title })
   if (logo) appStore.setSiteInfo({ logo })
+
+  // 租户品牌覆盖平台默认值：同一套部署里每个租户看到的标题/Logo/主色应是自己的
+  try {
+    const { data } = await tenantApi.current()
+    const brand = data.brand || {}
+    if (brand.title) appStore.setSiteInfo({ title: brand.title })
+    if (brand.logo) appStore.setSiteInfo({ logo: brand.logo })
+    // 主色只在用户没自定义过（仍是默认色）时才用租户品牌色，否则个人偏好赢
+    if (brand.color && appStore.primaryColor === DEFAULT_PRIMARY_COLOR) appStore.setPrimaryColor(brand.color)
+  } catch {
+    // 品牌信息拿不到就沿用平台设置，不该让首页白屏
+  }
 }
 
 const fetchMenuTree = async (): Promise<void> => {

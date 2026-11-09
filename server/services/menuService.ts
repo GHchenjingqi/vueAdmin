@@ -10,7 +10,21 @@ import Role from '../models/Role.js'
 import RoleMenu from '../models/RoleMenu.js'
 import UserRole from '../models/UserRole.js'
 import { AppError } from '../middleware/errorHandler.js'
+import { invalidateAllGrants } from './permissionService.js'
 import { buildTree } from '../utils/helpers.js'
+import { getTenantContext } from '../modules/tenant/context.js'
+import { PLATFORM_TENANT_ID } from '../modules/tenant/constants.js'
+
+/**
+ * 平台超管（tenantContext bypass）读取菜单时限定在模板作用域。
+ * 不加这层过滤，所有租户的菜单副本会一起进树，侧边栏出现成排重复条目；
+ * 租户用户则由全局 scope 钩子约束，无需在此处理。
+ */
+function platformViewWhere(where: Record<string, unknown> = {}): Record<string, unknown> {
+  const ctx = getTenantContext()
+  if (ctx?.bypass) return { ...where, tenantId: PLATFORM_TENANT_ID }
+  return where
+}
 
 /** 菜单类型合法值（与 DB ENUM('M','C','F') 一致）；缺省按 DB 默认值 'M' 处理 */
 const MENU_TYPES = ['M', 'C', 'F'] as const
@@ -80,10 +94,27 @@ function removeEmptyDirs(tree: any[]): any[] {
 }
 
 /**
+ * 递归剔除按钮节点（type='F'）
+ *
+ * 侧边栏导航树只应含目录与页面；按钮记录供角色授权树（GET /menus）与
+ * 登录返回的 permissions 使用，混入导航树会渲染出多余条目。
+ */
+function stripButtons(tree: any[]): any[] {
+  return tree
+    .filter((node) => node.type !== 'F')
+    .map((node) => {
+      if (node.children && node.children.length > 0) {
+        node.children = stripButtons(node.children)
+      }
+      return node
+    })
+}
+
+/**
  * 递归获取所有子菜单 ID
  */
 async function getChildIds(id: number): Promise<number[]> {
-  const allMenus = await Menu.findAll({ attributes: ['id', 'parentId'], order: [['id', 'ASC']] })
+  const allMenus = await Menu.findAll({ where: platformViewWhere(), attributes: ['id', 'parentId'], order: [['id', 'ASC']] })
   const ids: number[] = []
   const collect = (parentId: number): void => {
     allMenus
@@ -105,7 +136,7 @@ async function getChildIds(id: number): Promise<number[]> {
  */
 export async function listMenus(scope: string | undefined, userId?: number) {
   if (scope === 'options') {
-    const menus = await Menu.findAll({ order: [['sort', 'ASC']] })
+    const menus = await Menu.findAll({ where: platformViewWhere(), order: [['sort', 'ASC']] })
     return buildTree(menus)
   }
 
@@ -115,10 +146,10 @@ export async function listMenus(scope: string | undefined, userId?: number) {
 
     if (await hasAdminRole(roleIds)) {
       const menus = await Menu.findAll({
-        where: { status: 1, hidden: 0 },
+        where: platformViewWhere({ status: 1, hidden: 0 }),
         order: [['sort', 'ASC']],
       })
-      return removeEmptyDirs(buildTree(menus))
+      return removeEmptyDirs(stripButtons(buildTree(menus)))
     }
 
     const roleMenus = await RoleMenu.findAll({
@@ -129,19 +160,19 @@ export async function listMenus(scope: string | undefined, userId?: number) {
     if (menuIds.size === 0) return []
 
     const allPossibleMenus = await Menu.findAll({
-      where: { status: 1, hidden: 0 },
+      where: platformViewWhere({ status: 1, hidden: 0 }),
       attributes: ['id', 'parentId'],
     })
     collectParentIds(allPossibleMenus, menuIds)
 
     const menus = await Menu.findAll({
-      where: { id: { [Op.in]: [...menuIds] }, status: 1, hidden: 0 },
+      where: platformViewWhere({ id: { [Op.in]: [...menuIds] }, status: 1, hidden: 0 }),
       order: [['sort', 'ASC']],
     })
-    return removeEmptyDirs(buildTree(menus))
+    return removeEmptyDirs(stripButtons(buildTree(menus)))
   }
 
-  const menus = await Menu.findAll({ order: [['sort', 'ASC']] })
+  const menus = await Menu.findAll({ where: platformViewWhere(), order: [['sort', 'ASC']] })
   return buildTree(menus)
 }
 
@@ -190,6 +221,7 @@ export async function createMenu(data: {
   }
 
   const menu = await Menu.create({ parentId, name, path, component, icon, sort, type: normalizeMenuType(type), permission, status, hidden })
+  await invalidateAllGrants()
   return { id: menu.id }
 }
 
@@ -225,6 +257,7 @@ export async function updateMenu(
   }
 
   await menu.update({ parentId: safeParentId, name, path, component, icon, sort, type: normalizeMenuType(type), permission, status, hidden })
+  await invalidateAllGrants()
 }
 
 /**
@@ -238,4 +271,5 @@ export async function deleteMenu(id: number) {
   if (childCount > 0) throw new AppError(400, '请先删除子菜单')
 
   await menu.destroy()
+  await invalidateAllGrants()
 }

@@ -12,6 +12,7 @@ class Notice extends Model<InferAttributes<Notice>, InferCreationAttributes<Noti
   declare publishTime: Date | null
   declare isTop: CreationOptional<number>
   declare sort: CreationOptional<number>
+  declare tenantId: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -72,6 +73,12 @@ Notice.init(
       allowNull: false,
       defaultValue: 0,
       comment: '排序，越小越靠前',
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
   } as any,
   {

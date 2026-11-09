@@ -15,6 +15,10 @@ declare namespace Express {
     tenantId?: number
     /** 有效数据范围：1=全部 2=本部门 3=本级及以下 */
     dataScope?: number
+    /** dataScope=3 时由认证中间件解析出的可见部门集合（含自身与全部下级） */
+    deptIds?: number[]
+    /** 平台超管（跨租户可见，登录时按 username=admin 或 platform_admin 角色判定） */
+    isPlatformAdmin?: boolean
     iat?: number
     exp?: number
   }

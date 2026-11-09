@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
+import { requirePermission } from '../middleware/permissionGuard.js'
 import { quotaGuard } from '../modules/billing/middleware/quotaGuard.js'
 import { validate } from '../middleware/validate.js'
 import { paginationSchema, idParamSchema } from '../shared/schemas/common.js'
@@ -387,7 +388,7 @@ router.get('/users', authMiddleware, validate(userQuerySchema, 'query'), userCon
  *               type: string
  *               format: binary
  */
-router.get('/users/export', authMiddleware, userController.exportUsers)
+router.get('/users/export', authMiddleware, requirePermission('system:user:export'), userController.exportUsers)
 
 /**
  * @openapi
@@ -425,7 +426,7 @@ router.get('/users/template', authMiddleware, userController.downloadTemplate)
  *       200:
  *         description: 导入结果
  */
-router.post('/users/import', authMiddleware, userController.importUsers)
+router.post('/users/import', authMiddleware, requirePermission('system:user:import'), userController.importUsers)
 
 /**
  * @openapi
@@ -452,7 +453,13 @@ router.post('/users/import', authMiddleware, userController.importUsers)
  *       200:
  *         description: 密码重置成功
  */
-router.patch('/users/:id/password', authMiddleware, validate(idParamSchema, 'params'), userController.changePassword)
+router.patch(
+  '/users/:id/password',
+  authMiddleware,
+  requirePermission('system:user:resetPassword'),
+  validate(idParamSchema, 'params'),
+  userController.changePassword,
+)
 
 /**
  * @openapi
@@ -498,7 +505,7 @@ router.get('/users/:id', authMiddleware, validate(idParamSchema, 'params'), user
  *       201:
  *         description: 创建成功
  */
-router.post('/users', authMiddleware, quotaGuard('users'), validate(createUserSchema), userController.create)
+router.post('/users', authMiddleware, requirePermission('system:user:add'), quotaGuard('users'), validate(createUserSchema), userController.create)
 
 /**
  * @openapi
@@ -531,7 +538,14 @@ router.post('/users', authMiddleware, quotaGuard('users'), validate(createUserSc
  *       200:
  *         description: 更新成功
  */
-router.put('/users/:id', authMiddleware, validate(idParamSchema, 'params'), validate(updateUserSchema), userController.update)
+router.put(
+  '/users/:id',
+  authMiddleware,
+  requirePermission('system:user:edit'),
+  validate(idParamSchema, 'params'),
+  validate(updateUserSchema),
+  userController.update,
+)
 
 /**
  * @openapi
@@ -556,7 +570,7 @@ router.put('/users/:id', authMiddleware, validate(idParamSchema, 'params'), vali
  *       200:
  *         description: 批量删除成功
  */
-router.delete('/users/batch', authMiddleware, userController.batchRemove)
+router.delete('/users/batch', authMiddleware, requirePermission('system:user:batchDelete'), userController.batchRemove)
 
 /**
  * @openapi
@@ -577,7 +591,7 @@ router.delete('/users/batch', authMiddleware, userController.batchRemove)
  *       404:
  *         description: 用户不存在
  */
-router.delete('/users/:id', authMiddleware, validate(idParamSchema, 'params'), userController.remove)
+router.delete('/users/:id', authMiddleware, requirePermission('system:user:delete'), validate(idParamSchema, 'params'), userController.remove)
 
 // ==================== 菜单管理 ====================
 
@@ -658,7 +672,7 @@ router.get('/menus/:id', authMiddleware, menuController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/menus', authMiddleware, menuController.create)
+router.post('/menus', authMiddleware, requirePermission('system:menu:add'), menuController.create)
 
 /**
  * @openapi
@@ -693,7 +707,7 @@ router.post('/menus', authMiddleware, menuController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/menus/:id', authMiddleware, menuController.update)
+router.put('/menus/:id', authMiddleware, requirePermission('system:menu:edit'), menuController.update)
 
 /**
  * @openapi
@@ -711,7 +725,7 @@ router.put('/menus/:id', authMiddleware, menuController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/menus/:id', authMiddleware, menuController.remove)
+router.delete('/menus/:id', authMiddleware, requirePermission('system:menu:delete'), menuController.remove)
 
 // ==================== 系统设置 ====================
 
@@ -776,7 +790,7 @@ router.get('/settings/:key', authMiddleware, settingController.getByKey)
  *       200:
  *         description: 保存成功
  */
-router.put('/settings', authMiddleware, settingController.save)
+router.put('/settings', authMiddleware, requirePermission('system:setting:save'), settingController.save)
 
 /**
  * @openapi
@@ -796,7 +810,7 @@ router.put('/settings', authMiddleware, settingController.save)
  *       404:
  *         description: 设置项不存在
  */
-router.delete('/settings/:key', authMiddleware, settingController.remove)
+router.delete('/settings/:key', authMiddleware, requirePermission('system:setting:delete'), settingController.remove)
 
 // ==================== 字典类型管理 ====================
 
@@ -869,7 +883,7 @@ router.get('/dict/types/:id', authMiddleware, dictTypeController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/dict/types', authMiddleware, dictTypeController.create)
+router.post('/dict/types', authMiddleware, requirePermission('system:dict:add'), dictTypeController.create)
 
 /**
  * @openapi
@@ -899,7 +913,7 @@ router.post('/dict/types', authMiddleware, dictTypeController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/dict/types/:id', authMiddleware, dictTypeController.update)
+router.put('/dict/types/:id', authMiddleware, requirePermission('system:dict:edit'), dictTypeController.update)
 
 /**
  * @openapi
@@ -917,7 +931,7 @@ router.put('/dict/types/:id', authMiddleware, dictTypeController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/dict/types/:id', authMiddleware, dictTypeController.remove)
+router.delete('/dict/types/:id', authMiddleware, requirePermission('system:dict:delete'), dictTypeController.remove)
 
 /**
  * @openapi
@@ -931,7 +945,7 @@ router.delete('/dict/types/:id', authMiddleware, dictTypeController.remove)
  *       200:
  *         description: 缓存刷新成功
  */
-router.post('/dict/cache/refresh', authMiddleware, dictTypeController.refreshCache)
+router.post('/dict/cache/refresh', authMiddleware, requirePermission('system:dict:refresh'), dictTypeController.refreshCache)
 
 // ==================== 字典数据管理 ====================
 
@@ -1012,7 +1026,7 @@ router.get('/dict/data/:id', authMiddleware, dictDataController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/dict/data', authMiddleware, dictDataController.create)
+router.post('/dict/data', authMiddleware, requirePermission('system:dict:add'), dictDataController.create)
 
 /**
  * @openapi
@@ -1043,7 +1057,7 @@ router.post('/dict/data', authMiddleware, dictDataController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/dict/data/:id', authMiddleware, dictDataController.update)
+router.put('/dict/data/:id', authMiddleware, requirePermission('system:dict:edit'), dictDataController.update)
 
 /**
  * @openapi
@@ -1061,7 +1075,7 @@ router.put('/dict/data/:id', authMiddleware, dictDataController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/dict/data/:id', authMiddleware, dictDataController.remove)
+router.delete('/dict/data/:id', authMiddleware, requirePermission('system:dict:delete'), dictDataController.remove)
 
 // ==================== 通知管理 ====================
 
@@ -1098,8 +1112,8 @@ router.get(
     if (!userInfo) {
       return res.status(401).json({ code: 401, message: 'SSE 连接票据无效或已过期' })
     }
-    // 票据结构为 { userId, username, nickname }，需映射为 Express req.user 约定的 { id, ... }
-    req.user = { id: userInfo.userId, username: userInfo.username, nickname: userInfo.nickname }
+    // 票据结构为 { userId, username, nickname, tenantId }，需映射为 Express req.user 约定的 { id, ... }
+    req.user = { id: userInfo.userId, username: userInfo.username, nickname: userInfo.nickname, tenantId: userInfo.tenantId }
     next()
   },
   noticeController.sse,
@@ -1179,7 +1193,7 @@ router.get('/notices/:id', authMiddleware, noticeController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/notices', authMiddleware, noticeController.create)
+router.post('/notices', authMiddleware, requirePermission('notice:publish:add'), noticeController.create)
 
 /**
  * @openapi
@@ -1208,7 +1222,7 @@ router.post('/notices', authMiddleware, noticeController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/notices/:id', authMiddleware, noticeController.update)
+router.put('/notices/:id', authMiddleware, requirePermission('notice:publish:edit'), noticeController.update)
 
 /**
  * @openapi
@@ -1234,7 +1248,7 @@ router.put('/notices/:id', authMiddleware, noticeController.update)
  *       200:
  *         description: 操作成功
  */
-router.patch('/notices/:id', authMiddleware, noticeController.update)
+router.patch('/notices/:id', authMiddleware, noticeController.markRead)
 
 /**
  * @openapi
@@ -1273,7 +1287,7 @@ router.patch('/notices', authMiddleware, noticeController.markAllRead)
  *       200:
  *         description: 删除成功
  */
-router.delete('/notices/:id', authMiddleware, noticeController.remove)
+router.delete('/notices/:id', authMiddleware, requirePermission('notice:publish:delete'), noticeController.remove)
 
 // ==================== 系统日志 ====================
 
@@ -1339,7 +1353,7 @@ router.get('/logs', authMiddleware, logController.list)
  *       200:
  *         description: 清理成功
  */
-router.delete('/logs', authMiddleware, logController.cleanup)
+router.delete('/logs', authMiddleware, requirePermission('system:log:delete'), logController.cleanup)
 
 /**
  * @openapi
@@ -1420,7 +1434,7 @@ router.post('/upload', authMiddleware, quotaGuard('files'), uploadController.upl
  *       200:
  *         description: 删除成功
  */
-router.delete('/upload/:id', authMiddleware, uploadController.removeFile)
+router.delete('/upload/:id', authMiddleware, requirePermission('system:file:delete'), uploadController.removeFile)
 
 // ==================== 仪表盘 ====================
 
@@ -1502,7 +1516,7 @@ router.get('/departments/:id', authMiddleware, deptController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/departments', authMiddleware, deptController.create)
+router.post('/departments', authMiddleware, requirePermission('system:dept:add'), deptController.create)
 
 /**
  * @openapi
@@ -1534,7 +1548,7 @@ router.post('/departments', authMiddleware, deptController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/departments/:id', authMiddleware, deptController.update)
+router.put('/departments/:id', authMiddleware, requirePermission('system:dept:edit'), deptController.update)
 
 /**
  * @openapi
@@ -1552,7 +1566,7 @@ router.put('/departments/:id', authMiddleware, deptController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/departments/:id', authMiddleware, deptController.remove)
+router.delete('/departments/:id', authMiddleware, requirePermission('system:dept:delete'), deptController.remove)
 
 // ==================== 角色管理 ====================
 
@@ -1622,7 +1636,7 @@ router.get('/roles/:id', authMiddleware, roleController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/roles', authMiddleware, roleController.create)
+router.post('/roles', authMiddleware, requirePermission('system:role:add'), roleController.create)
 
 /**
  * @openapi
@@ -1653,7 +1667,7 @@ router.post('/roles', authMiddleware, roleController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/roles/:id', authMiddleware, roleController.update)
+router.put('/roles/:id', authMiddleware, requirePermission('system:role:edit'), roleController.update)
 
 /**
  * @openapi
@@ -1671,7 +1685,7 @@ router.put('/roles/:id', authMiddleware, roleController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/roles/:id', authMiddleware, roleController.remove)
+router.delete('/roles/:id', authMiddleware, requirePermission('system:role:delete'), roleController.remove)
 
 // ==================== 消息通知 ====================
 
@@ -1722,7 +1736,7 @@ router.get('/messages', authMiddleware, messageController.list)
  *       201:
  *         description: 发送成功
  */
-router.post('/messages', authMiddleware, messageController.create)
+router.post('/messages', authMiddleware, requirePermission('message:publish:send'), messageController.create)
 
 /**
  * @openapi
@@ -1831,7 +1845,7 @@ router.get('/tasks', authMiddleware, taskController.list)
  *       201:
  *         description: 创建成功
  */
-router.post('/tasks', authMiddleware, taskController.create)
+router.post('/tasks', authMiddleware, requirePermission('system:task:add'), taskController.create)
 
 /**
  * @openapi
@@ -1862,7 +1876,7 @@ router.post('/tasks', authMiddleware, taskController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/tasks/:id', authMiddleware, taskController.update)
+router.put('/tasks/:id', authMiddleware, requirePermission('system:task:edit'), taskController.update)
 
 /**
  * @openapi
@@ -1880,7 +1894,7 @@ router.put('/tasks/:id', authMiddleware, taskController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/tasks/:id', authMiddleware, taskController.remove)
+router.delete('/tasks/:id', authMiddleware, requirePermission('system:task:delete'), taskController.remove)
 
 /**
  * @openapi
@@ -1898,7 +1912,7 @@ router.delete('/tasks/:id', authMiddleware, taskController.remove)
  *       200:
  *         description: 任务已触发执行
  */
-router.post('/tasks/:id/execute', authMiddleware, taskController.execute)
+router.post('/tasks/:id/execute', authMiddleware, requirePermission('system:task:execute'), taskController.execute)
 
 // ==================== 在线用户 ====================
 
@@ -1936,7 +1950,7 @@ router.get('/online-users', authMiddleware, onlineUserController.list)
  *       200:
  *         description: 踢出成功
  */
-router.delete('/online-users/:userId/session', authMiddleware, onlineUserController.kick)
+router.delete('/online-users/:userId/session', authMiddleware, requirePermission('monitor:online:kick'), onlineUserController.kick)
 
 // ==================== 服务监控 ====================
 // M0 platformOnly: 此路由在 M1 接入 tenantContext 后正式拦截，普通租户不可见
@@ -1965,5 +1979,9 @@ router.use('/knowledge', knowledgeRoutes)
 // ==================== 计费与配额 ====================
 import billingRoutes from '../modules/billing/routes/billingRoutes.js'
 router.use(billingRoutes)
+
+// ==================== 租户管理（平台超管） ====================
+import tenantRoutes from '../modules/tenant/routes/tenantRoutes.js'
+router.use(tenantRoutes)
 
 export default router

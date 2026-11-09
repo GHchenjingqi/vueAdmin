@@ -48,8 +48,6 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const result = await userService.createUser(req.body, req.user!)
     logOperation(req, '创建用户', `ID: ${result.id} 用户名 ${req.body.username}`, JSON.stringify({ id: result.id, ...req.body }))
-    const tenantId = req.user!.tenantId
-    if (tenantId) incrUsage(tenantId, 'users').catch(() => {})
     res.status(201).json({ code: 0, data: result, message: '创建成功' })
   } catch (err) {
     next(err)

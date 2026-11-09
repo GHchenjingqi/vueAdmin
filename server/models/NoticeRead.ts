@@ -6,6 +6,7 @@ class NoticeRead extends Model<InferAttributes<NoticeRead>, InferCreationAttribu
   declare noticeId: number
   declare userId: number
   declare readAt: CreationOptional<Date>
+  declare tenantId: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -33,6 +34,12 @@ NoticeRead.init(
       allowNull: false,
       defaultValue: DataTypes.NOW,
       comment: '阅读时间',
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
   } as any,
   {

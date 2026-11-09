@@ -14,6 +14,28 @@ import { AppError } from '../middleware/errorHandler.js'
 import { logOperation } from '../utils/logger.js'
 import { createCache, stableKey } from '../utils/cache.js'
 import { applyCurrentTenantScope, currentTenantConstraint } from '../modules/tenant/scope.js'
+import { Op } from 'sequelize'
+import { scopedDeptIds } from '../utils/dataScope.js'
+import { incrUsage } from '../modules/billing/services/usageService.js'
+
+const STARTER_ATTRS = ['id', 'username', 'nickname']
+
+/**
+ * 实例本身不带部门列，数据权限通过「发起人所属部门」间接生效：
+ * 受部门范围限制的角色，只能看到/操作发起人在其可见部门内的实例。
+ * 不受限时返回 null，保持原有的 LEFT JOIN 语义（含发起人已删除的实例）。
+ */
+function starterDeptWhere(reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
+  const deptIds = scopedDeptIds(reqUser)
+  if (!deptIds) return null
+  return { deptId: { [Op.in]: deptIds } }
+}
+
+/** 部门范围受限时，按发起人部门过滤的 starter include；不受限即原 include */
+function starterInclude(reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
+  const where = starterDeptWhere(reqUser)
+  return where ? { model: User, as: 'starter', attributes: STARTER_ATTRS, where, required: true } : { model: User, as: 'starter', attributes: STARTER_ATTRS }
+}
 
 // 流程实例列表缓存；键含 where + 分页 + 租户约束（applyCurrentTenantScope 在键生成前注入，
 // 防止不同租户同一查询共用缓存键导致跨租户泄漏）
@@ -50,6 +72,8 @@ export const trigger = async (req, res, next) => {
     engine.execute(instance).catch(() => {})
     // 触发会新增实例，使实例列表缓存失效
     await instanceListCache.clear()
+    const tenantId = req.user?.tenantId
+    if (tenantId) incrUsage(tenantId, 'workflowRuns').catch(() => {})
 
     logOperation(req, '触发流程', `实例ID: ${instance.id}, 流程: ${workflow.name}`)
     res.status(201).json({ code: 0, data: { id: instance.id }, message: '流程已触发' })
@@ -69,17 +93,18 @@ export const listInstances = async (req, res, next) => {
     // 租户约束必须在缓存键生成前注入：键含租户维度，避免跨租户共用缓存
     applyCurrentTenantScope(where)
 
-    const cacheKey = stableKey({ where, page: Number(page), pageSize: Number(pageSize) })
+    const starter = starterInclude(req.user)
+    // 部门范围约束走 include（不进 where），因此必须显式并入缓存键，
+    // 否则受限用户与不受限用户会命中同一条缓存而互相泄漏
+    const deptIds = scopedDeptIds(req.user) ?? []
+    const cacheKey = stableKey({ where, deptIds, page: Number(page), pageSize: Number(pageSize) })
     const result = await instanceListCache.getOrSet(cacheKey, async () => {
       const { rows, count } = await WorkflowInstance.findAndCountAll({
         where,
         offset: (Number(page) - 1) * Number(pageSize),
         limit: Number(pageSize),
         order: [['createdAt', 'DESC']],
-        include: [
-          { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
-          { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
-        ],
+        include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name'] }, starter],
       })
       return { rows, total: count, page: Number(page), pageSize: Number(pageSize) }
     })
@@ -97,10 +122,7 @@ export const getInstanceDetail = async (req, res, next) => {
     const tenantWhere = currentTenantConstraint()
     const instance = await WorkflowInstance.findOne({
       where: { id: Number(req.params.id), ...tenantWhere },
-      include: [
-        { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
-        { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
-      ],
+      include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name'] }, starterInclude(req.user)],
     })
     if (!instance) throw new AppError(404, '实例不存在')
 
@@ -120,7 +142,7 @@ export const retryInstance = async (req, res, next) => {
   try {
     // 租户约束：普通租户仅可操作本租户实例；平台超管不约束
     const tenantWhere = currentTenantConstraint()
-    const instance = await WorkflowInstance.findOne({ where: { id: Number(req.params.id), ...tenantWhere } })
+    const instance = await WorkflowInstance.findOne({ where: { id: Number(req.params.id), ...tenantWhere }, include: [starterInclude(req.user)] })
     if (!instance) throw new AppError(404, '实例不存在')
     if (instance.status !== 'failed' && instance.status !== 'terminated') {
       throw new AppError(400, '仅失败或终止的实例可以重试')
@@ -142,7 +164,7 @@ export const terminateInstance = async (req, res, next) => {
   try {
     // 租户约束：普通租户仅可操作本租户实例；平台超管不约束
     const tenantWhere = currentTenantConstraint()
-    const instance = await WorkflowInstance.findOne({ where: { id: Number(req.params.id), ...tenantWhere } })
+    const instance = await WorkflowInstance.findOne({ where: { id: Number(req.params.id), ...tenantWhere }, include: [starterInclude(req.user)] })
     if (!instance) throw new AppError(404, '实例不存在')
     if (['approved', 'rejected', 'terminated'].includes(instance.status)) {
       throw new AppError(400, '实例已结束，无法终止')
@@ -181,10 +203,7 @@ export const exportInstances = async (req, res, next) => {
     const rows = await WorkflowInstance.findAll({
       where,
       order: [['createdAt', 'DESC']],
-      include: [
-        { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
-        { model: User, as: 'starter', attributes: ['id', 'username', 'nickname'] },
-      ],
+      include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name'] }, starterInclude(req.user)],
     })
 
     const header = ['实例ID', '流程名称', '发起人', '标题', '状态', '创建时间', '结束时间']

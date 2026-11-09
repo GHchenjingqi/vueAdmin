@@ -25,6 +25,8 @@ import { generate, verify } from '../utils/captcha.js'
 import { checkRateLimit, recordAttempt, clearAttempts } from '../middleware/rateLimiter.js'
 import { clearKickRecord, isUserKicked } from '../utils/onlineUsers.js'
 import { resolveDataScope } from '../utils/dataScope.js'
+import Tenant from '../modules/tenant/models/Tenant.js'
+import { DEFAULT_TENANT_ID } from '../modules/tenant/constants.js'
 import crypto from 'crypto'
 
 // ==================== 常量 ====================
@@ -42,6 +44,7 @@ interface SseTicketRecord {
   userId: number
   username: string
   nickname: string
+  tenantId?: number
   expiresAt: number
 }
 
@@ -61,12 +64,13 @@ setInterval(() => {
 /**
  * 生成 SSE 一次性 ticket（30 秒有效，一次使用）
  */
-export async function createSseTicket(userId: number, username: string, nickname: string): Promise<{ ticket: string }> {
+export async function createSseTicket(userId: number, username: string, nickname: string, tenantId?: number): Promise<{ ticket: string }> {
   const ticket = crypto.randomBytes(24).toString('hex')
   sseTickets.set(ticket, {
     userId,
     username,
     nickname,
+    tenantId,
     expiresAt: Date.now() + 30 * 1000,
   })
   return { ticket }
@@ -155,8 +159,10 @@ async function buildTokenPayload(user: { id: number; username: string; nickname:
   const roleIds = [...new Set(userRoles.map((ur) => ur.roleId))]
   const { dataScope, deptId } = await resolveDataScope(user.deptId ?? null, roleIds)
 
-  // 判断平台超管：username === 'admin' 或拥有 platform_admin 角色
-  const isPlatformAdmin = user.username === 'admin' || (await isPlatformAdminByRole(roleIds))
+  // 内置账号兜底：用户名 admin 仅当属于默认租户时才算平台超管——
+  // 用户名唯一性只在租户内成立，新租户管理员同样可能取名为 admin
+  const isPlatformAdmin =
+    (user.username === 'admin' && (user.tenantId ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID) || (await isPlatformAdminByRole(roleIds))
 
   return {
     id: user.id,
@@ -171,7 +177,8 @@ async function buildTokenPayload(user: { id: number; username: string; nickname:
 
 async function isPlatformAdminByRole(roleIds: number[]): Promise<boolean> {
   if (roleIds.length === 0) return false
-  const adminRole = await Role.findOne({ where: { code: 'platform_admin' } })
+  // 必须限定默认租户：角色编码唯一性只在租户内成立，租户自建的 platform_admin 角色不算平台身份
+  const adminRole = await Role.findOne({ where: { code: 'platform_admin', tenantId: DEFAULT_TENANT_ID } })
   if (!adminRole) return false
   return roleIds.includes(adminRole.id)
 }
@@ -277,19 +284,27 @@ export async function login(
       const updated = await User.findByPk(user.id, { attributes: ['loginAttempts'] })
       if (updated && updated.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
         await User.update({ lockedUntil: new Date(Date.now() + LOCKOUT_DURATION), loginAttempts: 0 }, { where: { id: user.id } })
-        logLoginFailure(username, '密码错误次数过多，账号已锁定', req)
+        logLoginFailure(username, '密码错误次数过多，账号已锁定', req, user.tenantId)
         throw new AppError(423, `密码错误次数过多，账号已锁定 ${LOCKOUT_DURATION / 60000} 分钟`)
       }
     }
 
-    logLoginFailure(username, '密码错误', req)
+    logLoginFailure(username, '密码错误', req, user.tenantId)
     throw new AppError(401, genericAuthError)
   }
 
   // 检查用户状态
   if (user.status !== 1) {
-    logLoginFailure(username, '账号已被禁用', req)
+    logLoginFailure(username, '账号已被禁用', req, user.tenantId)
     throw new AppError(403, '账号已被禁用')
+  }
+
+  // 租户级熔断：租户被停用/冻结后，其下所有账号一律拒绝登录，
+  // 不必（也不应）等管理员逐个禁用账号或等 token 过期
+  const tenant = await Tenant.findByPk(user.tenantId ?? DEFAULT_TENANT_ID)
+  if (tenant && tenant.status !== 1) {
+    logLoginFailure(username, tenant.status === 2 ? '租户已冻结' : '租户已停用', req, user.tenantId)
+    throw new AppError(403, tenant.status === 2 ? '所属租户已被冻结，请联系平台管理员' : '所属租户已被停用，请联系平台管理员')
   }
 
   // 登录成功，重置失败计数和速率限制

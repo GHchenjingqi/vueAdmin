@@ -47,7 +47,7 @@ export const create = async (req, res, next) => {
  */
 export const update = async (req, res, next) => {
   try {
-    const result = await markMessageRead(Number(req.params.id), req.body.isRead)
+    const result = await markMessageRead(Number(req.params.id), req.body.isRead, req.user.id)
     if ('markedRead' in result) {
       return res.json({ code: 0, message: '已标记为已读' })
     }
@@ -74,7 +74,7 @@ export const readAll = async (req, res, next) => {
  */
 export const remove = async (req, res, next) => {
   try {
-    await deleteMessage(Number(req.params.id))
+    await deleteMessage(Number(req.params.id), req.user.id)
     res.json({ code: 0, message: '删除成功' })
   } catch (err) {
     next(err)

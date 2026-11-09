@@ -8,6 +8,7 @@
 import { Router } from 'express'
 import type { Request, Response, NextFunction } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
+import { requirePermission } from '../middleware/permissionGuard.js'
 import { validate } from '../middleware/validate.js'
 import { chatSchema, applySchema } from '../shared/schemas/ai.js'
 import { createAiProviderSchema, updateAiProviderSchema, aiProviderQuerySchema, aiProviderIdSchema } from '../shared/schemas/aiProvider.js'
@@ -187,7 +188,7 @@ router.get('/ai/providers/:id', authMiddleware, validate(aiProviderIdSchema, 'pa
  *       201:
  *         description: 创建成功
  */
-router.post('/ai/providers', authMiddleware, validate(createAiProviderSchema), aiProviderController.create)
+router.post('/ai/providers', authMiddleware, requirePermission('ai:provider:add'), validate(createAiProviderSchema), aiProviderController.create)
 
 /**
  * @openapi
@@ -220,7 +221,14 @@ router.post('/ai/providers', authMiddleware, validate(createAiProviderSchema), a
  *       200:
  *         description: 更新成功
  */
-router.put('/ai/providers/:id', authMiddleware, validate(aiProviderIdSchema, 'params'), validate(updateAiProviderSchema), aiProviderController.update)
+router.put(
+  '/ai/providers/:id',
+  authMiddleware,
+  requirePermission('ai:provider:edit'),
+  validate(aiProviderIdSchema, 'params'),
+  validate(updateAiProviderSchema),
+  aiProviderController.update,
+)
 
 /**
  * @openapi
@@ -238,6 +246,6 @@ router.put('/ai/providers/:id', authMiddleware, validate(aiProviderIdSchema, 'pa
  *       200:
  *         description: 删除成功
  */
-router.delete('/ai/providers/:id', authMiddleware, validate(aiProviderIdSchema, 'params'), aiProviderController.remove)
+router.delete('/ai/providers/:id', authMiddleware, requirePermission('ai:provider:delete'), validate(aiProviderIdSchema, 'params'), aiProviderController.remove)
 
 export default router

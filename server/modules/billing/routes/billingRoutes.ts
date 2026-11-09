@@ -1,15 +1,16 @@
 import { Router } from 'express'
 import { authMiddleware } from '../../../middleware/auth.js'
-import { tenantContext } from '../../tenant/middleware/tenantContext.js'
-import { checkQuota, getUsage } from '../services/usageService.js'
+import { getQuotaSnapshot, checkQuota, getUsage } from '../services/usageService.js'
+import { issueInvoice } from '../services/invoiceService.js'
 import Subscription from '../models/Subscription.js'
 import Plan from '../models/Plan.js'
+import Invoice from '../models/Invoice.js'
 
 const router = Router()
 
-router.get('/billing/subscription', authMiddleware, tenantContext, async (req, res, next) => {
+router.get('/billing/subscription', authMiddleware, async (req, res, next) => {
   try {
-    const tenantId = (req.user as any).tenantId
+    const tenantId = req.user!.tenantId!
     const sub = await Subscription.findOne({ where: { tenantId, status: 'active' }, order: [['id', 'DESC']] })
     if (!sub) {
       res.json({ code: 0, data: null })
@@ -22,9 +23,18 @@ router.get('/billing/subscription', authMiddleware, tenantContext, async (req, r
   }
 })
 
-router.get('/billing/usage/:metric', authMiddleware, tenantContext, async (req, res, next) => {
+/** 全部指标的「已用/上限」，租户首页配额卡用这一次请求拿全 */
+router.get('/billing/usage', authMiddleware, async (req, res, next) => {
   try {
-    const tenantId = (req.user as any).tenantId
+    res.json({ code: 0, data: await getQuotaSnapshot(req.user!.tenantId!) })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/billing/usage/:metric', authMiddleware, async (req, res, next) => {
+  try {
+    const tenantId = req.user!.tenantId!
     const metric = String(req.params.metric)
     const { limit } = await checkQuota(tenantId, metric)
     const used = await getUsage(tenantId, metric)
@@ -34,7 +44,7 @@ router.get('/billing/usage/:metric', authMiddleware, tenantContext, async (req, 
   }
 })
 
-router.get('/billing/plans', authMiddleware, tenantContext, async (_req, res, next) => {
+router.get('/billing/plans', authMiddleware, async (_req, res, next) => {
   try {
     const plans = await Plan.findAll({ where: { status: 1 }, order: [['sort', 'ASC']] })
     res.json({ code: 0, data: plans })
@@ -43,10 +53,21 @@ router.get('/billing/plans', authMiddleware, tenantContext, async (_req, res, ne
   }
 })
 
-router.post('/billing/subscribe', authMiddleware, tenantContext, async (req, res, next) => {
+/** 本租户账单（变更套餐时出账，见 invoiceService） */
+router.get('/billing/invoices', authMiddleware, async (req, res, next) => {
   try {
-    const tenantId = (req.user as any).tenantId
-    const { planId } = req.body
+    const tenantId = req.user!.tenantId!
+    const invoices = await Invoice.findAll({ where: { tenantId }, order: [['id', 'DESC']], limit: 50 })
+    res.json({ code: 0, data: invoices })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/billing/subscribe', authMiddleware, async (req, res, next) => {
+  try {
+    const tenantId = req.user!.tenantId!
+    const planId = Number(req.body?.planId)
     const plan = await Plan.findByPk(planId)
     if (!plan) {
       res.status(404).json({ code: 404, message: '套餐不存在' })
@@ -57,14 +78,18 @@ router.post('/billing/subscribe', authMiddleware, tenantContext, async (req, res
       existing.status = 'cancelled'
       await existing.save()
     }
+    const now = new Date()
+    const periodEnd = new Date(now.getTime() + 30 * 86400000)
     await Subscription.create({
       tenantId,
       planId,
       status: 'active',
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(Date.now() + 30 * 86400000),
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
     })
-    res.json({ code: 0, message: '订阅成功' })
+    // 出账：一次套餐变更对应一张待支付账单，订阅记录不再是孤档案
+    const invoice = await issueInvoice({ tenantId, plan, periodStart: now, periodEnd })
+    res.json({ code: 0, data: { invoiceId: invoice.id, amount: invoice.amount }, message: '订阅成功' })
   } catch (err) {
     next(err)
   }

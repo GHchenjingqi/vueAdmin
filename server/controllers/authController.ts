@@ -12,7 +12,7 @@ import * as authService from '../services/authService.js'
  */
 export const createSseTicket = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await authService.createSseTicket(req.user!.id, req.user!.username, req.user!.nickname || '')
+    const result = await authService.createSseTicket(req.user!.id, req.user!.username, req.user!.nickname || '', req.user!.tenantId)
     res.json({ code: 0, data: result })
   } catch (err) {
     next(err)
@@ -44,7 +44,14 @@ export const captcha = async (_req: Request, res: Response, next: NextFunction) 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, password, captchaKey, captchaText, rememberMe } = req.body
-    const result = await authService.login(username, password, req.ip, { headers: req.headers as Record<string, string | undefined>, ip: req.ip }, { key: captchaKey, text: captchaText }, rememberMe)
+    const result = await authService.login(
+      username,
+      password,
+      req.ip,
+      { headers: req.headers as Record<string, string | undefined>, ip: req.ip },
+      { key: captchaKey, text: captchaText },
+      rememberMe,
+    )
 
     const { _refreshToken, _rtExpires, ...responseData } = result as any
 

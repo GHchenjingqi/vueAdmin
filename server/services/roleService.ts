@@ -8,6 +8,7 @@ import { Op } from 'sequelize'
 import Role from '../models/Role.js'
 import Menu from '../models/Menu.js'
 import RoleMenu from '../models/RoleMenu.js'
+import { invalidateAllGrants } from './permissionService.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { normalizeIds, prepareChangeLog } from '../utils/helpers.js'
 
@@ -78,6 +79,7 @@ export async function createRole(data: {
     await RoleMenu.bulkCreate(menuIds.map((menuId) => ({ roleId: role.id, menuId })))
   }
 
+  await invalidateAllGrants()
   return { id: role.id, name }
 }
 
@@ -113,6 +115,7 @@ export async function updateRole(
     }
   }
 
+  await invalidateAllGrants()
   return { changes, summary, name }
 }
 
@@ -127,5 +130,6 @@ export async function deleteRole(roleId: number) {
   await RoleMenu.destroy({ where: { roleId } })
   await role.destroy()
 
+  await invalidateAllGrants()
   return { id: roleId, name: roleName }
 }

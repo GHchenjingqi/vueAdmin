@@ -7,12 +7,23 @@ const mocks = vi.hoisted(() => {
   const mockDashboardApi = {
     getStats: vi.fn(),
   }
+  const mockBillingApi = {
+    getQuotaSnapshot: vi.fn(),
+  }
+  const mockElMessage = {
+    error: vi.fn(),
+    warning: vi.fn(),
+  }
 
-  return { mockDashboardApi }
+  return { mockDashboardApi, mockBillingApi, mockElMessage }
 })
 
 vi.mock('@/api', () => ({
   dashboardApi: mocks.mockDashboardApi,
+}))
+
+vi.mock('@/api/billing', () => ({
+  billingApi: mocks.mockBillingApi,
 }))
 
 vi.mock('@/utils/error', () => ({
@@ -23,9 +34,7 @@ vi.mock('element-plus', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   return {
     ...actual,
-    ElMessage: {
-      error: vi.fn(),
-    },
+    ElMessage: mocks.mockElMessage,
   }
 })
 
@@ -38,6 +47,16 @@ describe('Dashboard.vue', () => {
 
     mocks.mockDashboardApi.getStats.mockResolvedValue({
       data: [{ value: 1234 }, { value: 56 }, { value: 89 }, { value: 12 }],
+    })
+    mocks.mockBillingApi.getQuotaSnapshot.mockResolvedValue({
+      data: {
+        planCode: 'pro',
+        periodEnd: '2026-12-01T00:00:00.000Z',
+        metrics: [
+          { metric: 'users', period: 'total', used: 8, limit: 20 },
+          { metric: 'storage', period: 'total', used: 512, limit: 0 },
+        ],
+      },
     })
   })
 
@@ -55,6 +74,7 @@ describe('Dashboard.vue', () => {
             props: ['shadow', 'header'],
           },
           'el-skeleton': { template: '<div class="el-skeleton" />' },
+          'el-tag': { template: '<span class="el-tag"><slot /></span>' },
           'el-icon': { template: '<span class="el-icon"><slot /></span>' },
           'el-progress': { template: '<div class="el-progress" />' },
           MenuIcon: { template: '<span class="menu-icon" />' },
@@ -134,5 +154,34 @@ describe('Dashboard.vue', () => {
     await nextTick()
 
     expect(wrapper.findAll('.el-skeleton').length).toBe(0)
+  })
+
+  it('挂载时拉取配额快照并渲染「已用/上限」', async () => {
+    const wrapper = createWrapper()
+    await nextTick()
+    await nextTick()
+    await nextTick()
+
+    expect(mocks.mockBillingApi.getQuotaSnapshot).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.quota-card').exists()).toBe(true)
+    expect(wrapper.findAll('.quota-bar').length).toBe(2)
+
+    const values = wrapper.findAll('.quota-value').map((node) => node.text())
+    expect(values[0]).toContain('8')
+    expect(values[0]).toContain('20')
+    expect(values[1]).toContain('512')
+  })
+
+  it('配额接口失败时仅提示警告，不影响统计卡片', async () => {
+    mocks.mockBillingApi.getQuotaSnapshot.mockRejectedValue(new Error('quota down'))
+
+    const wrapper = createWrapper()
+    await nextTick()
+    await nextTick()
+    await nextTick()
+
+    expect(mocks.mockElMessage.warning).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.quota-card').exists()).toBe(false)
+    expect(wrapper.findAll('.stat-card').length).toBe(4)
   })
 })

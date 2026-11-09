@@ -8,6 +8,7 @@ import jwt, { JwtPayload } from 'jsonwebtoken'
 import config from '../config/index.js'
 import { updateUserActivity, isUserKicked, removeOnlineUser } from '../utils/onlineUsers.js'
 import { tenantContext } from '../modules/tenant/middleware/tenantContext.js'
+import { hydrateRequestScope, needsScopeHydration } from '../utils/dataScope.js'
 
 /**
  * JWT 认证中间件
@@ -51,8 +52,16 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
       nickname: decoded.nickname,
       tenantId: decoded.tenantId,
     })
-    // 建立租户上下文并驱动后续链路：控制器、服务与全局 scope 钩子均可见
-    tenantContext(req, res, next)
+    // 建立租户上下文并驱动后续链路：控制器、服务与全局 scope 钩子均可见。
+    // 数据权限子树必须在租户上下文内解析（departments 也受租户钩子约束），
+    // 且只在该用户确实是 dataScope=3 时才引入异步，避免普通请求多一次等待。
+    tenantContext(req, res, () => {
+      if (!needsScopeHydration(req.user)) {
+        next()
+        return
+      }
+      hydrateRequestScope(req.user).then(() => next())
+    })
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       res.status(401).json({ code: 401, message: '认证令牌已过期，请重新登录', expired: true })

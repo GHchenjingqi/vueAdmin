@@ -69,6 +69,11 @@ export async function createMessage(data: { fromUserId: number; toUserId?: numbe
   if (type && !['system', 'notice', 'private'].includes(type)) {
     throw new AppError(400, `非法的消息类型: ${type}（仅支持 system / notice / private）`)
   }
+  if (toUserId) {
+    // 经租户 scope 钩子解析：指向其他租户的用户视为不存在
+    const recipient = await User.findByPk(toUserId, { attributes: ['id'] })
+    if (!recipient) throw new AppError(404, '接收者不存在')
+  }
 
   const message = await Message.create({
     fromUserId,
@@ -83,10 +88,14 @@ export async function createMessage(data: { fromUserId: number; toUserId?: numbe
 
 /**
  * 标记消息已读
+ *
+ * 消息是按人投递的私人数据：只能操作自己收到的（或自己发出的）消息，
+ * 否则任意登录用户可用自增 id 读取/清除他人消息。
  */
-export async function markMessageRead(id: number, isRead: boolean) {
+export async function markMessageRead(id: number, isRead: boolean, userId: number) {
   const message = await Message.findByPk(id)
   if (!message) throw new AppError(404, '消息不存在')
+  if (message.toUserId !== null && message.toUserId !== userId) throw new AppError(403, '无权操作该消息')
 
   if (isRead) {
     message.isRead = true
@@ -116,9 +125,10 @@ export async function markAllMessagesRead(userId: number) {
 /**
  * 删除消息
  */
-export async function deleteMessage(id: number) {
+export async function deleteMessage(id: number, userId: number) {
   const message = await Message.findByPk(id)
   if (!message) throw new AppError(404, '消息不存在')
+  if (message.toUserId !== userId && message.fromUserId !== userId) throw new AppError(403, '无权删除该消息')
 
   await message.destroy()
 }

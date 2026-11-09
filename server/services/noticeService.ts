@@ -145,16 +145,37 @@ export async function createNotice(data: {
   })
 
   if (status === 'published') {
-    broadcast('notice-published', {
-      id: notice.id,
-      title: notice.title,
-      type: notice.type,
-      time: notice.publishTime,
-      content: notice.content,
-    })
+    broadcast(
+      'notice-published',
+      {
+        id: notice.id,
+        title: notice.title,
+        type: notice.type,
+        time: notice.publishTime,
+        content: notice.content,
+      },
+      notice.tenantId,
+    )
   }
 
   return { id: notice.id }
+}
+
+/**
+ * 标记通知已读（自助路径）
+ *
+ * 单独成函数而不是复用 updateNotice：/notices/:id 的 PATCH 是无权限码的自助接口，
+ * 若它同时能改标题/正文/状态，任何登录用户就可以越权发布或篡改公告。
+ */
+export async function markNoticeRead(id: number, userId: number) {
+  const notice = await Notice.findByPk(id, { attributes: ['id'] })
+  if (!notice) throw new AppError(404, '通知不存在')
+
+  await NoticeRead.findOrCreate({
+    where: { noticeId: id, userId },
+    defaults: { noticeId: id, userId },
+  })
+  return { markedRead: true }
 }
 
 /**
@@ -169,24 +190,12 @@ export async function updateNotice(
     status?: string
     isTop?: number
     sort?: number
-    isRead?: boolean
     userId?: number
     username?: string
   },
 ) {
   const notice = await Notice.findByPk(id)
   if (!notice) throw new AppError(404, '通知不存在')
-
-  if (data.isRead) {
-    const userId = data.userId
-    if (userId) {
-      await NoticeRead.findOrCreate({
-        where: { noticeId: notice.id, userId },
-        defaults: { noticeId: notice.id, userId },
-      })
-    }
-    return { markedRead: true }
-  }
 
   const { title, content, type, status, isTop, sort, userId, username } = data
   const updateData: Record<string, unknown> = { title, content, type, isTop, sort }
@@ -209,16 +218,20 @@ export async function updateNotice(
   await notice.update(updateData)
 
   if (wasPublished) {
-    broadcast('notice-published', {
-      id: notice.id,
-      title: updateData.title || notice.title,
-      type: updateData.type || notice.type,
-      time: updateData.publishTime,
-      content: (updateData.content as string | undefined) || notice.content,
-    })
+    broadcast(
+      'notice-published',
+      {
+        id: notice.id,
+        title: updateData.title || notice.title,
+        type: updateData.type || notice.type,
+        time: updateData.publishTime,
+        content: (updateData.content as string | undefined) || notice.content,
+      },
+      notice.tenantId,
+    )
   }
   if (wasUnpublished) {
-    broadcast('notice-removed', { id: notice.id })
+    broadcast('notice-removed', { id: notice.id }, notice.tenantId)
   }
 }
 

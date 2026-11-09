@@ -48,6 +48,8 @@ vi.mock('../models/Setting.js', () => ({
 vi.mock('../config/index.js', () => ({
   default: {
     jwt: { secret: 'test-secret-key-not-for-production' },
+    // dataScope 模块加载时会建部门缓存，createCache 需读取该字段
+    redis: { enabled: false },
   },
 }))
 
@@ -82,6 +84,7 @@ vi.mock('../models/UserRole.js', () => ({
 vi.mock('../models/Role.js', () => ({
   default: {
     findAll: vi.fn(),
+    findOne: vi.fn(),
   },
 }))
 
@@ -97,7 +100,21 @@ vi.mock('../models/Menu.js', () => ({
   },
 }))
 
-const { validatePasswordStrength, createSseTicket, consumeSseTicket, getRefreshCookieConfig } = await import('../services/authService.js')
+vi.mock('../modules/tenant/models/Tenant.js', () => ({
+  default: {
+    findByPk: vi.fn(),
+  },
+}))
+
+const { validatePasswordStrength, createSseTicket, consumeSseTicket, getRefreshCookieConfig, login } = await import('../services/authService.js')
+
+// login 走完整链路时需要直接操控这些模型 mock 的返回值
+type MockFn = ReturnType<typeof vi.fn>
+const TenantModel = (await import('../modules/tenant/models/Tenant.js')).default as unknown as { findByPk: MockFn }
+const UserModel = (await import('../models/User.js')).default as unknown as { findOne: MockFn; update: MockFn }
+const UserRoleModel = (await import('../models/UserRole.js')).default as unknown as { findAll: MockFn }
+const { logLoginFailure } = await import('../utils/logger.js')
+const jwt = (await import('jsonwebtoken')).default
 
 describe('validatePasswordStrength', () => {
   it('should reject empty password', () => {
@@ -202,5 +219,71 @@ describe('getRefreshCookieConfig', () => {
     expect(config.secure).toBe(true)
 
     process.env.NODE_ENV = originalEnv
+  })
+})
+
+describe('login 租户级熔断与平台身份', () => {
+  const req = { headers: {}, ip: '127.0.0.1' }
+
+  /** 只关心租户熔断，把前置的用户/密码校验做成恒定通过 */
+  function stubUser(username: string, tenantId: number | null) {
+    UserModel.findOne.mockResolvedValue({
+      id: 10,
+      username,
+      nickname: username,
+      tenantId,
+      deptId: null,
+      status: 1,
+      passwordResetRequired: 0,
+      verifyPassword: async () => true,
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    TenantModel.findByPk.mockResolvedValue({ id: 1, status: 1 })
+    UserModel.update.mockResolvedValue([1])
+    UserRoleModel.findAll.mockResolvedValue([])
+  })
+
+  it('租户被停用时整个租户的账号都拒绝登录', async () => {
+    stubUser('acme_admin', 7)
+    TenantModel.findByPk.mockResolvedValue({ id: 7, status: 0 })
+
+    await expect(login('acme_admin', 'Abc12345!', '127.0.0.1', req)).rejects.toMatchObject({
+      statusCode: 403,
+      message: '所属租户已被停用，请联系平台管理员',
+    })
+    expect(logLoginFailure).toHaveBeenCalledWith('acme_admin', '租户已停用', req, 7)
+  })
+
+  it('租户被冻结时给出可区分的提示', async () => {
+    stubUser('acme_admin', 7)
+    TenantModel.findByPk.mockResolvedValue({ id: 7, status: 2 })
+
+    await expect(login('acme_admin', 'Abc12345!', '127.0.0.1', req)).rejects.toMatchObject({
+      statusCode: 403,
+      message: '所属租户已被冻结，请联系平台管理员',
+    })
+  })
+
+  it('租户正常时放行登录', async () => {
+    stubUser('acme_admin', 7)
+    const result = await login('acme_admin', 'Abc12345!', '127.0.0.1', req)
+    expect(result.accessToken).toBeTruthy()
+  })
+
+  it('用户名 admin 只有在默认租户才算平台超管（用户名唯一性只在租户内成立）', async () => {
+    stubUser('admin', 7)
+    const other = jwt.verify((await login('admin', 'Abc12345!', '127.0.0.1', req)).accessToken, 'test-secret-key-not-for-production') as {
+      isPlatformAdmin: boolean
+    }
+    expect(other.isPlatformAdmin).toBe(false)
+
+    stubUser('admin', 1)
+    const platform = jwt.verify((await login('admin', 'Abc12345!', '127.0.0.1', req)).accessToken, 'test-secret-key-not-for-production') as {
+      isPlatformAdmin: boolean
+    }
+    expect(platform.isPlatformAdmin).toBe(true)
   })
 })

@@ -14,7 +14,7 @@ import { logOperation } from '../utils/logger.js'
 export const list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const scope = req.query.scope as string | undefined
-    const data = await listDepts(scope)
+    const data = await listDepts(scope, req.user)
     res.json({ code: 0, data })
   } catch (err) {
     next(err)
@@ -26,7 +26,7 @@ export const list = async (req: Request, res: Response, next: NextFunction): Pro
  */
 export const getById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const dept = await getDeptById(Number(req.params.id))
+    const dept = await getDeptById(Number(req.params.id), req.user)
     res.json({ code: 0, data: dept })
   } catch (err) {
     next(err)
@@ -38,7 +38,7 @@ export const getById = async (req: Request, res: Response, next: NextFunction): 
  */
 export const create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const result = await createDept(req.body)
+    const result = await createDept(req.body, req.user)
     logOperation(req, '创建部门', `ID: ${result.id} 名称: ${result.name}`)
     res.status(201).json({ code: 0, data: { id: result.id }, message: '创建成功' })
   } catch (err) {
@@ -52,7 +52,7 @@ export const create = async (req: Request, res: Response, next: NextFunction): P
 export const update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = Number(req.params.id)
-    const result = await updateDept(id, req.body)
+    const result = await updateDept(id, req.body, req.user)
     logOperation(req, '更新部门', `ID: ${id} 名称: ${result.name}`, JSON.stringify({ changes: result.changes, summary: result.summary }))
     res.json({ code: 0, message: '更新成功' })
   } catch (err) {
@@ -66,7 +66,7 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
 export const remove = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = Number(req.params.id)
-    const result = await deleteDept(id)
+    const result = await deleteDept(id, req.user)
     logOperation(req, '删除部门', `ID: ${id} 名称: ${result.name}`)
     res.json({ code: 0, message: '删除成功' })
   } catch (err) {
@@ -79,7 +79,7 @@ export const remove = async (req: Request, res: Response, next: NextFunction): P
  */
 export const options = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const data = await getDeptOptions()
+    const data = await getDeptOptions(req.user)
     res.json({ code: 0, data })
   } catch (err) {
     next(err)

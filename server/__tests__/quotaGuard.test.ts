@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const { mockCheckQuota } = vi.hoisted(() => ({ mockCheckQuota: vi.fn() }))
 vi.mock('../modules/billing/services/usageService.js', () => ({
   checkQuota: mockCheckQuota,
+  QUOTA_METRICS: ['users', 'files', 'storage', 'apiCalls', 'workflowRuns'],
 }))
 
 vi.mock('../config/database.js', () => ({ default: {} }))
@@ -42,5 +43,13 @@ describe('quotaGuard', () => {
     const guard = quotaGuard('users')
     await guard(req, res, next)
     expect(next).toHaveBeenCalled()
+  })
+
+  it('未注册的指标名交给错误处理，不静默放行也不误判 402', async () => {
+    const guard = quotaGuard('maxUsers')
+    await guard(req, res, next)
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('未注册的配额指标') }))
+    expect(mockCheckQuota).not.toHaveBeenCalled()
+    expect(res.status).not.toHaveBeenCalled()
   })
 })

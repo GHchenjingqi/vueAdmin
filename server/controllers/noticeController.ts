@@ -16,6 +16,7 @@ import {
   createNotice,
   updateNotice,
   deleteNotice,
+  markNoticeRead,
   markAllRead as markAllReadService,
 } from '../services/noticeService.js'
 
@@ -64,7 +65,7 @@ export const sse = async (req, res, next) => {
 
     res.write(`event: connected\ndata: ${JSON.stringify({ userId })}\n\n`)
 
-    addClient(userId, res)
+    addClient(userId, res, req.user?.tenantId)
 
     const heartbeat = setInterval(() => {
       try {
@@ -189,12 +190,15 @@ export const markAllRead = async (req, res, next) => {
 
 /**
  * 标记单条通知为已读
- * POST /api/notices/:id/read
+ * PATCH /api/notices/:id
+ *
+ * 走独立 Service 而非 updateNotice：这是无权限码的自助接口，
+ * 复用编辑接口会让任何登录用户改正文、改发布状态。
  */
 export const markRead = async (req, res, next) => {
   try {
     const id = Number(req.params.id)
-    const result = await updateNotice(id, { isRead: true, userId: req.user.id })
+    const result = await markNoticeRead(id, req.user.id)
     res.json({ code: 0, data: result, message: '已标记为已读' })
   } catch (err) {
     next(err)

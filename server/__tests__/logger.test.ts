@@ -42,6 +42,15 @@ describe('logger', () => {
 
       await expect(logLogin(user, req)).resolves.toBeUndefined()
     })
+
+    it('登录接口无租户上下文，日志需显式带出用户所属租户', async () => {
+      const user = { id: 1, username: 'admin', tenantId: 7 }
+      const req = { ip: '127.0.0.1', headers: { 'user-agent': 'test' } }
+
+      await logLogin(user, req)
+
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 7 }))
+    })
   })
 
   describe('logLoginFailure', () => {
@@ -86,6 +95,17 @@ describe('logger', () => {
           details: '密码错误',
         }),
       )
+    })
+
+    it('已知用户时带出租户，用户不存在（无归属）则交给列默认值', async () => {
+      const req = { ip: '127.0.0.1', headers: { 'user-agent': 'test' } }
+
+      await logLoginFailure('admin', '密码错误', req, 7)
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 7 }))
+
+      mockCreate.mockClear()
+      await logLoginFailure('ghost', '用户不存在', req)
+      expect(mockCreate.mock.calls[0][0].tenantId).toBeUndefined()
     })
   })
 

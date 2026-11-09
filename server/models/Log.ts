@@ -11,6 +11,7 @@ class Log extends Model<InferAttributes<Log>, InferCreationAttributes<Log>> {
   declare details: string | null
   declare ipAddress: string | null
   declare userAgent: string | null
+  declare tenantId: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -62,6 +63,12 @@ Log.init(
       type: DataTypes.STRING(500),
       allowNull: true,
       comment: '客户端 User-Agent',
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
   } as any,
   {

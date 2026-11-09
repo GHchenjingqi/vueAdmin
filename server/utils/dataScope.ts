@@ -12,6 +12,7 @@
 import { Op } from 'sequelize'
 import Department from '../models/Department.js'
 import Role from '../models/Role.js'
+import { createCache } from './cache.js'
 
 export interface ResolvedScope {
   /** 1=全部 2=本部门 3=本级及以下 */
@@ -80,6 +81,45 @@ export async function getDescendantDeptIds(rootId: number): Promise<number[]> {
 }
 
 /**
+ * dataScope=3 的子树解析结果按部门缓存 60s：
+ * JWT 载荷只携带 deptId/dataScope（不放数组），否则部门树一变就要全员重登；
+ * 部门结构变更处显式失效，保证调整后立即可见。
+ */
+const deptScopeCache = createCache<number[]>({ namespace: 'dept-scope', maxAgeMs: 60_000, max: 1000 })
+
+/** 以 deptId 为根的可见部门集合（含自身），带缓存 */
+export async function getAccessibleDeptIds(deptId: number): Promise<number[]> {
+  return deptScopeCache.getOrSet(`d:${deptId}`, async () => getDescendantDeptIds(deptId))
+}
+
+/** 部门结构（增删改、改父级）变更后失效全部子树缓存 */
+export async function invalidateDeptScope(): Promise<void> {
+  await deptScopeCache.clear()
+}
+
+/**
+ * 是否需要补齐子树：只有 dataScope=3 且尚未解析过才需要查库，
+ * 其余请求保持同步放行（认证中间件对无需解析的请求不得引入异步）。
+ */
+export function needsScopeHydration(user?: { dataScope?: number; deptId?: number; deptIds?: number[] }): boolean {
+  return user?.dataScope === 3 && !!user.deptId && !(user.deptIds && user.deptIds.length > 0)
+}
+
+/**
+ * 把请求用户的可见部门集合补齐到 req.user 上。
+ * 仅 dataScope=3 需要查库；解析失败时保持为空，
+ * 使 applyDataScopeWhere 退化为「仅本部门」而非放开为「全部」——宁可少看，不可多看。
+ */
+export async function hydrateRequestScope(user?: { dataScope?: number; deptId?: number; deptIds?: number[] }): Promise<void> {
+  if (!needsScopeHydration(user)) return
+  try {
+    user!.deptIds = await getAccessibleDeptIds(user!.deptId!)
+  } catch (err) {
+    console.warn('[dataScope] 子树解析失败，按仅本部门处理:', err)
+  }
+}
+
+/**
  * 将部门数据范围约束合并进查询 WHERE 条件。
  *
  * 规则：
@@ -120,6 +160,18 @@ export function applyDataScopeWhere(
     where.deptId = { [Op.in]: finalIds }
   }
   return where
+}
+
+/**
+ * 取当前用户的可见部门集合。
+ * - 返回 null：不限制（dataScope=1 或旧 token 未携带范围）；
+ * - 返回数组：仅允许这些部门；空数组表示无任何可见部门（调用方须给出空结果）。
+ */
+export function scopedDeptIds(reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }): number[] | null {
+  const scope = reqUser?.dataScope
+  if (scope === undefined || scope === 1) return null
+  if (reqUser?.deptIds && reqUser.deptIds.length) return reqUser.deptIds
+  return reqUser?.deptId ? [reqUser.deptId] : []
 }
 
 /**

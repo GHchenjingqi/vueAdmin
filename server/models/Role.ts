@@ -9,6 +9,7 @@ class Role extends Model<InferAttributes<Role>, InferCreationAttributes<Role>> {
   declare status: CreationOptional<number>
   declare dataScope: CreationOptional<number>
   declare remark: string | null
+  declare tenantId: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -24,14 +25,12 @@ Role.init(
     name: {
       type: DataTypes.STRING(30),
       allowNull: false,
-      unique: true,
-      comment: '角色名称',
+      comment: '角色名称（租户内唯一）',
     },
     code: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
-      comment: '角色编码',
+      comment: '角色编码（租户内唯一）',
     },
     sort: {
       type: DataTypes.INTEGER,
@@ -56,10 +55,17 @@ Role.init(
       allowNull: true,
       comment: '备注',
     },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      // 同 Menu：不设模型默认值，否则租户上下文的写入侧盖章会被默认值覆盖
+      comment: '租户ID',
+    },
   } as any,
   {
     sequelize,
     tableName: 'roles',
+    indexes: [{ fields: ['tenantId'] }],
   },
 )
 

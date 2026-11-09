@@ -1,17 +1,34 @@
+/**
+ * 计费/配额 API
+ */
 import request from '@/utils/request'
 
-export function getUsage(metric: string) {
-  return request.get<{ metric: string; used: number; limit: number }>(`/billing/usage/${metric}`)
+export type QuotaMetric = 'users' | 'files' | 'storage' | 'apiCalls' | 'workflowRuns'
+
+export interface QuotaSnapshot {
+  planCode: string | null
+  periodEnd: string | null
+  metrics: Array<{ metric: QuotaMetric; period: 'day' | 'month' | 'total'; used: number; limit: number }>
 }
 
-export function getSubscription() {
-  return request.get<{ subscription: unknown; plan: unknown }>('/billing/subscription')
+export interface PlanSummary {
+  id: number
+  code: string
+  name: string
+  priceMonthly: number
 }
 
-export function getPlans() {
-  return request.get<unknown[]>('/billing/plans')
-}
+export const billingApi = {
+  /** 租户首页配额卡：一次请求拿全部「已用/上限」 */
+  getQuotaSnapshot() {
+    return request.get<QuotaSnapshot>('/billing/usage')
+  },
 
-export function subscribe(planId: number) {
-  return request.post<{ message: string }>('/billing/subscribe', { planId })
+  getPlans() {
+    return request.get<PlanSummary[]>('/billing/plans')
+  },
+
+  subscribe(planId: number) {
+    return request.post<{ invoiceId: number; amount: number }>('/billing/subscribe', { planId })
+  },
 }

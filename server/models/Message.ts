@@ -10,6 +10,7 @@ class Message extends Model<InferAttributes<Message>, InferCreationAttributes<Me
   declare type: CreationOptional<'system' | 'notice' | 'private'>
   declare isRead: CreationOptional<boolean>
   declare readAt: Date | null
+  declare tenantId: CreationOptional<number>
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -56,6 +57,12 @@ Message.init(
       type: DataTypes.DATE,
       allowNull: true,
       comment: '阅读时间',
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
   } as any,
   {

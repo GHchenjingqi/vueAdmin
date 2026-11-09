@@ -62,6 +62,28 @@
       </el-row>
     </section>
 
+    <!-- 配额卡：租户看得懂「已用/上限」才谈得上升级套餐 -->
+    <el-card v-if="quota" shadow="hover" class="info-card quota-card">
+      <template #header>
+        <div class="quota-header">
+          <span class="card-title">{{ t('quota.title') }}</span>
+          <span class="quota-plan">
+            {{ t('quota.plan') }}:
+            <el-tag size="small" type="primary">{{ quota.planCode || t('quota.noPlan') }}</el-tag>
+            <span v-if="quota.periodEnd" class="quota-period">{{ t('quota.periodEnd') }}: {{ quotaPeriodText }}</span>
+          </span>
+        </div>
+      </template>
+      <QuotaBar
+        v-for="item in quota.metrics"
+        :key="item.metric"
+        :label="t(`quota.metrics.${item.metric}`)"
+        :used="item.used"
+        :limit="item.limit"
+        :unit="item.metric === 'storage' ? ' MB' : ''"
+      />
+    </el-card>
+
     <!-- 快速入?提示 - 骨架屏 -->
     <el-card v-if="loading" shadow="hover" class="info-card">
       <template #header>
@@ -86,6 +108,8 @@
 import { ElMessage } from 'element-plus'
 import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import { dashboardApi } from '@/api'
+import { billingApi, type QuotaSnapshot } from '@/api/billing'
+import QuotaBar from '@/components/QuotaBar.vue'
 import { getErrorMessage } from '@/utils/error'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
@@ -95,6 +119,9 @@ const { t } = useI18n()
 const username = computed(() => userStore.username || t('common.default'))
 
 const loading = ref(true)
+const quota = ref<QuotaSnapshot | null>(null)
+
+const quotaPeriodText = computed(() => (quota.value?.periodEnd ? new Date(quota.value.periodEnd).toLocaleDateString() : ''))
 
 interface StatsCard {
   title: string
@@ -177,6 +204,13 @@ onMounted(async () => {
     ElMessage.error(t('dashboard.fetchFailed') + ' ' + getErrorMessage(err))
   } finally {
     loading.value = false
+  }
+
+  try {
+    const res = await billingApi.getQuotaSnapshot()
+    quota.value = res.data
+  } catch (err: unknown) {
+    ElMessage.warning(t('quota.fetchFailed') + ': ' + getErrorMessage(err))
   }
 })
 </script>
@@ -327,5 +361,25 @@ onMounted(async () => {
 .info-card b {
   color: var(--mainColor);
   font-weight: 500;
+}
+
+.quota-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.quota-plan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.quota-period {
+  color: var(--text-secondary);
 }
 </style>

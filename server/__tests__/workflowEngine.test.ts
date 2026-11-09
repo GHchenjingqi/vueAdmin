@@ -33,6 +33,10 @@ vi.mock('../models/ApprovalTask.js', () => ({
 vi.mock('../models/Notice.js', () => ({ default: { create: (...args: any[]) => mockNoticeCreate(...args) } }))
 
 vi.mock('../utils/approvalRuleResolver.js', () => ({ resolveApprovers: vi.fn().mockResolvedValue([99]) }))
+// 8a17ca6 给引擎加了委托转交与出站回调，本文件的用例默认不涉及二者：
+// 不 mock 会加载真实模型（需数据库连接），异常被 execute 的 catch 吞掉后实例变 failed。
+vi.mock('../services/workflowDelegationService.js', () => ({ resolveDelegation: vi.fn(async () => null) }))
+vi.mock('../services/workflowCallbackService.js', () => ({ fireWorkflowCallback: vi.fn(async () => undefined) }))
 vi.mock('../utils/workflowExpression.js', () => ({ evaluateCondition: vi.fn().mockReturnValue(true) }))
 vi.mock('../utils/sseManager.js', () => ({ sendToUser: vi.fn() }))
 vi.mock('../utils/fileLogger.js', () => ({ logInfo: vi.fn() }))
@@ -54,7 +58,7 @@ function makeInstance(overrides = {}) {
     startedBy: 1,
     startedAt: null,
     runtimeState: null,
-    update: vi.fn((vals: any) => {
+    update: vi.fn(async (vals: any) => {
       Object.assign(self, vals)
     }),
     save: vi.fn(async () => {
