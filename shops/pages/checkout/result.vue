@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useCheckout } from '~/composables/useCheckout'
+import { useCheckout, type PaymentChannel, type PaymentSessionView } from '~/composables/useCheckout'
 import Price from '~/components/commerce/Price.vue'
 import { useI18n } from '~/composables/useI18n'
 import { trackPurchase } from '@shared/analytics/ecommerce'
@@ -10,7 +10,28 @@ import { trackPurchase } from '@shared/analytics/ecommerce'
  */
 const { t } = useI18n()
 const route = useRoute()
-const { getOrder, pay } = useCheckout()
+const { getOrder, pay, listProviders } = useCheckout()
+
+const channels = ref<PaymentChannel[]>([])
+const selectedProvider = ref('')
+const qrCode = ref<string | null>(null)
+const gatewayHint = ref<string | null>(null)
+
+/** 网关要求表单自动提交（支付宝网页支付 / 银联前台跳转） */
+function autoSubmitForm(form: NonNullable<PaymentSessionView['form']>): void {
+  const el = document.createElement('form')
+  el.method = form.method
+  el.action = form.url
+  for (const [name, value] of Object.entries(form.fields)) {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    el.appendChild(input)
+  }
+  document.body.appendChild(el)
+  el.submit()
+}
 
 const orderNo = computed(() => String(route.query.order ?? ''))
 const orderId = computed(() => String(route.query.id ?? ''))
@@ -50,12 +71,29 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function payNow(): Promise<void> {
   payError.value = null
+  qrCode.value = null
+  gatewayHint.value = null
   try {
     const key = orderId.value || orderNo.value
     if (!key) return
-    const res = await pay(key, token.value)
+    // 通道由后台勾选 + 当前币种决定；未选时后端按币种选默认
+    const res = await pay(key, token.value, selectedProvider.value || undefined)
     await refresh()
-    if (!paid.value && res.sessionUrl) await navigateTo(res.sessionUrl, { external: true })
+    if (paid.value) return
+    if (res.action === 'redirect' && res.redirectUrl) {
+      window.location.href = res.redirectUrl
+      return
+    }
+    if (res.action === 'form' && res.form) {
+      autoSubmitForm(res.form)
+      return
+    }
+    if (res.action === 'qr' && res.qrCode) {
+      qrCode.value = res.qrCode
+      gatewayHint.value = t('result.pending')
+      return
+    }
+    if (res.sessionUrl) await navigateTo(res.sessionUrl, { external: true })
   } catch (err) {
     payError.value = err instanceof Error ? err.message : t('result.paymentFailed')
   }
@@ -79,6 +117,11 @@ watchEffect(() => {
 })
 
 onMounted(() => {
+  // 可用通道来自后端（后台勾选 + 当前币种）；银联为全币种通道
+  void listProviders(order.value?.currency).then((list) => {
+    channels.value = list
+    selectedProvider.value = list[0]?.id ?? ''
+  }).catch(() => { channels.value = [] })
   if (order.value && !paid.value) {
     polling.value = true
     let elapsed = 0
@@ -131,6 +174,18 @@ useSeo({ title: () => t('result.title'), description: () => t('result.descriptio
         </li>
       </ul>
       <p v-if="payError" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ payError }}</p>
+      <div v-if="!paid && channels.length" class="space-y-2 border-t border-stone-200 pt-3">
+        <p class="text-xs font-medium text-stone-500">{{ t('result.payNow') }}</p>
+        <label v-for="ch in channels" :key="ch.id" class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm" :class="selectedProvider === ch.id ? 'border-stone-900' : 'border-stone-200'">
+          <input v-model="selectedProvider" type="radio" name="payment-provider" :value="ch.id" class="accent-stone-900" />
+          <span>{{ ch.label }}</span>
+          <span v-if="ch.supportedCurrencies.includes('*')" class="ml-auto text-xs text-stone-400">ALL</span>
+        </label>
+      </div>
+      <div v-if="qrCode" class="rounded-lg border border-stone-200 p-3 text-xs">
+        <p class="mb-2 font-medium text-stone-700">{{ gatewayHint }}</p>
+        <a :href="qrCode" class="break-all text-stone-600 underline">{{ qrCode }}</a>
+      </div>
       <button v-if="!paid" type="button" class="w-full rounded-lg bg-stone-900 px-6 py-3 text-sm font-semibold text-white hover:bg-stone-700" @click="payNow">
         {{ t('result.payNow') }}
       </button>

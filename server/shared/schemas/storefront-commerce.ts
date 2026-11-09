@@ -20,3 +20,14 @@ export const updateCurrencySchema = z.object({
 })
 
 export const rollbackCurrencySchema = z.object({ changeId: z.number().int().positive() })
+
+/** 支付通道后台开关：只允许已注册通道 id；密钥/证书不在此处（走环境变量） */
+export const paymentChannelsSchema = z.object({
+  enabled: z.array(z.enum(['paypal', 'wechat', 'alipay', 'unionpay', 'mock', 'bnpl'])).max(6),
+  /** 非敏感商户标识回显（如商户号后四位），不参与验签 */
+  accounts: z.record(z.string(), z.record(z.string(), z.string())).optional(),
+})
+
+export const updatePaymentChannelsSchema = paymentChannelsSchema.extend({
+  confirmImpact: z.literal(true),
+})

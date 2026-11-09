@@ -58,12 +58,13 @@ import * as orderController from '../controllers/orderController.js'
 import * as marketingController from '../controllers/marketingController.js'
 import * as analyticsController from '../controllers/analyticsController.js'
 import * as currencyConfigController from '../controllers/currencyConfigController.js'
+import * as paymentChannelsController from '../controllers/paymentChannelsController.js'
 import * as refundController from '../controllers/refundController.js'
 import * as orderMailController from '../controllers/orderMailController.js'
 import * as articleAdminController from '../controllers/articleAdminController.js'
 import * as rmaAdminController from '../controllers/rmaAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
-import { updateCurrencySchema, rollbackCurrencySchema } from '../../../shared/schemas/storefront-commerce.js'
+import { updateCurrencySchema, rollbackCurrencySchema, updatePaymentChannelsSchema } from '../../../shared/schemas/storefront-commerce.js'
 
 /**
  * 商城后台模块路由
@@ -222,6 +223,11 @@ router.get('/settings/currency/active', authMiddleware, currencyConfigController
 router.put('/settings/currency', authMiddleware, requireAdmin, validate(updateCurrencySchema), currencyConfigController.updateCurrency)
 router.post('/settings/currency/rollback', authMiddleware, requireAdmin, validate(rollbackCurrencySchema), currencyConfigController.rollbackCurrency)
 router.get('/config-changes', authMiddleware, requireAdmin, currencyConfigController.listConfigChanges)
+
+// 支付通道后台开关：勾选才展示/可结算；密钥走环境变量，不落 settings
+router.get('/settings/payment-channels', authMiddleware, paymentChannelsController.getChannels)
+router.put('/settings/payment-channels', authMiddleware, requireAdmin, validate(updatePaymentChannelsSchema), paymentChannelsController.updateChannels)
+router.get('/settings/payment-channels/state', authMiddleware, requireAdmin, paymentChannelsController.channelState)
 
 // X-T03 审计日志查询（仅 admin 可读，用于回溯订单/支付/库存/退款/文章状态变更链）
 router.get('/audit-logs', authMiddleware, requireAdmin, auditLogController.listAuditLogs)

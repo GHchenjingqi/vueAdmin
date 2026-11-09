@@ -4,6 +4,7 @@ import { getSite } from '../middleware/siteContext.js'
 import * as paymentService from '../services/paymentService.js'
 import * as monitoring from '../services/monitoringService.js'
 import { listProviders, publicProvider } from '../payments/providerRegistry.js'
+import { getGateway } from '../payments/gatewayRegistry.js'
 import type { CreatePaymentSessionInput } from '../../../shared/schemas/storefront.js'
 
 export const createSession = async (req: Request, res: Response, next: NextFunction) => {
@@ -42,9 +43,17 @@ export const webhook = async (req: Request, res: Response, next: NextFunction) =
     const provider = String(req.params.provider ?? 'mock')
     const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body ?? {}))
     const signature = req.header('x-mock-signature') || req.header('x-signature')
-    const result = await paymentService.handleWebhook(provider, rawBody, signature)
+    const result = await paymentService.handleWebhook(provider, rawBody, signature, req.headers)
     // P4-T13：webhook 处理延迟观测（P95 告警）
     monitoring.recordLatency('webhook_latency_ms', Date.now() - startedAt)
+    if (result.ok) {
+      // 支付宝要求纯文本 success、微信要求 JSON SUCCESS，否则网关会持续重投
+      const ack = getGateway(provider)?.successResponse?.()
+      if (ack) {
+        res.status(200).type(ack.contentType).send(ack.body)
+        return
+      }
+    }
     res.status(result.status).json({ code: result.ok ? 0 : result.status, message: result.message ?? 'ok', alreadyProcessed: result.alreadyProcessed ?? false })
   } catch (err) {
     monitoring.recordLatency('webhook_latency_ms', Date.now() - startedAt)

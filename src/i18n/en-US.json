@@ -941,6 +941,7 @@
     }
   },
   "sidebar": {
+    "shopPaymentChannels": "Payment Channels",
     "navigation": "Side Navigation",
     "collapsed": "Collapsed Side Navigation",
     "aiProviders": "AI Providers",

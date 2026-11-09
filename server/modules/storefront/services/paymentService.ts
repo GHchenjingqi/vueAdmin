@@ -9,8 +9,11 @@ import { assertShippableCountry, extractCountry } from './shippingService.js'
 import { getCounter, incCounter, setGauge } from './monitoringService.js'
 import * as auditLogService from '../../shop/services/auditLogService.js'
 import { getProvider, defaultProvider, isProviderUsable } from '../payments/providerRegistry.js'
+import { getGateway, assertGatewayConfigured } from '../payments/gatewayRegistry.js'
+import { notifyUrl } from '../payments/gateways/common.js'
 import config from '../../../config/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
+import type { GatewayAction, GatewayNotifyContext } from '../payments/types.js'
 
 /**
  * 支付服务（阶段 5 步骤 4 / P3-T11 / P3-T12）
@@ -31,14 +34,19 @@ export interface PaymentSession {
   amountCents: number
   currency: string
   status: string
+  /** 网关商户订单号（真实通道；mock 为空） */
+  gatewayOrderNo?: string
+  gatewayRef?: string
+  /** 收银台动作：redirect / qr / form / sdk / mock */
+  action: GatewayAction
+  redirectUrl?: string
+  qrCode?: string
+  form?: { url: string; method: 'GET' | 'POST'; fields: Record<string, string> }
+  clientParams?: Record<string, string>
 }
 
 /** 创建支付会话：金额与币种取自订单快照；provider 可选（缺省用默认，P5-T03 区域支付/BNPL） */
-export async function createSession(
-  site: StorefrontSite,
-  orderId: number,
-  requestedProvider?: string,
-): Promise<PaymentSession> {
+export async function createSession(site: StorefrontSite, orderId: number, requestedProvider?: string): Promise<PaymentSession> {
   void site
   const tId = tid()
   const order = await ShopOrder.findOne({ where: { id: orderId, tenantId: tId } })
@@ -50,17 +58,44 @@ export async function createSession(
   if (country) await assertShippableCountry(country)
 
   // P5-T03：Provider 前置能力校验（存在 + flag 开启 + 订单币种支持），任一不满足即 422 拒绝且无副作用
-  const providerDef = requestedProvider
-    ? getProvider(requestedProvider)
-    : (getProvider(config.payment?.provider) ?? defaultProvider())
+  const providerDef = requestedProvider ? getProvider(requestedProvider) : await defaultProvider(order.currency)
   if (!providerDef) throw new AppError(422, '支付方式不可用')
   if (!(await isProviderUsable(providerDef, order.currency))) {
     throw new AppError(422, `支付方式 ${providerDef.id} 不可用（未启用或不支持 ${order.currency}）`)
   }
+  // 真实网关缺配置 fail-closed：不产生会话、不静默降级为 mock
+  if (providerDef.real) assertGatewayConfigured(providerDef.id)
 
   const provider = providerDef.id
   const providerRef = `pay_${order.orderNo}_${crypto.randomBytes(8).toString('hex')}`
   const sessionId = `sess_${crypto.randomBytes(12).toString('hex')}`
+  // 网关商户订单号：纯字母数字，供 out_trade_no / invoice_id / orderId 使用
+  const gatewayOrderNo = `P${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(5).toString('hex').toUpperCase()}`
+
+  let gatewayResult: {
+    action: GatewayAction
+    redirectUrl?: string
+    qrCode?: string
+    form?: PaymentSession['form']
+    gatewayRef?: string
+    clientParams?: Record<string, string>
+  } = { action: 'mock' }
+  if (providerDef.real) {
+    const gateway = getGateway(provider)
+    if (!gateway) throw new AppError(422, '支付方式不可用')
+    const base = (process.env.PAYMENT_PUBLIC_BASE_URL ?? '').replace(/\/$/, '')
+    gatewayResult = await gateway.createPayment({
+      orderNo: order.orderNo,
+      amountCents: Number(order.amountCents),
+      currency: order.currency,
+      providerRef,
+      gatewayOrderNo,
+      notifyUrl: notifyUrl(provider),
+      returnUrl: base ? `${base}/checkout/result?orderNo=${encodeURIComponent(order.orderNo)}&provider=${provider}` : '',
+      subject: `订单 ${order.orderNo}`,
+      tenantId: tId,
+    })
+  }
 
   const payment = await ShopOrderPayment.create({
     tenantId: tId,
@@ -69,6 +104,8 @@ export async function createSession(
     provider,
     providerRef,
     sessionId,
+    gatewayOrderNo,
+    gatewayRef: gatewayResult.gatewayRef ?? null,
     amountCents: order.amountCents,
     currency: order.currency,
     status: 'initiated',
@@ -83,6 +120,13 @@ export async function createSession(
     amountCents: Number(payment.amountCents),
     currency: payment.currency,
     status: payment.status,
+    gatewayOrderNo,
+    gatewayRef: gatewayResult.gatewayRef,
+    action: gatewayResult.action,
+    redirectUrl: gatewayResult.redirectUrl,
+    qrCode: gatewayResult.qrCode,
+    form: gatewayResult.form,
+    clientParams: gatewayResult.clientParams,
   }
 }
 
@@ -118,35 +162,53 @@ const SETTLED_PAYMENT_STATUSES = new Set(['captured', 'refunding', 'refunded'])
  * 处理支付 Webhook（原始 body + 签名头）。
  * 返回 { ok, status } 供 controller 转化为 HTTP 响应；验签失败抛 401，且不产生任何副作用。
  */
-export async function handleWebhook(provider: string, rawBody: Buffer, signature: string | undefined): Promise<WebhookResult> {
-  // P5-T03 修复 1/4：provider 必须已注册；未知 provider 在验签/解析前直接拒绝，
-  // 避免任意路径参数都能进入支付状态机。
+export async function handleWebhook(
+  provider: string,
+  rawBody: Buffer,
+  signature: string | undefined,
+  notifyHeaders: GatewayNotifyContext['headers'] = {},
+): Promise<WebhookResult> {
+  // 未注册通道在验签/解析前直接拒绝，避免任意路径参数都能进入支付状态机
   const def = getProvider(provider)
   if (!def) return { ok: false, status: 400, message: `未注册的支付 Provider: ${provider}` }
-  // P5-T03 修复 4/4：优先使用 Provider 声明的独立 webhook 密钥。
-  const secret = def.webhookSecret ?? config.payment?.webhookSecret ?? 'storefront_mock_webhook_secret'
+  const gateway = getGateway(provider)
+  if (!gateway) return { ok: false, status: 400, message: `未注册的支付 Provider: ${provider}` }
 
-  // 1) 验签（时序安全比较）
-  if (!signature) return { ok: false, status: 401, message: '缺少签名' }
-  const expected = createHmac('sha256', secret).update(rawBody).digest('hex')
-  const a = Buffer.from(signature)
-  const b = Buffer.from(expected)
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    return { ok: false, status: 401, message: '签名无效' }
-  }
-
-  // 2) 解析事件（签名通过后）
-  let payload: Record<string, any>
+  // 验签与事件格式解析委派给各网关适配器；mock/bnpl 沿用 HMAC + 自定义 JSON
+  let event: Awaited<ReturnType<typeof gateway.verifyAndParse>>
   try {
-    payload = JSON.parse(rawBody.toString('utf8'))
-  } catch {
-    return { ok: false, status: 400, message: '非法 JSON' }
+    event = await gateway.verifyAndParse({
+      rawBody,
+      headers: notifyHeaders,
+      config: { providerId: provider, signature: signature ?? '' },
+    })
+  } catch (err) {
+    const status = (err as { statusCode?: number }).statusCode
+    if (status === 400 || status === 401 || status === 503) {
+      return { ok: false, status, message: (err as Error).message }
+    }
+    throw err
   }
 
   const tId = tid()
-  const providerRef: string | undefined = payload?.providerRef
-  const orderNo: string | undefined = payload?.orderNo
-  const eventType: string | undefined = payload?.type
+  const payload = event.raw
+  let providerRef: string | undefined = event.providerRef
+  let orderNo: string | undefined = event.orderNo
+  const eventType: string | undefined = event.type
+
+  // 真实网关通知通常只带商户订单号 / 网关交易号，回查内部绑定补齐幂等键与订单号
+  if (!providerRef || !orderNo) {
+    const where = event.gatewayOrderNo
+      ? { gatewayOrderNo: event.gatewayOrderNo, tenantId: tId }
+      : event.gatewayRef
+        ? { gatewayRef: event.gatewayRef, tenantId: tId }
+        : null
+    const row = where ? await ShopOrderPayment.findOne({ where: where as never }) : null
+    if (row) {
+      providerRef = providerRef || row.providerRef
+      orderNo = orderNo || row.orderNo
+    }
+  }
 
   if (!providerRef || !orderNo) return { ok: false, status: 400, message: '缺少 providerRef / orderNo' }
 
@@ -184,18 +246,29 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
     if (SETTLED_PAYMENT_STATUSES.has(order.paymentStatus)) return { ok: true, alreadyProcessed: true, status: 200 }
     // CAS 认领：并发同事件只有一个请求能把读到的非终态改为 captured；
     // 输家直接视为已处理，避免重复计数 / 重复审计 / 重复提交预占。
-    const [claimed] = await ShopOrder.update(
-      { paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never,
-      { where: { id: order.id, tenantId: tId, paymentStatus: order.paymentStatus } as never },
-    )
+    const [claimed] = await ShopOrder.update({ paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never, {
+      where: { id: order.id, tenantId: tId, paymentStatus: order.paymentStatus } as never,
+    })
     if (claimed !== 1) return { ok: true, alreadyProcessed: true, status: 200 }
     incCounter('payment_success')
     updatePaymentFailureRate()
     await reservationService.commitReservation(order.orderNo)
     if (prev) await prev.update({ status: 'captured', rawPayload: payload } as never)
     // X-T03：审计订单/支付状态变更（system 事件，不阻断主流程）
-    await auditLogService.record({ actorType: 'system', action: 'order.payment_captured', entityType: 'order', entityId: order.id, afterState: { status: 'paid', paymentStatus: 'captured' } })
-    await auditLogService.record({ actorType: 'system', action: 'payment.captured', entityType: 'payment', entityId: order.id, afterState: { paymentStatus: 'captured' } })
+    await auditLogService.record({
+      actorType: 'system',
+      action: 'order.payment_captured',
+      entityType: 'order',
+      entityId: order.id,
+      afterState: { status: 'paid', paymentStatus: 'captured' },
+    })
+    await auditLogService.record({
+      actorType: 'system',
+      action: 'payment.captured',
+      entityType: 'payment',
+      entityId: order.id,
+      afterState: { paymentStatus: 'captured' },
+    })
     // P3-T17：订单确认邮件入队（幂等 + 异常隔离，邮件失败不得让支付回调重投失败）
     await tryEnqueue({ orderId: order.id, type: 'confirmed' })
     return { ok: true, status: 200 }
@@ -216,17 +289,22 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
       return { ok: true, alreadyProcessed: true, status: 200 }
     }
     // 与 succeeded 同口径 CAS 认领，避免并发失败回调重复计数 / 重复审计 / 重复释放预占。
-    const [claimed] = await ShopOrder.update(
-      { paymentStatus: 'failed' } as never,
-      { where: { id: order.id, tenantId: tId, paymentStatus: order.paymentStatus } as never },
-    )
+    const [claimed] = await ShopOrder.update({ paymentStatus: 'failed' } as never, {
+      where: { id: order.id, tenantId: tId, paymentStatus: order.paymentStatus } as never,
+    })
     if (claimed !== 1) return { ok: true, alreadyProcessed: true, status: 200 }
     incCounter('payment_failure')
     updatePaymentFailureRate()
     await reservationService.releaseReservation(order.orderNo)
     if (prev) await prev.update({ status: 'failed', rawPayload: payload } as never)
     // X-T03：审计订单支付失败（system 事件，不阻断主流程）
-    await auditLogService.record({ actorType: 'system', action: 'order.payment_failed', entityType: 'order', entityId: order.id, afterState: { paymentStatus: 'failed' } })
+    await auditLogService.record({
+      actorType: 'system',
+      action: 'order.payment_failed',
+      entityType: 'order',
+      entityId: order.id,
+      afterState: { paymentStatus: 'failed' },
+    })
     return { ok: true, status: 200 }
   }
 

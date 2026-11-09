@@ -180,6 +180,16 @@ app.use(errorHandler)
 // ---------- 启动服务（数据库迁移、数据迁移、种子数据、前端托管、HTTP 监听）----------
 bootstrap(app)
 
+// ---------- 真实支付网关退款注入（按原支付通道原路退款）----------
+void (async () => {
+  try {
+    const { installRefundGatewayProvider } = await import('./modules/shop/services/refundGatewayProvider.js')
+    installRefundGatewayProvider()
+  } catch (err) {
+    logInfo(`退款通道注入失败: ${(err as Error).message}`)
+  }
+})()
+
 // ---------- 工作流超时催办 / 升级扫描器（始终启用，默认每 60 秒一次）----------
 // 轻量扫描 pending 审批任务：到期前提醒、超时自动通过、超时升级转交。
 void (async () => {

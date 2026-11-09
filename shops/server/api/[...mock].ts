@@ -20,6 +20,14 @@ export default defineEventHandler(async (event) => {
   // P5-T01：从 store_locale cookie 读取当前语言（单源），透传给真实后台/mock（x-store-locale）
   const locale = localeFrom(cookie)
 
+  // ---- GET /api/payments/providers（按后台勾选 + 当前币种筛出的可用支付通道） ----
+  // 只放行列表端点；session / webhooks 不走 BFF（webhook 必须保留原始 body 验签）
+  if (/^payments\/providers(\?.*)?$/.test(url) && method === 'GET' && source !== 'mock') {
+    const res = await commerceRealFetch(url, { method, cookie, requestId: event.context.requestId as string | undefined })
+    setResponseStatus(event, res.status)
+    return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'payment providers upstream error' })
+  }
+
   // ---- 直通域（并行后端已交付的扩展能力；auto/real 下透传，4xx 业务错误原样返回） ----
   const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses|referrals|experiments)\b/.exec(url)
   if (extMatch && source !== 'mock') {
@@ -194,8 +202,17 @@ async function handleReal(
     const session = unwrapEnvelope(sessionRes.body) as Record<string, unknown>
     const provider = String(session.provider ?? 'mock')
     if (provider !== 'mock') {
-      // 真实服务商：返回会话信息（跳转/SDK 流程按 provider 扩展）
-      return { sessionUrl: `/checkout/result?id=${key}&t=${t}`, provider }
+      // 真实网关：透传收银台动作，由前端拉起跳转 / 二维码 / 表单。
+      // 不再伪造结果页跳转——订单支付态只能由网关异步通知驱动。
+      return {
+        sessionUrl: '',
+        provider,
+        orderNo: String(session.orderNo ?? ''),
+        action: String(session.action ?? 'redirect'),
+        redirectUrl: session.redirectUrl ? String(session.redirectUrl) : undefined,
+        qrCode: session.qrCode ? String(session.qrCode) : undefined,
+        form: (session.form ?? undefined) as { url: string; method: 'GET' | 'POST'; fields: Record<string, string> } | undefined,
+      }
     }
     // mock：模拟「服务商服务器」向后台投递签名 Webhook（验签/事件去重/幂等/库存实扣全走真实链路）
     const delivered = await simulateMockProviderWebhook(String(session.orderNo), String(session.providerRef), String(session.currency))

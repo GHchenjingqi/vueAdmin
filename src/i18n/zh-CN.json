@@ -941,6 +941,7 @@
     }
   },
   "sidebar": {
+    "shopPaymentChannels": "支付通道设置",
     "navigation": "侧边导航",
     "collapsed": "折叠侧边导航",
     "aiProviders": "AI 提供商",

@@ -5,6 +5,32 @@ import type { OrderAttribution } from '@shared/analytics/attribution'
  * Checkout 组合式（P3-T09/T15 前端版）：useCheckout()。
  * 数据源：/api/checkout/* 与 /api/orders/*（BFF mock；后端阶段完成后切换真实路由，契约不变）。
  */
+export interface PaymentChannel {
+  id: string
+  label: string
+  kind: string
+  supportedCurrencies: string[]
+}
+
+export interface PaymentSessionView {
+  sessionUrl: string
+  provider: string
+  orderNo?: string
+  action?: 'redirect' | 'qr' | 'form' | 'sdk' | 'mock'
+  redirectUrl?: string
+  qrCode?: string
+  form?: { url: string; method: 'GET' | 'POST'; fields: Record<string, string> }
+}
+
+/** 按后台勾选 + 当前币种列出可用支付通道（银联 supportedCurrencies=['*'] 全币种可见） */
+async function listProviders(currency?: string): Promise<PaymentChannel[]> {
+  const qs = currency ? `?currency=${encodeURIComponent(currency)}` : ''
+  const res = await fetch(`/api/payments/providers${qs}`)
+  const data = (await res.json()) as { code?: number; data?: PaymentChannel[]; message?: string }
+  if (!res.ok || (data.code !== undefined && data.code !== 0)) throw new Error(data.message || 'failed to load payment providers')
+  return Array.isArray(data) ? (data as unknown as PaymentChannel[]) : (data.data ?? [])
+}
+
 export function useCheckout() {
   const order = ref<OrderDraft | null>(null)
   const loading = ref(false)
@@ -30,7 +56,7 @@ export function useCheckout() {
     }
   }
 
-  async function pay(orderIdOrNo: string, accessToken?: string, provider?: string): Promise<{ sessionUrl: string; provider: string }> {
+  async function pay(orderIdOrNo: string, accessToken?: string, provider?: string): Promise<PaymentSessionView> {
     // 原生 fetch：绕开 Nuxt 类型化路由联合在深层动态路径上的指数比较（TS2321）
     const qs = accessToken ? `?t=${encodeURIComponent(accessToken)}` : ''
     const res = await fetch(`/api/checkout/orders/${orderIdOrNo}/pay${qs}`, {
@@ -39,7 +65,7 @@ export function useCheckout() {
       // P5-T03：可选 provider（如 bnpl）；BFF 透传给后端做 flag+币种前置校验
       body: JSON.stringify(provider ? { provider } : {}),
     })
-    const data = (await res.json()) as { sessionUrl: string; provider: string }
+    const data = (await res.json()) as PaymentSessionView
     if (!res.ok) throw new Error((data as unknown as { message?: string })?.message || 'payment failed')
     return data
   }
@@ -64,5 +90,5 @@ export function useCheckout() {
     return { items: data.items ?? [], total: data.total ?? 0, page: data.page ?? page, pageSize: data.pageSize ?? pageSize }
   }
 
-  return { order, loading, placeOrder, pay, getOrder, listOrders }
+  return { order, loading, placeOrder, pay, getOrder, listOrders, listProviders }
 }
