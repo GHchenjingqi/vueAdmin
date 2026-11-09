@@ -16,7 +16,7 @@ import type { StorefrontSite } from '../middleware/siteContext.js'
  * 支付服务（阶段 5 步骤 4 / P3-T11 / P3-T12）
  *
  * - 支付会话金额 / 币种取自订单快照（amountCents / currency），绝不重新计价；
- * - Webhook：原始 body HMAC-SHA256 验签 → 事件去重（provider+providerRef 唯一约束）→ 幂等更新；
+ * - Webhook：原始 body HMAC-SHA256 验签 → providerRef/orderNo 绑定校验 → 订单状态 CAS 认领（仅赢家产生计数、审计、预占与邮件副作用）；
  * - 验签失败 / 重复投递均不产生副作用；回调币种与订单快照不一致时告警并不改单（此处以订单快照为准）。
  */
 
@@ -158,6 +158,11 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
   if (prev && prev.provider !== provider) {
     return { ok: false, status: 400, message: `providerRef 已绑定其它 Provider: ${prev.provider}` }
   }
+  // providerRef 与 orderNo 必须指向同一笔订单：否则可用 A 单的支付记录把 B 单标记为已支付，
+  // 并消费掉 A 单的支付记录（A 单真实回调随后被去重，永远无法支付）。
+  if (prev && prev.orderNo !== orderNo) {
+    return { ok: false, status: 400, message: `providerRef 已绑定其它订单: ${prev.orderNo}` }
+  }
   if (prev && prev.status !== 'initiated') {
     return { ok: true, alreadyProcessed: true, status: 200 }
   }
@@ -176,10 +181,16 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
   }
 
   if (eventType === 'payment.succeeded') {
+    if (SETTLED_PAYMENT_STATUSES.has(order.paymentStatus)) return { ok: true, alreadyProcessed: true, status: 200 }
+    // CAS 认领：并发同事件只有一个请求能把读到的非终态改为 captured；
+    // 输家直接视为已处理，避免重复计数 / 重复审计 / 重复提交预占。
+    const [claimed] = await ShopOrder.update(
+      { paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never,
+      { where: { id: order.id, tenantId: tId, paymentStatus: order.paymentStatus } as never },
+    )
+    if (claimed !== 1) return { ok: true, alreadyProcessed: true, status: 200 }
     incCounter('payment_success')
     updatePaymentFailureRate()
-    if (SETTLED_PAYMENT_STATUSES.has(order.paymentStatus)) return { ok: true, alreadyProcessed: true, status: 200 }
-    await order.update({ paymentStatus: 'captured', status: 'paid', paidAt: new Date() } as never)
     await reservationService.commitReservation(order.orderNo)
     if (prev) await prev.update({ status: 'captured', rawPayload: payload } as never)
     // X-T03：审计订单/支付状态变更（system 事件，不阻断主流程）
@@ -204,9 +215,14 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
       })
       return { ok: true, alreadyProcessed: true, status: 200 }
     }
+    // 与 succeeded 同口径 CAS 认领，避免并发失败回调重复计数 / 重复审计 / 重复释放预占。
+    const [claimed] = await ShopOrder.update(
+      { paymentStatus: 'failed' } as never,
+      { where: { id: order.id, tenantId: tId, paymentStatus: order.paymentStatus } as never },
+    )
+    if (claimed !== 1) return { ok: true, alreadyProcessed: true, status: 200 }
     incCounter('payment_failure')
     updatePaymentFailureRate()
-    await order.update({ paymentStatus: 'failed' } as never)
     await reservationService.releaseReservation(order.orderNo)
     if (prev) await prev.update({ status: 'failed', rawPayload: payload } as never)
     // X-T03：审计订单支付失败（system 事件，不阻断主流程）
