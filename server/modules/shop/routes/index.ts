@@ -37,12 +37,9 @@ import {
   analyticsQuerySchema,
   createRefundSchema,
   rmaRejectSchema,
+  qaAnswerSchema,
 } from '../../../shared/schemas/shop.js'
-import {
-  articleAdminListQuerySchema,
-  articleCreateSchema,
-  articleUpdateSchema,
-} from '../../../shared/schemas/cmsAdmin.js'
+import { articleAdminListQuerySchema, articleCreateSchema, articleUpdateSchema } from '../../../shared/schemas/cmsAdmin.js'
 import * as categoryController from '../controllers/categoryController.js'
 import * as brandController from '../controllers/brandController.js'
 import * as attributeController from '../controllers/attributeController.js'
@@ -63,6 +60,7 @@ import * as refundController from '../controllers/refundController.js'
 import * as orderMailController from '../controllers/orderMailController.js'
 import * as articleAdminController from '../controllers/articleAdminController.js'
 import * as rmaAdminController from '../controllers/rmaAdminController.js'
+import * as reviewAdminController from '../controllers/reviewAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
 import { updateCurrencySchema, rollbackCurrencySchema, updatePaymentChannelsSchema } from '../../../shared/schemas/storefront-commerce.js'
 
@@ -187,6 +185,14 @@ router.post('/order-mails/:id/retry', authMiddleware, validate(idParamSchema, 'p
 router.get('/rmas', authMiddleware, rmaAdminController.list)
 router.post('/rmas/:id/approve', authMiddleware, validate(idParamSchema, 'params'), rmaAdminController.approve)
 router.post('/rmas/:id/reject', authMiddleware, validate(idParamSchema, 'params'), validate(rmaRejectSchema, 'body'), rmaAdminController.reject)
+
+// ==================== 商品评价 / 问答后台审核（补齐 pending → 公开的断点） ====================
+router.get('/reviews', authMiddleware, reviewAdminController.listReviews)
+router.post('/reviews/:id/approve', authMiddleware, validate(idParamSchema, 'params'), reviewAdminController.approveReview)
+router.post('/reviews/:id/reject', authMiddleware, validate(idParamSchema, 'params'), reviewAdminController.rejectReview)
+router.get('/qa', authMiddleware, reviewAdminController.listQuestions)
+router.post('/qa/:id/answer', authMiddleware, validate(idParamSchema, 'params'), validate(qaAnswerSchema), reviewAdminController.answerQuestion)
+router.post('/qa/:id/hide', authMiddleware, validate(idParamSchema, 'params'), reviewAdminController.hideQuestion)
 
 // ==================== 阶段 4：营销中心 ====================
 router.get('/promotions', authMiddleware, validate(shopPaginationSchema, 'query'), marketingController.listPromotions)

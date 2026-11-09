@@ -339,8 +339,14 @@ export const updateBundleSchema = createBundleSchema.partial()
 export type UpdateBundleInput = z.infer<typeof updateBundleSchema>
 
 export const analyticsQuerySchema = z.object({
-  startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  endAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  startAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  endAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   dimension: z.enum(['channel', 'country', 'category', 'day']).default('day'),
   channelId: z.number().int().min(1).optional(),
 })
@@ -361,3 +367,9 @@ export const rmaRejectSchema = z.object({
   rejectReason: z.string().min(1, '驳回原因不能为空').max(255),
 })
 export type RmaRejectInput = z.infer<typeof rmaRejectSchema>
+
+/** 后台回答商品提问：答案必填；回答者标识由 JWT 注入，禁止请求体伪造 */
+export const qaAnswerSchema = z.object({
+  answer: z.string().trim().min(1, '答案不能为空').max(2000),
+})
+export type QaAnswerInput = z.infer<typeof qaAnswerSchema>
