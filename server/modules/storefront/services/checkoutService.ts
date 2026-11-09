@@ -186,7 +186,7 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
       reservationId: reservations[0]?.id ?? null,
       policySnapshot: {
         currency: quote.currency,
-        taxRate: Number(process.env.STORE_TAX_RATE ?? 0),
+        taxRate: quote.taxRate,
         shippingCents: quote.shippingCents,
         generatedAt: new Date().toISOString(),
         // P5-T04：按仓配送承诺（路由后的主仓，随单固化）

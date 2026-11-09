@@ -117,6 +117,9 @@ export async function createQuote(
   const destCountry = extractCountry(input.shippingAddress)
 
   let subtotalCents = 0
+  // 同一 skuId 可能在 items / 购物车中拆成多行，库存校验必须按累计需求比较，
+  // 否则每行单独通过而总需求已超可用量，报价会给出根本无法成交的结果。
+  const requestedBySku = new Map<number, number>()
   for (const line of lines) {
     const sku = await ShopSku.findOne({ where: { id: line.skuId, tenantId: tId } })
     if (!sku) throw new AppError(404, `SKU ${line.skuId} 不存在`)
@@ -129,8 +132,10 @@ export async function createQuote(
     if (!priceRow) throw new AppError(400, `SKU ${line.skuId} 在币种 ${currency} 下无有效报价`)
 
     const unitAmountCents = Math.round(Number(priceRow.amount) * 100)
+    const requestedQty = (requestedBySku.get(sku.id) ?? 0) + line.qty
+    requestedBySku.set(sku.id, requestedQty)
     const available = await inventoryService.available(sku.id)
-    if (available < line.qty) throw new AppError(400, `SKU ${line.skuId} 库存不足（可用 ${available}，需 ${line.qty}）`)
+    if (available < requestedQty) throw new AppError(400, `SKU ${line.skuId} 库存不足（可用 ${available}，需 ${requestedQty}）`)
 
     // P5-T04：按仓配送承诺（路由后的主仓，按目的国区域/优先级/可用量）
     const deliveryCommitment = await getDeliveryCommitment(sku.id, destCountry)
