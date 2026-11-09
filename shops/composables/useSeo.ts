@@ -20,6 +20,15 @@ export interface SeoInput {
   ogImage?: string | (() => string)
   /** 交易/隐私页 → noindex, nofollow；默认 index, follow */
   noindex?: boolean
+  /**
+   * Canonical 覆盖（P0-T16 / SEO_SPEC §2）：集合页分页第 2 页起 canonical 自指 `?page=N`，
+   * 而非默认的 `path`（无参数 URL）。仅传 path 时 canonical 恒为 path（筛选/排序参数被剥离）。
+   */
+  canonicalPath?: string | (() => string)
+  /** 分页 rel=prev（SEO_SPEC §2）：以 / 开头的相对路径，自动拼 siteUrl；空则不输出。 */
+  prevHref?: string | (() => string)
+  /** 分页 rel=next（SEO_SPEC §2）：以 / 开头的相对路径，自动拼 siteUrl；空则不输出。 */
+  nextHref?: string | (() => string)
 }
 
 export function useSeo(input: SeoInput) {
@@ -27,7 +36,13 @@ export function useSeo(input: SeoInput) {
   const { localePath } = useLocale()
   const resolve = (v: string | (() => string)) => (typeof v === 'function' ? v() : v)
 
-  const canonical = computed(() => `${siteUrl}${localePath(input.path)}`)
+  const canonical = computed(() => {
+    const override = resolve(input.canonicalPath ?? '')
+    const path = override || input.path
+    return `${siteUrl}${localePath(path)}`
+  })
+  const prevLink = computed(() => resolve(input.prevHref ?? ''))
+  const nextLink = computed(() => resolve(input.nextHref ?? ''))
   const title = computed(() => resolve(input.title))
   const description = computed(() => resolve(input.description))
   const keywords = computed(() => resolve(input.keywords ?? ''))
@@ -58,7 +73,11 @@ export function useSeo(input: SeoInput) {
       { name: 'twitter:description', content: description.value },
       ...(ogImage.value ? [{ name: 'twitter:image', content: ogImage.value }] : []),
     ],
-    link: [{ rel: 'canonical', href: canonical.value }],
+    link: [
+      { rel: 'canonical', href: canonical.value },
+      ...(prevLink.value ? [{ rel: 'prev', href: `${siteUrl}${localePath(prevLink.value)}` }] : []),
+      ...(nextLink.value ? [{ rel: 'next', href: `${siteUrl}${localePath(nextLink.value)}` }] : []),
+    ],
   })
 
   return { canonical, title, description }

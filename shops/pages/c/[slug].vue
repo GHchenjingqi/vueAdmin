@@ -2,6 +2,7 @@
 import { useCatalog } from '~/composables/useCatalog'
 import ProductCard from '~/components/commerce/ProductCard.vue'
 import { useI18n } from '~/composables/useI18n'
+import { buildCollectionPaginationLinks } from '~/shared/seo/pagination'
 
 /**
  * 集合页（P2-T03）：筛选、排序、分页、空状态；筛选组合可分享 URL；分页与 Canonical 符合 SEO_SPEC。
@@ -65,6 +66,12 @@ useSeo({
     `Shop ${humanize(category.value)} at Aurora Hair Studio. Free standard shipping over $99, 30-day returns.`,
   keywords: () => CATEGORY_SEO[category.value]?.keywords ?? category.value.replace(/-/g, ', '),
   path: `/c/${category.value}`,
+  // SEO_SPEC §2（P0-T16）：分页 canonical 自指 + rel=prev/next；第 1 页 canonical 去参数
+  ...(buildCollectionPaginationLinks({
+    basePath: `/c/${category.value}`,
+    page: page.value,
+    totalPages: totalPages.value,
+  }) as { canonicalPath?: string; prevHref?: string; nextHref?: string }),
 })
 </script>
 
