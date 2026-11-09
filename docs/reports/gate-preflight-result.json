@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-09T02:07:34.281Z",
+  "note": "证据快照：由 gate-preflight.mjs 生成，不构成签字或门禁通过结论。",
+  "git": {
+    "head": "7b3f012",
+    "branch": "master_shop",
+    "dirtyTrackedCount": 69,
+    "behind": 0,
+    "ahead": 0
+  },
+  "policy": {
+    "autoSignoff": false,
+    "autoCheckGate": false,
+    "statement": "本脚本只读；不代勾 [x]、不代替签字、不回填执行计划任务行。",
+    "gateRule": "每个门禁须其签字项由责任方逐项勾选后，方可在 storefront-execution-plan_v1.0.md 回填 [x]。"
+  },
+  "summary": {
+    "checks": {
+      "PASS": 8,
+      "WARN": 2
+    },
+    "signoffTotal": 17,
+    "signoffSigned": 0,
+    "signoffPending": 17,
+    "byCategory": {
+      "EVIDENCE_READY": 4,
+      "EXTERNAL_ENV": 9,
+      "HUMAN_DECISION": 4
+    }
+  },
+  "checks": [
+    {
+      "id": "env.db",
+      "label": "MySQL 3306",
+      "status": "PASS",
+      "detail": "3306 可连 (2ms)"
+    },
+    {
+      "id": "env.backend5173",
+      "label": "后端 5173 /health",
+      "status": "PASS",
+      "detail": "HTTPS /health = 200 (11ms)"
+    },
+    {
+      "id": "env.storefront3014",
+      "label": "storefront 3014",
+      "status": "WARN",
+      "detail": "无监听 (ECONNREFUSED)；注意 curl 若设 HTTP_PROXY 会收到代理返回的 502 假象，应以直连探测为准",
+      "remediation": "在 shops/ 下启动 dev 或 .output 生产构建后复跑浏览器 E2E"
+    },
+    {
+      "id": "env.storefront4015",
+      "label": "storefront 4015",
+      "status": "WARN",
+      "detail": "无监听 (ECONNREFUSED)；注意 curl 若设 HTTP_PROXY 会收到代理返回的 502 假象，应以直连探测为准",
+      "remediation": "在 shops/ 下启动 dev 或 .output 生产构建后复跑浏览器 E2E"
+    },
+    {
+      "id": "env.e2eBase",
+      "label": "E2E baseURL http://127.0.0.1:3103",
+      "status": "PASS",
+      "detail": "storefront 可用，HTTP 200 (202ms)；3014/4015 为历史登记端口，未启动时不影响本次复验"
+    },
+    {
+      "id": "ci.master_shop",
+      "status": "PASS",
+      "detail": "push/pull_request 分支列表共 2 处，其中 2 处包含 master_shop",
+      "remediation": "在 ci.yml 的 on.push.branches 与 on.pull_request.branches 加入 master_shop"
+    },
+    {
+      "id": "ci.deploy_guard",
+      "status": "PASS",
+      "detail": "deploy-staging 的 if 仍仅认 dev/develop，master_shop 不会触发自动部署"
+    },
+    {
+      "id": "signoff.integrity",
+      "status": "PASS",
+      "detail": "17 项签字栏全部未勾（pending=17），未被自动化代勾"
+    },
+    {
+      "id": "docs.links",
+      "label": "文档链接校验",
+      "status": "PASS",
+      "detail": "文档链接校验 通过"
+    },
+    {
+      "id": "e2e.smoke",
+      "label": "浏览器冒烟 E2E",
+      "status": "PASS",
+      "detail": "smoke.spec.ts 3 例通过（baseURL http://127.0.0.1:3103）"
+    }
+  ],
+  "gates": [
+    {
+      "gate": "G2",
+      "task": "P2-T14",
+      "planState": "[~]",
+      "technical": "PASS",
+      "signoffTotal": 3,
+      "signoffSigned": 0,
+      "blockingCategories": [
+        "EXTERNAL_ENV",
+        "EVIDENCE_READY"
+      ]
+    },
+    {
+      "gate": "G3",
+      "task": "P3-T19",
+      "planState": "[~]",
+      "technical": "PASS",
+      "signoffTotal": 3,
+      "signoffSigned": 0,
+      "blockingCategories": [
+        "HUMAN_DECISION",
+        "EVIDENCE_READY",
+        "EXTERNAL_ENV"
+      ]
+    },
+    {
+      "gate": "G4",
+      "task": "P4-T17",
+      "planState": "[ ]",
+      "technical": "PASS",
+      "signoffTotal": 4,
+      "signoffSigned": 0,
+      "blockingCategories": [
+        "EXTERNAL_ENV",
+        "HUMAN_DECISION"
+      ]
+    },
+    {
+      "gate": "G5",
+      "task": "P5-T09",
+      "planState": "[ ]",
+      "technical": "PASS",
+      "signoffTotal": 4,
+      "signoffSigned": 0,
+      "blockingCategories": [
+        "EVIDENCE_READY",
+        "EXTERNAL_ENV"
+      ]
+    },
+    {
+      "gate": "X-T06",
+      "task": "X-T06",
+      "planState": "横切",
+      "technical": "Runbook 已产出",
+      "signoffTotal": 3,
+      "signoffSigned": 0,
+      "blockingCategories": [
+        "EXTERNAL_ENV",
+        "HUMAN_DECISION"
+      ]
+    }
+  ],
+  "signoff": [
+    {
+      "id": "G2-S1",
+      "gate": "G2",
+      "task": "P2-T14",
+      "title": "Search Console 已验证站点可抓取（含 sitemap 提交）",
+      "category": "EXTERNAL_ENV",
+      "owner": "SEO / 运营",
+      "prerequisite": "Google Search Console 账号 + 站点所有权验证 + 已上线域名",
+      "evidence": [
+        "docs/reports/g2-audit.md"
+      ],
+      "verify": null
+    },
+    {
+      "id": "G2-S2",
+      "gate": "G2",
+      "task": "P2-T14",
+      "title": "价格/库存/币种符号抽查通过",
+      "category": "EVIDENCE_READY",
+      "owner": "业务 / QA",
+      "prerequisite": "责任方复核 A1~A3 与 T-12 币种切换证据",
+      "evidence": [
+        "docs/reports/g2-audit.md",
+        "docs/reports/t12-currency-switch.md"
+      ],
+      "verify": "node scripts/gate-preflight.mjs"
+    },
+    {
+      "id": "G2-S3",
+      "gate": "G2",
+      "task": "P2-T14",
+      "title": "移动端验收通过（LCP/CLS/TTFB）",
+      "category": "EVIDENCE_READY",
+      "owner": "业务 / QA",
+      "prerequisite": "责任方复核性能验收报告；如需重测另行跑 Lighthouse",
+      "evidence": [
+        "docs/reports/performance-acceptance.md"
+      ],
+      "verify": null
+    },
+    {
+      "id": "G3-S1",
+      "gate": "G3",
+      "task": "P3-T19",
+      "title": "沙箱完整交易 E2E 通过（含支付回跳/回调）",
+      "category": "HUMAN_DECISION",
+      "owner": "QA / 业务",
+      "prerequisite": "沙箱环境可执行完整下单链路，由责任方确认结果",
+      "evidence": [
+        "docs/reports/real-integration.md"
+      ],
+      "verify": null
+    },
+    {
+      "id": "G3-S2",
+      "gate": "G3",
+      "task": "P3-T19",
+      "title": "异常路径（重复请求/回调乱序/库存异常/币种变更）测试证据齐备",
+      "category": "EVIDENCE_READY",
+      "owner": "QA",
+      "prerequisite": "责任方复核源码级回归证据",
+      "evidence": [
+        "docs/reports/real-integration.md",
+        "docs/reports/g5-regression-report.md"
+      ],
+      "verify": "npm --prefix server test"
+    },
+    {
+      "id": "G3-S3",
+      "gate": "G3",
+      "task": "P3-T19",
+      "title": "生产级抽样计划与执行确认",
+      "category": "EXTERNAL_ENV",
+      "owner": "业务 / 运维",
+      "prerequisite": "真实可售商品 + 真实支付网关 + 抽样计划审批",
+      "evidence": [],
+      "verify": null
+    },
+    {
+      "id": "G4-S1",
+      "gate": "G4",
+      "task": "P4-T17",
+      "title": "政策文本经目标市场专业人士审核通过",
+      "category": "EXTERNAL_ENV",
+      "owner": "法务 / 合规",
+      "prerequisite": "目标市场专业人士审核合规口径、争议管辖、数据出境",
+      "evidence": [],
+      "verify": null
+    },
+    {
+      "id": "G4-S2",
+      "gate": "G4",
+      "task": "P4-T17",
+      "title": "退款/RMA 审批权限分配明确",
+      "category": "HUMAN_DECISION",
+      "owner": "业务 / 风控",
+      "prerequisite": "业务方确认权限矩阵（建议见签字包附录）",
+      "evidence": [
+        "docs/reports/gate-signoff-pack.md"
+      ],
+      "verify": null
+    },
+    {
+      "id": "G4-S3",
+      "gate": "G4",
+      "task": "P4-T17",
+      "title": "admin 履约界面人工试用通过",
+      "category": "HUMAN_DECISION",
+      "owner": "客服 / QA",
+      "prerequisite": "客服在 admin 侧人工走通查单、退款、RMA 审批路径",
+      "evidence": [
+        "docs/reports/g4-gate-checklist.md"
+      ],
+      "verify": null
+    },
+    {
+      "id": "G4-S4",
+      "gate": "G4",
+      "task": "P4-T17",
+      "title": "埋点抽样对账一致",
+      "category": "EXTERNAL_ENV",
+      "owner": "运营 / 数据分析",
+      "prerequisite": "真实投放/流量 + GA4 后台权限",
+      "evidence": [
+        "docs/reports/g4-gate-checklist.md"
+      ],
+      "verify": "GET /shop/analytics/events"
+    },
+    {
+      "id": "G5-S1",
+      "gate": "G5",
+      "task": "P5-T09",
+      "title": "扩展能力上线不破坏主市场交易链路（业务确认）",
+      "category": "EVIDENCE_READY",
+      "owner": "业务",
+      "prerequisite": "责任方复核主链路 / 币种 / 缓存 SEO / 隔离性回归证据",
+      "evidence": [
+        "docs/reports/g5-regression-report.md"
+      ],
+      "verify": "npm --prefix server test && npm --prefix server run typecheck"
+    },
+    {
+      "id": "G5-S2",
+      "gate": "G5",
+      "task": "P5-T09",
+      "title": "生产级 E2E 抽样通过",
+      "category": "EXTERNAL_ENV",
+      "owner": "QA / 业务",
+      "prerequisite": "生产级环境 + 真实可售商品",
+      "evidence": [],
+      "verify": null
+    },
+    {
+      "id": "G5-S3",
+      "gate": "G5",
+      "task": "P5-T09",
+      "title": "币种切换真实验收通过",
+      "category": "EXTERNAL_ENV",
+      "owner": "业务 / 运营",
+      "prerequisite": "真实币种配置切换 + 真实 CDN 缓存",
+      "evidence": [
+        "docs/reports/t12-currency-switch.md"
+      ],
+      "verify": null
+    },
+    {
+      "id": "G5-S4",
+      "gate": "G5",
+      "task": "P5-T09",
+      "title": "真实 CDN 缓存失效链路验证通过",
+      "category": "EXTERNAL_ENV",
+      "owner": "运维",
+      "prerequisite": "接入真实 CDN 失效器（当前为可插拔实现）",
+      "evidence": [],
+      "verify": null
+    },
+    {
+      "id": "X-S1",
+      "gate": "X-T06",
+      "task": "X-T06",
+      "title": "staging 发布回滚演练通过",
+      "category": "EXTERNAL_ENV",
+      "owner": "运维",
+      "prerequisite": "staging 环境 + 应用与 DB 全链路演练窗口",
+      "evidence": [],
+      "verify": null
+    },
+    {
+      "id": "X-S2",
+      "gate": "X-T06",
+      "task": "X-T06",
+      "title": "生产备份/恢复演练通过",
+      "category": "EXTERNAL_ENV",
+      "owner": "运维 / DBA",
+      "prerequisite": "生产环境备份恢复演练窗口",
+      "evidence": [],
+      "verify": null
+    },
+    {
+      "id": "X-S3",
+      "gate": "X-T06",
+      "task": "X-T06",
+      "title": "RTO/RPO 目标确认",
+      "category": "HUMAN_DECISION",
+      "owner": "业务 / 运维",
+      "prerequisite": "业务方确认 RTO/RPO 指标口径",
+      "evidence": [],
+      "verify": null
+    }
+  ]
+}
