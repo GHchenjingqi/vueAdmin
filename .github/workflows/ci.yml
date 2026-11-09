@@ -252,6 +252,58 @@ jobs:
           CI: true
           E2E_BASE_URL: https://localhost:5173
 
+      # ---- shops 前端冒烟 E2E（mock 自洽源，G5 §8：不依赖库数据，稳定复跑） ----
+      - name: Install shops dependencies
+        working-directory: shops
+        run: npm ci --ignore-scripts
+
+      - name: Install shops Playwright browsers
+        working-directory: shops
+        run: npx playwright install --with-deps chromium
+
+      - name: Build shops storefront
+        working-directory: shops
+        run: npx nuxt build
+
+      - name: Start shops server (mock self-consistent)
+        working-directory: shops
+        run: |
+          nohup env PORT=4015 NUXT_COMMERCE_SOURCE=mock NUXT_API_INSECURE_TLS=1 node .output/server/index.mjs > /tmp/shops-e2e.log 2>&1 &
+          echo $! > /tmp/shops-e2e.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4015/ >/dev/null 2>&1; then
+              echo "shops ready on attempt $i"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "shops server failed to start" >&2
+          cat /tmp/shops-e2e.log || true
+          exit 1
+
+      - name: Run shops smoke E2E
+        working-directory: shops
+        run: npx playwright test --config tests/e2e/playwright.config.ts --reporter=line
+        env:
+          CI: true
+          E2E_BASE_URL: http://127.0.0.1:4015
+
+      - name: Upload shops log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shops-e2e-log
+          path: /tmp/shops-e2e.log
+          retention-days: 7
+
+      - name: Upload shops E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shops-e2e-report
+          path: shops/test-results/
+          retention-days: 7
+
       - name: Upload server log on failure
         if: failure()
         uses: actions/upload-artifact@v4
