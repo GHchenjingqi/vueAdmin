@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { Op, Sequelize } from 'sequelize'
+import { Op, Sequelize, UniqueConstraintError } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderItem } from '../../shop/models/index.js'
@@ -145,70 +145,80 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
       : null
   if (coupon) await redeemCoupon(coupon, orderNo)
 
-  // 4) 库存预占（失败需同时释放预占与券占用）；P5-T04 按目的国做仓库路由
-  const destCountry = extractCountry(params.shippingAddress)
-  const reserveInputs = []
-  for (const line of quote.items) {
-    const warehouseId = await reservationService.pickWarehouse(line.skuId, destCountry)
-    reserveInputs.push({ skuId: line.skuId, warehouseId, qty: line.qty })
-  }
+  /**
+   * 4) 仓库路由 / 库存预占 / 订单落库共用同一失败回滚块。
+   * 原先只有 reserveItems 失败才回退：pickWarehouse 抛错、或并发同 idempotencyKey
+   * 时 ShopOrder.create 撞 uq_orders_idempotency_key，都会留下券与库存的孤儿占用。
+   */
+  const accessToken = genAccessToken()
   let reservations: Awaited<ReturnType<typeof reservationService.reserveItems>> = []
+  let order: ShopOrder
   try {
+    const destCountry = extractCountry(params.shippingAddress)
+    const reserveInputs = []
+    for (const line of quote.items) {
+      const warehouseId = await reservationService.pickWarehouse(line.skuId, destCountry)
+      reserveInputs.push({ skuId: line.skuId, warehouseId, qty: line.qty })
+    }
     reservations = await reservationService.reserveItems(orderNo, reserveInputs)
+
+    // 4b) 落库订单（快照）
+    order = await ShopOrder.create({
+      orderNo,
+      channelId: site.channelId ?? 0,
+      shopId: site.shopId ?? 0,
+      buyer: { email: params.email ?? null, customerId: params.customerId ?? null } as Record<string, unknown>,
+      currency: quote.currency,
+      amount: quote.amountCents / 100,
+      status: 'created',
+      paymentStatus: 'none',
+      email: params.email ?? null,
+      shippingAddress: params.shippingAddress ?? null,
+      note: params.note ?? null,
+      subtotalCents: quote.subtotalCents,
+      discountCents: quote.discountCents,
+      shippingCents: quote.shippingCents,
+      taxCents: quote.taxCents,
+      amountCents: quote.amountCents,
+      couponCode: quote.couponCode ?? null,
+      accessToken,
+      idempotencyKey,
+      reservationId: reservations[0]?.id ?? null,
+      policySnapshot: {
+        currency: quote.currency,
+        taxRate: Number(process.env.STORE_TAX_RATE ?? 0),
+        shippingCents: quote.shippingCents,
+        generatedAt: new Date().toISOString(),
+        // P5-T04：按仓配送承诺（路由后的主仓，随单固化）
+        deliveryCommitment: quote.deliveryCommitment,
+        // P5-T05：命中的 Bundle（组件 SKU 组合 + 优惠），订单明细仍按组件 SKU 记（库存按组件扣减）
+        bundle: quote.bundle,
+        bundleDiscountCents: quote.bundleDiscountCents,
+      } as Record<string, unknown>,
+      // 阶段 5 步骤 6：订单来源归因（site / utm），随订单固化，后台报表据此出渠道 ROI
+      sourceSiteId: site.shopId ?? null,
+      utmSource: params.attribution?.utmSource ?? null,
+      utmMedium: params.attribution?.utmMedium ?? null,
+      utmCampaign: params.attribution?.utmCampaign ?? null,
+      utmTerm: params.attribution?.utmTerm ?? null,
+      utmContent: params.attribution?.utmContent ?? null,
+      landingPage: params.attribution?.landingPage ?? null,
+      referrer: params.attribution?.referrer ?? null,
+      // P5-T07：推荐归因快照（码 + 首次触点，窗口起点）
+      referralCode: params.attribution?.referralCode ?? null,
+      referralTouchAt: params.attribution?.referralTouchAt ? new Date(params.attribution.referralTouchAt) : null,
+      tenantId: tId,
+    } as never)
   } catch (err) {
     await reservationService.releaseReservation(orderNo).catch(() => undefined)
     if (coupon) await releaseCoupon(orderNo).catch(() => undefined)
+    // 并发同幂等键：胜出者已落单，本次占位回退后按幂等语义返回首单
+    if (err instanceof UniqueConstraintError) {
+      const winner = await ShopOrder.findOne({ where: { idempotencyKey, tenantId: tId } })
+      if (winner) return toOrderView(winner, true)
+    }
     throw err
   }
-
-  // 4) 落库订单 + 明细（快照）
-  const accessToken = genAccessToken()
-  const order = await ShopOrder.create({
-    orderNo,
-    channelId: site.channelId ?? 0,
-    shopId: site.shopId ?? 0,
-    buyer: { email: params.email ?? null, customerId: params.customerId ?? null } as Record<string, unknown>,
-    currency: quote.currency,
-    amount: quote.amountCents / 100,
-    status: 'created',
-    paymentStatus: 'none',
-    email: params.email ?? null,
-    shippingAddress: params.shippingAddress ?? null,
-    note: params.note ?? null,
-    subtotalCents: quote.subtotalCents,
-    discountCents: quote.discountCents,
-    shippingCents: quote.shippingCents,
-    taxCents: quote.taxCents,
-    amountCents: quote.amountCents,
-    couponCode: quote.couponCode ?? null,
-    accessToken,
-    idempotencyKey,
-    reservationId: reservations[0]?.id ?? null,
-    policySnapshot: {
-      currency: quote.currency,
-      taxRate: Number(process.env.STORE_TAX_RATE ?? 0),
-      shippingCents: quote.shippingCents,
-      generatedAt: new Date().toISOString(),
-      // P5-T04：按仓配送承诺（路由后的主仓，随单固化）
-      deliveryCommitment: quote.deliveryCommitment,
-      // P5-T05：命中的 Bundle（组件 SKU 组合 + 优惠），订单明细仍按组件 SKU 记（库存按组件扣减）
-      bundle: quote.bundle,
-      bundleDiscountCents: quote.bundleDiscountCents,
-    } as Record<string, unknown>,
-    // 阶段 5 步骤 6：订单来源归因（site / utm），随订单固化，后台报表据此出渠道 ROI
-    sourceSiteId: site.shopId ?? null,
-    utmSource: params.attribution?.utmSource ?? null,
-    utmMedium: params.attribution?.utmMedium ?? null,
-    utmCampaign: params.attribution?.utmCampaign ?? null,
-    utmTerm: params.attribution?.utmTerm ?? null,
-    utmContent: params.attribution?.utmContent ?? null,
-    landingPage: params.attribution?.landingPage ?? null,
-    referrer: params.attribution?.referrer ?? null,
-    // P5-T07：推荐归因快照（码 + 首次触点，窗口起点）
-    referralCode: params.attribution?.referralCode ?? null,
-    referralTouchAt: params.attribution?.referralTouchAt ? new Date(params.attribution.referralTouchAt) : null,
-    tenantId: tId,
-  } as never)
 
   for (const line of quote.items) {
     await ShopOrderItem.create({
