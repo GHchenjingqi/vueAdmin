@@ -90,11 +90,19 @@ export async function createManualOrder(input: CreateOrderInput): Promise<ShopOr
 }
 
 export async function markPaid(id: number): Promise<ShopOrder> {
-  const order = await ShopOrder.findOne({ where: { id, tenantId: tid() } })
-  if (!order) throw new AppError(404, '订单不存在')
-  if (order.status !== 'created') throw new AppError(400, `当前状态 ${order.status} 不可标记为已支付`)
-  await order.update({ status: 'paid' })
-  return order
+  // 锁订单行串行化状态流转：否则与 ship/cancel 并发时各自读到旧状态，
+  // 后写覆盖会让「已取消」又被改回「已支付」。
+  return sequelize.transaction(async (t) => {
+    const order = await ShopOrder.findOne({
+      where: { id, tenantId: tid() },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    })
+    if (!order) throw new AppError(404, '订单不存在')
+    if (order.status !== 'created') throw new AppError(400, `当前状态 ${order.status} 不可标记为已支付`)
+    await order.update({ status: 'paid' }, { transaction: t })
+    return order
+  })
 }
 
 /**
@@ -102,25 +110,33 @@ export async function markPaid(id: number): Promise<ShopOrder> {
  * 释放占用并实际扣减库存，订单状态置为 shipped。
  */
 export async function ship(id: number, input: ShipOrderInput): Promise<ShopOrder> {
-  const order = await ShopOrder.findOne({ where: { id, tenantId: tid() } })
-  if (!order) throw new AppError(404, '订单不存在')
-  if (!['created', 'paid', 'fulfilled'].includes(order.status)) {
-    throw new AppError(400, `当前状态 ${order.status} 不可发货`)
-  }
+  const tId = tid()
+  // 状态检查与状态变更必须在同一事务内锁订单行完成：否则并发两次都读到
+  // 可发货状态，会重复扣减在库量、重复生成运单与两封发货通知。
+  const { order, trackingNo, carrier } = await sequelize.transaction(async (t) => {
+    const order = await ShopOrder.findOne({
+      where: { id, tenantId: tId },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    })
+    if (!order) throw new AppError(404, '订单不存在')
+    if (!['created', 'paid', 'fulfilled'].includes(order.status)) {
+      throw new AppError(400, `当前状态 ${order.status} 不可发货`)
+    }
 
-  const items = await ShopOrderItem.findAll({ where: { orderId: id, tenantId: tid() } })
-  if (items.length === 0) throw new AppError(400, '订单无明细，无法发货')
+    const items = await ShopOrderItem.findAll({ where: { orderId: id, tenantId: tId }, transaction: t })
+    if (items.length === 0) throw new AppError(400, '订单无明细，无法发货')
 
-  // 报关单号：依据首个 SKU 的 hs_code / origin_country / declared_value 自动带出
-  const firstSku = await ShopSku.findByPk(items[0].skuId)
-  const customsNo = firstSku
-    ? `${firstSku.hsCode || 'NA'}-${firstSku.originCountry || 'NA'}-${firstSku.declaredValue ?? 'NA'}`
-    : 'NA'
+    // 报关单号：依据首个 SKU 的 hs_code / origin_country / declared_value 自动带出
+    const firstSku = await ShopSku.findByPk(items[0].skuId, { transaction: t })
+    const customsNo = firstSku
+      ? `${firstSku.hsCode || 'NA'}-${firstSku.originCountry || 'NA'}-${firstSku.declaredValue ?? 'NA'}`
+      : 'NA'
 
-  const logistics = await createShipment({ carrier: input.carrier, shopId: order.shopId, channelId: order.channelId })
-  const trackingNo = input.trackingNo || logistics.trackingNo
+    // 运单在锁内生成：被拒绝的并发请求不应产生外部运单与通知去重键
+    const logistics = await createShipment({ carrier: input.carrier, shopId: order.shopId, channelId: order.channelId })
+    const trackingNo = input.trackingNo || logistics.trackingNo
 
-  await sequelize.transaction(async (t) => {
     for (const item of items) {
       await inventoryService.release(item.skuId, item.qty, order.orderNo)
       await inventoryService.deduct(item.skuId, item.qty, order.orderNo)
@@ -131,28 +147,36 @@ export async function ship(id: number, input: ShipOrderInput): Promise<ShopOrder
       trackingNo,
       customsNo,
       status: 'created',
-      tenantId: tid(),
+      tenantId: tId,
     } as never, { transaction: t })
     await order.update({ status: 'shipped' }, { transaction: t })
+    return { order, trackingNo, carrier: logistics.carrier }
   })
   // P3-T17：发货通知入队（以运单号去重；邮件失败不影响发货事实）
-  await tryEnqueue({ orderId: id, type: 'shipped', dedupeKey: trackingNo, trackingNo, carrier: logistics.carrier })
+  await tryEnqueue({ orderId: id, type: 'shipped', dedupeKey: trackingNo, trackingNo, carrier })
   return order
 }
 
 /** 取消：释放占用，置为 cancelled（已发货/已完成不可取消） */
 export async function cancel(id: number): Promise<ShopOrder> {
-  const order = await ShopOrder.findOne({ where: { id, tenantId: tid() } })
-  if (!order) throw new AppError(404, '订单不存在')
-  if (['shipped', 'done', 'cancelled'].includes(order.status)) {
-    throw new AppError(400, `当前状态 ${order.status} 不可取消`)
-  }
-  const items = await ShopOrderItem.findAll({ where: { orderId: id, tenantId: tid() } })
-  await sequelize.transaction(async (t) => {
+  const tId = tid()
+  // 与 ship/markPaid 共用订单行锁，保证状态检查与变更原子：
+  // 否则取消与发货并发时两者都成功返回，订单最终状态与库存账不一致。
+  return sequelize.transaction(async (t) => {
+    const order = await ShopOrder.findOne({
+      where: { id, tenantId: tId },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    })
+    if (!order) throw new AppError(404, '订单不存在')
+    if (['shipped', 'done', 'cancelled'].includes(order.status)) {
+      throw new AppError(400, `当前状态 ${order.status} 不可取消`)
+    }
+    const items = await ShopOrderItem.findAll({ where: { orderId: id, tenantId: tId }, transaction: t })
     for (const item of items) {
       await inventoryService.release(item.skuId, item.qty, order.orderNo)
     }
     await order.update({ status: 'cancelled' }, { transaction: t })
+    return order
   })
-  return order
 }
