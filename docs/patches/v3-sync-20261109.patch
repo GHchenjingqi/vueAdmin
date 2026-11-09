@@ -1,0 +1,2993 @@
+diff --git a/shops/app/router.options.ts b/shops/app/router.options.ts
+index f9dcc59..061ad9d 100644
+--- a/shops/app/router.options.ts
++++ b/shops/app/router.options.ts
+@@ -1,23 +1,6 @@
+-import type { RouteRecordRaw } from 'vue-router'
+-
+ /**
+- * 多语言 locale 路由前缀（P5-T01）。
+- *
+- * 为全部页面路由添加「可选」首段 `:locale(en-US|zh-CN)?`（en-US / zh-CN，见 shared/i18n）。
+- * - `/cart`、`/zh-CN/cart`、`/en-US/cart` 均匹配同一页面，locale 作为 route.params.locale 暴露
+- * - 首页 `/` 与 `/zh-CN/` 等价
+- * - 不破坏既有裸路径（前缀可选），客户端/SSR 一致（SSR 不再依赖 URL 改写）
++ * 单语站（P5-T01b）：路由无语言前缀。
++ * 站点语言由后台 store config `market.language` 决定（创建英文站即 en-US），
++ * 前端不提供语言切换，URL 不承载语言（单 URL 结构，SEO/分享稳定）。
+  */
+-const LOCALE_SEG = ':locale(en-US|zh-CN)?'
+-
+-export default {
+-  routes(routes: RouteRecordRaw[]) {
+-    return routes.map((r) => {
+-      if (r.path === '/' || r.path === '') {
+-        return { ...r, path: `/${LOCALE_SEG}` }
+-      }
+-      // 已带参数/子路径：在开头插入可选 locale 段
+-      return { ...r, path: `/${LOCALE_SEG}${r.path}` }
+-    })
+-  },
+-}
++export default {}
+diff --git a/shops/components/LocaleSwitcher.vue b/shops/components/LocaleSwitcher.vue
+index 5b8df68..a690b7e 100644
+--- a/shops/components/LocaleSwitcher.vue
++++ b/shops/components/LocaleSwitcher.vue
+@@ -1,31 +1,10 @@
+ <script setup lang="ts">
+-import { useLocale } from '~/composables/useLocale'
+-
+ /**
+- * 语言切换（P5-T01）：en-US / zh-CN。
+- * 切换仅改变 URL 前缀（经 app/router.options.ts 匹配）与 store_locale cookie；
+- * 购物车按 guest/token 服务端存储，不因切换丢失（P3-T01）。
+- * 真实语言版本由 shared/i18n/messages.ts locales 定义，切换器只渲染真实版本。
++ * 单语站（P5-T01b）：前端不提供语言切换，站点语言由后台 store config 决定。
++ * 切换器已停用；组件保留为占位（未在任何布局引用），避免破坏既有文件引用。
+  */
+-const { locale, localePath } = useLocale()
+-const route = useRoute()
+-const options = [
+-  { code: 'en-US', label: 'EN' },
+-  { code: 'zh-CN', label: '中文' },
+-] as const
+ </script>
+ 
+ <template>
+-  <nav class="flex items-center gap-1 text-xs" aria-label="Language">
+-    <NuxtLink
+-      v-for="opt in options"
+-      :key="opt.code"
+-      :to="localePath(route.fullPath, opt.code)"
+-      class="rounded px-2 py-1 hover:bg-stone-100"
+-      :class="locale === opt.code ? 'bg-stone-900 text-white hover:bg-stone-900' : 'text-stone-500 hover:text-stone-900'"
+-      :aria-current="locale === opt.code ? 'true' : undefined"
+-    >
+-      {{ opt.label }}
+-    </NuxtLink>
+-  </nav>
++  <span class="hidden" aria-hidden="true"></span>
+ </template>
+diff --git a/shops/components/commerce/ApparelAttributes.vue b/shops/components/commerce/ApparelAttributes.vue
+index 94fec91..fe7d430 100644
+--- a/shops/components/commerce/ApparelAttributes.vue
++++ b/shops/components/commerce/ApparelAttributes.vue
+@@ -1,19 +1,21 @@
+ <script setup lang="ts">
+-/** 服装品类属性展示（P2-T06）：尺码体系/尺码/颜色/面料/版型/测量值/试穿信息 */
++import { useI18n } from '~/composables/useI18n'
++/** 服装品类属性展示（P2-T06）：尺码体系/尺码/颜色/面料/版型/测量值/试穿信息。标签接入 i18n（P5-T01）。 */
++const { t } = useI18n()
+ const props = defineProps<{ spec: Record<string, string> }>()
+ const rows = computed(() =>
+   (
+     [
+-      ['sizeSystem', 'Size System'],
+-      ['size', 'Size'],
+-      ['color', 'Color'],
+-      ['fabric', 'Fabric'],
+-      ['fit', 'Fit'],
+-      ['measurements', 'Measurements'],
+-      ['tryOnInfo', 'Try-on Info'],
++      ['sizeSystem', 'attr.sizeSystem'],
++      ['size', 'attr.size'],
++      ['color', 'attr.color'],
++      ['fabric', 'attr.fabric'],
++      ['fit', 'attr.fit'],
++      ['measurements', 'attr.measurements'],
++      ['tryOnInfo', 'attr.tryOnInfo'],
+     ] as const
+   )
+-    .map(([key, label]) => ({ key, label, value: props.spec[key] }))
++    .map(([key, labelKey]) => ({ key, label: t(labelKey), value: props.spec[key] }))
+     .filter((r) => r.value),
+ )
+ </script>
+diff --git a/shops/components/commerce/ConsentBanner.vue b/shops/components/commerce/ConsentBanner.vue
+index f15fd14..8567954 100644
+--- a/shops/components/commerce/ConsentBanner.vue
++++ b/shops/components/commerce/ConsentBanner.vue
+@@ -2,13 +2,14 @@
+ import { ref } from 'vue'
+ import { readConsent, grantConsent } from '@shared/analytics/consent'
+ import { loadGa4 } from '@shared/analytics/events'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+  * P4-T11：Cookie 同意横幅（首次访问显示；决定后不再出现；可随时撤回）。
+- * 拒绝 = 仅必要 Cookie；接受 = analytics + marketing。
++ * 拒绝 = 仅必要 Cookie；接受 = analytics + marketing。文案接入 i18n（P5-T01）。
+  */
++const { t } = useI18n()
+ const visible = ref(false)
+-const cfg = useStoreConfig()
+ 
+ onMounted(() => {
+   visible.value = readConsent() === null
+@@ -29,23 +30,23 @@ function decide(analytics: boolean): void {
+     v-if="visible"
+     class="fixed bottom-3 left-3 right-3 z-50 mx-auto max-w-xl rounded-xl border border-stone-200 bg-white p-4 shadow-lg"
+     role="dialog"
+-    aria-label="Cookie 使用偏好"
++    :aria-label="t('consent.dialogLabel')"
+   >
+     <p class="text-xs leading-relaxed text-stone-600">
+-      我们使用必要 Cookie 保障站点运行，并希望在{{ cfg.market.value.language === 'zh-CN' ? '你' : '您' }}同意后使用统计与营销 Cookie 优化体验。详见
+-      <NuxtLink to="/policies/privacy" class="underline hover:text-stone-800">隐私政策</NuxtLink>
+-      。
++      {{ t('consent.messageBefore') }}
++      <NuxtLink to="/policies/privacy" class="underline hover:text-stone-800">{{ t('consent.privacy') }}</NuxtLink>
++      {{ t('consent.messageAfter') }}
+     </p>
+     <div class="mt-3 flex gap-2">
+       <button type="button" class="flex-1 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700" @click="decide(true)">
+-        全部接受
++        {{ t('consent.acceptAll') }}
+       </button>
+       <button
+         type="button"
+         class="flex-1 rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-stone-500"
+         @click="decide(false)"
+       >
+-        仅必要
++        {{ t('consent.essentialOnly') }}
+       </button>
+     </div>
+   </div>
+diff --git a/shops/components/commerce/FooterNewsletter.vue b/shops/components/commerce/FooterNewsletter.vue
+index 6c2d35f..8d15a74 100644
+--- a/shops/components/commerce/FooterNewsletter.vue
++++ b/shops/components/commerce/FooterNewsletter.vue
+@@ -1,10 +1,13 @@
+ <script setup lang="ts">
+ import { ref } from 'vue'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+  * P4-T09：页脚邮件订阅（双重确认=显式勾选同意 + 双重确认邮件由后台 mailer 承接）。
+- * 成功态展示退订说明；失败态展示服务端错误（邮箱非法/重复等）。
++ * 成功态展示退订说明；失败态展示服务端错误（邮箱非法/重复等）。文案接入 i18n（P5-T01）。
+  */
++const { t, ti } = useI18n()
++
+ const email = ref('')
+ const consent = ref(false)
+ const state = ref<'idle' | 'loading' | 'done' | 'error'>('idle')
+@@ -12,7 +15,7 @@ const errorMsg = ref('')
+ 
+ async function subscribe(): Promise<void> {
+   if (!consent.value) {
+-    errorMsg.value = '请先勾选同意接收邮件'
++    errorMsg.value = t('newsletter.needConsent')
+     return
+   }
+   state.value = 'loading'
+@@ -22,7 +25,7 @@ async function subscribe(): Promise<void> {
+     state.value = 'done'
+   } catch (err) {
+     state.value = 'error'
+-    errorMsg.value = err instanceof Error ? err.message : '订阅失败，请稍后再试'
++    errorMsg.value = err instanceof Error ? err.message : t('newsletter.failed')
+   }
+ }
+ </script>
+@@ -30,34 +33,34 @@ async function subscribe(): Promise<void> {
+ <template>
+   <div class="rounded-xl border border-stone-200 bg-stone-50 p-5">
+     <template v-if="state === 'done'">
+-      <p class="text-sm font-medium text-emerald-700">✓ 订阅成功！确认邮件已发送至 {{ email }}，邮件内可随时退订。</p>
++      <p class="text-sm font-medium text-emerald-700">{{ ti('newsletter.success', { email }) }}</p>
+     </template>
+     <template v-else>
+-      <h3 class="text-sm font-semibold text-stone-900">订阅新品与护理指南</h3>
++      <h3 class="text-sm font-semibold text-stone-900">{{ t('newsletter.title') }}</h3>
+       <form class="mt-3 space-y-2" @submit.prevent="subscribe">
+         <div class="flex gap-2">
+           <input
+             v-model="email"
+             type="email"
+             required
+-            placeholder="your@email.com"
++            :placeholder="t('newsletter.placeholder')"
+             class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
+-            aria-label="邮箱地址"
++            :aria-label="t('newsletter.emailLabel')"
+           />
+           <button
+             type="submit"
+             class="shrink-0 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50"
+             :disabled="state === 'loading'"
+           >
+-            {{ state === 'loading' ? '订阅中…' : '订阅' }}
++            {{ state === 'loading' ? t('newsletter.subscribing') : t('newsletter.subscribe') }}
+           </button>
+         </div>
+         <label class="flex items-start gap-2 text-xs text-stone-500">
+           <input v-model="consent" type="checkbox" class="mt-0.5" />
+           <span>
+-            我同意接收营销邮件，并已阅读
+-            <a href="/policies/privacy" class="underline hover:text-stone-800">隐私政策</a>
+-            。可随时通过邮件链接退订。
++            {{ t('newsletter.consentBefore') }}
++            <a href="/policies/privacy" class="underline hover:text-stone-800">{{ t('newsletter.privacy') }}</a>
++            {{ t('newsletter.consentAfter') }}
+           </span>
+         </label>
+         <p v-if="errorMsg" class="text-xs text-red-600">{{ errorMsg }}</p>
+diff --git a/shops/components/commerce/JsonLd.vue b/shops/components/commerce/JsonLd.vue
+index fb69599..06cc1ec 100644
+--- a/shops/components/commerce/JsonLd.vue
++++ b/shops/components/commerce/JsonLd.vue
+@@ -1,6 +1,7 @@
+ <script setup lang="ts">
+ import type { CatalogProduct } from '@shared/types/api'
+ import { useStoreConfig } from '~/composables/useStoreConfig'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+  * JSON-LD 结构化数据（P2-T11）：Product offers.priceCurrency 取 store config（禁止写死 C1/C4）。
+@@ -10,6 +11,7 @@ import { useStoreConfig } from '~/composables/useStoreConfig'
+  */
+ const props = defineProps<{ product: CatalogProduct }>()
+ const { currency } = useStoreConfig()
++const { t } = useI18n()
+ 
+ const productJsonLd = computed(() => {
+   const p = props.product.price
+@@ -32,7 +34,7 @@ const breadcrumbJsonLd = computed(() => ({
+   '@context': 'https://schema.org',
+   '@type': 'BreadcrumbList',
+   itemListElement: [
+-    { '@type': 'ListItem', position: 1, name: 'Home', item: '/' },
++    { '@type': 'ListItem', position: 1, name: t('product.home'), item: '/' },
+     ...(props.product.category ? [{ '@type': 'ListItem', position: 2, name: props.product.category.name, item: `/c/${props.product.category.slug}` }] : []),
+   ],
+ }))
+diff --git a/shops/components/commerce/ProductCard.vue b/shops/components/commerce/ProductCard.vue
+index 2fb3a0d..a0f4ff1 100644
+--- a/shops/components/commerce/ProductCard.vue
++++ b/shops/components/commerce/ProductCard.vue
+@@ -1,5 +1,6 @@
+ <script setup lang="ts">
+ import { useStoreConfig } from '~/composables/useStoreConfig'
++import { useI18n } from '~/composables/useI18n'
+ 
+ const props = defineProps<{
+   product: {
+@@ -12,6 +13,7 @@ const props = defineProps<{
+     category?: { name: string } | null
+   }
+ }>()
++const { t } = useI18n()
+ const cfg = useStoreConfig()
+ const link = computed(() => `/products/${props.product.slug}`)
+ const priceText = computed(() => (props.product.price ? cfg.format(props.product.price.amount) : '—'))
+@@ -35,7 +37,7 @@ const priceText = computed(() => (props.product.price ? cfg.format(props.product
+     <h3 class="mt-3 line-clamp-2 text-sm font-medium text-stone-900 group-hover:underline">{{ product.title }}</h3>
+     <div class="mt-1 flex items-center gap-2">
+       <span class="text-sm tabular-nums">{{ priceText }}</span>
+-      <span v-if="!product.inStock" class="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-500">Out of stock</span>
++      <span v-if="!product.inStock" class="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-500">{{ t('card.outOfStock') }}</span>
+     </div>
+   </NuxtLink>
+ </template>
+diff --git a/shops/components/commerce/ProductReviews.vue b/shops/components/commerce/ProductReviews.vue
+index 616a1f5..fac80bc 100644
+--- a/shops/components/commerce/ProductReviews.vue
++++ b/shops/components/commerce/ProductReviews.vue
+@@ -1,9 +1,11 @@
+ <script setup lang="ts">
+ import { onMounted, ref } from 'vue'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+- * 商品评价区（P4-T07 前端）：仅展示 approved（服务端过滤）；提交进 pending 审核队列。
++ * 商品评价区（P4-T07 前端）：仅展示 approved（服务端过滤）；提交进 pending 审核队列。文案接入 i18n（P5-T01）。
+  */
++const { t, ti } = useI18n()
+ const props = defineProps<{ spuId: number }>()
+ 
+ interface ReviewItem {
+@@ -14,6 +16,7 @@ interface ReviewItem {
+   customerNickname: string | null
+   createdAt: string
+   helpfulCount: number
++  isVerified?: boolean
+ }
+ 
+ const list = ref<ReviewItem[]>([])
+@@ -40,7 +43,7 @@ onMounted(async () => {
+ 
+ async function submit(): Promise<void> {
+   if (!content.value.trim()) {
+-    notice.value = '请填写评价内容'
++    notice.value = t('reviews.required')
+     return
+   }
+   busy.value = true
+@@ -50,10 +53,10 @@ async function submit(): Promise<void> {
+       method: 'POST',
+       body: { spuId: props.spuId, rating: rating.value, content: content.value.trim() },
+     })
+-    notice.value = '评价已提交，进入审核队列（审核通过后展示）'
++    notice.value = t('reviews.submitted')
+     content.value = ''
+   } catch (err) {
+-    notice.value = err instanceof Error ? err.message : '提交失败'
++    notice.value = err instanceof Error ? err.message : t('reviews.failedSubmit')
+   } finally {
+     busy.value = false
+   }
+@@ -63,17 +66,18 @@ async function submit(): Promise<void> {
+ <template>
+   <section class="mt-10 border-t border-stone-200 pt-8">
+     <h2 class="text-lg font-semibold">
+-      评价
+-      <span v-if="summary" class="ml-2 text-sm font-normal text-stone-500">{{ summary.average.toFixed(1) }} / 5（{{ summary.count }} 条）</span>
++      {{ t('reviews.title') }}
++      <span v-if="summary" class="ml-2 text-sm font-normal text-stone-500">{{ ti('reviews.avg', { avg: summary.average.toFixed(1), count: String(summary.count) }) }}</span>
+     </h2>
+ 
+-    <div v-if="loading" class="mt-4 text-sm text-stone-500">加载中…</div>
+-    <p v-else-if="list.length === 0" class="mt-4 text-sm text-stone-500">暂无已审核评价。</p>
++    <div v-if="loading" class="mt-4 text-sm text-stone-500">{{ t('reviews.loading') }}</div>
++    <p v-else-if="list.length === 0" class="mt-4 text-sm text-stone-500">{{ t('reviews.empty') }}</p>
+     <ul v-else class="mt-4 space-y-4">
+       <li v-for="r in list" :key="r.id" class="rounded-xl border border-stone-200 p-4">
+         <div class="flex items-center gap-2 text-sm">
+           <span class="text-amber-500" aria-hidden="true">{{ '★'.repeat(r.rating) }}{{ '☆'.repeat(5 - r.rating) }}</span>
+-          <span class="font-medium">{{ r.customerNickname || '匿名买家' }}</span>
++          <span class="font-medium">{{ r.customerNickname || t('reviews.anonymous') }}</span>
++          <span v-if="r.isVerified" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">{{ t('reviews.verified') }}</span>
+           <span class="text-xs text-stone-400">{{ new Date(r.createdAt).toLocaleDateString() }}</span>
+         </div>
+         <p v-if="r.title" class="mt-1 text-sm font-medium">{{ r.title }}</p>
+@@ -82,17 +86,17 @@ async function submit(): Promise<void> {
+     </ul>
+ 
+     <form class="mt-6 space-y-2 rounded-xl bg-stone-50 p-4" @submit.prevent="submit">
+-      <h3 class="text-sm font-semibold">写评价</h3>
++      <h3 class="text-sm font-semibold">{{ t('reviews.write') }}</h3>
+       <div class="flex items-center gap-2 text-sm">
+-        <span class="text-stone-500">评分</span>
+-        <select v-model.number="rating" class="rounded-lg border border-stone-300 px-2 py-1.5 text-sm" aria-label="评分">
+-          <option v-for="n in 5" :key="n" :value="6 - n">{{ 6 - n }} 星</option>
++        <span class="text-stone-500">{{ t('reviews.rating') }}</span>
++        <select v-model.number="rating" class="rounded-lg border border-stone-300 px-2 py-1.5 text-sm" :aria-label="t('reviews.rating')">
++          <option v-for="n in 5" :key="n" :value="6 - n">{{ ti('reviews.stars', { n: String(6 - n) }) }}</option>
+         </select>
+       </div>
+-      <textarea v-model="content" rows="3" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" placeholder="分享你的使用体验…" />
++      <textarea v-model="content" rows="3" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" :placeholder="t('reviews.share')" />
+       <p v-if="notice" class="text-xs text-stone-600">{{ notice }}</p>
+       <button type="submit" class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50" :disabled="busy">
+-        {{ busy ? '提交中…' : '提交评价' }}
++        {{ busy ? t('reviews.submitting') : t('reviews.submit') }}
+       </button>
+     </form>
+   </section>
+diff --git a/shops/components/commerce/WigAttributes.vue b/shops/components/commerce/WigAttributes.vue
+index 2749f47..116cfee 100644
+--- a/shops/components/commerce/WigAttributes.vue
++++ b/shops/components/commerce/WigAttributes.vue
+@@ -1,19 +1,21 @@
+ <script setup lang="ts">
+-/** 假发品类属性展示（P2-T05）：发质/纹理/Lace/长度/密度/帽围/是否 Glueless */
++import { useI18n } from '~/composables/useI18n'
++/** 假发品类属性展示（P2-T05）：发质/纹理/Lace/长度/密度/帽围/是否 Glueless。标签接入 i18n（P5-T01）。 */
++const { t } = useI18n()
+ const props = defineProps<{ spec: Record<string, string> }>()
+ const rows = computed(() =>
+   (
+     [
+-      ['hairMaterial', 'Hair Material'],
+-      ['texture', 'Texture'],
+-      ['laceType', 'Lace Type'],
+-      ['capSize', 'Cap Size'],
+-      ['length', 'Length'],
+-      ['density', 'Density'],
+-      ['glueless', 'Glueless'],
++      ['hairMaterial', 'attr.hairMaterial'],
++      ['texture', 'attr.texture'],
++      ['laceType', 'attr.laceType'],
++      ['capSize', 'attr.capSize'],
++      ['length', 'attr.length'],
++      ['density', 'attr.density'],
++      ['glueless', 'attr.glueless'],
+     ] as const
+   )
+-    .map(([key, label]) => ({ key, label, value: props.spec[key] }))
++    .map(([key, labelKey]) => ({ key, label: t(labelKey), value: props.spec[key] }))
+     .filter((r) => r.value),
+ )
+ </script>
+diff --git a/shops/components/ui/AppDialog.vue b/shops/components/ui/AppDialog.vue
+index dd363ad..4b6f784 100644
+--- a/shops/components/ui/AppDialog.vue
++++ b/shops/components/ui/AppDialog.vue
+@@ -1,5 +1,7 @@
+ <script setup lang="ts">
++import { useI18n } from '~/composables/useI18n'
+ /** 基础 UI 组件（P1-T12）：Dialog（open 关闭由父组件控制，Escape 可关） */
++const { t } = useI18n()
+ const props = defineProps<{ open: boolean; title?: string }>()
+ const emit = defineEmits<{ (e: 'close'): void }>()
+ 
+@@ -17,7 +19,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
+       <div class="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+         <div class="mb-3 flex items-center justify-between">
+           <h3 class="text-base font-semibold">{{ title }}</h3>
+-          <button type="button" class="text-stone-400 hover:text-stone-900" aria-label="Close" @click="emit('close')">✕</button>
++          <button type="button" class="text-stone-400 hover:text-stone-900" :aria-label="t('common.close')" @click="emit('close')">✕</button>
+         </div>
+         <slot />
+       </div>
+diff --git a/shops/components/ui/ShippingInfo.vue b/shops/components/ui/ShippingInfo.vue
+index 1e7caac..fd9bac0 100644
+--- a/shops/components/ui/ShippingInfo.vue
++++ b/shops/components/ui/ShippingInfo.vue
+@@ -1,7 +1,9 @@
+ <script setup lang="ts">
+ import { useStoreConfig } from '~/composables/useStoreConfig'
++import { useI18n } from '~/composables/useI18n'
+ 
+-/** 基础 UI 组件（P1-T12）：配送承诺摘要（币种表述取 store config，不写死） */
++/** 基础 UI 组件（P1-T12）：配送承诺摘要（币种表述取 store config，不写死）。文案接入 i18n（P5-T01）。 */
++const { ti } = useI18n()
+ const props = withDefaults(defineProps<{ standardDays?: string; expressDays?: string; freeThreshold?: number | null }>(), {
+   standardDays: '7-12',
+   expressDays: '3-5',
+@@ -9,13 +11,15 @@ const props = withDefaults(defineProps<{ standardDays?: string; expressDays?: st
+ })
+ const cfg = useStoreConfig()
+ const thresholdText = computed(() =>
+-  props.freeThreshold ? `Free standard shipping over ${cfg.format(props.freeThreshold)}` : 'Shipping calculated at checkout',
++  props.freeThreshold
++    ? ti('shipping.freeOver', { amount: cfg.format(props.freeThreshold) })
++    : ti('shipping.calculated', {}),
+ )
+ </script>
+ 
+ <template>
+   <div class="space-y-1 rounded-xl border border-stone-200 p-4 text-xs text-stone-600">
+-    <p>🚚 Standard {{ standardDays }} days · Express {{ expressDays }} days</p>
+-    <p>{{ thresholdText }} · Ships in 1-2 business days</p>
++    <p>{{ ti('shipping.standard', { days: standardDays, express: expressDays }) }}</p>
++    <p>{{ thresholdText }} · {{ ti('shipping.shipsIn', {}) }}</p>
+   </div>
+ </template>
+diff --git a/shops/composables/useCart.ts b/shops/composables/useCart.ts
+index 3bc8e12..eea6101 100644
+--- a/shops/composables/useCart.ts
++++ b/shops/composables/useCart.ts
+@@ -3,10 +3,11 @@ import type { Cart, CartItem } from '@shared/types/commerce'
+ /**
+  * Cart 组合式（P3-T02 前端版）：useCart()。
+  * 数据源：/api/cart/*（BFF mock；后端阶段完成后切换真实路由，契约不变）。
++ * 状态用 useState 全局共享：产品页加购后，布局层导航角标立即同步（修复"加购无反馈"）。
+  */
+ export function useCart() {
+-  const cart = ref<Cart | null>(null)
+-  const loading = ref(false)
++  const cart = useState<Cart | null>('cart', () => null)
++  const loading = useState<boolean>('cart-loading', () => false)
+ 
+   async function load(): Promise<Cart | null> {
+     loading.value = true
+diff --git a/shops/composables/useExperiment.ts b/shops/composables/useExperiment.ts
+index 99167f8..ea178b2 100644
+--- a/shops/composables/useExperiment.ts
++++ b/shops/composables/useExperiment.ts
+@@ -22,7 +22,7 @@ export function useExperiment() {
+   async function assign(key: string): Promise<ExperimentAssignment> {
+     try {
+       return await $fetch<ExperimentAssignment>(
+-        `/api/storefront/v1/experiments/${encodeURIComponent(key)}/assign?subjectId=${encodeURIComponent(subjectId.value ?? '')}`,
++        `/api/experiments/${encodeURIComponent(key)}/assign?subjectId=${encodeURIComponent(subjectId.value ?? '')}`,
+       )
+     } catch {
+       // 网络级失败 fail-closed：视为关闭，不阻塞页面
+diff --git a/shops/composables/useLocale.ts b/shops/composables/useLocale.ts
+index 380549d..b232d7b 100644
+--- a/shops/composables/useLocale.ts
++++ b/shops/composables/useLocale.ts
+@@ -1,44 +1,30 @@
+ import { computed } from 'vue'
+ import { locales as ALL_LOCALES, defaultLocale, type Locale } from '@shared/i18n/messages'
+-import { detectLocale, localePath as buildLocalePath } from '@shared/i18n/localePath'
+ import { useStoreConfig } from './useStoreConfig'
+ 
+ /**
+- * 多语言（P5-T01）。
++ * 站点语言（P5-T01b 单语收敛）。
+  *
+- * locale 单一事实源（优先级）：
+- * 1. URL 前缀（route.path → detectLocale，SSR 与客户端一致，路由经 app/router.options.ts 匹配）
+- * 2. 已存 `store_locale` cookie（无前缀页面延续用户已选语言；locale.global 中间件与 URL 前缀同步）
+- * 3. store config 默认语言
+- * 与币种完全解耦：language 不来自 currency（P1-T05）；切换语言不清空购物车（购物车按 guest/token 服务端存储，URL 变更不影响）。
++ * locale 单一来源 = 后台 store config `market.language`（settings 唯一数据源）。
++ * - 前端不再提供语言切换器，URL 无语言前缀（单 URL 结构）。
++ * - 创建英文站即后台设 en-US → 全站英文；后台可改 zh-CN，站点随之切换（不在前端切换）。
++ * - 与币种解耦：语言不来自 currency（P1-T05）。
++ * - store config 加载前/失败回退：defaultLocale（en-US），与币种 fail-closed 不同（语言允许回退）。
+  */
+ export function useLocale() {
+-  const route = useRoute()
+   const storeCfg = useStoreConfig()
+-  const cookieLocale = useCookie<Locale>('store_locale', { maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' })
+ 
+   const locale = computed<Locale>(() => {
+-    const fromPath = detectLocale(route.path)
+-    if (fromPath) return fromPath
+-    const c = cookieLocale.value
+-    if (c && ALL_LOCALES.includes(c)) return c
+-    const fromStore = (storeCfg.market.value.language as Locale) ?? defaultLocale
++    const fromStore = storeCfg.market.value.language as Locale
+     return ALL_LOCALES.includes(fromStore) ? fromStore : defaultLocale
+   })
+ 
+   const lang = computed(() => locale.value.split('-')[0] || 'en')
+ 
+-  /** 将路径规范化为带 locale 前缀（用于 hreflang/canonical/切换跳转） */
+-  function localePath(path: string, loc: Locale = locale.value): string {
+-    return buildLocalePath(path, loc)
++  /** 单语站：路径恒为原样（无语言前缀），供 canonical/SEO 使用 */
++  function localePath(path: string): string {
++    return path || '/'
+   }
+ 
+-  /** 切换到指定语言：写 cookie 并跳转到对应前缀 URL */
+-  function setLocale(loc: Locale): void {
+-    cookieLocale.value = loc
+-    const target = buildLocalePath(route.fullPath, loc)
+-    if (target !== route.fullPath) navigateTo(target, { replace: true })
+-  }
+-
+-  return { locale, lang, locales: ALL_LOCALES, localePath, setLocale }
++  return { locale, lang, locales: ALL_LOCALES, localePath }
+ }
+diff --git a/shops/composables/useSeo.ts b/shops/composables/useSeo.ts
+index 6212eb3..9458e35 100644
+--- a/shops/composables/useSeo.ts
++++ b/shops/composables/useSeo.ts
+@@ -1,24 +1,65 @@
+ import { computed } from 'vue'
+-import { locales, defaultLocale } from '@shared/i18n/messages'
+ import { useLocale } from './useLocale'
+ 
+-/** SEO 组合式（P2-T09 / P5-T01）：唯一 Title/Description/Canonical/hreflang（仅真实存在的语言版本，禁止指向 404）。 */
+-export function useSeo(input: { title: string; description: string; path: string }) {
++/**
++ * SEO 组合式（P2-T09 / P5-T01b 单语 / SEO-TDK）。
++ * 跨境独立站 TDK 惯例：唯一 Title/Description/Keywords + canonical + Open Graph + Twitter Card + robots。
++ * - 单语站无 hreflang（后台语言唯一，前端不切换）。
++ * - 默认 index, follow；交易/隐私页传 noindex 生成 noindex, nofollow。
++ * - og:type：website（默认）/ product / article；og:image 自动拼 siteUrl。
++ */
++export interface SeoInput {
++  title: string | (() => string)
++  description: string | (() => string)
++  path: string
++  /** 页面关键词（逗号分隔）；Google 已忽略 keywords，但保留完整 TDK（跨境惯例）。空则不输出。 */
++  keywords?: string | (() => string)
++  /** Open Graph 类型：website（默认）/ product / article 等 */
++  ogType?: 'website' | 'product' | 'article' | string
++  /** OG/Twitter 分享图：绝对 URL 或以 / 开头的相对路径（自动拼 siteUrl）；可传函数以支持异步数据 */
++  ogImage?: string | (() => string)
++  /** 交易/隐私页 → noindex, nofollow；默认 index, follow */
++  noindex?: boolean
++}
++
++export function useSeo(input: SeoInput) {
+   const siteUrl = useRuntimeConfig().public.siteUrl as string
+   const { localePath } = useLocale()
++  const resolve = (v: string | (() => string)) => (typeof v === 'function' ? v() : v)
++
+   const canonical = computed(() => `${siteUrl}${localePath(input.path)}`)
++  const title = computed(() => resolve(input.title))
++  const description = computed(() => resolve(input.description))
++  const keywords = computed(() => resolve(input.keywords ?? ''))
++  const ogImage = computed(() => {
++    const img = resolve(input.ogImage ?? '')
++    if (!img) return ''
++    return img.startsWith('http') ? img : `${siteUrl}${img.startsWith('/') ? img : `/${img}`}`
++  })
+ 
+-  // P5-T01：hreflang 只输出真实存在的语言版本（en-US / zh-CN），各自指向带前缀 URL（经 01-locale 中间件服务，不会 404）
+-  const hreflang = computed(() => [
+-    ...locales.map((loc) => ({ rel: 'alternate', hreflang: loc, href: `${siteUrl}${localePath(input.path, loc)}` })),
+-    { rel: 'alternate', hreflang: 'x-default', href: `${siteUrl}${localePath(input.path, defaultLocale)}` },
+-  ])
++  const siteName = 'Aurora Hair Studio'
++  const ogType = input.ogType ?? 'website'
++  const robots = input.noindex ? 'noindex, nofollow' : 'index, follow'
+ 
+   useHead({
+-    title: () => input.title,
+-    meta: [{ name: 'description', content: input.description }],
+-    link: [{ rel: 'canonical', href: canonical.value }, ...hreflang.value],
++    title: () => title.value,
++    meta: [
++      { name: 'description', content: description.value },
++      ...(keywords.value ? [{ name: 'keywords', content: keywords.value }] : []),
++      { name: 'robots', content: robots },
++      { property: 'og:title', content: title.value },
++      { property: 'og:description', content: description.value },
++      { property: 'og:type', content: ogType },
++      { property: 'og:url', content: canonical.value },
++      { property: 'og:site_name', content: siteName },
++      ...(ogImage.value ? [{ property: 'og:image', content: ogImage.value }] : []),
++      { name: 'twitter:card', content: ogImage.value ? 'summary_large_image' : 'summary' },
++      { name: 'twitter:title', content: title.value },
++      { name: 'twitter:description', content: description.value },
++      ...(ogImage.value ? [{ name: 'twitter:image', content: ogImage.value }] : []),
++    ],
++    link: [{ rel: 'canonical', href: canonical.value }],
+   })
+ 
+-  return { canonical }
++  return { canonical, title, description }
+ }
+diff --git a/shops/layouts/default.vue b/shops/layouts/default.vue
+index 3c92912..63fe127 100644
+--- a/shops/layouts/default.vue
++++ b/shops/layouts/default.vue
+@@ -13,6 +13,12 @@ useHead({ htmlAttrs: { lang } })
+ 
+ const t = (key: string) => translate(locale.value, key)
+ provide('t', t)
++
++// 导航购物车数量角标：客户端拉取当前购物车；产品页加购后经共享 useCart 状态实时 +1。
++const { itemCount, load: loadCart } = useCart()
++onMounted(() => {
++  void loadCart()
++})
+ </script>
+ 
+ <template>
+@@ -21,19 +27,25 @@ provide('t', t)
+       href="#main"
+       class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-stone-900 focus:px-3 focus:py-2 focus:text-white"
+     >
+-      Skip to content
++      {{ t('nav.skipToContent') }}
+     </a>
+     <header class="border-b border-stone-200">
+       <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+-        <NuxtLink to="/" class="text-lg font-semibold tracking-wide">Aurora Hair Studio</NuxtLink>
++        <NuxtLink to="/" class="text-lg font-semibold tracking-wide">{{ t('shop.title') }}</NuxtLink>
+         <div class="flex items-center gap-5">
+           <nav class="flex items-center gap-5 text-sm text-stone-600">
+-            <NuxtLink to="/c/lace-wigs" class="hover:text-stone-900">Lace Wigs</NuxtLink>
+-            <NuxtLink to="/c/apparel" class="hover:text-stone-900">Apparel</NuxtLink>
+-            <NuxtLink to="/cart" class="hover:text-stone-900">Cart</NuxtLink>
+-            <NuxtLink to="/track" class="hover:text-stone-900">Track</NuxtLink>
++            <NuxtLink to="/c/lace-wigs" class="hover:text-stone-900">{{ t('nav.laceWigs') }}</NuxtLink>
++            <NuxtLink to="/c/apparel" class="hover:text-stone-900">{{ t('nav.apparel') }}</NuxtLink>
++            <NuxtLink to="/cart" class="relative hover:text-stone-900">
++              {{ t('nav.cart') }}
++              <span
++                v-if="itemCount > 0"
++                class="absolute -right-5 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-stone-900 px-1 text-[10px] font-semibold leading-none text-white"
++                aria-live="polite"
++              >{{ itemCount > 99 ? '99+' : itemCount }}</span>
++            </NuxtLink>
++            <NuxtLink to="/track" class="hover:text-stone-900">{{ t('nav.track') }}</NuxtLink>
+           </nav>
+-          <LocaleSwitcher />
+         </div>
+       </div>
+     </header>
+@@ -45,13 +57,13 @@ provide('t', t)
+       <div class="mx-auto max-w-6xl px-4">
+         <CommerceFooterNewsletter class="mx-auto max-w-md" />
+         <p class="mt-6 text-center text-xs text-stone-500">
+-          <NuxtLink to="/policies/privacy" class="hover:underline">Privacy</NuxtLink>
++          <NuxtLink to="/policies/privacy" class="hover:underline">{{ t('nav.privacy') }}</NuxtLink>
+           ·
+-          <NuxtLink to="/policies/terms" class="hover:underline">Terms</NuxtLink>
++          <NuxtLink to="/policies/terms" class="hover:underline">{{ t('nav.terms') }}</NuxtLink>
+           ·
+-          <NuxtLink to="/policies/shipping" class="hover:underline">Shipping</NuxtLink>
++          <NuxtLink to="/policies/shipping" class="hover:underline">{{ t('nav.shipping') }}</NuxtLink>
+           ·
+-          <NuxtLink to="/policies/returns" class="hover:underline">Returns</NuxtLink>
++          <NuxtLink to="/policies/returns" class="hover:underline">{{ t('nav.returns') }}</NuxtLink>
+         </p>
+       </div>
+     </footer>
+diff --git a/shops/middleware/locale.global.ts b/shops/middleware/locale.global.ts
+index cbbb368..c30c354 100644
+--- a/shops/middleware/locale.global.ts
++++ b/shops/middleware/locale.global.ts
+@@ -1,22 +1,5 @@
+-import { defaultLocale, type Locale } from '@shared/i18n/messages'
+-import { detectLocale } from '@shared/i18n/localePath'
+-
+ /**
+- * 多语言全局路由守卫（P5-T01）。
+- *
+- * 路由经 app/router.options.ts 提供 `:locale(en-US|zh-CN)?` 前缀参数，
+- * 故 `/zh-CN/cart` 命中带前缀页面。本守卫在每次导航（SSR+客户端）将 URL 前缀
+- * 同步进 store_locale cookie，使 useLocale() 单一事实源保持一致。
+- * 无前缀路径（可选参数缺失）不改写 cookie，保留用户已选语言。
++ * 单语站（P5-T01b）：前端不切换语言，URL 无语言前缀，无 cookie 可同步。
++ * 守卫为空实现（保留文件仅为兼容旧 import，无副作用）。
+  */
+-export default defineNuxtRouteMiddleware((to) => {
+-  const seg = detectLocale(to.path)
+-  if (seg) {
+-    const cookie = useCookie<Locale>('store_locale', {
+-      maxAge: 60 * 60 * 24 * 365,
+-      sameSite: 'lax',
+-      default: () => defaultLocale,
+-    })
+-    if (cookie.value !== seg) cookie.value = seg
+-  }
+-})
++export default defineNuxtRouteMiddleware(() => {})
+diff --git a/shops/pages/account/addresses.vue b/shops/pages/account/addresses.vue
+index 3fdd785..3598f1d 100644
+--- a/shops/pages/account/addresses.vue
++++ b/shops/pages/account/addresses.vue
+@@ -1,12 +1,14 @@
+ <script setup lang="ts">
+ import { ref } from 'vue'
+ import { getToken, getStoredCustomer } from '@shared/customer/auth'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+  * 地址簿（P4-T02）：列表/新增/编辑/删除/设默认（唯一）。
+  * 端点：/api/addresses（BFF 直通真实后台，Bearer 顾客 JWT）。
+- * 删除默认地址自动提升（后端兜底）。
++ * 删除默认地址自动提升（后端兜底）。文案接入 i18n（P5-T01）。
+  */
++const { t, ti } = useI18n()
+ interface AddressItem {
+   id: number
+   fullName: string
+@@ -78,7 +80,7 @@ async function save(): Promise<void> {
+     showForm.value = false
+     await load()
+   } catch (err) {
+-    error.value = err instanceof Error ? err.message : '保存失败'
++    error.value = err instanceof Error ? err.message : t('addresses.saveFailed')
+   }
+ }
+ 
+@@ -92,57 +94,57 @@ async function makeDefault(a: AddressItem): Promise<void> {
+   await load()
+ }
+ 
+-useSeo({ title: '地址簿', description: '收货地址管理', path: '/account/addresses' })
++useSeo({ title: () => t('addresses.title'), description: () => t('addresses.description'), path: '/account/addresses', noindex: true })
+ </script>
+ 
+ <template>
+   <div class="mx-auto max-w-2xl space-y-5">
+     <div class="flex items-center justify-between">
+-      <h1 class="text-2xl font-semibold">地址簿</h1>
+-      <button type="button" class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700" @click="openCreate">新增地址</button>
++      <h1 class="text-2xl font-semibold">{{ t('addresses.title') }}</h1>
++      <button type="button" class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700" @click="openCreate">{{ t('addresses.add') }}</button>
+     </div>
+ 
+     <form v-if="showForm" class="space-y-2 rounded-xl border border-stone-200 p-5" @submit.prevent="save">
+-      <h2 class="text-sm font-semibold">{{ editing ? '编辑地址' : '新增地址' }}</h2>
++      <h2 class="text-sm font-semibold">{{ editing ? t('addresses.edit') : t('addresses.add') }}</h2>
+       <div class="grid grid-cols-2 gap-2">
+-        <input v-model="form.fullName" required placeholder="收件人" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+-        <input v-model="form.phone" required placeholder="电话" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+-        <input v-model="form.country" required maxlength="2" placeholder="国家码（US）" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+-        <input v-model="form.postcode" required placeholder="邮编" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+-        <input v-model="form.province" required placeholder="省/州" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+-        <input v-model="form.city" required placeholder="城市" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="form.fullName" required :placeholder="t('addresses.recipient')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="form.phone" required :placeholder="t('addresses.phone')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="form.country" required maxlength="2" :placeholder="t('addresses.countryHint')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="form.postcode" required :placeholder="t('addresses.zip')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="form.province" required :placeholder="t('addresses.state')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="form.city" required :placeholder="t('addresses.city')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+       </div>
+-      <input v-model="form.address1" required placeholder="详细地址" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++      <input v-model="form.address1" required :placeholder="t('addresses.address')" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+       <label class="flex items-center gap-2 text-xs text-stone-500">
+         <input v-model="form.isDefault" type="checkbox" />
+-        设为默认地址
++        {{ t('addresses.setDefaultAddress') }}
+       </label>
+       <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
+       <div class="flex gap-2">
+-        <button type="submit" class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700">保存</button>
+-        <button type="button" class="rounded-lg border border-stone-300 px-4 py-2 text-sm" @click="showForm = false">取消</button>
++        <button type="submit" class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700">{{ t('addresses.save') }}</button>
++        <button type="button" class="rounded-lg border border-stone-300 px-4 py-2 text-sm" @click="showForm = false">{{ t('addresses.cancel') }}</button>
+       </div>
+     </form>
+ 
+-    <div v-if="loading" class="text-sm text-stone-500">加载中…</div>
+-    <p v-else-if="list.length === 0" class="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-500">暂无地址，点击右上角新增。</p>
++    <div v-if="loading" class="text-sm text-stone-500">{{ t('addresses.loading') }}</div>
++    <p v-else-if="list.length === 0" class="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-500">{{ t('addresses.empty') }}</p>
+     <ul v-else class="space-y-3">
+       <li v-for="a in list" :key="a.id" class="rounded-xl border border-stone-200 p-4 text-sm" :class="a.isDefault ? 'border-stone-900' : ''">
+         <div class="flex items-center justify-between">
+           <span class="font-medium">
+             {{ a.fullName }} · {{ a.phone }}
+-            <span v-if="a.isDefault" class="ml-1 rounded-full bg-stone-900 px-2 py-0.5 text-[10px] text-white">默认</span>
++            <span v-if="a.isDefault" class="ml-1 rounded-full bg-stone-900 px-2 py-0.5 text-[10px] text-white">{{ t('addresses.default') }}</span>
+           </span>
+         </div>
+         <p class="mt-1 text-stone-600">{{ a.country }} {{ a.province }} {{ a.city }} · {{ a.address1 }} · {{ a.postcode }}</p>
+         <div class="mt-2 flex gap-3 text-xs">
+-          <button type="button" class="text-stone-600 underline hover:text-stone-900" @click="openEdit(a)">编辑</button>
+-          <button v-if="!a.isDefault" type="button" class="text-stone-600 underline hover:text-stone-900" @click="makeDefault(a)">设为默认</button>
+-          <button type="button" class="text-red-600 underline hover:text-red-800" @click="remove(a)">删除</button>
++          <button type="button" class="text-stone-600 underline hover:text-stone-900" @click="openEdit(a)">{{ t('addresses.edit') }}</button>
++          <button v-if="!a.isDefault" type="button" class="text-stone-600 underline hover:text-stone-900" @click="makeDefault(a)">{{ t('addresses.setDefault') }}</button>
++          <button type="button" class="text-red-600 underline hover:text-red-800" @click="remove(a)">{{ t('addresses.delete') }}</button>
+         </div>
+       </li>
+     </ul>
+ 
+-    <p class="text-xs text-stone-400">登录身份：{{ customer?.email }}</p>
++    <p class="text-xs text-stone-400">{{ ti('addresses.identity', { email: customer?.email ?? '' }) }}</p>
+   </div>
+ </template>
+diff --git a/shops/pages/account/index.vue b/shops/pages/account/index.vue
+index bf50b80..019ce59 100644
+--- a/shops/pages/account/index.vue
++++ b/shops/pages/account/index.vue
+@@ -1,10 +1,12 @@
+ <script setup lang="ts">
+ import { ref, computed } from 'vue'
+ import { register, login, logout, getStoredCustomer, getToken, me, type CustomerPublic } from '@shared/customer/auth'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+- * 账户中心（P4-T01）：注册/登录/登出/me。登录后可访问 /account/rma 退货。
++ * 账户中心（P4-T01）：注册/登录/登出/me。登录后可访问 /account/rma 退货。文案接入 i18n（P5-T01）。
+  */
++const { t } = useI18n()
+ const mode = ref<'login' | 'register'>('login')
+ const email = ref('')
+ const password = ref('')
+@@ -36,7 +38,7 @@ async function submit(): Promise<void> {
+     }
+     customer.value = await login(email.value, password.value)
+   } catch (err) {
+-    error.value = err instanceof Error ? err.message : '操作失败'
++    error.value = err instanceof Error ? err.message : t('account.failed')
+   } finally {
+     busy.value = false
+   }
+@@ -47,23 +49,23 @@ async function doLogout(): Promise<void> {
+   customer.value = null
+ }
+ 
+-useSeo({ title: 'Account', description: 'Sign in to your account', path: '/account' })
++useSeo({ title: () => t('account.title'), description: () => t('account.description'), path: '/account', noindex: true })
+ </script>
+ 
+ <template>
+   <div class="mx-auto max-w-md">
+     <template v-if="loggedIn">
+       <div class="rounded-xl border border-stone-200 p-6">
+-        <p class="text-sm text-stone-500">Welcome back</p>
++        <p class="text-sm text-stone-500">{{ t('account.welcome') }}</p>
+         <h1 class="mt-1 text-xl font-semibold">{{ customer?.nickname || customer?.email }}</h1>
+         <div class="mt-5 space-y-2 text-sm">
+-          <NuxtLink to="/account/orders" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">我的订单</NuxtLink>
+-          <NuxtLink to="/account/addresses" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">收货地址簿</NuxtLink>
+-          <NuxtLink to="/account/rma" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">退货申请 / RMA</NuxtLink>
+-          <NuxtLink to="/policies/returns" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">退货政策</NuxtLink>
++          <NuxtLink to="/account/orders" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.title') }}</NuxtLink>
++          <NuxtLink to="/account/addresses" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.addressBook') }}</NuxtLink>
++          <NuxtLink to="/account/rma" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.rma') }}</NuxtLink>
++          <NuxtLink to="/policies/returns" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.returnsPolicy') }}</NuxtLink>
+         </div>
+         <button type="button" class="mt-5 w-full rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-medium hover:border-stone-500" @click="doLogout">
+-          登出
++          {{ t('account.logout') }}
+         </button>
+       </div>
+     </template>
+@@ -76,7 +78,7 @@ useSeo({ title: 'Account', description: 'Sign in to your account', path: '/accou
+           :class="mode === 'login' ? 'bg-stone-900 text-white' : 'border border-stone-300'"
+           @click="mode = 'login'"
+         >
+-          登录
++          {{ t('account.login') }}
+         </button>
+         <button
+           type="button"
+@@ -84,19 +86,19 @@ useSeo({ title: 'Account', description: 'Sign in to your account', path: '/accou
+           :class="mode === 'register' ? 'bg-stone-900 text-white' : 'border border-stone-300'"
+           @click="mode = 'register'"
+         >
+-          注册
++          {{ t('account.register') }}
+         </button>
+       </div>
+       <div>
+-        <label class="block text-xs font-medium text-stone-600" for="email">Email</label>
++        <label class="block text-xs font-medium text-stone-600" for="email">{{ t('checkout.email') }}</label>
+         <input id="email" v-model="email" type="email" required class="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+       </div>
+       <div v-if="mode === 'register'">
+-        <label class="block text-xs font-medium text-stone-600" for="nickname">昵称（可选）</label>
++        <label class="block text-xs font-medium text-stone-600" for="nickname">{{ t('account.nickname') }}</label>
+         <input id="nickname" v-model="nickname" class="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+       </div>
+       <div>
+-        <label class="block text-xs font-medium text-stone-600" for="password">密码</label>
++        <label class="block text-xs font-medium text-stone-600" for="password">{{ t('account.password') }}</label>
+         <input
+           id="password"
+           v-model="password"
+@@ -112,7 +114,7 @@ useSeo({ title: 'Account', description: 'Sign in to your account', path: '/accou
+         class="w-full rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50"
+         :disabled="busy"
+       >
+-        {{ busy ? '处理中…' : mode === 'login' ? '登录' : '注册并登录' }}
++        {{ busy ? t('account.processing') : mode === 'login' ? t('account.login') : t('account.registerLogin') }}
+       </button>
+     </form>
+   </div>
+diff --git a/shops/pages/account/orders/index.vue b/shops/pages/account/orders/index.vue
+index a7ae7ad..9c6c78d 100644
+--- a/shops/pages/account/orders/index.vue
++++ b/shops/pages/account/orders/index.vue
+@@ -2,13 +2,16 @@
+ import { ref } from 'vue'
+ import { getToken } from '@shared/customer/auth'
+ import { useCheckout } from '~/composables/useCheckout'
++import { useI18n } from '~/composables/useI18n'
+ import Price from '~/components/commerce/Price.vue'
+ 
+ /**
+  * 顾客订单列表（P4-T03）：仅展示本人订单；金额按订单快照币种展示；分页与空态完整。
+  * 数据源：/api/checkout/orders（BFF 直通真实后台，Bearer 顾客 JWT）。
+  * 详情复用 P3-T16 双要素路径 /checkout/result?id=<id>&t=<accessToken>（列表仅返回本人凭证）。
++ * 文案接入 i18n（P5-T01）。
+  */
++const { t } = useI18n()
+ interface OrderRow {
+   id: number
+   orderNo: string
+@@ -38,7 +41,7 @@ async function load(): Promise<void> {
+     orders.value = res.items as unknown as OrderRow[]
+     total.value = res.total
+   } catch (err) {
+-    error.value = err instanceof Error ? err.message : '订单加载失败'
++    error.value = err instanceof Error ? err.message : t('orders.loadFailed')
+   } finally {
+     loading.value = false
+   }
+@@ -52,43 +55,35 @@ function goPage(p: number): void {
+   load()
+ }
+ 
+-const statusText: Record<string, string> = {
+-  created: '已创建',
+-  processing: '处理中',
+-  paid: '已支付',
+-  fulfilled: '已履约',
+-  shipped: '已发货',
+-  done: '已完成',
+-  cancelled: '已取消',
++function statusLabel(s: string): string {
++  const key = `orders.status.${s}`
++  const v = t(key)
++  return v === key ? s : v
+ }
+-const paymentText: Record<string, string> = {
+-  none: '未支付',
+-  pending: '待支付',
+-  authorized: '已授权',
+-  captured: '已扣款',
+-  refunding: '退款中',
+-  refunded: '已退款',
+-  failed: '支付失败',
++function paymentLabel(p: string): string {
++  const key = `orders.payment.${p}`
++  const v = t(key)
++  return v === key ? p : v
+ }
+ function fmtDate(v: string): string {
+   const d = new Date(v)
+   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+ }
+ 
+-useSeo({ title: 'My Orders', description: 'View your order history', path: '/account/orders' })
++useSeo({ title: () => t('orders.title'), description: () => t('orders.description'), path: '/account/orders', noindex: true })
+ </script>
+ 
+ <template>
+   <div class="mx-auto max-w-3xl">
+-    <h1 class="mb-4 text-xl font-semibold">我的订单</h1>
++    <h1 class="mb-4 text-xl font-semibold">{{ t('orders.title') }}</h1>
+ 
+     <div v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ error }}</div>
+ 
+-    <div v-if="loading" class="py-12 text-center text-sm text-stone-400">加载中…</div>
++    <div v-if="loading" class="py-12 text-center text-sm text-stone-400">{{ t('orders.loading') }}</div>
+ 
+     <div v-else-if="orders.length === 0" class="rounded-xl border border-dashed border-stone-300 py-16 text-center">
+-      <p class="text-stone-500">暂无订单</p>
+-      <NuxtLink to="/collections" class="mt-3 inline-block text-sm font-medium text-stone-900 underline">去逛逛</NuxtLink>
++      <p class="text-stone-500">{{ t('orders.empty') }}</p>
++      <NuxtLink to="/collections" class="mt-3 inline-block text-sm font-medium text-stone-900 underline">{{ t('orders.browse') }}</NuxtLink>
+     </div>
+ 
+     <ul v-else class="space-y-3">
+@@ -101,9 +96,9 @@ useSeo({ title: 'My Orders', description: 'View your order history', path: '/acc
+           <div class="text-right">
+             <p class="font-semibold"><Price :money="{ amount: o.totals.total.amount, currency: o.currency }" /></p>
+             <p class="mt-0.5 text-xs">
+-              <span class="text-stone-500">{{ statusText[o.status] ?? o.status }}</span>
++              <span class="text-stone-500">{{ statusLabel(o.status) }}</span>
+               <span class="mx-1 text-stone-300">·</span>
+-              <span class="text-stone-500">{{ paymentText[o.paymentStatus] ?? o.paymentStatus }}</span>
++              <span class="text-stone-500">{{ paymentLabel(o.paymentStatus) }}</span>
+             </p>
+           </div>
+         </NuxtLink>
+@@ -111,9 +106,9 @@ useSeo({ title: 'My Orders', description: 'View your order history', path: '/acc
+     </ul>
+ 
+     <nav v-if="pageCount > 1" class="mt-6 flex items-center justify-center gap-4 text-sm">
+-      <button class="disabled:opacity-40" :disabled="page <= 1" @click="goPage(page - 1)">上一页</button>
++      <button class="disabled:opacity-40" :disabled="page <= 1" @click="goPage(page - 1)">{{ t('orders.prev') }}</button>
+       <span class="text-stone-500">{{ page }} / {{ pageCount }}</span>
+-      <button class="disabled:opacity-40" :disabled="page >= pageCount" @click="goPage(page + 1)">下一页</button>
++      <button class="disabled:opacity-40" :disabled="page >= pageCount" @click="goPage(page + 1)">{{ t('orders.next') }}</button>
+     </nav>
+   </div>
+ </template>
+diff --git a/shops/pages/account/rma.vue b/shops/pages/account/rma.vue
+index 8c7c311..3dcf922 100644
+--- a/shops/pages/account/rma.vue
++++ b/shops/pages/account/rma.vue
+@@ -1,10 +1,13 @@
+ <script setup lang="ts">
+ import { ref } from 'vue'
+ import { getToken, submitRma, listMyRmas } from '@shared/customer/auth'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+  * 退货申请 / RMA 列表（P4-T05/T06）：登录态；服务端校验订单归属 + 可退状态 + 重算退款。
++ * 文案接入 i18n（P5-T01）。
+  */
++const { t } = useI18n()
+ const orderId = ref('')
+ const orderItemId = ref('')
+ const skuId = ref('')
+@@ -23,7 +26,7 @@ async function load(): Promise<void> {
+   try {
+     rmas.value = await listMyRmas()
+   } catch (err) {
+-    error.value = err instanceof Error ? err.message : '加载失败'
++    error.value = err instanceof Error ? err.message : t('rma.loadFailed')
+   }
+ }
+ 
+@@ -39,31 +42,31 @@ async function submit(): Promise<void> {
+       [{ orderItemId: Number(orderItemId.value), skuId: Number(skuId.value), qty: Number(qty.value) }],
+       reason.value || undefined,
+     )
+-    message.value = '退货申请已提交，等待审核'
++    message.value = t('rma.submitted')
+     await load()
+   } catch (err) {
+-    error.value = err instanceof Error ? err.message : '提交失败'
++    error.value = err instanceof Error ? err.message : t('rma.submitFailed')
+   } finally {
+     busy.value = false
+   }
+ }
+ 
+-useSeo({ title: '退货申请', description: 'RMA', path: '/account/rma' })
++useSeo({ title: () => t('rma.title'), description: () => t('rma.description'), path: '/account/rma', noindex: true })
+ </script>
+ 
+ <template>
+   <div class="mx-auto max-w-xl space-y-6">
+-    <h1 class="text-2xl font-semibold">退货申请 / RMA</h1>
++    <h1 class="text-2xl font-semibold">{{ t('rma.title') }}</h1>
+ 
+     <form class="space-y-3 rounded-xl border border-stone-200 p-5" @submit.prevent="submit">
+-      <h2 class="text-sm font-semibold">新建申请</h2>
++      <h2 class="text-sm font-semibold">{{ t('rma.new') }}</h2>
+       <div class="grid grid-cols-3 gap-2">
+-        <input v-model="orderId" required placeholder="订单 ID（数字）" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+-        <input v-model="orderItemId" required placeholder="订单明细 ID" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+-        <input v-model="skuId" required placeholder="SKU ID" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="orderId" required :placeholder="t('rma.orderId')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="orderItemId" required :placeholder="t('rma.itemId')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
++        <input v-model="skuId" required :placeholder="t('rma.sku')" class="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+       </div>
+-      <input v-model.number="qty" type="number" min="1" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" placeholder="数量" />
+-      <textarea v-model="reason" rows="2" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" placeholder="退货原因（可选）" />
++      <input v-model.number="qty" type="number" min="1" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" :placeholder="t('rma.qty')" />
++      <textarea v-model="reason" rows="2" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" :placeholder="t('rma.reason')" />
+       <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
+       <p v-if="message" class="text-xs text-emerald-700">{{ message }}</p>
+       <button
+@@ -71,13 +74,13 @@ useSeo({ title: '退货申请', description: 'RMA', path: '/account/rma' })
+         class="w-full rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50"
+         :disabled="busy"
+       >
+-        {{ busy ? '提交中…' : '提交退货申请' }}
++        {{ busy ? t('rma.submitting') : t('rma.submit') }}
+       </button>
+     </form>
+ 
+     <section class="rounded-xl border border-stone-200 p-5">
+-      <h2 class="mb-3 text-sm font-semibold">我的申请</h2>
+-      <p v-if="(rmas?.length ?? 0) === 0" class="text-sm text-stone-500">暂无退货申请。</p>
++      <h2 class="mb-3 text-sm font-semibold">{{ t('rma.my') }}</h2>
++      <p v-if="(rmas?.length ?? 0) === 0" class="text-sm text-stone-500">{{ t('rma.empty') }}</p>
+       <ul v-else class="space-y-2 text-sm">
+         <li v-for="(r, idx) in rmas ?? []" :key="idx" class="rounded-lg border border-stone-100 px-3 py-2">{{ JSON.stringify(r).slice(0, 120) }}…</li>
+       </ul>
+diff --git a/shops/pages/blog/[slug].vue b/shops/pages/blog/[slug].vue
+index 0a50a78..a5038fe 100644
+--- a/shops/pages/blog/[slug].vue
++++ b/shops/pages/blog/[slug].vue
+@@ -1,5 +1,7 @@
+ <script setup lang="ts">
+ /** 博客详情（P5-T06）：唯一 slug + BlogPosting 结构化数据。数据源 /api/cms/articles/:slug（SSR 取数）。 */
++import { useI18n } from '~/composables/useI18n'
++const { t } = useI18n()
+ const route = useRoute()
+ const siteUrl = useRuntimeConfig().public.siteUrl as string
+ const { getArticle } = useCms()
+@@ -7,10 +9,16 @@ const { getArticle } = useCms()
+ const { data: post } = await useAsyncData(`blog-post-${route.params.slug}`, () => getArticle(String(route.params.slug)))
+ 
+ // 不存在 / 未发布 → 404（SSR 直接返回 404，客户端重定向错误页）
+-if (!post.value) throw createError({ statusCode: 404, statusText: 'Post not found', fatal: true })
++if (!post.value) throw createError({ statusCode: 404, statusText: t('blog.notFound'), fatal: true })
+ 
+ // useSeo 接受普通对象：用 reactive 使标题/描述随数据更新（SSR 时已就绪）
+-const seo = reactive({ title: post.value.title, description: post.value.summary ?? '', path: `/blog/${route.params.slug}` })
++const seo = reactive({
++  title: post.value.title,
++  description: (post.value.summary ?? '').slice(0, 155),
++  path: `/blog/${route.params.slug}`,
++  keywords: `${post.value.title}, wig care, human hair wig tips, glueless wig, Aurora Hair Studio blog`,
++  ogType: 'article',
++})
+ useSeo(seo)
+ 
+ // schema.org/BlogPosting：优先服务端 structuredData（与 GET /cms/articles/:slug 契约一致），
+diff --git a/shops/pages/blog/index.vue b/shops/pages/blog/index.vue
+index 6eebff5..2e00126 100644
+--- a/shops/pages/blog/index.vue
++++ b/shops/pages/blog/index.vue
+@@ -1,6 +1,8 @@
+ <script setup lang="ts">
+-/** 博客列表（P5-T06）：数据源 /api/cms/articles（BFF → 真实后台或 mock 兜底）。 */
++/** 博客列表（P5-T06）：数据源 /api/cms/articles（BFF → 真实后台或 mock 兜底）。文案接入 i18n（P5-T01）。 */
+ import type { CmsArticleSummary } from '~/composables/useCms'
++import { useI18n } from '~/composables/useI18n'
++const { t, ti } = useI18n()
+ const { loading, error, listArticles } = useCms()
+ const posts = ref<CmsArticleSummary[]>([])
+ const total = ref(0)
+@@ -11,15 +13,20 @@ onMounted(async () => {
+   total.value = res.total
+ })
+ 
+-useSeo({ title: 'Blog — Aurora Hair Studio', description: 'Wig care, styling guides and brand stories.', path: '/blog' })
++useSeo({
++  title: () => t('blog.title'),
++  description: () => 'Wig care guides, glueless wig installation tutorials and hair tips from Aurora Hair Studio.',
++  keywords: () => 'wig care, glueless wig install, human hair wig tips, wig blog, hair care guide',
++  path: '/blog',
++})
+ </script>
+ 
+ <template>
+   <div>
+-    <h1 class="mb-6 text-2xl font-semibold">Blog</h1>
+-    <p v-if="loading" class="text-sm text-stone-400">Loading posts…</p>
++    <h1 class="mb-6 text-2xl font-semibold">{{ t('blog.title') }}</h1>
++    <p v-if="loading" class="text-sm text-stone-400">{{ t('blog.loading') }}</p>
+     <p v-else-if="error" class="text-sm text-red-600">{{ error }}</p>
+-    <p v-else-if="posts.length === 0" class="text-sm text-stone-400">No posts yet.</p>
++    <p v-else-if="posts.length === 0" class="text-sm text-stone-400">{{ t('blog.empty') }}</p>
+     <div v-else class="grid gap-4 sm:grid-cols-2">
+       <NuxtLink v-for="post in posts" :key="post.slug" :to="`/blog/${post.slug}`" class="rounded-xl border border-stone-200 p-6 hover:border-stone-400">
+         <p class="text-xs text-stone-400">{{ post.publishedAt ?? post.summary }}</p>
+@@ -27,6 +34,6 @@ useSeo({ title: 'Blog — Aurora Hair Studio', description: 'Wig care, styling g
+         <p class="mt-2 text-sm text-stone-600">{{ post.summary }}</p>
+       </NuxtLink>
+     </div>
+-    <p v-if="total > posts.length" class="mt-6 text-xs text-stone-400">Showing {{ posts.length }} of {{ total }} posts.</p>
++    <p v-if="total > posts.length" class="mt-6 text-xs text-stone-400">{{ ti('blog.showing', { shown: String(posts.length), total: String(total) }) }}</p>
+   </div>
+ </template>
+diff --git a/shops/pages/c/[slug].vue b/shops/pages/c/[slug].vue
+index 663cf0d..31c990b 100644
+--- a/shops/pages/c/[slug].vue
++++ b/shops/pages/c/[slug].vue
+@@ -1,10 +1,13 @@
+ <script setup lang="ts">
+ import { useCatalog } from '~/composables/useCatalog'
+ import ProductCard from '~/components/commerce/ProductCard.vue'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+  * 集合页（P2-T03）：筛选、排序、分页、空状态；筛选组合可分享 URL；分页与 Canonical 符合 SEO_SPEC。
++ * 文案接入 i18n（P5-T01）。
+  */
++const { t, ti } = useI18n()
+ const route = useRoute()
+ const { listProducts } = useCatalog()
+ 
+@@ -25,9 +28,40 @@ const sortOptions = [
+   { value: 'price-desc', label: 'Price: High to Low' },
+ ]
+ 
++// 跨境独立站 TDK：类目级 Title/Description/Keywords（英文站，面向目标市场）。
++const CATEGORY_SEO: Record<string, { name: string; desc: string; keywords: string }> = {
++  'lace-wigs': {
++    name: 'Lace Wigs',
++    desc: 'Shop premium lace wigs at Aurora Hair Studio: HD lace & full lace, glueless install, 100% human hair, natural hairline. Free standard shipping over $99.',
++    keywords: 'lace wigs, lace front wigs, glueless wigs, human hair wigs, HD lace wig, full lace wig',
++  },
++  'hd-lace': {
++    name: 'HD Lace Wigs',
++    desc: 'Invisible HD lace wigs with pre-plucked baby hair, glueless install in minutes. 100% human hair, 180% density. Free standard shipping over $99.',
++    keywords: 'HD lace wig, invisible lace wig, pre-plucked lace wig, glueless HD lace wig, HD lace front wig',
++  },
++  'full-lace': {
++    name: 'Full Lace Wigs',
++    desc: 'Full lace wigs with a natural hairline, 100% human hair, 180% density. Pre-plucked and glueless-ready. Free standard shipping over $99.',
++    keywords: 'full lace wig, full lace front wig, human hair full lace wig, natural hairline wig',
++  },
++  apparel: {
++    name: 'Apparel',
++    desc: 'Shop Aurora Hair Studio apparel: dresses, summer slip dresses and more. Quality fabrics, free standard shipping over $99.',
++    keywords: 'apparel, dresses, women fashion, summer dress, slip dress',
++  },
++  dresses: {
++    name: 'Dresses',
++    desc: 'Shop dresses at Aurora Hair Studio: summer slip dresses and more. Quality fabrics, free standard shipping over $99.',
++    keywords: 'dresses, summer dress, slip dress, women dress, fashion dress',
++  },
++}
++const humanize = (s: string) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
++
+ useSeo({
+-  title: `${category.value.replace(/-/g, ' ')} — Aurora Hair Studio`,
+-  description: `Shop ${category.value.replace(/-/g, ' ')} at Aurora Hair Studio. Filter, sort and find your perfect fit.`,
++  title: () => CATEGORY_SEO[category.value]?.name ?? humanize(category.value),
++  description: () => CATEGORY_SEO[category.value]?.desc ?? t('category.adjust'),
++  keywords: () => CATEGORY_SEO[category.value]?.keywords ?? category.value.replace(/-/g, ', '),
+   path: `/c/${category.value}`,
+ })
+ </script>
+@@ -37,7 +71,7 @@ useSeo({
+     <h1 class="mb-6 text-2xl font-semibold capitalize">{{ category.replace(/-/g, ' ') }}</h1>
+ 
+     <div class="mb-6 flex flex-wrap items-center gap-2 text-sm">
+-      <span class="text-stone-500">Sort:</span>
++      <span class="text-stone-500">{{ t('category.sort') }}</span>
+       <NuxtLink
+         v-for="opt in sortOptions"
+         :key="opt.value"
+@@ -53,14 +87,14 @@ useSeo({
+       <div v-for="n in 8" :key="n" class="aspect-square animate-pulse rounded-xl bg-stone-100" />
+     </div>
+ 
+-    <div v-else-if="error" class="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-600">{{ error }} — try adjusting filters.</div>
++    <div v-else-if="error" class="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-600">{{ ti('category.error', { msg: String(error) }) }}</div>
+ 
+     <template v-else>
+       <div v-if="(data?.list?.length ?? 0) === 0" class="rounded-xl border border-stone-200 p-12 text-center">
+-        <p class="text-sm font-medium text-stone-900">No products found</p>
+-        <p class="mt-1 text-sm text-stone-500">Try adjusting filters or browse all categories.</p>
++        <p class="text-sm font-medium text-stone-900">{{ t('category.noProducts') }}</p>
++        <p class="mt-1 text-sm text-stone-500">{{ t('category.adjust') }}</p>
+         <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
+-          Back to home
++          {{ t('category.backHome') }}
+         </NuxtLink>
+       </div>
+       <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+diff --git a/shops/pages/cart.vue b/shops/pages/cart.vue
+index b7cea52..9245f7f 100644
+--- a/shops/pages/cart.vue
++++ b/shops/pages/cart.vue
+@@ -1,13 +1,14 @@
+ <script setup lang="ts">
+ import { useCart } from '~/composables/useCart'
+ import Price from '~/components/commerce/Price.vue'
+-import { translate } from '@shared/i18n/messages'
++import { useI18n } from '~/composables/useI18n'
+ import { trackViewCart } from '@shared/analytics/ecommerce'
+ 
+ /**
+  * 购物车页（P3-T02）：数量修改、删除、行小计；金额由 Price 组件渲染（配置驱动零硬编码）。
+- * 文案走 i18n（P1-T05）；locale 由 useLocale() 注入（URL 前缀/cookie 驱动，与币种解耦）。
++ * 文案走 i18n（P5-T01）；locale 由 useLocale() 注入（URL 前缀/cookie 驱动，与币种解耦）。
+  */
++const { t } = useI18n()
+ const { items, update, remove, load } = useCart()
+ await load()
+ 
+@@ -22,10 +23,7 @@ watchEffect(() => {
+   )
+ })
+ 
+-const { locale } = useLocale()
+-const t = (key: string) => translate(locale.value, key)
+-
+-useSeo({ title: t('cart.title'), description: t('cart.description'), path: '/cart' })
++useSeo({ title: () => t('cart.title'), description: () => t('cart.description'), path: '/cart', noindex: true })
+ </script>
+ 
+ <template>
+@@ -48,13 +46,13 @@ useSeo({ title: t('cart.title'), description: t('cart.description'), path: '/car
+             <p class="text-xs capitalize text-stone-500">
+               {{ [item.spec?.texture, item.spec?.length && item.spec.length + '"', item.spec?.color].filter(Boolean).join(' · ') || '—' }}
+             </p>
+-            <p v-if="!item.sellable" class="text-xs text-red-600">This item is no longer available</p>
++            <p v-if="!item.sellable" class="text-xs text-red-600">{{ t('cart.unavailable') }}</p>
+           </div>
+           <div class="flex items-center gap-2">
+             <button
+               type="button"
+               class="h-7 w-7 rounded border border-stone-300 text-sm hover:border-stone-500"
+-              aria-label="Decrease quantity"
++              :aria-label="t('cart.decQty')"
+               @click="update(item.id, item.qty - 1)"
+             >
+               −
+@@ -63,18 +61,18 @@ useSeo({ title: t('cart.title'), description: t('cart.description'), path: '/car
+             <button
+               type="button"
+               class="h-7 w-7 rounded border border-stone-300 text-sm hover:border-stone-500"
+-              aria-label="Increase quantity"
++              :aria-label="t('cart.incQty')"
+               @click="update(item.id, item.qty + 1)"
+             >
+               +
+             </button>
+           </div>
+           <Price :money="item.lineTotal" size="sm" />
+-          <button type="button" class="text-xs text-stone-500 hover:text-stone-900" @click="remove(item.id)">Remove</button>
++          <button type="button" class="text-xs text-stone-500 hover:text-stone-900" @click="remove(item.id)">{{ t('cart.remove') }}</button>
+         </li>
+       </ul>
+       <NuxtLink to="/checkout" class="mt-6 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
+-        Checkout
++        {{ t('cart.checkout') }}
+       </NuxtLink>
+     </template>
+   </div>
+diff --git a/shops/pages/checkout/index.vue b/shops/pages/checkout/index.vue
+index 11020bc..4ca4b05 100644
+--- a/shops/pages/checkout/index.vue
++++ b/shops/pages/checkout/index.vue
+@@ -1,21 +1,23 @@
+ <script setup lang="ts">
+ import { useCheckout } from '~/composables/useCheckout'
+ import Price from '~/components/commerce/Price.vue'
++import { useI18n } from '~/composables/useI18n'
+ import { trackBeginCheckout } from '@shared/analytics/ecommerce'
+ import { collectAttribution } from '@shared/analytics/attribution'
+ 
+ /**
+  * 结算页（P3-T09 前端版）：地址表单（字段级校验）、报价确认、运费选择、优惠券。
+- * 报价为服务端重算（BFF mock：前端传入总价被忽略）；金额对象 {amount, currency}。
++ * 报价为服务端重算（BFF mock：前端传入总价被忽略）；金额对象 {amount, currency}。文案接入 i18n（P5-T01）。
+  */
++const { t, ti } = useI18n()
+ const { placeOrder, loading } = useCheckout()
+ 
+ // P5-T08：checkout_cta 业务实验（仅按钮文案变体；关闭/未知 fail-closed → control）
+ const { assign } = useExperiment()
+-const ctaLabel = ref('Place Order')
++const ctaLabel = ref(t('checkout.placeOrder'))
+ onMounted(async () => {
+   const a = await assign('checkout_cta')
+-  if (a.enabled && a.variant === 'variant_a') ctaLabel.value = 'Place order securely'
++  if (a.enabled && a.variant === 'variant_a') ctaLabel.value = t('checkout.secureCta')
+ })
+ 
+ const address = reactive({
+@@ -73,12 +75,12 @@ async function refreshQuote(): Promise<void> {
+ }
+ 
+ function validateAddress(): boolean {
+-  fieldErrors.fullName = address.fullName.trim() ? '' : 'Full name is required'
+-  fieldErrors.province = address.province.trim() ? '' : 'State/Province is required'
+-  fieldErrors.city = address.city.trim() ? '' : 'City is required'
+-  fieldErrors.address1 = address.address1.trim() ? '' : 'Street address is required'
+-  fieldErrors.postcode = address.postcode.trim() ? '' : 'Postcode is required'
+-  fieldErrors.email = email.value.includes('@') ? '' : 'Valid email is required'
++  fieldErrors.fullName = address.fullName.trim() ? '' : t('checkout.err.fullName')
++  fieldErrors.province = address.province.trim() ? '' : t('checkout.err.province')
++  fieldErrors.city = address.city.trim() ? '' : t('checkout.err.city')
++  fieldErrors.address1 = address.address1.trim() ? '' : t('checkout.err.address1')
++  fieldErrors.postcode = address.postcode.trim() ? '' : t('checkout.err.postcode')
++  fieldErrors.email = email.value.includes('@') ? '' : t('checkout.err.email')
+   return Object.values(fieldErrors).every((v) => !v)
+ }
+ 
+@@ -97,24 +99,24 @@ async function submit(): Promise<void> {
+     })
+     await navigateTo(`/checkout/result?id=${order.id}&order=${order.orderNo}&t=${order.accessToken}`)
+   } catch (err) {
+-    submitError.value = err instanceof Error ? err.message : 'Failed to place order'
++    submitError.value = err instanceof Error ? err.message : t('checkout.failed')
+   } finally {
+     submitting.value = false
+   }
+ }
+ 
+-useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
++useSeo({ title: () => t('checkout.title'), description: () => t('checkout.description'), path: '/checkout', noindex: true })
+ </script>
+ 
+ <template>
+   <div>
+-    <h1 class="mb-6 text-2xl font-semibold">Checkout</h1>
++    <h1 class="mb-6 text-2xl font-semibold">{{ t('checkout.title') }}</h1>
+     <div class="grid gap-8 lg:grid-cols-2">
+       <section>
+-        <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-500">Shipping Address</h2>
++        <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.shippingAddress') }}</h2>
+         <div class="space-y-3">
+           <div v-for="key in Object.keys(address) as (keyof typeof address)[]" :key="key" class="space-y-1">
+-            <label class="block text-xs font-medium text-stone-600" :for="key">{{ key }}</label>
++            <label class="block text-xs font-medium text-stone-600" :for="key">{{ t('field.' + key) }}</label>
+             <input
+               :id="key"
+               v-model="address[key]"
+@@ -125,7 +127,7 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
+             <p v-if="fieldErrors[key]" class="text-xs text-red-600">{{ fieldErrors[key] }}</p>
+           </div>
+           <div class="space-y-1">
+-            <label class="block text-xs font-medium text-stone-600" for="email">Email</label>
++            <label class="block text-xs font-medium text-stone-600" for="email">{{ t('checkout.email') }}</label>
+             <input
+               id="email"
+               v-model="email"
+@@ -137,7 +139,7 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
+           </div>
+         </div>
+ 
+-        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">Shipping Method</h2>
++        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.shippingMethod') }}</h2>
+         <div v-for="rate in quote?.shippingRates ?? []" :key="rate.id" class="mb-2 flex items-center gap-3">
+           <input :id="'rate-' + rate.id" v-model="shippingRateId" type="radio" :value="rate.id" name="shippingRate" @change="refreshQuote" />
+           <label :for="'rate-' + rate.id" class="text-sm">
+@@ -146,46 +148,46 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
+           </label>
+         </div>
+ 
+-        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">Coupon</h2>
++        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.coupon') }}</h2>
+         <div class="flex gap-2">
+           <input
+             v-model="couponCode"
+             class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm"
+-            placeholder="Coupon code (try WIG10 / EXPIRED10 / USEDOUT10)"
++            :placeholder="t('checkout.couponHint')"
+           />
+-          <button type="button" class="rounded-lg border border-stone-300 px-4 py-2 text-sm hover:border-stone-500" @click="refreshQuote">Apply</button>
++          <button type="button" class="rounded-lg border border-stone-300 px-4 py-2 text-sm hover:border-stone-500" @click="refreshQuote">{{ t('checkout.apply') }}</button>
+         </div>
+       </section>
+ 
+       <section class="rounded-xl border border-stone-200 p-6">
+-        <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500">Order Summary</h2>
++        <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.orderSummary') }}</h2>
+         <div v-if="quote" class="space-y-2 text-sm">
+           <div class="flex justify-between">
+-            <span class="text-stone-500">Subtotal</span>
++            <span class="text-stone-500">{{ t('checkout.subtotal') }}</span>
+             <Price :money="quote.totals.subtotal" size="sm" />
+           </div>
+           <div class="flex justify-between">
+-            <span class="text-stone-500">Discount</span>
++            <span class="text-stone-500">{{ t('checkout.discount') }}</span>
+             <Price :money="quote.totals.discount" size="sm" />
+           </div>
+           <div class="flex justify-between">
+-            <span class="text-stone-500">Shipping</span>
++            <span class="text-stone-500">{{ t('checkout.shipping') }}</span>
+             <Price :money="quote.totals.shipping" size="sm" />
+           </div>
+           <div v-if="quote.deliveryCommitment" class="flex justify-between">
+-            <span class="text-stone-500">Estimated delivery</span>
+-            <span class="text-stone-700">{{ quote.deliveryCommitment.deliveryEstimateDays }} business days</span>
++            <span class="text-stone-500">{{ t('checkout.estimatedDelivery') }}</span>
++            <span class="text-stone-700">{{ ti('checkout.businessDays', { n: String(quote.deliveryCommitment.deliveryEstimateDays) }) }}</span>
+           </div>
+           <div class="flex justify-between">
+-            <span class="text-stone-500">Tax</span>
++            <span class="text-stone-500">{{ t('checkout.tax') }}</span>
+             <Price :money="quote.totals.tax" size="sm" />
+           </div>
+           <div class="flex justify-between border-t border-stone-200 pt-2 text-base font-semibold">
+-            <span>Total</span>
++            <span>{{ t('checkout.total') }}</span>
+             <Price :money="quote.totals.total" size="md" />
+           </div>
+         </div>
+-        <p v-else class="text-sm text-stone-500">Add items to your cart to see the order summary.</p>
++        <p v-else class="text-sm text-stone-500">{{ t('checkout.addItems') }}</p>
+ 
+         <p v-if="submitError" class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ submitError }}</p>
+ 
+@@ -195,9 +197,9 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
+           :disabled="loading || submitting"
+           @click="submit"
+         >
+-          {{ submitting ? 'Placing order…' : ctaLabel }}
++          {{ submitting ? t('checkout.placing') : ctaLabel }}
+         </button>
+-        <p v-if="quote" class="mt-3 text-xs text-stone-400">Quote expires at {{ new Date(quote.expiresAt).toLocaleTimeString() }}</p>
++        <p v-if="quote" class="mt-3 text-xs text-stone-400">{{ ti('checkout.quoteExpires', { time: new Date(quote.expiresAt).toLocaleTimeString() }) }}</p>
+       </section>
+     </div>
+   </div>
+diff --git a/shops/pages/checkout/result.vue b/shops/pages/checkout/result.vue
+index e34de60..8268300 100644
+--- a/shops/pages/checkout/result.vue
++++ b/shops/pages/checkout/result.vue
+@@ -1,12 +1,14 @@
+ <script setup lang="ts">
+ import { useCheckout } from '~/composables/useCheckout'
+ import Price from '~/components/commerce/Price.vue'
++import { useI18n } from '~/composables/useI18n'
+ import { trackPurchase } from '@shared/analytics/ecommerce'
+ 
+ /**
+  * 支付结果页（P3-T15 前端版）：由服务端订单状态驱动（getOrder 校验 accessToken），不盲信 URL 参数。
+- * 处理中状态有轮询与超时提示；支付按钮触发 mock 支付会话。
++ * 处理中状态有轮询与超时提示；支付按钮触发 mock 支付会话。文案接入 i18n（P5-T01）。
+  */
++const { t } = useI18n()
+ const route = useRoute()
+ const { getOrder, pay } = useCheckout()
+ 
+@@ -55,7 +57,7 @@ async function payNow(): Promise<void> {
+     await refresh()
+     if (!paid.value && res.sessionUrl) await navigateTo(res.sessionUrl, { external: true })
+   } catch (err) {
+-    payError.value = err instanceof Error ? err.message : 'Payment failed'
++    payError.value = err instanceof Error ? err.message : t('result.paymentFailed')
+   }
+ }
+ 
+@@ -94,32 +96,32 @@ onUnmounted(() => {
+   if (pollTimer) clearInterval(pollTimer)
+ })
+ 
+-useSeo({ title: 'Order Result', description: 'Order status', path: '/checkout/result' })
++useSeo({ title: () => t('result.title'), description: () => t('result.description'), path: '/checkout/result', noindex: true })
+ </script>
+ 
+ <template>
+   <div class="mx-auto max-w-xl">
+-    <h1 class="mb-6 text-2xl font-semibold">Order Result</h1>
++    <h1 class="mb-6 text-2xl font-semibold">{{ t('result.title') }}</h1>
+ 
+     <div v-if="!order" class="rounded-xl border border-stone-200 p-8 text-center">
+-      <p class="text-sm font-medium text-stone-900">Order not found</p>
+-      <p class="mt-1 text-sm text-stone-500">Invalid or expired order link.</p>
+-      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">Back to home</NuxtLink>
++      <p class="text-sm font-medium text-stone-900">{{ t('result.notFound') }}</p>
++      <p class="mt-1 text-sm text-stone-500">{{ t('result.invalid') }}</p>
++      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">{{ t('result.backHome') }}</NuxtLink>
+     </div>
+ 
+     <div v-else class="space-y-4 rounded-xl border border-stone-200 p-6">
+       <div class="flex items-center justify-between">
+-        <span class="text-sm font-semibold">Order {{ order.orderNo }}</span>
++        <span class="text-sm font-semibold">{{ t('track.orderPrefix') }} {{ order.orderNo }}</span>
+         <span class="rounded-full px-2.5 py-0.5 text-xs font-medium" :class="paid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+-          {{ paid ? 'Paid' : 'Pending payment' }}
++          {{ paid ? t('result.paid') : t('result.pending') }}
+         </span>
+       </div>
+       <div class="flex justify-between text-sm">
+-        <span class="text-stone-500">Email</span>
++        <span class="text-stone-500">{{ t('result.email') }}</span>
+         <span>{{ order.email }}</span>
+       </div>
+       <div class="flex justify-between text-sm">
+-        <span class="text-stone-500">Total</span>
++        <span class="text-stone-500">{{ t('result.total') }}</span>
+         <Price :money="order.totals.total" size="md" />
+       </div>
+       <ul class="space-y-1 border-t border-stone-200 pt-3 text-sm text-stone-600">
+@@ -130,15 +132,15 @@ useSeo({ title: 'Order Result', description: 'Order status', path: '/checkout/re
+       </ul>
+       <p v-if="payError" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ payError }}</p>
+       <button v-if="!paid" type="button" class="w-full rounded-lg bg-stone-900 px-6 py-3 text-sm font-semibold text-white hover:bg-stone-700" @click="payNow">
+-        Pay Now (Mock)
++        {{ t('result.payNow') }}
+       </button>
+-      <p v-if="polling && !paid" class="text-xs text-stone-500">Waiting for payment confirmation… polling up to 60s</p>
++      <p v-if="polling && !paid" class="text-xs text-stone-500">{{ t('result.polling') }}</p>
+       <NuxtLink
+         v-if="paid && trackingLink"
+         :to="trackingLink"
+         class="block rounded-lg border border-stone-300 px-6 py-2.5 text-center text-sm font-semibold hover:border-stone-900"
+       >
+-        Track shipment
++        {{ t('result.track') }}
+       </NuxtLink>
+     </div>
+   </div>
+diff --git a/shops/pages/index.vue b/shops/pages/index.vue
+index 35194e6..b68d1d3 100644
+--- a/shops/pages/index.vue
++++ b/shops/pages/index.vue
+@@ -1,29 +1,60 @@
+ <script setup lang="ts">
+ import ProductCard from '~/components/commerce/ProductCard.vue'
++import { useI18n } from '~/composables/useI18n'
+ 
++const { t } = useI18n()
+ const catalog = useCatalog()
++const siteUrl = useRuntimeConfig().public.siteUrl as string
+ const { data: categories } = await useAsyncData('home-categories', () => catalog.loadCategories())
+ const { data: featured } = await useAsyncData('home-featured', () => catalog.listProducts({ pageSize: 8 }))
+ 
+ useSeo({
+-  title: 'Glueless Wigs & Apparel — Aurora Hair Studio',
+-  description: 'HD lace glueless wigs, human hair wigs and apparel. Free standard shipping on orders over $99.',
++  title: () => t('home.heroTitle'),
++  description: () => `${t('home.heroSubtitle')} Shop HD lace wigs, body wave & deep wave human hair wigs, plus apparel. Free standard shipping over $99, 30-day returns.`,
++  keywords: () =>
++    'HD lace wigs, glueless wigs, human hair wigs, lace front wigs, body wave wig, deep wave wig, pre-plucked lace wig, natural hairline wig, hair studio',
++  ogType: 'website',
++  ogImage: () => featured.value?.list?.[0]?.cover ?? '',
+   path: '/',
+ })
++
++// 跨境独立站首页结构化数据：Organization + WebSite（含站内搜索）。
++useHead({
++  script: [
++    {
++      type: 'application/ld+json',
++      innerHTML: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'Aurora Hair Studio', url: siteUrl }),
++    },
++    {
++      type: 'application/ld+json',
++      innerHTML: JSON.stringify({
++        '@context': 'https://schema.org',
++        '@type': 'WebSite',
++        name: 'Aurora Hair Studio',
++        url: siteUrl,
++        potentialAction: {
++          '@type': 'SearchAction',
++          target: `${siteUrl}/search?q={search_term_string}`,
++          'query-input': 'required name=search_term_string',
++        },
++      }),
++    },
++  ],
++})
+ </script>
+ 
+ <template>
+   <div class="space-y-10">
+     <section class="rounded-2xl bg-stone-900 px-6 py-14 text-center text-white">
+-      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Glueless Wigs, Melted in Minutes</h1>
+-      <p class="mx-auto mt-3 max-w-xl text-sm text-stone-300">Pre-cut HD lace, 100% human hair, 180% density. Free standard shipping on orders over $99.</p>
++      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ t('home.heroTitle') }}</h1>
++      <p class="mx-auto mt-3 max-w-xl text-sm text-stone-300">{{ t('home.heroSubtitle') }}</p>
+       <NuxtLink to="/c/lace-wigs" class="mt-6 inline-block rounded-lg bg-white px-6 py-3 text-sm font-semibold text-stone-900 hover:bg-stone-100">
+-        Shop Lace Wigs
++        {{ t('home.shopLaceWigs') }}
+       </NuxtLink>
+     </section>
+ 
+     <section>
+-      <h2 class="mb-4 text-lg font-semibold">Shop by Category</h2>
++      <h2 class="mb-4 text-lg font-semibold">{{ t('home.shopByCategory') }}</h2>
+       <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+         <NuxtLink
+           v-for="cat in categories ?? []"
+@@ -37,7 +68,7 @@ useSeo({
+     </section>
+ 
+     <section>
+-      <h2 class="mb-4 text-lg font-semibold">Best Sellers</h2>
++      <h2 class="mb-4 text-lg font-semibold">{{ t('home.bestSellers') }}</h2>
+       <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+         <ProductCard v-for="p in featured?.list ?? []" :key="p.id" :product="p" />
+       </div>
+diff --git a/shops/pages/newsletter/unsubscribe.vue b/shops/pages/newsletter/unsubscribe.vue
+index 5c3987c..ac7350a 100644
+--- a/shops/pages/newsletter/unsubscribe.vue
++++ b/shops/pages/newsletter/unsubscribe.vue
+@@ -1,5 +1,7 @@
+ <script setup lang="ts">
+-/** P4-T09：邮件退订落地页（邮件内链接 → GET ?token= → 调后台退订） */
++/** P4-T09：邮件退订落地页（邮件内链接 → GET ?token= → 调后台退订）。文案接入 i18n（P5-T01）。 */
++import { useI18n } from '~/composables/useI18n'
++const { t } = useI18n()
+ const route = useRoute()
+ const token = computed(() => String(route.query.token ?? ''))
+ const state = ref<'loading' | 'done' | 'error'>('loading')
+@@ -8,7 +10,7 @@ const message = ref('')
+ onMounted(async () => {
+   if (!token.value) {
+     state.value = 'error'
+-    message.value = '退订链接无效'
++    message.value = t('unsubscribe.invalid')
+     return
+   }
+   try {
+@@ -16,18 +18,18 @@ onMounted(async () => {
+     state.value = 'done'
+   } catch (err) {
+     state.value = 'error'
+-    message.value = err instanceof Error ? err.message : '退订失败，请稍后再试'
++    message.value = err instanceof Error ? err.message : t('unsubscribe.failed')
+   }
+ })
+ 
+-useSeo({ title: '退订邮件', description: '取消订阅营销邮件', path: '/newsletter/unsubscribe' })
++useSeo({ title: () => t('unsubscribe.title'), description: () => t('unsubscribe.subtitle'), path: '/newsletter/unsubscribe', noindex: true })
+ </script>
+ 
+ <template>
+   <div class="mx-auto max-w-md rounded-xl border border-stone-200 p-8 text-center">
+-    <p v-if="state === 'loading'" class="text-sm text-stone-500">处理中…</p>
+-    <p v-else-if="state === 'done'" class="text-sm font-medium text-emerald-700">✓ 已退订。你不会再收到营销邮件。</p>
++    <p v-if="state === 'loading'" class="text-sm text-stone-500">{{ t('unsubscribe.processing') }}</p>
++    <p v-else-if="state === 'done'" class="text-sm font-medium text-emerald-700">{{ t('unsubscribe.done') }}</p>
+     <p v-else class="text-sm text-red-600">{{ message }}</p>
+-    <NuxtLink to="/" class="mt-4 inline-block text-xs text-stone-500 underline hover:text-stone-900">返回首页</NuxtLink>
++    <NuxtLink to="/" class="mt-4 inline-block text-xs text-stone-500 underline hover:text-stone-900">{{ t('unsubscribe.home') }}</NuxtLink>
+   </div>
+ </template>
+diff --git a/shops/pages/policies/[slug].vue b/shops/pages/policies/[slug].vue
+index 71b4e5c..65b8828 100644
+--- a/shops/pages/policies/[slug].vue
++++ b/shops/pages/policies/[slug].vue
+@@ -1,20 +1,27 @@
+ <script setup lang="ts">
+ import { MOCK_POLICY_PAGES } from '@shared/mock/fixtures'
++import { useI18n } from '~/composables/useI18n'
+ 
+-/** 政策页（P4-T12 前端版）：内容与市场一致、版本与生效日期可见；文中货币表述取配置（Price 表述由文案约定，不写死符号）。 */
++/** 政策页（P4-T12 前端版）：内容与市场一致、版本与生效日期可见；文中货币表述取配置（Price 表述由文案约定，不写死符号）。文案接入 i18n（P5-T01）。 */
++const { t } = useI18n()
+ const route = useRoute()
+ const slug = computed(() => String(route.params.slug ?? 'privacy'))
+ const page = computed(() => MOCK_POLICY_PAGES[slug.value] ?? null)
+ 
+ if (!page.value) throw createError({ statusCode: 404, statusText: 'Policy not found', fatal: true })
+ 
+-useSeo({ title: page.value.title, description: page.value.body.slice(0, 120), path: `/policies/${slug.value}` })
++useSeo({
++  title: page.value.title,
++  description: page.value.body.slice(0, 155),
++  keywords: `${page.value.title}, Aurora Hair Studio policies, shipping, returns, privacy`,
++  path: `/policies/${slug.value}`,
++})
+ </script>
+ 
+ <template>
+   <article class="mx-auto max-w-2xl">
+     <h1 class="mb-2 text-2xl font-semibold">{{ page?.title }}</h1>
+-    <p class="mb-6 text-xs text-stone-400">Version 1.0 · Effective 2026-11-04 · All amounts shown in your store currency.</p>
++    <p class="mb-6 text-xs text-stone-400">{{ t('policies.meta') }}</p>
+     <div class="prose prose-stone text-sm leading-relaxed text-stone-700">
+       <p>{{ page?.body }}</p>
+     </div>
+diff --git a/shops/pages/products/[slug].vue b/shops/pages/products/[slug].vue
+index f84769a..b5a9978 100644
+--- a/shops/pages/products/[slug].vue
++++ b/shops/pages/products/[slug].vue
+@@ -4,14 +4,16 @@ import WigAttributes from '~/components/commerce/WigAttributes.vue'
+ import ApparelAttributes from '~/components/commerce/ApparelAttributes.vue'
+ import VariantSelector from '~/components/commerce/VariantSelector.vue'
+ import { useStoreConfig } from '~/composables/useStoreConfig'
++import { useI18n } from '~/composables/useI18n'
+ import { trackViewItem, trackAddToCart } from '@shared/analytics/ecommerce'
+ import ProductReviews from '~/components/commerce/ProductReviews.vue'
+ import type { CatalogProduct } from '@shared/types/api'
+ 
+ /**
+  * 商品详情页（P2-T04/T05/T06）：变体选择、价格、库存、配送承诺、退货摘要。
+- * 不可售 SKU 说明原因（stockNote）而非仅置灰；下架/不存在 → 404 页。
++ * 不可售 SKU 说明原因（stockNote）而非仅置灰；下架/不存在 → 404 页。文案接入 i18n（P5-T01）。
+  */
++const { t } = useI18n()
+ const route = useRoute()
+ const catalog = useCatalog()
+ const cart = useCart()
+@@ -19,7 +21,7 @@ const cfg = useStoreConfig()
+ 
+ const { data: product, error } = await useAsyncData(`product-${route.params.slug}`, () => catalog.getProduct(route.params.slug as string))
+ if (!product.value) {
+-  throw createError({ statusCode: 404, statusText: 'Product not found', fatal: true })
++  throw createError({ statusCode: 404, statusText: t('product.notFound'), fatal: true })
+ }
+ 
+ // P2-T12：slug 规范化——同一商品经旧 slug/纯 id 抵达时 301 到 canonical slug（SEO_SPEC §7；410 策略待后台重定向表）
+@@ -64,9 +66,20 @@ watchEffect(() => {
+   }
+ })
+ 
++// 跨境 TDK：Title 用纯产品名（品牌由全局 titleTemplate 追加）；产品名超 42 字符截断保总长 ≤60；
++// description 截断 155；og:type=product；og:image 用产品图。
++const productTitle = computed(() => {
++  const p = product.value?.title ?? t('product.notFound')
++  return p.length <= 42 ? p : `${p.slice(0, 39)}…`
++})
++
+ useSeo({
+-  title: product.value?.title ?? 'Product',
+-  description: product.value?.description ?? '',
++  title: () => productTitle.value,
++  description: () => (product.value?.description ?? '').slice(0, 155),
++  keywords: () =>
++    product.value ? `${product.value.title}, human hair wig, glueless lace wig, HD lace wig, Aurora Hair Studio` : '',
++  ogType: 'product',
++  ogImage: () => product.value?.cover ?? '',
+   path: `/products/${route.params.slug}`,
+ })
+ 
+@@ -90,15 +103,15 @@ onMounted(async () => {
+ <template>
+   <div>
+     <JsonLd v-if="product" :product="product" />
+-    <nav class="mb-4 text-xs text-stone-500" aria-label="Breadcrumb">
+-      <NuxtLink to="/" class="hover:underline">Home</NuxtLink>
++    <nav class="mb-4 text-xs text-stone-500" :aria-label="t('product.breadcrumb')">
++      <NuxtLink to="/" class="hover:underline">{{ t('product.home') }}</NuxtLink>
+       <span aria-hidden="true">/</span>
+       <NuxtLink v-if="product?.category" :to="`/c/${product.category.slug}`" class="hover:underline">{{ product.category.name }}</NuxtLink>
+     </nav>
+ 
+     <div v-if="error || !product" class="rounded-xl border border-stone-200 p-12 text-center">
+-      <p class="text-sm font-medium text-stone-900">Product not found</p>
+-      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">Back to home</NuxtLink>
++      <p class="text-sm font-medium text-stone-900">{{ t('product.notFound') }}</p>
++      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">{{ t('product.backHome') }}</NuxtLink>
+     </div>
+ 
+     <div v-else class="grid gap-8 lg:grid-cols-2">
+@@ -115,7 +128,7 @@ onMounted(async () => {
+           <div class="mt-2 flex items-center gap-3">
+             <span class="text-2xl font-semibold tabular-nums">{{ priceText }}</span>
+             <span class="rounded-full px-2.5 py-0.5 text-xs font-medium" :class="inStock ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-500'">
+-              {{ inStock ? 'In stock' : 'Out of stock' }}
++              {{ inStock ? t('product.inStock') : t('product.outOfStock') }}
+             </span>
+           </div>
+         </div>
+@@ -128,20 +141,20 @@ onMounted(async () => {
+         <ApparelAttributes v-else-if="product.categoryKind === 'apparel'" :spec="spec" />
+ 
+         <div class="space-y-2 rounded-xl border border-stone-200 p-4 text-xs text-stone-600">
+-          <p>🚚 Ships in 1-2 business days · Standard 7-12 days / Express 3-5 days</p>
+-          <p>↩️ 30-day returns · items must be unworn with original packaging</p>
++          <p>{{ t('product.ships') }}</p>
++          <p>{{ t('product.returns30') }}</p>
+         </div>
+ 
+         <div class="flex items-center gap-3">
+           <button
+             type="button"
+             class="rounded-lg bg-stone-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
+-            :disabled="!inStock"
++            :disabled="!inStock || !price"
+             @click="addToCart"
+           >
+-            {{ added ? 'Added ✓' : 'Add to Cart' }}
++            {{ added ? t('product.added') : t('product.addToCart') }}
+           </button>
+-          <p v-if="!inStock" class="text-xs text-stone-500">{{ stockNote ?? 'Currently unavailable' }}</p>
++          <p v-if="!inStock" class="text-xs text-stone-500">{{ stockNote ?? t('product.unavailable') }}</p>
+         </div>
+       </div>
+ 
+@@ -149,8 +162,8 @@ onMounted(async () => {
+     </div>
+ 
+     <!-- P5-T08：product_recommendation 变体 → 推荐数量（control=4 / variant_b=8 / variant_c=12） -->
+-    <section v-if="related.length" class="mt-14" aria-label="You may also like">
+-      <h2 class="mb-5 text-lg font-semibold">You may also like</h2>
++    <section v-if="related.length" class="mt-14" :aria-label="t('product.youMayLike')">
++      <h2 class="mb-5 text-lg font-semibold">{{ t('product.youMayLike') }}</h2>
+       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+         <NuxtLink
+           v-for="p in related"
+diff --git a/shops/pages/search.vue b/shops/pages/search.vue
+index 6a3a986..e8cf714 100644
+--- a/shops/pages/search.vue
++++ b/shops/pages/search.vue
+@@ -1,10 +1,13 @@
+ <script setup lang="ts">
+ import ProductCard from '~/components/commerce/ProductCard.vue'
+ import { useCatalog } from '~/composables/useCatalog'
++import { useI18n } from '~/composables/useI18n'
+ 
+ /**
+  * 搜索页（P2-T07）：关键词搜索、无结果态、参数白名单（q/sort/page 之外忽略）、默认 noindex。
++ * 文案接入 i18n（P5-T01）。
+  */
++const { t, ti } = useI18n()
+ const route = useRoute()
+ const catalog = useCatalog()
+ 
+@@ -21,15 +24,20 @@ const results = computed(() => {
+   return (data.value?.list ?? []).filter((p) => p.title.toLowerCase().includes(term) || p.description.toLowerCase().includes(term))
+ })
+ 
+-useHead({ title: 'Search · Aurora Hair Studio', meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
++useSeo({
++  title: () => t('search.title'),
++  description: () => `${t('search.hint')} Search HD lace wigs, human hair wigs and apparel.`,
++  path: '/search',
++  noindex: true,
++})
+ </script>
+ 
+ <template>
+   <div>
+-    <h1 class="mb-2 text-2xl font-semibold">Search</h1>
++    <h1 class="mb-2 text-2xl font-semibold">{{ t('search.title') }}</h1>
+     <p class="mb-6 text-sm text-stone-500">
+-      <template v-if="q">Results for "{{ q }}" — {{ results.length }} found</template>
+-      <template v-else>Enter a keyword, e.g. "lace" or "dress".</template>
++      <template v-if="q">{{ ti('search.results', { q, n: String(results.length) }) }}</template>
++      <template v-else>{{ t('search.hint') }}</template>
+     </p>
+ 
+     <div v-if="pending" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+@@ -37,10 +45,10 @@ useHead({ title: 'Search · Aurora Hair Studio', meta: [{ name: 'robots', conten
+     </div>
+ 
+     <div v-else-if="q && results.length === 0" class="rounded-xl border border-stone-200 p-12 text-center">
+-      <p class="text-sm font-medium text-stone-900">No results for "{{ q }}"</p>
+-      <p class="mt-1 text-sm text-stone-500">Check spelling or try a more general term.</p>
++      <p class="text-sm font-medium text-stone-900">{{ ti('search.noResults', { q }) }}</p>
++      <p class="mt-1 text-sm text-stone-500">{{ t('search.spelling') }}</p>
+       <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
+-        Browse collections
++        {{ t('search.browse') }}
+       </NuxtLink>
+     </div>
+ 
+diff --git a/shops/pages/track.vue b/shops/pages/track.vue
+index dd79b0a..5a2814e 100644
+--- a/shops/pages/track.vue
++++ b/shops/pages/track.vue
+@@ -1,10 +1,13 @@
+ <script setup lang="ts">
++import { useI18n } from '~/composables/useI18n'
++
+ /**
+  * 物流轨迹查询页（P4-T04 前端接线）。
+  *
+  * - 凭「订单号 + 访问凭证」双要素查询，凭证错误/缺失一律显示 order not found（防枚举）；
+  * - 结果页 `/checkout/result` 的 Track shipment 链接会带入 orderNo + t，本页自动查询；
+  * - 页面 noindex + private no-store（含凭证的 URL 不进索引、不进 CDN 缓存）。
++ * - 文案接入 i18n（P5-T01），title/description 随语言切换。
+  */
+ interface TrackingNode {
+   time: string
+@@ -23,6 +26,7 @@ interface TrackingView {
+   syncedAt: string
+ }
+ 
++const { t } = useI18n()
+ const route = useRoute()
+ const orderNo = ref(String(route.query.orderNo ?? ''))
+ const token = ref(String(route.query.t ?? ''))
+@@ -34,18 +38,18 @@ async function lookup(): Promise<void> {
+   error.value = null
+   tracking.value = null
+   const no = orderNo.value.trim()
+-  const t = token.value.trim()
+-  if (!no || !t) {
+-    error.value = 'Order number and access code are both required.'
++  const t2 = token.value.trim()
++  if (!no || !t2) {
++    error.value = t('track.required')
+     return
+   }
+   loading.value = true
+   try {
+     tracking.value = await $fetch<TrackingView>(`/api/track/${encodeURIComponent(no)}`, {
+-      query: { t },
++      query: { t: t2 },
+     })
+   } catch {
+-    error.value = 'Order not found or invalid access link.'
++    error.value = t('track.notFound')
+   } finally {
+     loading.value = false
+   }
+@@ -55,18 +59,22 @@ onMounted(() => {
+   if (orderNo.value && token.value) void lookup()
+ })
+ 
+-useSeo({ title: 'Track Your Order', description: 'Check your shipment status', path: '/track' })
+-useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
++useSeo({
++  title: () => t('track.title'),
++  description: () => t('track.subtitle'),
++  path: '/track',
++  noindex: true,
++})
+ </script>
+ 
+ <template>
+   <div class="mx-auto max-w-xl">
+-    <h1 class="mb-2 text-2xl font-semibold">Track Your Order</h1>
+-    <p class="mb-6 text-sm text-stone-500">Enter the order number and the access code from your confirmation email or order result page.</p>
++    <h1 class="mb-2 text-2xl font-semibold">{{ t('track.title') }}</h1>
++    <p class="mb-6 text-sm text-stone-500">{{ t('track.subtitle') }}</p>
+ 
+     <form class="space-y-3 rounded-xl border border-stone-200 p-6" @submit.prevent="lookup">
+       <div class="space-y-1">
+-        <label class="block text-xs font-medium text-stone-600" for="track-order-no">Order number</label>
++        <label class="block text-xs font-medium text-stone-600" for="track-order-no">{{ t('track.orderNo') }}</label>
+         <input
+           id="track-order-no"
+           v-model="orderNo"
+@@ -75,7 +83,7 @@ useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
+         />
+       </div>
+       <div class="space-y-1">
+-        <label class="block text-xs font-medium text-stone-600" for="track-token">Access code</label>
++        <label class="block text-xs font-medium text-stone-600" for="track-token">{{ t('track.accessCode') }}</label>
+         <input
+           id="track-token"
+           v-model="token"
+@@ -90,20 +98,20 @@ useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
+         class="w-full rounded-lg bg-stone-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50"
+         :disabled="loading"
+       >
+-        {{ loading ? 'Looking up…' : 'Track order' }}
++        {{ loading ? t('track.lookingUp') : t('track.lookup') }}
+       </button>
+     </form>
+ 
+     <section v-if="tracking" class="mt-6 space-y-4 rounded-xl border border-stone-200 p-6">
+       <div class="flex items-center justify-between">
+-        <span class="text-sm font-semibold">Order {{ tracking.orderNo }}</span>
++        <span class="text-sm font-semibold">{{ t('track.orderPrefix') }} {{ tracking.orderNo }}</span>
+         <span class="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-700">{{ tracking.status }}</span>
+       </div>
+       <div v-if="tracking.trackingNo" class="flex justify-between text-sm">
+-        <span class="text-stone-500">{{ tracking.carrier || 'Carrier' }}</span>
++        <span class="text-stone-500">{{ tracking.carrier || t('track.carrier') }}</span>
+         <span class="font-mono text-xs">{{ tracking.trackingNo }}</span>
+       </div>
+-      <p v-else class="text-sm text-stone-500">Your shipment has not been dispatched yet. Please check back later.</p>
++      <p v-else class="text-sm text-stone-500">{{ t('track.notDispatched') }}</p>
+ 
+       <ol v-if="tracking.events.length" class="space-y-3 border-t border-stone-200 pt-4">
+         <li v-for="(node, idx) in tracking.events" :key="`${node.time}-${idx}`" class="flex gap-3 text-sm">
+@@ -114,7 +122,7 @@ useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
+           </span>
+         </li>
+       </ol>
+-      <p v-else-if="tracking.trackingNo" class="border-t border-stone-200 pt-4 text-xs text-stone-500">No tracking events have been reported yet.</p>
++      <p v-else-if="tracking.trackingNo" class="border-t border-stone-200 pt-4 text-xs text-stone-500">{{ t('track.noEvents') }}</p>
+     </section>
+   </div>
+ </template>
+diff --git a/shops/plugins/vitals.client.ts b/shops/plugins/vitals.client.ts
+index 13e596a..44a7bf2 100644
+--- a/shops/plugins/vitals.client.ts
++++ b/shops/plugins/vitals.client.ts
+@@ -19,8 +19,11 @@ function send(metric: Metric): void {
+     ts: new Date().toISOString(),
+   })
+   try {
+-    if (navigator.sendBeacon) navigator.sendBeacon('/api/vitals', payload)
+-    else void fetch('/api/vitals', { method: 'POST', body: payload, keepalive: true })
++    // sendBeacon 默认以 text/plain 发送，Nitro readBody 无法解析为 JSON → 400。
++    // 显式指定 application/json Blob，确保 BFF /api/vitals 正常解析（P4-T16）。
++    const blob = new Blob([payload], { type: 'application/json' })
++    if (navigator.sendBeacon) navigator.sendBeacon('/api/vitals', blob)
++    else void fetch('/api/vitals', { method: 'POST', body: blob, headers: { 'content-type': 'application/json' }, keepalive: true })
+   } catch {
+     /* 上报失败静默 */
+   }
+diff --git a/shops/server/api/[...mock].ts b/shops/server/api/[...mock].ts
+index d3738f9..5a0e2c6 100644
+--- a/shops/server/api/[...mock].ts
++++ b/shops/server/api/[...mock].ts
+@@ -1,5 +1,5 @@
+ import { mockStore } from '@shared/mock/store'
+-import { MOCK_BLOG_POSTS } from '@shared/mock/fixtures'
++import { MOCK_BLOG_POSTS, MOCK_REVIEWS } from '@shared/mock/fixtures'
+ import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
+ 
+ /**
+@@ -31,6 +31,10 @@ export default defineEventHandler(async (event) => {
+       requestId: event.context.requestId as string | undefined,
+     })
+     console.log(`[ext] ${method} ${url} -> status=${res.status} networkError=${res.networkError} body=${JSON.stringify(res.body)?.slice(0, 140)}`)
++    // P4-T07：reviews 在 auto 网络级失败时回退 mock（与 cart 一致），保证本地演示可见评论/验证购买标记
++    if (url.startsWith('reviews') && res.networkError && source === 'auto') {
++      return mockHandle(url, method, event, locale)
++    }
+     setResponseStatus(event, res.status)
+     return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'ext upstream error' })
+   }
+@@ -249,6 +253,18 @@ function upstreamFail(event: Parameters<Parameters<typeof defineEventHandler>[0]
+ 
+ /** mock 契约层（后端不可用时的独立数据源） */
+ async function mockHandle(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], locale?: string): Promise<unknown> {
++  // P4-T07 mock 评论：GET 按 spuId 过滤（isVerified 由后端按订单归属判定；示例混合）；POST 进审核队列
++  if (url.startsWith('reviews') && method === 'GET') {
++    const spuId = Number(new URLSearchParams(url.split('?')[1] ?? '').get('spuId') ?? 0)
++    const items = MOCK_REVIEWS.filter((r) => r.spuId === spuId).map(({ spuId: _s, ...rest }) => rest)
++    const count = items.length
++    const average = count ? Number((items.reduce((n, r) => n + r.rating, 0) / count).toFixed(1)) : 0
++    return { code: 0, data: { items, summary: count ? { average, count } : undefined } }
++  }
++  if (url === 'reviews' && method === 'POST') {
++    const body = await readBody(event).catch(() => ({}))
++    return { code: 0, data: { id: Date.now(), spuId: Number(body.spuId), status: 'pending' } }
++  }
+   // P5-T06 mock 兜底：博客列表/详情（真实模式走 BFF 直通 /storefront/v1/cms/articles）
+   if (url === 'cms/articles' && method === 'GET') {
+     const page = Number(new URLSearchParams(url.split('?')[1] ?? '').get('page') ?? 1) || 1
+@@ -323,8 +339,10 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
+   if (url.startsWith('checkout/orders') && method === 'GET') {
+     return { items: [], total: 0, page: 1, pageSize: 10 }
+   }
+-  if (url.startsWith('checkout/orders/') && url.endsWith('/pay') && method === 'POST') {
+-    const key = url.split('/')[2]
++  // 修复：pay 匹配需剥离 query（?t=accessToken），否则 endsWith('/pay') 恒 false → 404
++  const payPath = url.split('?')[0]
++  if (payPath.startsWith('checkout/orders/') && payPath.endsWith('/pay') && method === 'POST') {
++    const key = payPath.split('/')[2]
+     const order = [...mockStore.orders.values()].find((o) => String(o.id) === key || o.orderNo === key)
+     if (!order) {
+       setResponseStatus(event, 404)
+@@ -348,6 +366,11 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
+       return { code: 'ORDER_NOT_FOUND', message: 'order not found' }
+     }
+   }
++  // P5-T08 mock 兜底：实验分配 fail-closed control（与真实后端 flag 关闭响应同构，mock 模式自洽无 404）
++  const expMatch = /^experiments\/([^/]+)\/assign/.exec(url)
++  if (expMatch && method === 'GET') {
++    return { code: 0, data: { key: decodeURIComponent(expMatch[1]), enabled: false, variant: 'control', reason: 'feature_disabled' } }
++  }
+   setResponseStatus(event, 404)
+   return { code: 'NOT_FOUND', message: `no handler for ${method} /api/${url}` }
+ }
+diff --git a/shops/server/middleware/01-locale.ts b/shops/server/middleware/01-locale.ts
+index 0815c7b..e2a391b 100644
+--- a/shops/server/middleware/01-locale.ts
++++ b/shops/server/middleware/01-locale.ts
+@@ -1,39 +1,6 @@
+-import { randomUUID } from 'node:crypto'
+-
+ /**
+- * 多语言 locale 路由前缀（P5-T01）。
+- *
+- * 真实语言版本：en-US / zh-CN（见 shared/i18n/messages.ts locales）。
+- * 页面路由经 app/router.options.ts 的 `:locale(en-US|zh-CN)?` 前缀匹配，
+- * 因此 `/zh-CN/cart` 直接命中 cart 页面（SSR 与客户端一致，无需改写 URL）。
+- * 本中间件只做两件事：
+- * - 检测 URL 前缀并写 `store_locale` cookie + `x-store-locale` 响应头（SSR 首屏与后续请求可读）
+- * - 将检测到的 locale 写入 event.context.locale（服务端组件可用）
+- * 不处理 /api、/server、静态资源与 robots/sitemap。
++ * 单语站（P5-T01b）：URL 无语言前缀，locale 由后台 store config 决定。
++ * 此中间件不再做前缀检测/cookie/响应头写入；保留文件仅为兼容旧 import，无副作用。
++ * requestId 兜底由 00-request-id 承担。
+  */
+-const LOCALES = ['en-US', 'zh-CN']
+-
+-export default defineEventHandler((event) => {
+-  const path = getRequestURL(event).pathname
+-  // 仅页面请求；API/资源/控制文件不处理
+-  if (path.startsWith('/api/') || path.startsWith('/server/') || path === '/robots.txt' || path === '/sitemap.xml') return
+-  if (path.includes('.')) return // 静态文件
+-
+-  const seg = path.split('/').filter(Boolean)[0]
+-  if (!LOCALES.includes(seg)) return
+-
+-  event.context.locale = seg
+-
+-  // 写 cookie + 响应头（客户端水合与后续请求可读；Nuxt locale.global 中间件也会同步）
+-  setCookie(event, 'store_locale', seg, {
+-    path: '/',
+-    maxAge: 60 * 60 * 24 * 365,
+-    httpOnly: false,
+-    sameSite: 'lax',
+-  })
+-  setResponseHeader(event, 'x-store-locale', seg)
+-  // 保留既有 requestId 约定（与 00-request-id 一致，缺失则补）
+-  if (!getHeader(event, 'x-request-id')) {
+-    setResponseHeader(event, 'x-request-id', randomUUID())
+-  }
+-})
++export default defineEventHandler(() => {})
+diff --git a/shops/shared/i18n/localePath.ts b/shops/shared/i18n/localePath.ts
+index 967a7bc..e021004 100644
+--- a/shops/shared/i18n/localePath.ts
++++ b/shops/shared/i18n/localePath.ts
+@@ -1,29 +1,20 @@
+-import { locales, defaultLocale, type Locale } from './messages'
++import { locales, type Locale } from './messages'
+ 
+ /**
+- * locale 路径规范化（P5-T01）：为任意路径生成带语言前缀的 URL（en-US/zh-CN）。
+- * 用于 hreflang/canonical 与语言切换跳转；已带前缀的路径会被替换为目标语言前缀。
+- * 真实语言版本来自 locales（禁止 hreflang 指向不存在的版本 → 不输出 404 地址）。
++ * 单语站（P5-T01b）：路径无语言前缀。
++ * locale 唯一来源为后台 store config，前端不切换，故 URL 不再承载语言。
++ * 保留函数以兼容 import；localePath 恒返回原路径，detectLocale 恒 null（无前缀可检测）。
+  */
+-export function localePath(path: string, loc: Locale = defaultLocale): string {
+-  const safeLoc = locales.includes(loc) ? loc : defaultLocale
+-  if (!path) return `/${safeLoc}`
+-  const seg = path.split('/').filter(Boolean)[0]
+-  if (locales.includes(seg as Locale)) {
+-    const rest = path.slice(seg.length + 1) // 已含前导 /
+-    return `/${safeLoc}${rest}`
+-  }
+-  if (path === '/' || path === '') return `/${safeLoc}`
+-  return `/${safeLoc}/${path.replace(/^\//, '')}`
++export function localePath(path: string, _loc?: string): string {
++  return path || '/'
+ }
+ 
+-/** 从路径提取语言前缀（无则 null） */
+-export function detectLocale(path: string): Locale | null {
+-  const seg = path.split('/').filter(Boolean)[0]
+-  return locales.includes(seg as Locale) ? (seg as Locale) : null
++/** 单语站无 URL 前缀 → 恒 null */
++export function detectLocale(_path: string): null {
++  return null
+ }
+ 
+-/** 判断某语言是否为「真实存在」的版本（决定 hreflang 是否输出） */
++/** 判断某语言是否为「后台可配置」的版本 */
+ export function isRealLocale(loc: string): loc is Locale {
+   return locales.includes(loc as Locale)
+ }
+diff --git a/shops/shared/i18n/messages.ts b/shops/shared/i18n/messages.ts
+index 2513102..56f8a56 100644
+--- a/shops/shared/i18n/messages.ts
++++ b/shops/shared/i18n/messages.ts
+@@ -1,4 +1,4 @@
+-/** 轻量 i18n（P1-T05）：单语言 en-US 首发，结构预留 zh-CN 扩展（locale 一律来自 store config，不硬编码） */
++/** 轻量 i18n（P1-T05 / P5-T01）：en-US + zh-CN 全站文案，locale 一律来自 useLocale（URL→cookie→store config），不硬编码 */
+ export type Locale = 'en-US' | 'zh-CN'
+ 
+ export const locales: Locale[] = ['en-US', 'zh-CN']
+@@ -6,26 +6,505 @@ export const defaultLocale: Locale = 'en-US'
+ 
+ const zh: Record<string, string> = {
+   'shop.title': 'Aurora Hair Studio',
++  'nav.laceWigs': '蕾丝假发',
++  'nav.apparel': '服饰',
++  'nav.cart': '购物车',
++  'nav.track': '查物流',
++  'nav.privacy': '隐私政策',
++  'nav.shipping': '配送',
++  'nav.returns': '退换货',
++  'nav.terms': '条款',
++  'nav.skipToContent': '跳到内容',
++  'nav.language': '语言',
+   'cart.title': '购物车',
+   'cart.description': '查看您的购物车商品、数量与金额',
+   'cart.empty': '购物车是空的',
+   'cart.backHome': '回到首页',
++  'cart.checkout': '去结算',
++  'cart.remove': '移除',
++  'cart.unavailable': '该商品已不可用',
++  'cart.incQty': '增加数量',
++  'cart.decQty': '减少数量',
+   'checkout.title': '结算',
++  'checkout.placeOrder': '提交订单',
++  'checkout.secureCta': '安全下单',
++  'checkout.placing': '提交中…',
++  'checkout.description': '安全结算',
++  'checkout.failed': '下单失败',
++  'checkout.quoteExpires': '报价将于 {time} 过期',
++  'checkout.businessDays': '{n} 个工作日',
++  'checkout.err.fullName': '请填写全名',
++  'checkout.err.province': '请填写省/州',
++  'checkout.err.city': '请填写城市',
++  'checkout.err.address1': '请填写详细地址',
++  'checkout.err.postcode': '请填写邮编',
++  'checkout.err.email': '请填写有效邮箱',
++  'field.fullName': '全名',
++  'field.phone': '电话',
++  'field.country': '国家',
++  'field.province': '省/州',
++  'field.city': '城市',
++  'field.address1': '详细地址',
++  'field.postcode': '邮编',
++  'checkout.email': '邮箱',
++  'checkout.coupon': '优惠券',
++  'checkout.apply': '应用',
++  'checkout.discount': '折扣',
++  'checkout.orderSummary': '订单摘要',
++  'checkout.subtotal': '小计',
++  'checkout.shipping': '配送',
++  'checkout.tax': '税费',
++  'checkout.total': '总计',
++  'checkout.shippingAddress': '收货地址',
++  'checkout.shippingMethod': '配送方式',
++  'checkout.estimatedDelivery': '预计送达',
++  'checkout.addItems': '请先添加商品到购物车以查看订单金额',
++  'checkout.couponHint': '优惠码（试试 WIG10 / EXPIRED）',
+   'product.addToCart': '加入购物车',
+   'product.outOfStock': '缺货',
++  'product.inStock': '有货',
++  'product.added': '已加入 ✓',
++  'product.unavailable': '当前不可用',
++  'product.backHome': '返回首页',
++  'product.notFound': '未找到商品',
++  'product.youMayLike': '相关推荐',
++  'product.returns30': '↩️ 30 天退换 · 商品须未穿戴，保留原包装',
++  'product.ships': '🚚 1-2 个工作日发货 · 标准 7-12 天 / 特快 3-5 天',
++  'product.home': '首页',
++  'product.breadcrumb': '面包屑',
++  'product.price': '价格',
+   'common.currency': '货币',
++  'common.loading': '加载中…',
++  'common.privacy': '隐私政策',
++  'common.close': '关闭',
++  'card.outOfStock': '缺货',
++  'reviews.title': '评价',
++  'reviews.rating': '评分',
++  'reviews.write': '写评价',
++  'reviews.empty': '暂无已审核评价。',
++  'reviews.loading': '加载中…',
++  'reviews.share': '分享你的使用体验…',
++  'reviews.required': '请填写评价内容',
++  'reviews.submitted': '评价已提交，进入审核队列（审核通过后展示）',
++  'reviews.failedSubmit': '提交失败',
++  'reviews.avg': '{avg} / 5（{count} 条）',
++  'reviews.anonymous': '匿名买家',
++  'reviews.stars': '{n} 星',
++  'reviews.submit': '提交评价',
++  'reviews.submitting': '提交中…',
++  'reviews.verified': '已验证购买',
++  'shipping.standard': '🚚 标准 {days} 天 · 特快 {express} 天',
++  'shipping.freeOver': '满 {amount} 免标准运费',
++  'shipping.calculated': '运费结算时计算',
++  'shipping.shipsIn': '1-2 个工作日发货',
++  'attr.hairMaterial': '发质',
++  'attr.texture': '纹理',
++  'attr.laceType': 'Lace 类型',
++  'attr.capSize': '帽围',
++  'attr.length': '长度',
++  'attr.density': '密度',
++  'attr.glueless': '无胶（Glueless）',
++  'attr.sizeSystem': '尺码体系',
++  'attr.size': '尺码',
++  'attr.color': '颜色',
++  'attr.fabric': '面料',
++  'attr.fit': '版型',
++  'attr.measurements': '测量值',
++  'attr.tryOnInfo': '试穿信息',
++  'home.heroTitle': '无痕假发，瞬间贴合',
++  'home.heroSubtitle': '预剪 HD 蕾丝，100% 真人发，180% 密度。订单满 $99 享标准免邮。',
++  'home.shopLaceWigs': '选购蕾丝假发',
++  'home.shopByCategory': '按品类选购',
++  'home.bestSellers': '热销推荐',
++  'category.backHome': '返回首页',
++  'category.noProducts': '未找到商品',
++  'category.sort': '排序：',
++  'category.adjust': '请调整筛选或浏览全部品类',
++  'search.title': '搜索',
++  'search.results': '"{q}" 的结果 — 共 {n} 条',
++  'search.hint': '输入关键词，如"lace"或"dress"。',
++  'search.noResults': '未找到"{q}"的结果',
++  'search.spelling': '请检查拼写，或尝试更宽泛的关键词。',
++  'search.browse': '浏览全部分类',
++  'category.error': '{msg} — 请调整筛选。',
++  'blog.showing': '显示 {shown} / {total} 篇文章。',
++  'track.title': '查询物流',
++  'track.subtitle': '输入确认邮件或订单结果页中的订单号与访问凭证。',
++  'track.orderNo': '订单号',
++  'track.accessCode': '访问凭证',
++  'track.required': '订单号与访问凭证均为必填。',
++  'track.notFound': '未找到订单或访问链接无效。',
++  'track.lookup': '查询',
++  'track.lookingUp': '查询中…',
++  'track.carrier': '承运商',
++  'track.notDispatched': '您的包裹尚未发货，请稍后再来查看。',
++  'track.noEvents': '暂无物流跟踪记录。',
++  'track.orderPrefix': '订单',
++  'newsletter.title': '订阅新品与护理指南',
++  'newsletter.placeholder': 'your@email.com',
++  'newsletter.emailLabel': '邮箱地址',
++  'newsletter.consentBefore': '我同意接收营销邮件，并已阅读',
++  'newsletter.consentAfter': '。可随时通过邮件链接退订。',
++  'newsletter.privacy': '隐私政策',
++  'newsletter.subscribe': '订阅',
++  'newsletter.subscribing': '订阅中…',
++  'newsletter.success': '✓ 订阅成功！确认邮件已发送至 {email}，邮件内可随时退订。',
++  'newsletter.needConsent': '请先勾选同意接收邮件',
++  'newsletter.failed': '订阅失败，请稍后再试',
++  'consent.dialogLabel': 'Cookie 使用偏好',
++  'consent.messageBefore': '我们使用必要 Cookie 保障站点运行，并希望在您同意后使用统计与营销 Cookie 优化体验。详见',
++  'consent.messageAfter': '。',
++  'consent.privacy': '隐私政策',
++  'consent.acceptAll': '全部接受',
++  'consent.essentialOnly': '仅必要',
++  'account.welcome': '欢迎回来',
++  'account.login': '登录',
++  'account.register': '注册',
++  'account.registerLogin': '注册并登录',
++  'account.nickname': '昵称（可选）',
++  'account.password': '密码',
++  'account.processing': '处理中…',
++  'account.failed': '操作失败',
++  'account.description': '登录您的账户',
++  'account.title': '我的订单',
++  'account.addressBook': '收货地址簿',
++  'account.logout': '登出',
++  'account.returnsPolicy': '退货政策',
++  'account.rma': '退货申请 / RMA',
++  'orders.title': '我的订单',
++  'orders.empty': '暂无订单',
++  'orders.browse': '去逛逛',
++  'orders.prev': '上一页',
++  'orders.next': '下一页',
++  'orders.loading': '加载中…',
++  'orders.loadFailed': '订单加载失败',
++  'orders.description': '查看您的订单历史',
++  'orders.status.created': '已创建',
++  'orders.status.processing': '处理中',
++  'orders.status.paid': '已支付',
++  'orders.status.fulfilled': '已履约',
++  'orders.status.shipped': '已发货',
++  'orders.status.done': '已完成',
++  'orders.status.cancelled': '已取消',
++  'orders.payment.none': '未支付',
++  'orders.payment.pending': '待支付',
++  'orders.payment.authorized': '已授权',
++  'orders.payment.captured': '已扣款',
++  'orders.payment.refunding': '退款中',
++  'orders.payment.refunded': '已退款',
++  'orders.payment.failed': '支付失败',
++  'addresses.title': '地址簿',
++  'addresses.add': '新增地址',
++  'addresses.edit': '编辑',
++  'addresses.delete': '删除',
++  'addresses.default': '默认',
++  'addresses.setDefault': '设为默认',
++  'addresses.empty': '暂无地址，点击右上角新增。',
++  'addresses.cancel': '取消',
++  'addresses.save': '保存',
++  'addresses.loading': '加载中…',
++  'addresses.recipient': '收件人',
++  'addresses.phone': '电话',
++  'addresses.zip': '邮编',
++  'addresses.city': '城市',
++  'addresses.state': '省/州',
++  'addresses.address': '详细地址',
++  'addresses.countryHint': '国家码（US）',
++  'addresses.saveFailed': '保存失败',
++  'addresses.description': '收货地址管理',
++  'addresses.identity': '登录身份：{email}',
++  'addresses.setDefaultAddress': '设为默认地址',
++  'rma.title': '退货申请 / RMA',
++  'rma.new': '新建申请',
++  'rma.my': '我的申请',
++  'rma.empty': '暂无退货申请。',
++  'rma.orderId': '订单 ID（数字）',
++  'rma.itemId': '订单明细 ID',
++  'rma.qty': '数量',
++  'rma.sku': 'SKU ID',
++  'rma.reason': '退货原因（可选）',
++  'rma.loadFailed': '加载失败',
++  'rma.submitted': '退货申请已提交，等待审核',
++  'rma.submitFailed': '提交失败',
++  'rma.description': '退货申请',
++  'rma.submitting': '提交中…',
++  'rma.submit': '提交退货申请',
++  'blog.notFound': '未找到文章',
++  'blog.title': '博客',
++  'blog.loading': '加载中…',
++  'blog.empty': '暂无文章。',
++  'result.title': '订单结果',
++  'result.backHome': '返回首页',
++  'result.payNow': '立即支付（模拟）',
++  'result.track': '查看物流',
++  'result.total': '总计',
++  'result.email': '邮箱',
++  'result.notFound': '未找到订单',
++  'result.invalid': '订单链接无效或已过期。',
++  'result.description': '订单状态',
++  'result.paymentFailed': '支付失败',
++  'result.paid': '已支付',
++  'result.pending': '待支付',
++  'result.polling': '等待支付确认… 最多轮询 60 秒',
++  'unsubscribe.title': '退订邮件',
++  'unsubscribe.subtitle': '取消订阅营销邮件',
++  'unsubscribe.done': '✓ 已退订。你不会再收到营销邮件。',
++  'unsubscribe.invalid': '退订链接无效',
++  'unsubscribe.failed': '退订失败，请稍后再试',
++  'unsubscribe.processing': '处理中…',
++  'unsubscribe.home': '返回首页',
++  'policies.meta': '版本 1.0 · 生效 2026-11-04 · 全部金额以店铺币种显示',
+ }
+-
+ const en: Record<string, string> = {
+   'shop.title': 'Aurora Hair Studio',
++  'nav.laceWigs': 'Lace Wigs',
++  'nav.apparel': 'Apparel',
++  'nav.cart': 'Cart',
++  'nav.track': 'Track',
++  'nav.privacy': 'Privacy',
++  'nav.shipping': 'Shipping',
++  'nav.returns': 'Returns',
++  'nav.terms': 'Terms',
++  'nav.skipToContent': 'Skip to content',
++  'nav.language': 'Language',
+   'cart.title': 'Cart',
+   'cart.description': 'Review the items, quantities and totals in your cart',
+   'cart.empty': 'Your cart is empty',
+   'cart.backHome': 'Back to home',
++  'cart.checkout': 'Checkout',
++  'cart.remove': 'Remove',
++  'cart.unavailable': 'This item is no longer available',
++  'cart.incQty': 'Increase quantity',
++  'cart.decQty': 'Decrease quantity',
+   'checkout.title': 'Checkout',
++  'checkout.placeOrder': 'Place Order',
++  'checkout.secureCta': 'Place order securely',
++  'checkout.placing': 'Placing order…',
++  'checkout.description': 'Secure checkout',
++  'checkout.failed': 'Failed to place order',
++  'checkout.quoteExpires': 'Quote expires at {time}',
++  'checkout.businessDays': '{n} business days',
++  'checkout.err.fullName': 'Full name is required',
++  'checkout.err.province': 'State/Province is required',
++  'checkout.err.city': 'City is required',
++  'checkout.err.address1': 'Street address is required',
++  'checkout.err.postcode': 'Postcode is required',
++  'checkout.err.email': 'Valid email is required',
++  'field.fullName': 'Full name',
++  'field.phone': 'Phone',
++  'field.country': 'Country',
++  'field.province': 'State/Province',
++  'field.city': 'City',
++  'field.address1': 'Street address',
++  'field.postcode': 'Postcode',
++  'checkout.email': 'Email',
++  'checkout.coupon': 'Coupon',
++  'checkout.apply': 'Apply',
++  'checkout.discount': 'Discount',
++  'checkout.orderSummary': 'Order Summary',
++  'checkout.subtotal': 'Subtotal',
++  'checkout.shipping': 'Shipping',
++  'checkout.tax': 'Tax',
++  'checkout.total': 'Total',
++  'checkout.shippingAddress': 'Shipping Address',
++  'checkout.shippingMethod': 'Shipping Method',
++  'checkout.estimatedDelivery': 'Estimated delivery',
++  'checkout.addItems': 'Add items to your cart to see the order total',
++  'checkout.couponHint': 'Coupon code (try WIG10 / EXPIRED)',
+   'product.addToCart': 'Add to Cart',
+   'product.outOfStock': 'Out of stock',
++  'product.inStock': 'In stock',
++  'product.added': 'Added ✓',
++  'product.unavailable': 'Currently unavailable',
++  'product.backHome': 'Back to home',
++  'product.notFound': 'Product not found',
++  'product.youMayLike': 'You may also like',
++  'product.returns30': '↩️ 30-day returns · items must be unworn with original packaging',
++  'product.ships': '🚚 Ships in 1-2 business days · Standard 7-12 days / Express 3-5 days',
++  'product.home': 'Home',
++  'product.breadcrumb': 'Breadcrumb',
++  'product.price': 'Price',
+   'common.currency': 'Currency',
++  'common.loading': 'Loading…',
++  'common.privacy': 'Privacy Policy',
++  'common.close': 'Close',
++  'card.outOfStock': 'Out of stock',
++  'reviews.title': 'Reviews',
++  'reviews.rating': 'Rating',
++  'reviews.write': 'Write a review',
++  'reviews.empty': 'No verified reviews yet.',
++  'reviews.loading': 'Loading…',
++  'reviews.share': 'Share your experience…',
++  'reviews.required': 'Please write a review',
++  'reviews.submitted': 'Review submitted for moderation (shown after approval)',
++  'reviews.failedSubmit': 'Failed to submit',
++  'reviews.avg': '{avg} / 5（{count}）',
++  'reviews.anonymous': 'Anonymous',
++  'reviews.stars': '{n} star(s)',
++  'reviews.submit': 'Submit review',
++  'reviews.submitting': 'Submitting…',
++  'reviews.verified': 'Verified Purchase',
++  'shipping.standard': '🚚 Standard {days} days · Express {express} days',
++  'shipping.freeOver': 'Free standard shipping over {amount}',
++  'shipping.calculated': 'Shipping calculated at checkout',
++  'shipping.shipsIn': 'Ships in 1-2 business days',
++  'attr.hairMaterial': 'Hair Material',
++  'attr.texture': 'Texture',
++  'attr.laceType': 'Lace Type',
++  'attr.capSize': 'Cap Size',
++  'attr.length': 'Length',
++  'attr.density': 'Density',
++  'attr.glueless': 'Glueless',
++  'attr.sizeSystem': 'Size System',
++  'attr.size': 'Size',
++  'attr.color': 'Color',
++  'attr.fabric': 'Fabric',
++  'attr.fit': 'Fit',
++  'attr.measurements': 'Measurements',
++  'attr.tryOnInfo': 'Try-on Info',
++  'home.heroTitle': 'Glueless Wigs, Melted in Minutes',
++  'home.heroSubtitle': 'Pre-cut HD lace, 100% human hair, 180% density. Free standard shipping on orders over $99.',
++  'home.shopLaceWigs': 'Shop Lace Wigs',
++  'home.shopByCategory': 'Shop by Category',
++  'home.bestSellers': 'Best Sellers',
++  'category.backHome': 'Back to home',
++  'category.noProducts': 'No products found',
++  'category.sort': 'Sort:',
++  'category.adjust': 'Try adjusting filters or browse all categories',
++  'search.title': 'Search',
++  'search.results': 'Results for "{q}" — {n} found',
++  'search.hint': 'Enter a keyword, e.g. "lace" or "dress".',
++  'search.noResults': 'No results for "{q}"',
++  'search.spelling': 'Check spelling or try a more general term.',
++  'search.browse': 'Browse collections',
++  'category.error': '{msg} — try adjusting filters.',
++  'blog.showing': 'Showing {shown} of {total} posts.',
++  'track.title': 'Track Your Order',
++  'track.subtitle': 'Enter the order number and the access code from your confirmation email or order result page.',
++  'track.orderNo': 'Order number',
++  'track.accessCode': 'Access code',
++  'track.required': 'Order number and access code are both required.',
++  'track.notFound': 'Order not found or invalid access link.',
++  'track.lookup': 'Track order',
++  'track.lookingUp': 'Looking up…',
++  'track.carrier': 'Carrier',
++  'track.notDispatched': 'Your shipment has not been dispatched yet. Please check back later.',
++  'track.noEvents': 'No tracking events have been reported yet.',
++  'track.orderPrefix': 'Order',
++  'newsletter.title': 'Subscribe to new arrivals & care guide',
++  'newsletter.placeholder': 'your@email.com',
++  'newsletter.emailLabel': 'Email address',
++  'newsletter.consentBefore': 'I agree to receive marketing emails and have read the',
++  'newsletter.consentAfter': '. You can unsubscribe anytime via the email link.',
++  'newsletter.privacy': 'Privacy Policy',
++  'newsletter.subscribe': 'Subscribe',
++  'newsletter.subscribing': 'Subscribing…',
++  'newsletter.success': '✓ Subscribed! Confirmation email sent to {email}. You can unsubscribe anytime via the email link.',
++  'newsletter.needConsent': 'Please agree to receive emails first',
++  'newsletter.failed': 'Subscription failed, please try again later',
++  'consent.dialogLabel': 'Cookie preferences',
++  'consent.messageBefore': 'We use necessary cookies to keep the site running, and with your consent use analytics & marketing cookies to improve your experience. See our',
++  'consent.messageAfter': '.',
++  'consent.privacy': 'Privacy Policy',
++  'consent.acceptAll': 'Accept all',
++  'consent.essentialOnly': 'Essential only',
++  'account.welcome': 'Welcome back',
++  'account.login': 'Sign in',
++  'account.register': 'Sign up',
++  'account.registerLogin': 'Sign up & sign in',
++  'account.nickname': 'Nickname (optional)',
++  'account.password': 'Password',
++  'account.processing': 'Processing…',
++  'account.failed': 'Operation failed',
++  'account.description': 'Sign in to your account',
++  'account.title': 'My Orders',
++  'account.addressBook': 'Address book',
++  'account.logout': 'Log out',
++  'account.returnsPolicy': 'Returns policy',
++  'account.rma': 'Return / RMA',
++  'orders.title': 'My Orders',
++  'orders.empty': 'No orders yet',
++  'orders.browse': 'Browse products',
++  'orders.prev': 'Previous',
++  'orders.next': 'Next',
++  'orders.loading': 'Loading…',
++  'orders.loadFailed': 'Failed to load orders',
++  'orders.description': 'View your order history',
++  'orders.status.created': 'Created',
++  'orders.status.processing': 'Processing',
++  'orders.status.paid': 'Paid',
++  'orders.status.fulfilled': 'Fulfilled',
++  'orders.status.shipped': 'Shipped',
++  'orders.status.done': 'Completed',
++  'orders.status.cancelled': 'Cancelled',
++  'orders.payment.none': 'Unpaid',
++  'orders.payment.pending': 'Pending',
++  'orders.payment.authorized': 'Authorized',
++  'orders.payment.captured': 'Captured',
++  'orders.payment.refunding': 'Refunding',
++  'orders.payment.refunded': 'Refunded',
++  'orders.payment.failed': 'Payment failed',
++  'addresses.title': 'Address book',
++  'addresses.add': 'Add address',
++  'addresses.edit': 'Edit',
++  'addresses.delete': 'Delete',
++  'addresses.default': 'Default',
++  'addresses.setDefault': 'Set as default',
++  'addresses.empty': 'No addresses yet. Click add in the top right.',
++  'addresses.cancel': 'Cancel',
++  'addresses.save': 'Save',
++  'addresses.loading': 'Loading…',
++  'addresses.recipient': 'Recipient',
++  'addresses.phone': 'Phone',
++  'addresses.zip': 'ZIP',
++  'addresses.city': 'City',
++  'addresses.state': 'State',
++  'addresses.address': 'Address',
++  'addresses.countryHint': 'Country code (US)',
++  'addresses.saveFailed': 'Failed to save',
++  'addresses.description': 'Manage shipping addresses',
++  'addresses.identity': 'Signed in as {email}',
++  'addresses.setDefaultAddress': 'Set as default address',
++  'rma.title': 'Return / RMA',
++  'rma.new': 'New request',
++  'rma.my': 'My requests',
++  'rma.empty': 'No return requests yet.',
++  'rma.orderId': 'Order ID (numeric)',
++  'rma.itemId': 'Order item ID',
++  'rma.qty': 'Quantity',
++  'rma.sku': 'SKU ID',
++  'rma.reason': 'Return reason (optional)',
++  'rma.loadFailed': 'Failed to load',
++  'rma.submitted': 'Return request submitted for review',
++  'rma.submitFailed': 'Failed to submit',
++  'rma.description': 'Returns (RMA)',
++  'rma.submitting': 'Submitting…',
++  'rma.submit': 'Submit return request',
++  'blog.notFound': 'Post not found',
++  'blog.title': 'Blog',
++  'blog.loading': 'Loading…',
++  'blog.empty': 'No posts yet.',
++  'result.title': 'Order Result',
++  'result.backHome': 'Back to home',
++  'result.payNow': 'Pay Now (Mock)',
++  'result.track': 'Track shipment',
++  'result.total': 'Total',
++  'result.email': 'Email',
++  'result.notFound': 'Order not found',
++  'result.invalid': 'Invalid or expired order link.',
++  'result.description': 'Order status',
++  'result.paymentFailed': 'Payment failed',
++  'result.paid': 'Paid',
++  'result.pending': 'Pending payment',
++  'result.polling': 'Waiting for payment confirmation… polling up to 60s',
++  'unsubscribe.title': 'Unsubscribe',
++  'unsubscribe.subtitle': 'Unsubscribe from marketing emails',
++  'unsubscribe.done': '✓ Unsubscribed. You will no longer receive marketing emails.',
++  'unsubscribe.invalid': 'Invalid unsubscribe link',
++  'unsubscribe.failed': 'Unsubscribe failed, please try again later',
++  'unsubscribe.processing': 'Processing…',
++  'unsubscribe.home': 'Back to home',
++  'policies.meta': 'Version 1.0 · Effective 2026-11-04 · All amounts shown in your store currency.',
+ }
+ 
+ const messages: Record<Locale, Record<string, string>> = { 'en-US': en, 'zh-CN': zh }
+@@ -33,3 +512,10 @@ const messages: Record<Locale, Record<string, string>> = { 'en-US': en, 'zh-CN':
+ export function translate(locale: Locale, key: string): string {
+   return messages[locale]?.[key] ?? messages[defaultLocale][key] ?? key
+ }
++
++/** 带插值：translateI('newsletter.success', 'zh-CN', { email: 'a@b.c' }) */
++export function translateI(locale: Locale, key: string, vars: Record<string, string>): string {
++  let s = translate(locale, key)
++  for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, v)
++  return s
++}
+diff --git a/shops/shared/mock/fixtures.ts b/shops/shared/mock/fixtures.ts
+index e379869..975ea6a 100644
+--- a/shops/shared/mock/fixtures.ts
++++ b/shops/shared/mock/fixtures.ts
+@@ -107,6 +107,80 @@ export const MOCK_PRODUCTS: CatalogProduct[] = [
+   },
+ ]
+ 
++/**
++ * Mock 评论（P4-T07）：isVerified 标记"已验证购买"（后端按订单归属判定；mock 示例混合）。
++ * 提交进 pending 审核队列；GET 仅返回 approved（此处直接模拟审核通过）。
++ */
++export interface MockReview {
++  id: number
++  spuId: number
++  rating: number
++  title: string | null
++  content: string
++  customerNickname: string | null
++  createdAt: string
++  helpfulCount: number
++  isVerified: boolean
++}
++
++export const MOCK_REVIEWS: MockReview[] = [
++  {
++    id: 1,
++    spuId: 101,
++    rating: 5,
++    title: 'Best wig I have ever owned',
++    content: 'The lace melted perfectly and the hair is soft and true to length. Zero glue needed, exactly as described.',
++    customerNickname: 'Jasmine M.',
++    createdAt: '2026-10-12T10:00:00Z',
++    helpfulCount: 12,
++    isVerified: true,
++  },
++  {
++    id: 2,
++    spuId: 101,
++    rating: 4,
++    title: 'Great lace, minor shedding',
++    content: 'Very natural hairline and comfortable cap. A little shedding on the first brush but overall great value.',
++    customerNickname: 'Amara',
++    createdAt: '2026-10-02T14:30:00Z',
++    helpfulCount: 4,
++    isVerified: true,
++  },
++  {
++    id: 3,
++    spuId: 101,
++    rating: 5,
++    title: null,
++    content: 'Fast shipping and the HD lace is invisible. Will buy again.',
++    customerNickname: 'Tiana',
++    createdAt: '2026-09-20T09:15:00Z',
++    helpfulCount: 3,
++    isVerified: false,
++  },
++  {
++    id: 4,
++    spuId: 102,
++    rating: 5,
++    title: 'Deep wave is gorgeous',
++    content: 'The deep wave pattern holds beautifully after washing. 200% density is thick and full.',
++    customerNickname: 'Denise',
++    createdAt: '2026-10-08T11:00:00Z',
++    helpfulCount: 8,
++    isVerified: true,
++  },
++  {
++    id: 5,
++    spuId: 201,
++    rating: 4,
++    title: 'Cute summer dress',
++    content: 'Lightweight and true to size. The fabric is a bit thin but perfect for summer.',
++    customerNickname: 'Kayla',
++    createdAt: '2026-09-28T16:45:00Z',
++    helpfulCount: 2,
++    isVerified: true,
++  },
++]
++
+ export const MOCK_POLICY_PAGES: Record<string, { title: string; body: string }> = {
+   privacy: { title: 'Privacy Policy', body: 'We collect only the data needed to fulfil your order...' },
+   terms: { title: 'Terms of Service', body: 'By placing an order you agree to our terms...' },
+diff --git a/shops/tests/e2e/smoke.spec.ts b/shops/tests/e2e/smoke.spec.ts
+index f910c73..3e5299f 100644
+--- a/shops/tests/e2e/smoke.spec.ts
++++ b/shops/tests/e2e/smoke.spec.ts
+@@ -48,7 +48,12 @@ test('product detail: variant selection updates availability', async ({ page })
+ 
+ test('cart → checkout → order result flow', async ({ page }) => {
+   await gotoAvailableProduct(page)
+-  await page.getByRole('button', { name: /Add to Cart/ }).click()
++  // 等待加购 POST /api/cart/items 成功后再导航：真实链路响应慢于 mock，
++  // 立即 goto 会中断加购请求导致购物车空、下单 400（G5 真实链路回归修复）。
++  await Promise.all([
++    page.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
++    page.getByRole('button', { name: /Add to Cart/ }).click(),
++  ])
+   await page.goto('/checkout')
+   await page.fill('#fullName', 'Test Buyer')
+   await page.fill('#phone', '1000000')
+@@ -60,4 +65,7 @@ test('cart → checkout → order result flow', async ({ page }) => {
+   await page.getByRole('button', { name: /Place Order/ }).click()
+   await expect(page).toHaveURL(/\/checkout\/result/)
+   await expect(page.getByText(/Order SO\d+/)).toBeVisible()
++  // G5 主链路：固化支付路径（真实链路 Pay Now → mock 支付 webhook → paymentStatus=captured → Paid 徽章）。
++  await page.getByRole('button', { name: /Pay Now/ }).click()
++  await expect(page.getByText('Paid', { exact: true })).toBeVisible({ timeout: 20_000 })
+ })
+diff --git a/shops/tests/unit/locale.spec.ts b/shops/tests/unit/locale.spec.ts
+index bc26c1e..31b9699 100644
+--- a/shops/tests/unit/locale.spec.ts
++++ b/shops/tests/unit/locale.spec.ts
+@@ -2,47 +2,39 @@ import { describe, it, expect } from 'vitest'
+ import { localePath, detectLocale, isRealLocale } from '@shared/i18n/localePath'
+ import { translate, locales, defaultLocale } from '@shared/i18n/messages'
+ 
+-describe('P5-T01 多语言 locale 路由', () => {
+-  it('localePath：裸路径 → 加语言前缀', () => {
+-    expect(localePath('/cart', 'en-US')).toBe('/en-US/cart')
+-    expect(localePath('/cart', 'zh-CN')).toBe('/zh-CN/cart')
+-    expect(localePath('/products/x', 'zh-CN')).toBe('/zh-CN/products/x')
++describe('P5-T01b 单语站 locale 语义', () => {
++  it('localePath：单语站恒返回原路径（无语言前缀）', () => {
++    expect(localePath('/cart')).toBe('/cart')
++    expect(localePath('/products/x')).toBe('/products/x')
++    expect(localePath('/')).toBe('/')
++    expect(localePath('')).toBe('/')
+   })
+ 
+-  it('localePath：已带前缀 → 替换为目标语言', () => {
+-    expect(localePath('/zh-CN/cart', 'en-US')).toBe('/en-US/cart')
+-    expect(localePath('/en-US/products/x', 'zh-CN')).toBe('/zh-CN/products/x')
++  it('localePath：忽略语言参数（前端不切换，URL 不承载语言）', () => {
++    expect(localePath('/cart', 'en-US')).toBe('/cart')
++    expect(localePath('/products/x', 'zh-CN')).toBe('/products/x')
+   })
+ 
+-  it('localePath：根路径 → 语言根', () => {
+-    expect(localePath('/', 'zh-CN')).toBe('/zh-CN')
+-    expect(localePath('', 'en-US')).toBe('/en-US')
+-  })
+-
+-  it('localePath：未知语言 → 回退默认 en-US（禁止 404/非法 hreflang）', () => {
+-    expect(localePath('/cart', 'xx-XX' as never)).toBe('/en-US/cart')
+-  })
+-
+-  it('detectLocale：识别前缀 / 无前缀返回 null', () => {
+-    expect(detectLocale('/zh-CN/cart')).toBe('zh-CN')
+-    expect(detectLocale('/en-US/products/x')).toBe('en-US')
++  it('detectLocale：单语站无 URL 前缀可检测 → 恒 null', () => {
++    expect(detectLocale('/zh-CN/cart')).toBeNull()
++    expect(detectLocale('/en-US/products/x')).toBeNull()
+     expect(detectLocale('/cart')).toBeNull()
+   })
+ 
+-  it('isRealLocale：仅 en-US / zh-CN 为真实版本', () => {
++  it('isRealLocale：仅 en-US / zh-CN 为后台可配置版本', () => {
+     expect(isRealLocale('en-US')).toBe(true)
+     expect(isRealLocale('zh-CN')).toBe(true)
+     expect(isRealLocale('fr-FR')).toBe(false)
+     expect(isRealLocale('xx')).toBe(false)
+   })
+ 
+-  it('translate：zh-CN 返回中文，缺键回退 en', () => {
++  it('translate：zh-CN 返回中文，缺键回退 en（字典保留，后台可切语言）', () => {
+     expect(translate('zh-CN', 'cart.title')).toBe('购物车')
+     expect(translate('en-US', 'cart.title')).toBe('Cart')
+     expect(translate('zh-CN', 'unknown.key')).toBe('unknown.key') // 回退键名
+   })
+ 
+-  it('locales 仅含真实版本（hreflang 不指向 404）', () => {
++  it('locales 保留后台可配置版本；defaultLocale en-US（英文站）', () => {
+     expect(locales).toEqual(['en-US', 'zh-CN'])
+     expect(defaultLocale).toBe('en-US')
+   })
