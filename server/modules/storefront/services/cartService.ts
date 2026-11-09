@@ -58,10 +58,20 @@ async function findCart(token: string): Promise<ShopCart | null> {
   return ShopCart.findOne({ where: { token, tenantId: tid() } })
 }
 
-/** 取购物车（按 token），不存在则按站点币种新建。customerId 仅在登录态传入。 */
+/**
+ * 取购物车：token 优先；token 缺失/无效时，登录顾客复用其既有车（按 id 升序取最早一条，
+ * 与 mergeCartOnLogin 口径一致），避免每次无 token 加购都新建一辆车导致商品分叉丢失；
+ * 游客则新建。customerId 仅在登录态传入。
+ */
 export async function getOrCreateCart(site: StorefrontSite, token?: string, customerId?: number, locale?: string): Promise<ShopCart> {
   let cart: ShopCart | null = null
   if (token) cart = await findCart(token)
+  if (!cart && customerId) {
+    cart = await ShopCart.findOne({
+      where: { tenantId: tid(), customerId },
+      order: [['id', 'ASC']],
+    })
+  }
   if (!cart) {
     cart = await ShopCart.create({
       tenantId: tid(),
