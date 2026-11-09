@@ -116,6 +116,10 @@ export const orderAttributionSchema = z.object({
   utmContent: z.string().max(200).optional(),
   landingPage: z.string().max(512).optional(),
   referrer: z.string().max(512).optional(),
+  /** P5-T07：使用的推荐码（随订单快照） */
+  referralCode: z.string().max(64).optional(),
+  /** P5-T07：推荐首次触点时间（归因窗口起点，ISO） */
+  referralTouchAt: z.string().datetime({ offset: true }).optional(),
 })
 
 export type OrderAttribution = z.infer<typeof orderAttributionSchema>
@@ -135,10 +139,11 @@ export const createOrderSchema = z
   })
   .passthrough()
 
-/** POST /payments/session —— 创建支付会话 */
+/** POST /payments/session —— 创建支付会话（可选指定 provider；P5-T03 区域支付/BNPL） */
 export const createPaymentSessionSchema = z
   .object({
     orderId: z.number().int().positive('orderId 必须为正整数'),
+    provider: z.string().min(1).max(32).optional(),
   })
   .passthrough()
 

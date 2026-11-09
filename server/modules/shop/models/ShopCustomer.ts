@@ -12,6 +12,7 @@ class ShopCustomer extends Model<InferAttributes<ShopCustomer>, InferCreationAtt
   declare passwordHash: string
   declare nickname: string | null
   declare status: CreationOptional<CustomerStatus>
+  declare referralCode: string | null
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -49,13 +50,21 @@ ShopCustomer.init(
       defaultValue: 'active',
       comment: 'active/blocked',
     },
+    referralCode: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+      comment: '推荐码（租户内唯一，创建时自动生成）',
+    },
     createdAt: { type: DataTypes.DATE, allowNull: false },
     updatedAt: { type: DataTypes.DATE, allowNull: false },
   },
   {
     sequelize,
     tableName: 'customers',
-    indexes: [{ unique: true, fields: ['tenantId', 'email'], name: 'uq_customers_tenant_email' }],
+    indexes: [
+      { unique: true, fields: ['tenantId', 'email'], name: 'uq_customers_tenant_email' },
+      { unique: true, fields: ['tenantId', 'referralCode'], name: 'uq_customers_tenant_referral_code' },
+    ],
   },
 )
 

@@ -32,6 +32,8 @@ import {
   updatePromotionSchema,
   createCouponSchema,
   updateCouponSchema,
+  createBundleSchema,
+  updateBundleSchema,
   analyticsQuerySchema,
   createRefundSchema,
   rmaRejectSchema,
@@ -197,6 +199,13 @@ router.get('/coupons/:id', authMiddleware, validate(idParamSchema, 'params'), ma
 router.post('/coupons', authMiddleware, validate(createCouponSchema), marketingController.createCoupon)
 router.put('/coupons/:id', authMiddleware, validate(idParamSchema, 'params'), validate(updateCouponSchema), marketingController.updateCoupon)
 router.delete('/coupons/:id', authMiddleware, validate(idParamSchema, 'params'), marketingController.deleteCoupon)
+
+// ==================== 阶段 5：Bundle / 搭配购 ====================
+router.get('/bundles', authMiddleware, validate(shopPaginationSchema, 'query'), marketingController.listBundles)
+router.get('/bundles/:id', authMiddleware, validate(idParamSchema, 'params'), marketingController.getBundle)
+router.post('/bundles', authMiddleware, validate(createBundleSchema), marketingController.createBundle)
+router.put('/bundles/:id', authMiddleware, validate(idParamSchema, 'params'), validate(updateBundleSchema), marketingController.updateBundle)
+router.delete('/bundles/:id', authMiddleware, validate(idParamSchema, 'params'), marketingController.deleteBundle)
 
 // ==================== 阶段 4：数据参谋 ====================
 router.get('/analytics/sales', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.sales)

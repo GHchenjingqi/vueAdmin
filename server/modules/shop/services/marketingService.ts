@@ -97,3 +97,56 @@ export async function deleteCoupon(id: number): Promise<void> {
   const row = await getCouponById(id)
   await row.destroy()
 }
+
+// ==================== Bundle / 搭配购 ====================
+
+import { ShopBundle } from '../models/index.js'
+import type { CreateBundleInput, UpdateBundleInput } from '../../../shared/schemas/shop.js'
+
+export async function listBundles(params: { page?: number; pageSize?: number; active?: boolean } = {}) {
+  const page = params.page ?? 1
+  const pageSize = params.pageSize ?? 20
+  const where: Record<string, unknown> = { tenantId: tid() }
+  if (typeof params.active === 'boolean') where.active = params.active
+  const { rows, count } = await ShopBundle.findAndCountAll({
+    where,
+    order: [['id', 'DESC']],
+    offset: (page - 1) * pageSize,
+    limit: pageSize,
+  })
+  return { list: rows, total: count, page, pageSize }
+}
+
+export async function getBundleById(id: number): Promise<ShopBundle> {
+  const row = await ShopBundle.findOne({ where: { id, tenantId: tid() } })
+  if (!row) throw new AppError(404, 'Bundle 不存在')
+  return row
+}
+
+export async function createBundle(input: CreateBundleInput): Promise<ShopBundle> {
+  return ShopBundle.create({ ...input, tenantId: tenantId() } as never)
+}
+
+export async function updateBundle(id: number, input: UpdateBundleInput): Promise<ShopBundle> {
+  const row = await getBundleById(id)
+  await row.update(input as never)
+  return row
+}
+
+export async function deleteBundle(id: number): Promise<void> {
+  const row = await getBundleById(id)
+  await row.destroy()
+}
+
+/** 生效期内启用中的 Bundle（可按推荐位过滤） */
+export async function activeBundles(placement?: string): Promise<ShopBundle[]> {
+  const today = new Date().toISOString().slice(0, 10)
+  const where: Record<string, unknown> = {
+    tenantId: tid(),
+    active: true,
+    startAt: { [Op.lte]: today },
+    endAt: { [Op.gte]: today },
+  }
+  if (placement) where.placement = placement
+  return ShopBundle.findAll({ where, order: [['id', 'DESC']] })
+}

@@ -53,6 +53,8 @@ class ShopOrder extends Model<InferAttributes<ShopOrder>, InferCreationAttribute
   declare utmContent: string | null
   declare landingPage: string | null
   declare referrer: string | null
+  declare referralCode: string | null
+  declare referralTouchAt: Date | null
 
   declare readonly createdAt: CreationOptional<Date>
   declare readonly updatedAt: CreationOptional<Date>
@@ -108,6 +110,8 @@ ShopOrder.init(
     utmContent: { type: DataTypes.STRING(200), allowNull: true, comment: 'UTM content' },
     landingPage: { type: DataTypes.STRING(512), allowNull: true, comment: '首次落地页' },
     referrer: { type: DataTypes.STRING(512), allowNull: true, comment: '来源 referrer' },
+    referralCode: { type: DataTypes.STRING(64), allowNull: true, comment: '建单快照：使用的推荐码' },
+    referralTouchAt: { type: DataTypes.DATE, allowNull: true, comment: '建单快照：推荐首次触点时间' },
 
     createdAt: { type: DataTypes.DATE, allowNull: false },
     updatedAt: { type: DataTypes.DATE, allowNull: false },

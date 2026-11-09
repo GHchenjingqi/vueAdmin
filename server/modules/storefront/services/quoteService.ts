@@ -2,9 +2,12 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopSku, ShopSpu, ShopProductPrice } from '../../shop/models/index.js'
 import * as inventoryService from '../../shop/services/inventoryService.js'
+import { getDeliveryCommitment, type DeliveryCommitment } from '../../shop/services/warehouseRoutingService.js'
+import { evaluateBundle, allocateBundleDiscount } from './bundleService.js'
 import { resolveShipping } from './shippingService.js'
 import { evaluateCoupon } from './couponService.js'
 import { resolveTax } from './taxService.js'
+import { extractCountry } from './shippingService.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
 /**
@@ -32,6 +35,11 @@ export interface QuoteLine {
   qty: number
   lineTotalCents: number
   available: number
+  /** P5-T04：按仓配送承诺（该 SKU 路由后的主仓） */
+  deliveryCommitment: DeliveryCommitment | null
+  /** P5-T05：命中 Bundle 时标记（组件行分摊后价格已含优惠） */
+  bundleId?: number | null
+  bundleName?: Record<string, string> | null
 }
 
 export interface QuoteResult {
@@ -46,6 +54,12 @@ export interface QuoteResult {
   /** T-07：服务端校验通过的券码 / 券 ID（供建单占用，未用券为 null） */
   couponCode: string | null
   couponId: number | null
+  /** P5-T04：按仓配送承诺（路由后的主仓；无库存记录为 null） */
+  deliveryCommitment: DeliveryCommitment | null
+  /** P5-T05：命中 Bundle 的优惠金额（分，未命中为 0） */
+  bundleDiscountCents: number
+  /** P5-T05：命中的 Bundle 摘要 */
+  bundle: { id: number; name: Record<string, string> } | null
   amountCents: number
   version: number
   expiresAt: string
@@ -100,6 +114,7 @@ export async function createQuote(
   const { currency, lines } = await resolveQuoteLines(site, input)
   const tId = tid()
   const quoteLines: QuoteLine[] = []
+  const destCountry = extractCountry(input.shippingAddress)
 
   let subtotalCents = 0
   for (const line of lines) {
@@ -117,6 +132,9 @@ export async function createQuote(
     const available = await inventoryService.available(sku.id)
     if (available < line.qty) throw new AppError(400, `SKU ${line.skuId} 库存不足（可用 ${available}，需 ${line.qty}）`)
 
+    // P5-T04：按仓配送承诺（路由后的主仓，按目的国区域/优先级/可用量）
+    const deliveryCommitment = await getDeliveryCommitment(sku.id, destCountry)
+
     const lineTotalCents = unitAmountCents * line.qty
     subtotalCents += lineTotalCents
     quoteLines.push({
@@ -128,7 +146,29 @@ export async function createQuote(
       qty: line.qty,
       lineTotalCents,
       available,
+      deliveryCommitment,
     })
+  }
+
+  // P5-T05：Bundle / 搭配购 —— 服务端匹配并按组件小计打折（命中后行级分摊，库存仍按组件 SKU 扣减）
+  const bundleEval = await evaluateBundle(lines, currency)
+  let bundleDiscountCents = 0
+  let bundleInfo: { id: number; name: Record<string, string> } | null = null
+  if (bundleEval) {
+    bundleDiscountCents = bundleEval.discountCents
+    bundleInfo = { id: bundleEval.bundleId, name: bundleEval.bundleName }
+    const alloc = allocateBundleDiscount(bundleEval, quoteLines)
+    for (const line of quoteLines) {
+      const share = alloc.get(line.skuId) ?? 0
+      if (share > 0) {
+        // 组件行：把分摊到的优惠折入单价（保留分整数，行金额随之下降）
+        line.unitAmountCents = Math.max(0, line.unitAmountCents - Math.round(share / line.qty))
+        line.lineTotalCents = line.unitAmountCents * line.qty
+        line.bundleId = bundleEval.bundleId
+        line.bundleName = bundleEval.bundleName
+      }
+    }
+    subtotalCents = quoteLines.reduce((s, l) => s + l.lineTotalCents, 0)
   }
 
   // 运费：地址驱动的白名单校验 + 分区计费（服务端重算，忽略前端传入运费）
@@ -148,8 +188,18 @@ export async function createQuote(
 
   // T-07：券码由服务端校验并重算折扣，前端传入的任何折扣金额一律忽略
   const coupon = await evaluateCoupon(input.couponCode, { currency, subtotalCents })
-  const discountCents = coupon?.discountCents ?? 0
-  const amountCents = subtotalCents + shippingCents + taxCents - discountCents
+  const couponDiscountCents = coupon?.discountCents ?? 0
+  const discountCents = bundleDiscountCents + couponDiscountCents
+  const amountCents = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents)
+
+  // P5-T04：订单级配送承诺 = 各 SKU 主仓承诺的最大值（取最不利/最长），无库存记录为 null
+  const commitments = quoteLines
+    .map((l) => l.deliveryCommitment)
+    .filter((c): c is DeliveryCommitment => !!c)
+  const orderCommitment: DeliveryCommitment | null =
+    commitments.length === 0
+      ? null
+      : commitments.reduce((a, b) => (b.deliveryEstimateDays > a.deliveryEstimateDays ? b : a))
 
   return {
     currency,
@@ -161,6 +211,9 @@ export async function createQuote(
     discountCents,
     couponCode: coupon?.couponCode ?? null,
     couponId: coupon?.couponId ?? null,
+    deliveryCommitment: orderCommitment,
+    bundleDiscountCents,
+    bundle: bundleInfo,
     amountCents,
     version: Date.now(),
     expiresAt: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),

@@ -58,7 +58,7 @@ async function findCart(token: string): Promise<ShopCart | null> {
 }
 
 /** 取购物车（按 token），不存在则按站点币种新建。customerId 仅在登录态传入。 */
-export async function getOrCreateCart(site: StorefrontSite, token?: string, customerId?: number): Promise<ShopCart> {
+export async function getOrCreateCart(site: StorefrontSite, token?: string, customerId?: number, locale?: string): Promise<ShopCart> {
   let cart: ShopCart | null = null
   if (token) cart = await findCart(token)
   if (!cart) {
@@ -67,7 +67,11 @@ export async function getOrCreateCart(site: StorefrontSite, token?: string, cust
       token: genCartToken(),
       customerId: customerId ?? null,
       currency: site.defaultCurrency,
+      locale: locale ?? null,
     } as never)
+  } else if (locale) {
+    // 语言快照随访问刷新（与币种互不推导，不参与报价）
+    await cart.update({ locale } as never)
   }
   return cart
 }
@@ -78,8 +82,9 @@ export async function addItem(
   token: string | undefined,
   input: { skuId: number; qty: number },
   customerId?: number,
+  locale?: string,
 ): Promise<ShopCart> {
-  const cart = await getOrCreateCart(site, token, customerId)
+  const cart = await getOrCreateCart(site, token, customerId, locale)
   const tId = tid()
 
   const sku = await ShopSku.findOne({ where: { id: input.skuId, tenantId: tId } })
@@ -112,20 +117,22 @@ export async function addItem(
 }
 
 /** 改数量（须属于该购物车） */
-export async function updateItemQty(site: StorefrontSite, token: string, itemId: number, qty: number): Promise<ShopCart> {
+export async function updateItemQty(site: StorefrontSite, token: string, itemId: number, qty: number, locale?: string): Promise<ShopCart> {
   const cart = await requireCart(token)
   const item = await ShopCartItem.findOne({ where: { id: itemId, cartId: cart.id, tenantId: tid() } })
   if (!item) throw new AppError(404, '购物车明细不存在')
+  if (locale && cart.locale !== locale) await cart.update({ locale } as never)
   void site
   await item.update({ qty } as never)
   return cart
 }
 
 /** 删除明细（须属于该购物车） */
-export async function removeItem(token: string, itemId: number): Promise<ShopCart> {
+export async function removeItem(token: string, itemId: number, locale?: string): Promise<ShopCart> {
   const cart = await requireCart(token)
   const item = await ShopCartItem.findOne({ where: { id: itemId, cartId: cart.id, tenantId: tid() } })
   if (!item) throw new AppError(404, '购物车明细不存在')
+  if (locale && cart.locale !== locale) await cart.update({ locale } as never)
   await item.destroy()
   return cart
 }
@@ -156,6 +163,7 @@ export interface CartItemView {
 export interface CartView {
   token: string
   currency: string
+  locale: string | null
   items: CartItemView[]
 }
 
@@ -176,7 +184,7 @@ export async function toCartView(cart: ShopCart): Promise<CartView> {
       available,
     })
   }
-  return { token: cart.token, currency: cart.currency, items: views }
+  return { token: cart.token, currency: cart.currency, locale: cart.locale, items: views }
 }
 
 /**
@@ -207,7 +215,7 @@ export async function mergeCartOnLogin(
       })
       if (!customerCart) {
         customerCart = await ShopCart.create(
-          { tenantId: tId, token: genCartToken(), customerId, currency: site.defaultCurrency } as never,
+          { tenantId: tId, token: genCartToken(), customerId, currency: site.defaultCurrency, locale: site.defaultLocale } as never,
           { transaction: tx },
         )
       }

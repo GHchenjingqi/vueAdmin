@@ -1,9 +1,9 @@
 import { Op } from 'sequelize'
-import { AppError } from '../../../middleware/errorHandler.js'
 import sequelize from '../../../config/database.js'
-import { ShopInventory, ShopInventoryReservation } from '../models/index.js'
+import { ShopInventoryReservation } from '../models/index.js'
 import { getTenantContext } from '../../tenant/context.js'
 import * as inventoryService from './inventoryService.js'
+import * as warehouseRouting from './warehouseRoutingService.js'
 import config from '../../../config/index.js'
 
 /**
@@ -28,12 +28,8 @@ export function reservationTtlMs(): number {
 }
 
 /** 为某 SKU 选取「可用量最大」的仓库作为预占代表仓库（库存跨仓分布记录在 inventory.locked） */
-export async function pickWarehouse(skuId: number): Promise<number> {
-  const tId = tid()
-  const rows = await ShopInventory.findAll({ where: { skuId, tenantId: tId } })
-  if (rows.length === 0) throw new AppError(400, `SKU ${skuId} 无库存记录`)
-  rows.sort((a, b) => b.quantity - b.locked - (a.quantity - a.locked))
-  return rows[0].warehouseId
+export async function pickWarehouse(skuId: number, country?: string | null): Promise<number> {
+  return warehouseRouting.pickWarehouse(skuId, country)
 }
 
 /**

@@ -6,7 +6,7 @@
  * 建单（幂等 + 库存预占 + 快照 + 访问凭证）、支付会话、Webhook（验签 / 成功改单 / 去重 / 错误签名）。
  * 依赖已迁移的测试库与租户上下文（runInTenant）。
  */
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { runInTenant } from '../modules/tenant/context.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { ShopChannel, ShopShop, ShopInventoryReservation } from '../modules/shop/models/index.js'
@@ -22,6 +22,8 @@ import * as cartService from '../modules/storefront/services/cartService.js'
 import * as quoteService from '../modules/storefront/services/quoteService.js'
 import * as checkoutService from '../modules/storefront/services/checkoutService.js'
 import * as paymentService from '../modules/storefront/services/paymentService.js'
+import { setFlag, resetFlagsCache, isFeatureEnabled } from '../modules/featureflags/featureFlags.js'
+import { listProviders, isProviderUsable, publicProvider } from '../modules/storefront/payments/providerRegistry.js'
 
 const TID = 1
 function uniq(): string {
@@ -227,5 +229,98 @@ describe('阶段5-步骤4：支付会话 + Webhook', () => {
       expect(result.ok).toBe(false)
       expect(result.status).toBe(401)
     })
+  })
+})
+
+describe('P5-T01 购物车语言快照（语言与币种互不推导）', () => {
+  it('addItem 记录 locale，且 currency 不受语言影响（zh-CN 加购仍 USD）', async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const cart = await cartService.addItem(siteUSD, undefined, { skuId, qty: 1 }, undefined, 'zh-CN')
+      expect(cart.locale).toBe('zh-CN')
+      expect(cart.currency).toBe('USD')
+      const view = await cartService.toCartView(cart)
+      expect(view.locale).toBe('zh-CN')
+      expect(view.currency).toBe('USD')
+      expect(view.items).toHaveLength(1)
+    })
+  })
+
+  it('切换语言只更新 locale，购物车内容不丢（同 token 续用）', async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const first = await cartService.addItem(siteUSD, undefined, { skuId, qty: 2 }, undefined, 'zh-CN')
+      const token = first.token
+      // 用户切到 en-US 后再次访问（GET / 加购路径），语言快照刷新、币种与行不变
+      const refreshed = await cartService.getOrCreateCart(siteUSD, token, undefined, 'en-US')
+      expect(refreshed.locale).toBe('en-US')
+      expect(refreshed.currency).toBe('USD')
+      const view = await cartService.toCartView(refreshed)
+      expect(view.items).toHaveLength(1)
+      expect(view.items[0].qty).toBe(2)
+    })
+  })
+})
+
+describe('P5-T03 区域支付方式与 BNPL（Provider 注册表 + flag 门控）', () => {
+  let oid = 0
+  let ono = ''
+
+  beforeAll(async () => {
+    await runInTenant({ tenantId: TID }, async () => {
+      const cart = await cartService.addItem(siteUSD, undefined, { skuId, qty: 1 })
+      const order = await checkoutService.createOrder(siteUSD, {
+        cartToken: cart.token,
+        email: 'bnpl@example.com',
+        idempotencyKey: `bnpl-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      })
+      oid = order.id
+      ono = order.orderNo
+    })
+  })
+
+  afterAll(async () => {
+    // 收尾：setFlag 持久写入 Setting 表，必须重置回默认，避免污染后续 featureFlags 测试
+    await runInTenant({ tenantId: TID }, async () => {
+      await setFlag('bnpl', false, { id: null, name: 'test' }).catch(() => {})
+    })
+    resetFlagsCache()
+  })
+
+  it('默认关闭：listProviders 不含 bnpl、请求 bnpl 建会话 422 且无副作用', async () => {
+    resetFlagsCache()
+    await runInTenant({ tenantId: TID }, async () => {
+      await setFlag('bnpl', false, { id: null, name: 'test' }).catch(() => {})
+      resetFlagsCache()
+      expect(await isFeatureEnabled('bnpl')).toBe(false)
+      const provs = await listProviders('USD')
+      expect(provs.map((p) => p.id)).toContain('mock')
+      expect(provs.map((p) => p.id)).not.toContain('bnpl')
+      await expect(paymentService.createSession(siteUSD, oid, 'bnpl')).rejects.toMatchObject({ statusCode: 422 })
+    })
+    resetFlagsCache()
+  })
+
+  it('开启后：listProviders 含 bnpl、币种能力校验（USD 支持 / CNY 拒绝）、建会话成功且公开投影不泄漏内部字段', async () => {
+    resetFlagsCache()
+    await runInTenant({ tenantId: TID }, async () => {
+      await setFlag('bnpl', true, { id: null, name: 'test' })
+      resetFlagsCache()
+      expect(await isFeatureEnabled('bnpl')).toBe(true)
+      const provs = await listProviders('USD')
+      const def = provs.find((p) => p.id === 'bnpl')
+      expect(def).toBeTruthy()
+      expect(await isProviderUsable(def as never, 'USD')).toBe(true)
+      expect(await isProviderUsable(def as never, 'CNY')).toBe(false)
+
+      const session = await paymentService.createSession(siteUSD, oid, 'bnpl')
+      expect(session.provider).toBe('bnpl')
+      expect(session.orderNo).toBe(ono)
+
+      const pub = publicProvider(def as never)
+      expect(pub).not.toHaveProperty('flag')
+      expect(pub).not.toHaveProperty('webhookSecret')
+      expect(pub.kind).toBe('bnpl')
+      expect(pub.supportedCurrencies).toContain('USD')
+    })
+    resetFlagsCache()
   })
 })

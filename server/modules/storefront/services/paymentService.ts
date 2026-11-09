@@ -8,6 +8,7 @@ import { tryEnqueue } from '../../shop/services/orderMailService.js'
 import { assertShippableCountry, extractCountry } from './shippingService.js'
 import { getCounter, incCounter, setGauge } from './monitoringService.js'
 import * as auditLogService from '../../shop/services/auditLogService.js'
+import { getProvider, defaultProvider, isProviderUsable } from '../payments/providerRegistry.js'
 import config from '../../../config/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
@@ -32,8 +33,12 @@ export interface PaymentSession {
   status: string
 }
 
-/** 创建支付会话：金额与币种取自订单快照 */
-export async function createSession(site: StorefrontSite, orderId: number): Promise<PaymentSession> {
+/** 创建支付会话：金额与币种取自订单快照；provider 可选（缺省用默认，P5-T03 区域支付/BNPL） */
+export async function createSession(
+  site: StorefrontSite,
+  orderId: number,
+  requestedProvider?: string,
+): Promise<PaymentSession> {
   void site
   const tId = tid()
   const order = await ShopOrder.findOne({ where: { id: orderId, tenantId: tId } })
@@ -44,7 +49,16 @@ export async function createSession(site: StorefrontSite, orderId: number): Prom
   const country = extractCountry(order.shippingAddress)
   if (country) await assertShippableCountry(country)
 
-  const provider = config.payment?.provider ?? 'mock'
+  // P5-T03：Provider 前置能力校验（存在 + flag 开启 + 订单币种支持），任一不满足即 422 拒绝且无副作用
+  const providerDef = requestedProvider
+    ? getProvider(requestedProvider)
+    : (getProvider(config.payment?.provider) ?? defaultProvider())
+  if (!providerDef) throw new AppError(422, '支付方式不可用')
+  if (!(await isProviderUsable(providerDef, order.currency))) {
+    throw new AppError(422, `支付方式 ${providerDef.id} 不可用（未启用或不支持 ${order.currency}）`)
+  }
+
+  const provider = providerDef.id
   const providerRef = `pay_${order.orderNo}_${crypto.randomBytes(8).toString('hex')}`
   const sessionId = `sess_${crypto.randomBytes(12).toString('hex')}`
 

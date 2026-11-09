@@ -20,9 +20,11 @@ import rmaRouter from './rma.js'
 import trackingRouter from './tracking.js'
 import analyticsRouter from './analytics.js'
 import addressRouter from './address.js'
+import referralRouter from './referral.js'
 import monitoringRouter from './monitoring.js'
 import * as flagsController from '../../featureflags/flagsController.js'
 import { publicRouter as experimentsPublicRouter } from '../../experiments/routes.js'
+import * as recommendationController from '../controllers/recommendationController.js'
 
 /**
  * Storefront 公开接口路由
@@ -56,8 +58,10 @@ router.use('/rma', rmaRouter)
 router.use('/', trackingRouter)
 router.use('/', analyticsRouter)
 router.use('/addresses', addressRouter)
+router.use('/referrals', referralRouter)
 router.use('/monitoring', monitoringRouter)
 router.get('/flags/:key', flagsController.publicCheck)
 router.use('/experiments', experimentsPublicRouter)
+router.get('/recommendations', recommendationController.recommendations)
 
 export default router

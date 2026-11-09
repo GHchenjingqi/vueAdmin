@@ -312,6 +312,32 @@ export type CreateCouponInput = z.infer<typeof createCouponSchema>
 export const updateCouponSchema = createCouponSchema.partial()
 export type UpdateCouponInput = z.infer<typeof updateCouponSchema>
 
+// ============================================================================
+// 阶段 5：Bundle / 搭配购（P5-T05）
+// ============================================================================
+
+export const bundleComponentSchema = z.object({
+  skuId: z.number().int().min(1),
+  qty: z.number().int().min(1),
+})
+export type BundleComponentInput = z.infer<typeof bundleComponentSchema>
+
+export const createBundleSchema = z.object({
+  name: i18nTextSchema,
+  currency: z.string().length(3).default('USD'),
+  components: z.array(bundleComponentSchema).min(1, '至少包含一个组件 SKU'),
+  discountType: z.enum(['fixed', 'percent']),
+  discountValue: z.number().min(0).max(9999999999.99),
+  active: z.boolean().optional().default(true),
+  startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  placement: z.string().max(50).nullable().optional(),
+})
+export type CreateBundleInput = z.infer<typeof createBundleSchema>
+
+export const updateBundleSchema = createBundleSchema.partial()
+export type UpdateBundleInput = z.infer<typeof updateBundleSchema>
+
 export const analyticsQuerySchema = z.object({
   startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

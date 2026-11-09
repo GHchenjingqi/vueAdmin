@@ -17,8 +17,10 @@ const TID = 1
 beforeEach(async () => {
   resetFlagsCache()
   await runInTenant({ tenantId: TID }, async () => {
-    await setFlag('referral', false, { id: null, name: 'test' }).catch(() => {})
-    await setFlag('blog', false, { id: null, name: 'test' }).catch(() => {})
+    // 重置本文件断言的全部 flag 为 false（并行 worker 下其他文件可能持久写过），保证「默认关闭」断言确定性
+    for (const k of ['referral', 'bundle', 'ab_test', 'multi_warehouse', 'blog', 'bnpl']) {
+      await setFlag(k, false, { id: null, name: 'test' }).catch(() => {})
+    }
   })
   resetFlagsCache()
 })
@@ -33,6 +35,7 @@ describe('X-T04 Feature Flag', () => {
       expect(await isFeatureEnabled('ab_test')).toBe(false)
       expect(await isFeatureEnabled('multi_warehouse')).toBe(false)
       expect(await isFeatureEnabled('blog')).toBe(false)
+      expect(await isFeatureEnabled('bnpl')).toBe(false)
     })
   })
 

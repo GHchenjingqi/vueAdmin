@@ -29,6 +29,7 @@ export const FLAG_DEFS: FlagDef[] = [
   { key: 'ab_test', description: 'A/B 测试与个性化（P5-T08）', defaultEnabled: false },
   { key: 'multi_warehouse', description: '多仓与精细配送策略（P5-T04）', defaultEnabled: false },
   { key: 'blog', description: '博客 CMS 与内容 SEO（P5-T06）', defaultEnabled: false },
+  { key: 'bnpl', description: '区域 BNPL 支付方式（P5-T03）', defaultEnabled: false },
 ]
 
 const FLAG_SETTING_KEY = 'feature.flags'

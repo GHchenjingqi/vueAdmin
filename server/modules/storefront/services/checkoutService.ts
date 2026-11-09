@@ -6,6 +6,8 @@ import { ShopOrder, ShopOrderItem } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
 import { createQuote, type QuoteResult } from './quoteService.js'
 import { redeemCoupon, releaseCoupon, type CouponEvaluation } from './couponService.js'
+import * as referralService from './referralService.js'
+import { extractCountry } from './shippingService.js'
 import type { OrderAttribution } from '../../../shared/schemas/storefront.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
@@ -143,10 +145,11 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
       : null
   if (coupon) await redeemCoupon(coupon, orderNo)
 
-  // 4) 库存预占（失败需同时释放预占与券占用）
+  // 4) 库存预占（失败需同时释放预占与券占用）；P5-T04 按目的国做仓库路由
+  const destCountry = extractCountry(params.shippingAddress)
   const reserveInputs = []
   for (const line of quote.items) {
-    const warehouseId = await reservationService.pickWarehouse(line.skuId)
+    const warehouseId = await reservationService.pickWarehouse(line.skuId, destCountry)
     reserveInputs.push({ skuId: line.skuId, warehouseId, qty: line.qty })
   }
   let reservations: Awaited<ReturnType<typeof reservationService.reserveItems>> = []
@@ -186,6 +189,11 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
       taxRate: Number(process.env.STORE_TAX_RATE ?? 0),
       shippingCents: quote.shippingCents,
       generatedAt: new Date().toISOString(),
+      // P5-T04：按仓配送承诺（路由后的主仓，随单固化）
+      deliveryCommitment: quote.deliveryCommitment,
+      // P5-T05：命中的 Bundle（组件 SKU 组合 + 优惠），订单明细仍按组件 SKU 记（库存按组件扣减）
+      bundle: quote.bundle,
+      bundleDiscountCents: quote.bundleDiscountCents,
     } as Record<string, unknown>,
     // 阶段 5 步骤 6：订单来源归因（site / utm），随订单固化，后台报表据此出渠道 ROI
     sourceSiteId: site.shopId ?? null,
@@ -196,6 +204,9 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
     utmContent: params.attribution?.utmContent ?? null,
     landingPage: params.attribution?.landingPage ?? null,
     referrer: params.attribution?.referrer ?? null,
+    // P5-T07：推荐归因快照（码 + 首次触点，窗口起点）
+    referralCode: params.attribution?.referralCode ?? null,
+    referralTouchAt: params.attribution?.referralTouchAt ? new Date(params.attribution.referralTouchAt) : null,
     tenantId: tId,
   } as never)
 
@@ -212,6 +223,21 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
       lineTotalCents: line.lineTotalCents,
       currency: quote.currency,
     } as never)
+  }
+
+  // P5-T07：推荐佣金（flag 门控 fail-closed；基数=订单净额已扣优惠；币种=订单币种；窗口失效 void）
+  if (params.attribution?.referralCode) {
+    const referrer = await referralService.resolveReferrer(params.attribution.referralCode)
+    if (referrer && referrer.id !== params.customerId) {
+      await referralService.recordCommission({
+        orderId: order.id,
+        referrerCustomerId: referrer.id,
+        code: params.attribution.referralCode,
+        orderCurrency: quote.currency,
+        orderNetCents: quote.amountCents,
+        referralTouchAt: params.attribution.referralTouchAt ?? null,
+      })
+    }
   }
 
   return toOrderView(order, true)

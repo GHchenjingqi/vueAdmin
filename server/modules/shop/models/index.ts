@@ -28,6 +28,7 @@ export { default as ShopOrderShipment } from './ShopOrderShipment.js'
 // 阶段 4：营销中心 / 数据参谋
 export { default as ShopPromotion } from './ShopPromotion.js'
 export { default as ShopCoupon } from './ShopCoupon.js'
+export { default as ShopBundle } from './ShopBundle.js'
 
 // 阶段 5 步骤 3：C 端顾客（与 admin users 隔离，独立 JWT）
 export { default as ShopCustomer } from './ShopCustomer.js'
@@ -69,6 +70,7 @@ export { default as ShopTaxRate } from './ShopTaxRate.js'
 
 // P3-T17 订单邮件 outbox（确认 / 发货 / 退款）
 export { default as ShopOrderEmail } from './ShopOrderEmail.js'
+export { default as ShopReferralCommission } from './ShopReferralCommission.js'
 
 // X-T03 审计日志（订单/支付/库存/退款状态变更留痕；币种配置审计在 config_changes）
 export { default as AuditLog } from './AuditLog.js'

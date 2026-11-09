@@ -10,6 +10,7 @@ import * as paymentController from '../controllers/paymentController.js'
  */
 const router = Router()
 
+router.get('/providers', paymentController.listPaymentProviders)
 router.post('/session', validate(createPaymentSessionSchema, 'body'), paymentController.createSession)
 router.post('/webhooks/:provider', express.raw({ type: 'application/json', limit: '1mb' }), paymentController.webhook)
 

@@ -12,6 +12,12 @@ function extractCartToken(req: Request): string | undefined {
   return fromCookie && fromCookie.length <= 64 ? fromCookie : undefined
 }
 
+/** P5-T01：从 x-store-locale 头提取当前语言（与币种互不推导；仅接受真实版本，其余回退 undefined） */
+function extractLocale(req: Request): string | undefined {
+  const v = req.header('x-store-locale')
+  return v === 'en-US' || v === 'zh-CN' ? v : undefined
+}
+
 /** 将购物车 token 写回（Set-Cookie + 响应体），便于游客后续携带 */
 function issueToken(res: Response, token: string): void {
   res.cookie('cart_token', token, {
@@ -24,8 +30,9 @@ function issueToken(res: Response, token: string): void {
 export const getCart = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = extractCartToken(req)
+    const locale = extractLocale(req)
     const cart = token ? await cartService.getCart(token) : null
-    const view = cart ? await cartService.toCartView(cart) : { token: null, currency: getSite(res).defaultCurrency, items: [] }
+    const view = cart ? await cartService.toCartView(cart) : { token: null, currency: getSite(res).defaultCurrency, locale, items: [] }
     res.json({ code: 0, data: view })
   } catch (err) {
     next(err)
@@ -41,7 +48,8 @@ export const addItem = async (req: Request, res: Response, next: NextFunction) =
     }
     const token = extractCartToken(req)
     const customerId = req.customer?.customerId
-    const cart = await cartService.addItem(site, token, { skuId: body.skuId, qty: body.qty }, customerId)
+    const locale = extractLocale(req)
+    const cart = await cartService.addItem(site, token, { skuId: body.skuId, qty: body.qty }, customerId, locale)
     issueToken(res, cart.token)
     const view = await cartService.toCartView(cart)
     res.json({ code: 0, data: view })
@@ -56,7 +64,7 @@ export const updateItem = async (req: Request, res: Response, next: NextFunction
     const body = req.body as CartUpdateInput
     const token = extractCartToken(req)
     if (!Number.isInteger(body.qty) || body.qty < 1) throw new AppError(400, 'qty 不合法')
-    const cart = await cartService.updateItemQty(site, token as string, Number(req.params.id), body.qty)
+    const cart = await cartService.updateItemQty(site, token as string, Number(req.params.id), body.qty, extractLocale(req))
     const view = await cartService.toCartView(cart)
     res.json({ code: 0, data: view })
   } catch (err) {
@@ -67,7 +75,7 @@ export const updateItem = async (req: Request, res: Response, next: NextFunction
 export const removeItem = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = extractCartToken(req)
-    const cart = await cartService.removeItem(token as string, Number(req.params.id))
+    const cart = await cartService.removeItem(token as string, Number(req.params.id), extractLocale(req))
     const view = await cartService.toCartView(cart)
     res.json({ code: 0, data: view })
   } catch (err) {

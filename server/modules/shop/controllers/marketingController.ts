@@ -92,3 +92,49 @@ export const deleteCoupon = async (req: Request, res: Response, next: NextFuncti
     next(err)
   }
 }
+
+// ==================== Bundle / 搭配购 ====================
+
+export const listBundles = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = req.query.page ? queryInt(req.query.page) : undefined
+    const pageSize = req.query.pageSize ? queryInt(req.query.pageSize) : undefined
+    const active = req.query.active === 'true' ? true : req.query.active === 'false' ? false : undefined
+    res.json({ code: 0, data: await marketingService.listBundles({ page, pageSize, active }) })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getBundle = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ code: 0, data: await marketingService.getBundleById(Number(req.params.id)) })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const createBundle = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ code: 0, data: await marketingService.createBundle(req.body) })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const updateBundle = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ code: 0, data: await marketingService.updateBundle(Number(req.params.id), req.body) })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const deleteBundle = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await marketingService.deleteBundle(Number(req.params.id))
+    res.json({ code: 0, data: null })
+  } catch (err) {
+    next(err)
+  }
+}

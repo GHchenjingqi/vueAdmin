@@ -3,6 +3,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { getSite } from '../middleware/siteContext.js'
 import * as paymentService from '../services/paymentService.js'
 import * as monitoring from '../services/monitoringService.js'
+import { listProviders, publicProvider } from '../payments/providerRegistry.js'
 import type { CreatePaymentSessionInput } from '../../../shared/schemas/storefront.js'
 
 export const createSession = async (req: Request, res: Response, next: NextFunction) => {
@@ -10,7 +11,21 @@ export const createSession = async (req: Request, res: Response, next: NextFunct
     const site = getSite(res)
     const body = req.body as CreatePaymentSessionInput
     if (!Number.isInteger(body.orderId)) throw new AppError(400, 'orderId 不合法')
-    const data = await paymentService.createSession(site, body.orderId)
+    const data = await paymentService.createSession(site, body.orderId, body.provider)
+    res.json({ code: 0, data })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * P5-T03：列出当前可用支付方式（flag 开启 + 可选币种能力过滤），
+ * 供结算页渲染支付方式列表（BNPL 在 flag 开启后才出现）。公开安全投影，不泄漏内部字段。
+ */
+export const listPaymentProviders = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const currency = typeof req.query.currency === 'string' ? req.query.currency : undefined
+    const data = (await listProviders(currency)).map(publicProvider)
     res.json({ code: 0, data })
   } catch (err) {
     next(err)
