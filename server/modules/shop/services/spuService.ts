@@ -138,9 +138,7 @@ export async function submitForPublish(spuId: number, opts: SubmitPublishOptions
   // 合规卡点（跨境红线）：每个 SKU 须齐备 hs_code / origin_country / declared_value
   const compliance = await checkSpuCompliance(spuId, opts.requiredQualifications)
   if (!compliance.ok) {
-    const detail = compliance.missing
-      .map((m) => `SKU[${m.skuCode}] 缺失: ${m.fields.join('、')}`)
-      .join('; ')
+    const detail = compliance.missing.map((m) => `SKU[${m.skuCode}] 缺失: ${m.fields.join('、')}`).join('; ')
     throw new AppError(400, `合规校验未通过: ${detail}`)
   }
 
@@ -187,6 +185,11 @@ export async function submitForPublish(spuId: number, opts: SubmitPublishOptions
  * 工作流审批结果回调：审批流结束后由引擎回调 shop/workflow-callback 触发。
  * approved → SPU 置为 published（SKU 跟随）；rejected → rejected。
  * 若提交时已选择渠道，则审批通过后同步发布到渠道（channel_products）。
+ *
+ * 幂等与状态校验：以 SPU 状态 CAS（review → 目标态）作为唯一认领闸门。
+ * 引擎重试 / 回调重放时重复结果直接返回（不重放 SKU 跟随与渠道推送），
+ * 不一致结果 409 拒绝，避免 approved 后被 rejected 回调把已发布商品打回、
+ * SKU 状态与 SPU 分裂，或对非待审商品强行改写状态。
  */
 export async function applyWorkflowResult(instanceId: number, finalStatus: 'approved' | 'rejected', reason?: string): Promise<ShopSpu> {
   const instance = await WorkflowInstance.findByPk(instanceId)
@@ -194,20 +197,22 @@ export async function applyWorkflowResult(instanceId: number, finalStatus: 'appr
     throw new AppError(400, '无效的工作流实例')
   }
   const input = (instance.input ? JSON.parse(instance.input) : {}) as { spuId: number; channelId?: number; shopId?: number; listToChannel?: boolean }
-  const spu = await getSpuById(input.spuId)
+  await getSpuById(input.spuId)
 
-  if (finalStatus === 'rejected') {
-    await spu.update({ status: 'rejected' })
-    return spu
+  const target: SpuStatus = finalStatus === 'rejected' ? 'rejected' : 'published'
+  const [affected] = await ShopSpu.update({ status: target }, { where: { id: input.spuId, tenantId: tid(), status: 'review' } } as never)
+  if (affected === 0) {
+    const current = await getSpuById(input.spuId)
+    if (current.status === target) return current
+    throw new AppError(409, `WORKFLOW_RESULT_CONFLICT: 商品当前状态 ${current.status} 不接受审批结果 ${target}`)
   }
 
-  // 审批通过：发布（SKU 跟随流转）
-  await spu.update({ status: 'published' })
-  await skuService.followSpuStatus(input.spuId, 'published')
-
-  // 审批通过后按提交时选择的渠道发布
-  if (input.listToChannel && input.channelId && input.shopId) {
-    await channelProductService.publishToChannel(input.spuId, input.channelId, input.shopId).catch(() => null)
+  // 只有 CAS 胜出者执行不可逆副作用
+  if (finalStatus === 'approved') {
+    await skuService.followSpuStatus(input.spuId, 'published')
+    if (input.listToChannel && input.channelId && input.shopId) {
+      await channelProductService.publishToChannel(input.spuId, input.channelId, input.shopId).catch(() => null)
+    }
   }
-  return spu
+  return getSpuById(input.spuId)
 }
