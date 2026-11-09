@@ -35,9 +35,12 @@ export const products = async (req: Request, res: Response, next: NextFunction) 
 export const productDetail = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const site = getSite(res)
+    // 与 categories / products 保持同一语言口径：生成式 slug 由 localized(name, lang) 生成，
+    // 详情若固定用站点默认语言，其它语言的列表链接会解析失败（404）或返回错误语种内容。
+    const lang = typeof req.query.lang === 'string' && req.query.lang ? req.query.lang : site.defaultLocale
     const data = await catalogService.getProductBySlug(String(req.params.slug ?? ''), {
       currency: site.defaultCurrency,
-      lang: site.defaultLocale,
+      lang,
     })
     res.json({ code: 0, data })
   } catch (err) {

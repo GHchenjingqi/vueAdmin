@@ -4,6 +4,7 @@ import * as cmsService from '../services/cmsService.js'
 import { articleDetailEtag, articleListEtag, etagMatches } from '../services/cmsCacheService.js'
 
 const CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=30'
+const VARY = 'Host, X-Forwarded-Proto'
 
 /** 结构化数据里的绝对 URL：来自当前请求 Host（可被反代 X-Forwarded-Proto 覆盖），无法推导时用相对路径 */
 function baseUrlOf(req: Request): string {
@@ -17,6 +18,14 @@ function baseUrlOf(req: Request): string {
 function setCacheHeaders(res: Response, etag: string): void {
   res.set('ETag', etag)
   res.set('Cache-Control', CACHE_CONTROL)
+  res.set('Vary', VARY)
+}
+
+/** 304 同样要带 Vary，否则中间缓存可能把另一 Host / 协议的响应复用给本次请求 */
+function setNotModified(res: Response, etag: string): void {
+  res.set('ETag', etag)
+  res.set('Vary', VARY)
+  res.status(304).end()
 }
 
 /** GET /cms/articles —— 公开文章列表（仅 published，分页 + tag/keyword 过滤） */
@@ -32,8 +41,7 @@ export const listArticles = async (req: Request, res: Response, next: NextFuncti
 
     // 站点级 revision 覆盖任意文章写操作：ETag 命中说明发布/下线后没有任何变更，可直接 304
     if (etagMatches(req.headers['if-none-match'], etag)) {
-      res.set('ETag', etag)
-      res.status(304).end()
+      setNotModified(res, etag)
       return
     }
 
@@ -50,12 +58,13 @@ export const getArticle = async (req: Request, res: Response, next: NextFunction
   try {
     const site = getSite(res)
     const slug = (req.params as Record<string, unknown>).slug as string
+    // structuredData 的绝对 URL 随 Host / X-Forwarded-Proto 变化，必须同时进入 ETag 因子
+    const baseUrl = baseUrlOf(req)
     // 必须先查库：文章下线后即使客户端持有旧 ETag，也必须返回 404 而不是 304
-    const data = await cmsService.getArticleBySlug(site, slug, baseUrlOf(req))
-    const etag = articleDetailEtag(site.tenantId, site.shopId ?? 0, slug, data.updatedAt)
+    const data = await cmsService.getArticleBySlug(site, slug, baseUrl)
+    const etag = articleDetailEtag(site.tenantId, site.shopId ?? 0, slug, data.updatedAt, baseUrl)
     if (etagMatches(req.headers['if-none-match'], etag)) {
-      res.set('ETag', etag)
-      res.status(304).end()
+      setNotModified(res, etag)
       return
     }
     setCacheHeaders(res, etag)

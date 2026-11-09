@@ -73,10 +73,14 @@ export function articleListEtag(
   return `"articles-${hash(factors.join('|'))}"`
 }
 
-/** 详情 ETag：revision + slug + 文章自身更新时间（编辑同一篇也会失效） */
-export function articleDetailEtag(tenantId: number, siteId: number, slug: string, updatedAt: Date | null): string {
+/**
+ * 详情 ETag：revision + slug + 文章自身更新时间（编辑同一篇也会失效）。
+ * baseUrl 来自请求 Host / X-Forwarded-Proto，决定 structuredData 里的绝对 URL；
+ * 不纳入因子会让不同域名共用同一校验器，跨域名 If-None-Match 可能 304 串内容。
+ */
+export function articleDetailEtag(tenantId: number, siteId: number, slug: string, updatedAt: Date | null, baseUrl = ''): string {
   const stamp = updatedAt ? updatedAt.getTime() : 0
-  const factors = [tenantId, siteId, getArticleRevision(tenantId, siteId), slug, stamp]
+  const factors = [tenantId, siteId, getArticleRevision(tenantId, siteId), slug, stamp, baseUrl]
   return `"article-${hash(factors.join('|'))}"`
 }
 
