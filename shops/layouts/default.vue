@@ -13,6 +13,12 @@ useHead({ htmlAttrs: { lang } })
 
 const t = (key: string) => translate(locale.value, key)
 provide('t', t)
+
+// 导航购物车数量角标：客户端拉取当前购物车；产品页加购后经共享 useCart 状态实时 +1。
+const { itemCount, load: loadCart } = useCart()
+onMounted(() => {
+  void loadCart()
+})
 </script>
 
 <template>
@@ -21,19 +27,25 @@ provide('t', t)
       href="#main"
       class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-stone-900 focus:px-3 focus:py-2 focus:text-white"
     >
-      Skip to content
+      {{ t('nav.skipToContent') }}
     </a>
     <header class="border-b border-stone-200">
       <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <NuxtLink to="/" class="text-lg font-semibold tracking-wide">Aurora Hair Studio</NuxtLink>
+        <NuxtLink to="/" class="text-lg font-semibold tracking-wide">{{ t('shop.title') }}</NuxtLink>
         <div class="flex items-center gap-5">
           <nav class="flex items-center gap-5 text-sm text-stone-600">
-            <NuxtLink to="/c/lace-wigs" class="hover:text-stone-900">Lace Wigs</NuxtLink>
-            <NuxtLink to="/c/apparel" class="hover:text-stone-900">Apparel</NuxtLink>
-            <NuxtLink to="/cart" class="hover:text-stone-900">Cart</NuxtLink>
-            <NuxtLink to="/track" class="hover:text-stone-900">Track</NuxtLink>
+            <NuxtLink to="/c/lace-wigs" class="hover:text-stone-900">{{ t('nav.laceWigs') }}</NuxtLink>
+            <NuxtLink to="/c/apparel" class="hover:text-stone-900">{{ t('nav.apparel') }}</NuxtLink>
+            <NuxtLink to="/cart" class="relative hover:text-stone-900">
+              {{ t('nav.cart') }}
+              <span
+                v-if="itemCount > 0"
+                class="absolute -right-5 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-stone-900 px-1 text-[10px] font-semibold leading-none text-white"
+                aria-live="polite"
+              >{{ itemCount > 99 ? '99+' : itemCount }}</span>
+            </NuxtLink>
+            <NuxtLink to="/track" class="hover:text-stone-900">{{ t('nav.track') }}</NuxtLink>
           </nav>
-          <LocaleSwitcher />
         </div>
       </div>
     </header>
@@ -45,13 +57,13 @@ provide('t', t)
       <div class="mx-auto max-w-6xl px-4">
         <CommerceFooterNewsletter class="mx-auto max-w-md" />
         <p class="mt-6 text-center text-xs text-stone-500">
-          <NuxtLink to="/policies/privacy" class="hover:underline">Privacy</NuxtLink>
+          <NuxtLink to="/policies/privacy" class="hover:underline">{{ t('nav.privacy') }}</NuxtLink>
           ·
-          <NuxtLink to="/policies/terms" class="hover:underline">Terms</NuxtLink>
+          <NuxtLink to="/policies/terms" class="hover:underline">{{ t('nav.terms') }}</NuxtLink>
           ·
-          <NuxtLink to="/policies/shipping" class="hover:underline">Shipping</NuxtLink>
+          <NuxtLink to="/policies/shipping" class="hover:underline">{{ t('nav.shipping') }}</NuxtLink>
           ·
-          <NuxtLink to="/policies/returns" class="hover:underline">Returns</NuxtLink>
+          <NuxtLink to="/policies/returns" class="hover:underline">{{ t('nav.returns') }}</NuxtLink>
         </p>
       </div>
     </footer>

@@ -3,10 +3,11 @@ import type { Cart, CartItem } from '@shared/types/commerce'
 /**
  * Cart 组合式（P3-T02 前端版）：useCart()。
  * 数据源：/api/cart/*（BFF mock；后端阶段完成后切换真实路由，契约不变）。
+ * 状态用 useState 全局共享：产品页加购后，布局层导航角标立即同步（修复"加购无反馈"）。
  */
 export function useCart() {
-  const cart = ref<Cart | null>(null)
-  const loading = ref(false)
+  const cart = useState<Cart | null>('cart', () => null)
+  const loading = useState<boolean>('cart-loading', () => false)
 
   async function load(): Promise<Cart | null> {
     loading.value = true

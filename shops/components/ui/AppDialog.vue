@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { useI18n } from '~/composables/useI18n'
 /** 基础 UI 组件（P1-T12）：Dialog（open 关闭由父组件控制，Escape 可关） */
+const { t } = useI18n()
 const props = defineProps<{ open: boolean; title?: string }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
@@ -17,7 +19,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <div class="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <div class="mb-3 flex items-center justify-between">
           <h3 class="text-base font-semibold">{{ title }}</h3>
-          <button type="button" class="text-stone-400 hover:text-stone-900" aria-label="Close" @click="emit('close')">✕</button>
+          <button type="button" class="text-stone-400 hover:text-stone-900" :aria-label="t('common.close')" @click="emit('close')">✕</button>
         </div>
         <slot />
       </div>

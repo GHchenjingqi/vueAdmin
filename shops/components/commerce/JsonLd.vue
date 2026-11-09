@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CatalogProduct } from '@shared/types/api'
 import { useStoreConfig } from '~/composables/useStoreConfig'
+import { useI18n } from '~/composables/useI18n'
 
 /**
  * JSON-LD 结构化数据（P2-T11）：Product offers.priceCurrency 取 store config（禁止写死 C1/C4）。
@@ -10,6 +11,7 @@ import { useStoreConfig } from '~/composables/useStoreConfig'
  */
 const props = defineProps<{ product: CatalogProduct }>()
 const { currency } = useStoreConfig()
+const { t } = useI18n()
 
 const productJsonLd = computed(() => {
   const p = props.product.price
@@ -32,7 +34,7 @@ const breadcrumbJsonLd = computed(() => ({
   '@context': 'https://schema.org',
   '@type': 'BreadcrumbList',
   itemListElement: [
-    { '@type': 'ListItem', position: 1, name: 'Home', item: '/' },
+    { '@type': 'ListItem', position: 1, name: t('product.home'), item: '/' },
     ...(props.product.category ? [{ '@type': 'ListItem', position: 2, name: props.product.category.name, item: `/c/${props.product.category.slug}` }] : []),
   ],
 }))

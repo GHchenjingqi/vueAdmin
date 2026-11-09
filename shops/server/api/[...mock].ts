@@ -1,5 +1,5 @@
 import { mockStore } from '@shared/mock/store'
-import { MOCK_BLOG_POSTS } from '@shared/mock/fixtures'
+import { MOCK_BLOG_POSTS, MOCK_REVIEWS } from '@shared/mock/fixtures'
 import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
 
 /**
@@ -31,6 +31,10 @@ export default defineEventHandler(async (event) => {
       requestId: event.context.requestId as string | undefined,
     })
     console.log(`[ext] ${method} ${url} -> status=${res.status} networkError=${res.networkError} body=${JSON.stringify(res.body)?.slice(0, 140)}`)
+    // P4-T07：reviews 在 auto 网络级失败时回退 mock（与 cart 一致），保证本地演示可见评论/验证购买标记
+    if (url.startsWith('reviews') && res.networkError && source === 'auto') {
+      return mockHandle(url, method, event, locale)
+    }
     setResponseStatus(event, res.status)
     return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'ext upstream error' })
   }
@@ -249,6 +253,18 @@ function upstreamFail(event: Parameters<Parameters<typeof defineEventHandler>[0]
 
 /** mock 契约层（后端不可用时的独立数据源） */
 async function mockHandle(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], locale?: string): Promise<unknown> {
+  // P4-T07 mock 评论：GET 按 spuId 过滤（isVerified 由后端按订单归属判定；示例混合）；POST 进审核队列
+  if (url.startsWith('reviews') && method === 'GET') {
+    const spuId = Number(new URLSearchParams(url.split('?')[1] ?? '').get('spuId') ?? 0)
+    const items = MOCK_REVIEWS.filter((r) => r.spuId === spuId).map(({ spuId: _s, ...rest }) => rest)
+    const count = items.length
+    const average = count ? Number((items.reduce((n, r) => n + r.rating, 0) / count).toFixed(1)) : 0
+    return { code: 0, data: { items, summary: count ? { average, count } : undefined } }
+  }
+  if (url === 'reviews' && method === 'POST') {
+    const body = await readBody(event).catch(() => ({}))
+    return { code: 0, data: { id: Date.now(), spuId: Number(body.spuId), status: 'pending' } }
+  }
   // P5-T06 mock 兜底：博客列表/详情（真实模式走 BFF 直通 /storefront/v1/cms/articles）
   if (url === 'cms/articles' && method === 'GET') {
     const page = Number(new URLSearchParams(url.split('?')[1] ?? '').get('page') ?? 1) || 1
@@ -323,8 +339,10 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
   if (url.startsWith('checkout/orders') && method === 'GET') {
     return { items: [], total: 0, page: 1, pageSize: 10 }
   }
-  if (url.startsWith('checkout/orders/') && url.endsWith('/pay') && method === 'POST') {
-    const key = url.split('/')[2]
+  // 修复：pay 匹配需剥离 query（?t=accessToken），否则 endsWith('/pay') 恒 false → 404
+  const payPath = url.split('?')[0]
+  if (payPath.startsWith('checkout/orders/') && payPath.endsWith('/pay') && method === 'POST') {
+    const key = payPath.split('/')[2]
     const order = [...mockStore.orders.values()].find((o) => String(o.id) === key || o.orderNo === key)
     if (!order) {
       setResponseStatus(event, 404)
@@ -347,6 +365,11 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
       setResponseStatus(event, 404)
       return { code: 'ORDER_NOT_FOUND', message: 'order not found' }
     }
+  }
+  // P5-T08 mock 兜底：实验分配 fail-closed control（与真实后端 flag 关闭响应同构，mock 模式自洽无 404）
+  const expMatch = /^experiments\/([^/]+)\/assign/.exec(url)
+  if (expMatch && method === 'GET') {
+    return { code: 0, data: { key: decodeURIComponent(expMatch[1]), enabled: false, variant: 'control', reason: 'feature_disabled' } }
   }
   setResponseStatus(event, 404)
   return { code: 'NOT_FOUND', message: `no handler for ${method} /api/${url}` }

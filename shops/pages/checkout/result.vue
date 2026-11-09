@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { useCheckout } from '~/composables/useCheckout'
 import Price from '~/components/commerce/Price.vue'
+import { useI18n } from '~/composables/useI18n'
 import { trackPurchase } from '@shared/analytics/ecommerce'
 
 /**
  * 支付结果页（P3-T15 前端版）：由服务端订单状态驱动（getOrder 校验 accessToken），不盲信 URL 参数。
- * 处理中状态有轮询与超时提示；支付按钮触发 mock 支付会话。
+ * 处理中状态有轮询与超时提示；支付按钮触发 mock 支付会话。文案接入 i18n（P5-T01）。
  */
+const { t } = useI18n()
 const route = useRoute()
 const { getOrder, pay } = useCheckout()
 
@@ -55,7 +57,7 @@ async function payNow(): Promise<void> {
     await refresh()
     if (!paid.value && res.sessionUrl) await navigateTo(res.sessionUrl, { external: true })
   } catch (err) {
-    payError.value = err instanceof Error ? err.message : 'Payment failed'
+    payError.value = err instanceof Error ? err.message : t('result.paymentFailed')
   }
 }
 
@@ -94,32 +96,32 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
 })
 
-useSeo({ title: 'Order Result', description: 'Order status', path: '/checkout/result' })
+useSeo({ title: () => t('result.title'), description: () => t('result.description'), path: '/checkout/result', noindex: true })
 </script>
 
 <template>
   <div class="mx-auto max-w-xl">
-    <h1 class="mb-6 text-2xl font-semibold">Order Result</h1>
+    <h1 class="mb-6 text-2xl font-semibold">{{ t('result.title') }}</h1>
 
     <div v-if="!order" class="rounded-xl border border-stone-200 p-8 text-center">
-      <p class="text-sm font-medium text-stone-900">Order not found</p>
-      <p class="mt-1 text-sm text-stone-500">Invalid or expired order link.</p>
-      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">Back to home</NuxtLink>
+      <p class="text-sm font-medium text-stone-900">{{ t('result.notFound') }}</p>
+      <p class="mt-1 text-sm text-stone-500">{{ t('result.invalid') }}</p>
+      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">{{ t('result.backHome') }}</NuxtLink>
     </div>
 
     <div v-else class="space-y-4 rounded-xl border border-stone-200 p-6">
       <div class="flex items-center justify-between">
-        <span class="text-sm font-semibold">Order {{ order.orderNo }}</span>
+        <span class="text-sm font-semibold">{{ t('track.orderPrefix') }} {{ order.orderNo }}</span>
         <span class="rounded-full px-2.5 py-0.5 text-xs font-medium" :class="paid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
-          {{ paid ? 'Paid' : 'Pending payment' }}
+          {{ paid ? t('result.paid') : t('result.pending') }}
         </span>
       </div>
       <div class="flex justify-between text-sm">
-        <span class="text-stone-500">Email</span>
+        <span class="text-stone-500">{{ t('result.email') }}</span>
         <span>{{ order.email }}</span>
       </div>
       <div class="flex justify-between text-sm">
-        <span class="text-stone-500">Total</span>
+        <span class="text-stone-500">{{ t('result.total') }}</span>
         <Price :money="order.totals.total" size="md" />
       </div>
       <ul class="space-y-1 border-t border-stone-200 pt-3 text-sm text-stone-600">
@@ -130,15 +132,15 @@ useSeo({ title: 'Order Result', description: 'Order status', path: '/checkout/re
       </ul>
       <p v-if="payError" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ payError }}</p>
       <button v-if="!paid" type="button" class="w-full rounded-lg bg-stone-900 px-6 py-3 text-sm font-semibold text-white hover:bg-stone-700" @click="payNow">
-        Pay Now (Mock)
+        {{ t('result.payNow') }}
       </button>
-      <p v-if="polling && !paid" class="text-xs text-stone-500">Waiting for payment confirmation… polling up to 60s</p>
+      <p v-if="polling && !paid" class="text-xs text-stone-500">{{ t('result.polling') }}</p>
       <NuxtLink
         v-if="paid && trackingLink"
         :to="trackingLink"
         class="block rounded-lg border border-stone-300 px-6 py-2.5 text-center text-sm font-semibold hover:border-stone-900"
       >
-        Track shipment
+        {{ t('result.track') }}
       </NuxtLink>
     </div>
   </div>

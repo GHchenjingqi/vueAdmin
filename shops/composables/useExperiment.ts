@@ -22,7 +22,7 @@ export function useExperiment() {
   async function assign(key: string): Promise<ExperimentAssignment> {
     try {
       return await $fetch<ExperimentAssignment>(
-        `/api/storefront/v1/experiments/${encodeURIComponent(key)}/assign?subjectId=${encodeURIComponent(subjectId.value ?? '')}`,
+        `/api/experiments/${encodeURIComponent(key)}/assign?subjectId=${encodeURIComponent(subjectId.value ?? '')}`,
       )
     } catch {
       // 网络级失败 fail-closed：视为关闭，不阻塞页面

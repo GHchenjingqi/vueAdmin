@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useStoreConfig } from '~/composables/useStoreConfig'
+import { useI18n } from '~/composables/useI18n'
 
 const props = defineProps<{
   product: {
@@ -12,6 +13,7 @@ const props = defineProps<{
     category?: { name: string } | null
   }
 }>()
+const { t } = useI18n()
 const cfg = useStoreConfig()
 const link = computed(() => `/products/${props.product.slug}`)
 const priceText = computed(() => (props.product.price ? cfg.format(props.product.price.amount) : '—'))
@@ -35,7 +37,7 @@ const priceText = computed(() => (props.product.price ? cfg.format(props.product
     <h3 class="mt-3 line-clamp-2 text-sm font-medium text-stone-900 group-hover:underline">{{ product.title }}</h3>
     <div class="mt-1 flex items-center gap-2">
       <span class="text-sm tabular-nums">{{ priceText }}</span>
-      <span v-if="!product.inStock" class="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-500">Out of stock</span>
+      <span v-if="!product.inStock" class="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-500">{{ t('card.outOfStock') }}</span>
     </div>
   </NuxtLink>
 </template>

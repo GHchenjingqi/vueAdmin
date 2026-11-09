@@ -1,19 +1,21 @@
 <script setup lang="ts">
-/** 服装品类属性展示（P2-T06）：尺码体系/尺码/颜色/面料/版型/测量值/试穿信息 */
+import { useI18n } from '~/composables/useI18n'
+/** 服装品类属性展示（P2-T06）：尺码体系/尺码/颜色/面料/版型/测量值/试穿信息。标签接入 i18n（P5-T01）。 */
+const { t } = useI18n()
 const props = defineProps<{ spec: Record<string, string> }>()
 const rows = computed(() =>
   (
     [
-      ['sizeSystem', 'Size System'],
-      ['size', 'Size'],
-      ['color', 'Color'],
-      ['fabric', 'Fabric'],
-      ['fit', 'Fit'],
-      ['measurements', 'Measurements'],
-      ['tryOnInfo', 'Try-on Info'],
+      ['sizeSystem', 'attr.sizeSystem'],
+      ['size', 'attr.size'],
+      ['color', 'attr.color'],
+      ['fabric', 'attr.fabric'],
+      ['fit', 'attr.fit'],
+      ['measurements', 'attr.measurements'],
+      ['tryOnInfo', 'attr.tryOnInfo'],
     ] as const
   )
-    .map(([key, label]) => ({ key, label, value: props.spec[key] }))
+    .map(([key, labelKey]) => ({ key, label: t(labelKey), value: props.spec[key] }))
     .filter((r) => r.value),
 )
 </script>

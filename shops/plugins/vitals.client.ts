@@ -19,8 +19,11 @@ function send(metric: Metric): void {
     ts: new Date().toISOString(),
   })
   try {
-    if (navigator.sendBeacon) navigator.sendBeacon('/api/vitals', payload)
-    else void fetch('/api/vitals', { method: 'POST', body: payload, keepalive: true })
+    // sendBeacon 默认以 text/plain 发送，Nitro readBody 无法解析为 JSON → 400。
+    // 显式指定 application/json Blob，确保 BFF /api/vitals 正常解析（P4-T16）。
+    const blob = new Blob([payload], { type: 'application/json' })
+    if (navigator.sendBeacon) navigator.sendBeacon('/api/vitals', blob)
+    else void fetch('/api/vitals', { method: 'POST', body: blob, headers: { 'content-type': 'application/json' }, keepalive: true })
   } catch {
     /* 上报失败静默 */
   }

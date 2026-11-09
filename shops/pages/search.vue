@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import ProductCard from '~/components/commerce/ProductCard.vue'
 import { useCatalog } from '~/composables/useCatalog'
+import { useI18n } from '~/composables/useI18n'
 
 /**
  * 搜索页（P2-T07）：关键词搜索、无结果态、参数白名单（q/sort/page 之外忽略）、默认 noindex。
+ * 文案接入 i18n（P5-T01）。
  */
+const { t, ti } = useI18n()
 const route = useRoute()
 const catalog = useCatalog()
 
@@ -21,15 +24,20 @@ const results = computed(() => {
   return (data.value?.list ?? []).filter((p) => p.title.toLowerCase().includes(term) || p.description.toLowerCase().includes(term))
 })
 
-useHead({ title: 'Search · Aurora Hair Studio', meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
+useSeo({
+  title: () => t('search.title'),
+  description: () => `${t('search.hint')} Search HD lace wigs, human hair wigs and apparel.`,
+  path: '/search',
+  noindex: true,
+})
 </script>
 
 <template>
   <div>
-    <h1 class="mb-2 text-2xl font-semibold">Search</h1>
+    <h1 class="mb-2 text-2xl font-semibold">{{ t('search.title') }}</h1>
     <p class="mb-6 text-sm text-stone-500">
-      <template v-if="q">Results for "{{ q }}" — {{ results.length }} found</template>
-      <template v-else>Enter a keyword, e.g. "lace" or "dress".</template>
+      <template v-if="q">{{ ti('search.results', { q, n: String(results.length) }) }}</template>
+      <template v-else>{{ t('search.hint') }}</template>
     </p>
 
     <div v-if="pending" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -37,10 +45,10 @@ useHead({ title: 'Search · Aurora Hair Studio', meta: [{ name: 'robots', conten
     </div>
 
     <div v-else-if="q && results.length === 0" class="rounded-xl border border-stone-200 p-12 text-center">
-      <p class="text-sm font-medium text-stone-900">No results for "{{ q }}"</p>
-      <p class="mt-1 text-sm text-stone-500">Check spelling or try a more general term.</p>
+      <p class="text-sm font-medium text-stone-900">{{ ti('search.noResults', { q }) }}</p>
+      <p class="mt-1 text-sm text-stone-500">{{ t('search.spelling') }}</p>
       <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
-        Browse collections
+        {{ t('search.browse') }}
       </NuxtLink>
     </div>
 

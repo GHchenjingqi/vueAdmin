@@ -1,19 +1,21 @@
 <script setup lang="ts">
-/** 假发品类属性展示（P2-T05）：发质/纹理/Lace/长度/密度/帽围/是否 Glueless */
+import { useI18n } from '~/composables/useI18n'
+/** 假发品类属性展示（P2-T05）：发质/纹理/Lace/长度/密度/帽围/是否 Glueless。标签接入 i18n（P5-T01）。 */
+const { t } = useI18n()
 const props = defineProps<{ spec: Record<string, string> }>()
 const rows = computed(() =>
   (
     [
-      ['hairMaterial', 'Hair Material'],
-      ['texture', 'Texture'],
-      ['laceType', 'Lace Type'],
-      ['capSize', 'Cap Size'],
-      ['length', 'Length'],
-      ['density', 'Density'],
-      ['glueless', 'Glueless'],
+      ['hairMaterial', 'attr.hairMaterial'],
+      ['texture', 'attr.texture'],
+      ['laceType', 'attr.laceType'],
+      ['capSize', 'attr.capSize'],
+      ['length', 'attr.length'],
+      ['density', 'attr.density'],
+      ['glueless', 'attr.glueless'],
     ] as const
   )
-    .map(([key, label]) => ({ key, label, value: props.spec[key] }))
+    .map(([key, labelKey]) => ({ key, label: t(labelKey), value: props.spec[key] }))
     .filter((r) => r.value),
 )
 </script>

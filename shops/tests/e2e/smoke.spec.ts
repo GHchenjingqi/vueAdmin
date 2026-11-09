@@ -48,7 +48,12 @@ test('product detail: variant selection updates availability', async ({ page }) 
 
 test('cart → checkout → order result flow', async ({ page }) => {
   await gotoAvailableProduct(page)
-  await page.getByRole('button', { name: /Add to Cart/ }).click()
+  // 等待加购 POST /api/cart/items 成功后再导航：真实链路响应慢于 mock，
+  // 立即 goto 会中断加购请求导致购物车空、下单 400（G5 真实链路回归修复）。
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
+    page.getByRole('button', { name: /Add to Cart/ }).click(),
+  ])
   await page.goto('/checkout')
   await page.fill('#fullName', 'Test Buyer')
   await page.fill('#phone', '1000000')
@@ -60,4 +65,29 @@ test('cart → checkout → order result flow', async ({ page }) => {
   await page.getByRole('button', { name: /Place Order/ }).click()
   await expect(page).toHaveURL(/\/checkout\/result/)
   await expect(page.getByText(/Order SO\d+/)).toBeVisible()
+  // G5 主链路：固化支付路径（真实链路 Pay Now → mock 支付 webhook → paymentStatus=captured → Paid 徽章）。
+  await page.getByRole('button', { name: /Pay Now/ }).click()
+  await expect(page.getByText('Paid', { exact: true })).toBeVisible({ timeout: 20_000 })
+})
+
+test('checkout coupon: WIG10 applies discount (mock data source)', async ({ page }) => {
+  // 优惠券用例以 mock fixtures 已知商品（101- 前缀 slug）确定性断言折扣 > 0；
+  // 真实数据源（auto）无此 slug → 页面 "Product not found" → skip（CI 以 mock 自洽源运行，本地真实链路跑主链路用例）。
+  await page.goto('/products/101-hd-lace-glueless-body-wave-wig')
+  const notFound = await page.getByText('Product not found').isVisible({ timeout: 2_000 }).catch(() => false)
+  if (notFound) return test.skip()
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
+    page.getByRole('button', { name: /Add to Cart/ }).click(),
+  ])
+  await page.goto('/checkout')
+  await page.getByPlaceholder(/Coupon code/).fill('WIG10')
+  const quoteResp = page.waitForResponse((r) => r.url().includes('/api/checkout/quote') && r.request().method() === 'POST')
+  await page.getByRole('button', { name: /Apply/ }).click()
+  const resp = await quoteResp
+  expect(resp.status()).toBe(200)
+  const body = (await resp.json()) as { totals?: { discount?: { amount?: number } } }
+  expect(body.totals?.discount?.amount ?? 0).toBeGreaterThan(0)
+  // 页面可见性：Discount 行随报价刷新（总结区仍在、未因优惠券请求崩溃）
+  await expect(page.getByRole('heading', { name: 'Order Summary' })).toBeVisible()
 })

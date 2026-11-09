@@ -1,5 +1,7 @@
 <script setup lang="ts">
 /** 博客详情（P5-T06）：唯一 slug + BlogPosting 结构化数据。数据源 /api/cms/articles/:slug（SSR 取数）。 */
+import { useI18n } from '~/composables/useI18n'
+const { t } = useI18n()
 const route = useRoute()
 const siteUrl = useRuntimeConfig().public.siteUrl as string
 const { getArticle } = useCms()
@@ -7,10 +9,16 @@ const { getArticle } = useCms()
 const { data: post } = await useAsyncData(`blog-post-${route.params.slug}`, () => getArticle(String(route.params.slug)))
 
 // 不存在 / 未发布 → 404（SSR 直接返回 404，客户端重定向错误页）
-if (!post.value) throw createError({ statusCode: 404, statusText: 'Post not found', fatal: true })
+if (!post.value) throw createError({ statusCode: 404, statusText: t('blog.notFound'), fatal: true })
 
 // useSeo 接受普通对象：用 reactive 使标题/描述随数据更新（SSR 时已就绪）
-const seo = reactive({ title: post.value.title, description: post.value.summary ?? '', path: `/blog/${route.params.slug}` })
+const seo = reactive({
+  title: post.value.title,
+  description: (post.value.summary ?? '').slice(0, 155),
+  path: `/blog/${route.params.slug}`,
+  keywords: `${post.value.title}, wig care, human hair wig tips, glueless wig, Aurora Hair Studio blog`,
+  ogType: 'article',
+})
 useSeo(seo)
 
 // schema.org/BlogPosting：优先服务端 structuredData（与 GET /cms/articles/:slug 契约一致），

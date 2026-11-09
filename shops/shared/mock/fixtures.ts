@@ -107,6 +107,80 @@ export const MOCK_PRODUCTS: CatalogProduct[] = [
   },
 ]
 
+/**
+ * Mock 评论（P4-T07）：isVerified 标记"已验证购买"（后端按订单归属判定；mock 示例混合）。
+ * 提交进 pending 审核队列；GET 仅返回 approved（此处直接模拟审核通过）。
+ */
+export interface MockReview {
+  id: number
+  spuId: number
+  rating: number
+  title: string | null
+  content: string
+  customerNickname: string | null
+  createdAt: string
+  helpfulCount: number
+  isVerified: boolean
+}
+
+export const MOCK_REVIEWS: MockReview[] = [
+  {
+    id: 1,
+    spuId: 101,
+    rating: 5,
+    title: 'Best wig I have ever owned',
+    content: 'The lace melted perfectly and the hair is soft and true to length. Zero glue needed, exactly as described.',
+    customerNickname: 'Jasmine M.',
+    createdAt: '2026-10-12T10:00:00Z',
+    helpfulCount: 12,
+    isVerified: true,
+  },
+  {
+    id: 2,
+    spuId: 101,
+    rating: 4,
+    title: 'Great lace, minor shedding',
+    content: 'Very natural hairline and comfortable cap. A little shedding on the first brush but overall great value.',
+    customerNickname: 'Amara',
+    createdAt: '2026-10-02T14:30:00Z',
+    helpfulCount: 4,
+    isVerified: true,
+  },
+  {
+    id: 3,
+    spuId: 101,
+    rating: 5,
+    title: null,
+    content: 'Fast shipping and the HD lace is invisible. Will buy again.',
+    customerNickname: 'Tiana',
+    createdAt: '2026-09-20T09:15:00Z',
+    helpfulCount: 3,
+    isVerified: false,
+  },
+  {
+    id: 4,
+    spuId: 102,
+    rating: 5,
+    title: 'Deep wave is gorgeous',
+    content: 'The deep wave pattern holds beautifully after washing. 200% density is thick and full.',
+    customerNickname: 'Denise',
+    createdAt: '2026-10-08T11:00:00Z',
+    helpfulCount: 8,
+    isVerified: true,
+  },
+  {
+    id: 5,
+    spuId: 201,
+    rating: 4,
+    title: 'Cute summer dress',
+    content: 'Lightweight and true to size. The fabric is a bit thin but perfect for summer.',
+    customerNickname: 'Kayla',
+    createdAt: '2026-09-28T16:45:00Z',
+    helpfulCount: 2,
+    isVerified: true,
+  },
+]
+
 export const MOCK_POLICY_PAGES: Record<string, { title: string; body: string }> = {
   privacy: { title: 'Privacy Policy', body: 'We collect only the data needed to fulfil your order...' },
   terms: { title: 'Terms of Service', body: 'By placing an order you agree to our terms...' },

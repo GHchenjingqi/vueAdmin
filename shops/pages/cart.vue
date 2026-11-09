@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { useCart } from '~/composables/useCart'
 import Price from '~/components/commerce/Price.vue'
-import { translate } from '@shared/i18n/messages'
+import { useI18n } from '~/composables/useI18n'
 import { trackViewCart } from '@shared/analytics/ecommerce'
 
 /**
  * 购物车页（P3-T02）：数量修改、删除、行小计；金额由 Price 组件渲染（配置驱动零硬编码）。
- * 文案走 i18n（P1-T05）；locale 由 useLocale() 注入（URL 前缀/cookie 驱动，与币种解耦）。
+ * 文案走 i18n（P5-T01）；locale 由 useLocale() 注入（URL 前缀/cookie 驱动，与币种解耦）。
  */
+const { t } = useI18n()
 const { items, update, remove, load } = useCart()
 await load()
 
@@ -22,10 +23,7 @@ watchEffect(() => {
   )
 })
 
-const { locale } = useLocale()
-const t = (key: string) => translate(locale.value, key)
-
-useSeo({ title: t('cart.title'), description: t('cart.description'), path: '/cart' })
+useSeo({ title: () => t('cart.title'), description: () => t('cart.description'), path: '/cart', noindex: true })
 </script>
 
 <template>
@@ -48,13 +46,13 @@ useSeo({ title: t('cart.title'), description: t('cart.description'), path: '/car
             <p class="text-xs capitalize text-stone-500">
               {{ [item.spec?.texture, item.spec?.length && item.spec.length + '"', item.spec?.color].filter(Boolean).join(' · ') || '—' }}
             </p>
-            <p v-if="!item.sellable" class="text-xs text-red-600">This item is no longer available</p>
+            <p v-if="!item.sellable" class="text-xs text-red-600">{{ t('cart.unavailable') }}</p>
           </div>
           <div class="flex items-center gap-2">
             <button
               type="button"
               class="h-7 w-7 rounded border border-stone-300 text-sm hover:border-stone-500"
-              aria-label="Decrease quantity"
+              :aria-label="t('cart.decQty')"
               @click="update(item.id, item.qty - 1)"
             >
               −
@@ -63,18 +61,18 @@ useSeo({ title: t('cart.title'), description: t('cart.description'), path: '/car
             <button
               type="button"
               class="h-7 w-7 rounded border border-stone-300 text-sm hover:border-stone-500"
-              aria-label="Increase quantity"
+              :aria-label="t('cart.incQty')"
               @click="update(item.id, item.qty + 1)"
             >
               +
             </button>
           </div>
           <Price :money="item.lineTotal" size="sm" />
-          <button type="button" class="text-xs text-stone-500 hover:text-stone-900" @click="remove(item.id)">Remove</button>
+          <button type="button" class="text-xs text-stone-500 hover:text-stone-900" @click="remove(item.id)">{{ t('cart.remove') }}</button>
         </li>
       </ul>
       <NuxtLink to="/checkout" class="mt-6 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
-        Checkout
+        {{ t('cart.checkout') }}
       </NuxtLink>
     </template>
   </div>

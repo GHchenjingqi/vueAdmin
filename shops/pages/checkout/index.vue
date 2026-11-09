@@ -1,21 +1,23 @@
 <script setup lang="ts">
 import { useCheckout } from '~/composables/useCheckout'
 import Price from '~/components/commerce/Price.vue'
+import { useI18n } from '~/composables/useI18n'
 import { trackBeginCheckout } from '@shared/analytics/ecommerce'
 import { collectAttribution } from '@shared/analytics/attribution'
 
 /**
  * 结算页（P3-T09 前端版）：地址表单（字段级校验）、报价确认、运费选择、优惠券。
- * 报价为服务端重算（BFF mock：前端传入总价被忽略）；金额对象 {amount, currency}。
+ * 报价为服务端重算（BFF mock：前端传入总价被忽略）；金额对象 {amount, currency}。文案接入 i18n（P5-T01）。
  */
+const { t, ti } = useI18n()
 const { placeOrder, loading } = useCheckout()
 
 // P5-T08：checkout_cta 业务实验（仅按钮文案变体；关闭/未知 fail-closed → control）
 const { assign } = useExperiment()
-const ctaLabel = ref('Place Order')
+const ctaLabel = ref(t('checkout.placeOrder'))
 onMounted(async () => {
   const a = await assign('checkout_cta')
-  if (a.enabled && a.variant === 'variant_a') ctaLabel.value = 'Place order securely'
+  if (a.enabled && a.variant === 'variant_a') ctaLabel.value = t('checkout.secureCta')
 })
 
 const address = reactive({
@@ -73,12 +75,12 @@ async function refreshQuote(): Promise<void> {
 }
 
 function validateAddress(): boolean {
-  fieldErrors.fullName = address.fullName.trim() ? '' : 'Full name is required'
-  fieldErrors.province = address.province.trim() ? '' : 'State/Province is required'
-  fieldErrors.city = address.city.trim() ? '' : 'City is required'
-  fieldErrors.address1 = address.address1.trim() ? '' : 'Street address is required'
-  fieldErrors.postcode = address.postcode.trim() ? '' : 'Postcode is required'
-  fieldErrors.email = email.value.includes('@') ? '' : 'Valid email is required'
+  fieldErrors.fullName = address.fullName.trim() ? '' : t('checkout.err.fullName')
+  fieldErrors.province = address.province.trim() ? '' : t('checkout.err.province')
+  fieldErrors.city = address.city.trim() ? '' : t('checkout.err.city')
+  fieldErrors.address1 = address.address1.trim() ? '' : t('checkout.err.address1')
+  fieldErrors.postcode = address.postcode.trim() ? '' : t('checkout.err.postcode')
+  fieldErrors.email = email.value.includes('@') ? '' : t('checkout.err.email')
   return Object.values(fieldErrors).every((v) => !v)
 }
 
@@ -97,24 +99,24 @@ async function submit(): Promise<void> {
     })
     await navigateTo(`/checkout/result?id=${order.id}&order=${order.orderNo}&t=${order.accessToken}`)
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : 'Failed to place order'
+    submitError.value = err instanceof Error ? err.message : t('checkout.failed')
   } finally {
     submitting.value = false
   }
 }
 
-useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
+useSeo({ title: () => t('checkout.title'), description: () => t('checkout.description'), path: '/checkout', noindex: true })
 </script>
 
 <template>
   <div>
-    <h1 class="mb-6 text-2xl font-semibold">Checkout</h1>
+    <h1 class="mb-6 text-2xl font-semibold">{{ t('checkout.title') }}</h1>
     <div class="grid gap-8 lg:grid-cols-2">
       <section>
-        <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-500">Shipping Address</h2>
+        <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.shippingAddress') }}</h2>
         <div class="space-y-3">
           <div v-for="key in Object.keys(address) as (keyof typeof address)[]" :key="key" class="space-y-1">
-            <label class="block text-xs font-medium text-stone-600" :for="key">{{ key }}</label>
+            <label class="block text-xs font-medium text-stone-600" :for="key">{{ t('field.' + key) }}</label>
             <input
               :id="key"
               v-model="address[key]"
@@ -125,7 +127,7 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
             <p v-if="fieldErrors[key]" class="text-xs text-red-600">{{ fieldErrors[key] }}</p>
           </div>
           <div class="space-y-1">
-            <label class="block text-xs font-medium text-stone-600" for="email">Email</label>
+            <label class="block text-xs font-medium text-stone-600" for="email">{{ t('checkout.email') }}</label>
             <input
               id="email"
               v-model="email"
@@ -137,7 +139,7 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
           </div>
         </div>
 
-        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">Shipping Method</h2>
+        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.shippingMethod') }}</h2>
         <div v-for="rate in quote?.shippingRates ?? []" :key="rate.id" class="mb-2 flex items-center gap-3">
           <input :id="'rate-' + rate.id" v-model="shippingRateId" type="radio" :value="rate.id" name="shippingRate" @change="refreshQuote" />
           <label :for="'rate-' + rate.id" class="text-sm">
@@ -146,46 +148,46 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
           </label>
         </div>
 
-        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">Coupon</h2>
+        <h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.coupon') }}</h2>
         <div class="flex gap-2">
           <input
             v-model="couponCode"
             class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm"
-            placeholder="Coupon code (try WIG10 / EXPIRED10 / USEDOUT10)"
+            :placeholder="t('checkout.couponHint')"
           />
-          <button type="button" class="rounded-lg border border-stone-300 px-4 py-2 text-sm hover:border-stone-500" @click="refreshQuote">Apply</button>
+          <button type="button" class="rounded-lg border border-stone-300 px-4 py-2 text-sm hover:border-stone-500" @click="refreshQuote">{{ t('checkout.apply') }}</button>
         </div>
       </section>
 
       <section class="rounded-xl border border-stone-200 p-6">
-        <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500">Order Summary</h2>
+        <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t('checkout.orderSummary') }}</h2>
         <div v-if="quote" class="space-y-2 text-sm">
           <div class="flex justify-between">
-            <span class="text-stone-500">Subtotal</span>
+            <span class="text-stone-500">{{ t('checkout.subtotal') }}</span>
             <Price :money="quote.totals.subtotal" size="sm" />
           </div>
           <div class="flex justify-between">
-            <span class="text-stone-500">Discount</span>
+            <span class="text-stone-500">{{ t('checkout.discount') }}</span>
             <Price :money="quote.totals.discount" size="sm" />
           </div>
           <div class="flex justify-between">
-            <span class="text-stone-500">Shipping</span>
+            <span class="text-stone-500">{{ t('checkout.shipping') }}</span>
             <Price :money="quote.totals.shipping" size="sm" />
           </div>
           <div v-if="quote.deliveryCommitment" class="flex justify-between">
-            <span class="text-stone-500">Estimated delivery</span>
-            <span class="text-stone-700">{{ quote.deliveryCommitment.deliveryEstimateDays }} business days</span>
+            <span class="text-stone-500">{{ t('checkout.estimatedDelivery') }}</span>
+            <span class="text-stone-700">{{ ti('checkout.businessDays', { n: String(quote.deliveryCommitment.deliveryEstimateDays) }) }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-stone-500">Tax</span>
+            <span class="text-stone-500">{{ t('checkout.tax') }}</span>
             <Price :money="quote.totals.tax" size="sm" />
           </div>
           <div class="flex justify-between border-t border-stone-200 pt-2 text-base font-semibold">
-            <span>Total</span>
+            <span>{{ t('checkout.total') }}</span>
             <Price :money="quote.totals.total" size="md" />
           </div>
         </div>
-        <p v-else class="text-sm text-stone-500">Add items to your cart to see the order summary.</p>
+        <p v-else class="text-sm text-stone-500">{{ t('checkout.addItems') }}</p>
 
         <p v-if="submitError" class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ submitError }}</p>
 
@@ -195,9 +197,9 @@ useSeo({ title: 'Checkout', description: 'Secure checkout', path: '/checkout' })
           :disabled="loading || submitting"
           @click="submit"
         >
-          {{ submitting ? 'Placing order…' : ctaLabel }}
+          {{ submitting ? t('checkout.placing') : ctaLabel }}
         </button>
-        <p v-if="quote" class="mt-3 text-xs text-stone-400">Quote expires at {{ new Date(quote.expiresAt).toLocaleTimeString() }}</p>
+        <p v-if="quote" class="mt-3 text-xs text-stone-400">{{ ti('checkout.quoteExpires', { time: new Date(quote.expiresAt).toLocaleTimeString() }) }}</p>
       </section>
     </div>
   </div>

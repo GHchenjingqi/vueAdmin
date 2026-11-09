@@ -4,14 +4,16 @@ import WigAttributes from '~/components/commerce/WigAttributes.vue'
 import ApparelAttributes from '~/components/commerce/ApparelAttributes.vue'
 import VariantSelector from '~/components/commerce/VariantSelector.vue'
 import { useStoreConfig } from '~/composables/useStoreConfig'
+import { useI18n } from '~/composables/useI18n'
 import { trackViewItem, trackAddToCart } from '@shared/analytics/ecommerce'
 import ProductReviews from '~/components/commerce/ProductReviews.vue'
 import type { CatalogProduct } from '@shared/types/api'
 
 /**
  * 商品详情页（P2-T04/T05/T06）：变体选择、价格、库存、配送承诺、退货摘要。
- * 不可售 SKU 说明原因（stockNote）而非仅置灰；下架/不存在 → 404 页。
+ * 不可售 SKU 说明原因（stockNote）而非仅置灰；下架/不存在 → 404 页。文案接入 i18n（P5-T01）。
  */
+const { t } = useI18n()
 const route = useRoute()
 const catalog = useCatalog()
 const cart = useCart()
@@ -19,7 +21,7 @@ const cfg = useStoreConfig()
 
 const { data: product, error } = await useAsyncData(`product-${route.params.slug}`, () => catalog.getProduct(route.params.slug as string))
 if (!product.value) {
-  throw createError({ statusCode: 404, statusText: 'Product not found', fatal: true })
+  throw createError({ statusCode: 404, statusText: t('product.notFound'), fatal: true })
 }
 
 // P2-T12：slug 规范化——同一商品经旧 slug/纯 id 抵达时 301 到 canonical slug（SEO_SPEC §7；410 策略待后台重定向表）
@@ -64,9 +66,20 @@ watchEffect(() => {
   }
 })
 
+// 跨境 TDK：Title 用纯产品名（品牌由全局 titleTemplate 追加）；产品名超 42 字符截断保总长 ≤60；
+// description 截断 155；og:type=product；og:image 用产品图。
+const productTitle = computed(() => {
+  const p = product.value?.title ?? t('product.notFound')
+  return p.length <= 42 ? p : `${p.slice(0, 39)}…`
+})
+
 useSeo({
-  title: product.value?.title ?? 'Product',
-  description: product.value?.description ?? '',
+  title: () => productTitle.value,
+  description: () => (product.value?.description ?? '').slice(0, 155),
+  keywords: () =>
+    product.value ? `${product.value.title}, human hair wig, glueless lace wig, HD lace wig, Aurora Hair Studio` : '',
+  ogType: 'product',
+  ogImage: () => product.value?.cover ?? '',
   path: `/products/${route.params.slug}`,
 })
 
@@ -90,15 +103,15 @@ onMounted(async () => {
 <template>
   <div>
     <JsonLd v-if="product" :product="product" />
-    <nav class="mb-4 text-xs text-stone-500" aria-label="Breadcrumb">
-      <NuxtLink to="/" class="hover:underline">Home</NuxtLink>
+    <nav class="mb-4 text-xs text-stone-500" :aria-label="t('product.breadcrumb')">
+      <NuxtLink to="/" class="hover:underline">{{ t('product.home') }}</NuxtLink>
       <span aria-hidden="true">/</span>
       <NuxtLink v-if="product?.category" :to="`/c/${product.category.slug}`" class="hover:underline">{{ product.category.name }}</NuxtLink>
     </nav>
 
     <div v-if="error || !product" class="rounded-xl border border-stone-200 p-12 text-center">
-      <p class="text-sm font-medium text-stone-900">Product not found</p>
-      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">Back to home</NuxtLink>
+      <p class="text-sm font-medium text-stone-900">{{ t('product.notFound') }}</p>
+      <NuxtLink to="/" class="mt-4 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">{{ t('product.backHome') }}</NuxtLink>
     </div>
 
     <div v-else class="grid gap-8 lg:grid-cols-2">
@@ -115,7 +128,7 @@ onMounted(async () => {
           <div class="mt-2 flex items-center gap-3">
             <span class="text-2xl font-semibold tabular-nums">{{ priceText }}</span>
             <span class="rounded-full px-2.5 py-0.5 text-xs font-medium" :class="inStock ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-500'">
-              {{ inStock ? 'In stock' : 'Out of stock' }}
+              {{ inStock ? t('product.inStock') : t('product.outOfStock') }}
             </span>
           </div>
         </div>
@@ -128,20 +141,20 @@ onMounted(async () => {
         <ApparelAttributes v-else-if="product.categoryKind === 'apparel'" :spec="spec" />
 
         <div class="space-y-2 rounded-xl border border-stone-200 p-4 text-xs text-stone-600">
-          <p>🚚 Ships in 1-2 business days · Standard 7-12 days / Express 3-5 days</p>
-          <p>↩️ 30-day returns · items must be unworn with original packaging</p>
+          <p>{{ t('product.ships') }}</p>
+          <p>{{ t('product.returns30') }}</p>
         </div>
 
         <div class="flex items-center gap-3">
           <button
             type="button"
             class="rounded-lg bg-stone-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="!inStock"
+            :disabled="!inStock || !price"
             @click="addToCart"
           >
-            {{ added ? 'Added ✓' : 'Add to Cart' }}
+            {{ added ? t('product.added') : t('product.addToCart') }}
           </button>
-          <p v-if="!inStock" class="text-xs text-stone-500">{{ stockNote ?? 'Currently unavailable' }}</p>
+          <p v-if="!inStock" class="text-xs text-stone-500">{{ stockNote ?? t('product.unavailable') }}</p>
         </div>
       </div>
 
@@ -149,8 +162,8 @@ onMounted(async () => {
     </div>
 
     <!-- P5-T08：product_recommendation 变体 → 推荐数量（control=4 / variant_b=8 / variant_c=12） -->
-    <section v-if="related.length" class="mt-14" aria-label="You may also like">
-      <h2 class="mb-5 text-lg font-semibold">You may also like</h2>
+    <section v-if="related.length" class="mt-14" :aria-label="t('product.youMayLike')">
+      <h2 class="mb-5 text-lg font-semibold">{{ t('product.youMayLike') }}</h2>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <NuxtLink
           v-for="p in related"
