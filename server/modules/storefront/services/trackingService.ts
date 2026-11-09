@@ -1,3 +1,4 @@
+import { UniqueConstraintError } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderShipment, ShopTrackingEvent } from '../../shop/models/index.js'
@@ -37,6 +38,27 @@ let trackingProvider: TrackingProvider | null = null
 
 export function setTrackingProvider(provider: TrackingProvider | null): void {
   trackingProvider = provider
+}
+
+/**
+ * 进程内合并同租户同运单的并发外部拉取：缓存过期时多个 C 端请求只打一次
+ * 17track。settled 后立刻移除，异常同样不留在表里，避免下次查询被旧 Promise 卡住。
+ * 多实例部署仍各自拉取（见审计报告残留）。
+ */
+const inFlightPulls = new Map<string, Promise<TrackingProviderResult>>()
+
+function pullOnce(
+  key: string,
+  provider: TrackingProvider,
+  input: TrackingProviderInput,
+): Promise<TrackingProviderResult> {
+  const pending = inFlightPulls.get(key)
+  if (pending) return pending
+  const tracked = provider(input).finally(() => {
+    if (inFlightPulls.get(key) === tracked) inFlightPulls.delete(key)
+  })
+  inFlightPulls.set(key, tracked)
+  return tracked
 }
 
 export interface TrackingView {
@@ -82,9 +104,10 @@ export async function getOrderTracking(
   // 有 provider 且缓存过期（>10 分钟）时尝试拉取并刷新；失败降级到本地缓存
   const STALE_MS = 10 * 60 * 1000
   const stale = !cache || Date.now() - new Date(cache.syncedAt).getTime() > STALE_MS
+  let pulled: TrackingProviderResult | null = null
   if (trackingProvider && stale) {
     try {
-      const pulled = await trackingProvider({
+      pulled = await pullOnce(`${tId}:${shipment.id}`, trackingProvider, {
         carrier: shipment.carrier,
         trackingNo: shipment.trackingNo,
         tenantId: tId,
@@ -104,20 +127,26 @@ export async function getOrderTracking(
       if (cache) {
         await cache.update(values as never)
       } else {
-        cache = await ShopTrackingEvent.create(values as never)
+        try {
+          cache = await ShopTrackingEvent.create(values as never)
+        } catch (err) {
+          if (!(err instanceof UniqueConstraintError)) throw err
+          // 并发首次查询：赢家已落库，回读其缓存，避免本请求返回空轨迹
+          cache = await ShopTrackingEvent.findOne({ where: { tenantId: tId, shipmentId: shipment.id } })
+        }
       }
     } catch {
-      // 外部 API 故障：降级使用已有缓存，不影响 C 端查询
+      // 外部 API 故障 / 其它写入异常：降级使用已有缓存，不影响 C 端查询
     }
   }
 
   return {
     orderNo: order.orderNo,
-    status: cache?.status ?? shipment.status,
+    status: cache?.status ?? pulled?.status ?? shipment.status,
     carrier: shipment.carrier,
     trackingNo: shipment.trackingNo,
-    events: (cache?.events as TrackingNode[] | null) ?? [],
-    provider: cache?.provider ?? 'local',
+    events: (cache?.events as TrackingNode[] | null) ?? pulled?.events ?? [],
+    provider: cache?.provider ?? (pulled ? '17track' : 'local'),
     syncedAt: cache?.syncedAt ?? new Date(0),
   }
 }
@@ -153,6 +182,15 @@ export async function upsertTrackingCache(
     await existing.update(values as never)
     return existing.id
   }
-  const row = await ShopTrackingEvent.create(values as never)
-  return row.id
+  try {
+    const row = await ShopTrackingEvent.create(values as never)
+    return row.id
+  } catch (err) {
+    if (!(err instanceof UniqueConstraintError)) throw err
+    // 后台并发刷新同一运单：唯一键冲突说明赢家已插入，回读后更新同一行
+    const winner = await ShopTrackingEvent.findOne({ where: { tenantId: tId, shipmentId: input.shipmentId } })
+    if (!winner) throw err
+    await winner.update(values as never)
+    return winner.id
+  }
 }
