@@ -23,20 +23,34 @@ export async function listRmas(q: { status?: string; orderId?: number; limit?: n
   return { rows, total: count, limit, offset }
 }
 
-/** 审核通过：pending → approved（顾客随后可提交回寄单号） */
+/**
+ * 审核通过：pending → approved（顾客随后可提交回寄单号）。
+ * CAS 原子流转（UPDATE ... WHERE status='pending'）：与顾客取消、后台驳回
+ * 并发时恰好一方胜出；0 行受影响时回读区分 404/400。
+ */
 export async function approveRma(id: number) {
-  const row = await ShopRmaRequest.findOne({ where: { tenantId: tid(), id } })
-  if (!row) throw new AppError(404, '退货申请不存在')
-  if (row.status !== 'pending') throw new AppError(400, '仅 pending 状态的申请可审核')
-  await row.update({ status: 'approved' } as never)
-  return row
+  const tId = tid()
+  const [affected] = await ShopRmaRequest.update({ status: 'approved' } as never, {
+    where: { tenantId: tId, id, status: 'pending' },
+  })
+  if (affected === 0) {
+    const row = await ShopRmaRequest.findOne({ where: { tenantId: tId, id } })
+    if (!row) throw new AppError(404, '退货申请不存在')
+    throw new AppError(400, '仅 pending 状态的申请可审核')
+  }
+  return ShopRmaRequest.findOne({ where: { tenantId: tId, id } })
 }
 
 /** 审核驳回：pending → rejected，必须附驳回原因（≤255 字符，schema 已校验） */
 export async function rejectRma(id: number, rejectReason: string) {
-  const row = await ShopRmaRequest.findOne({ where: { tenantId: tid(), id } })
-  if (!row) throw new AppError(404, '退货申请不存在')
-  if (row.status !== 'pending') throw new AppError(400, '仅 pending 状态的申请可驳回')
-  await row.update({ status: 'rejected', rejectReason } as never)
-  return row
+  const tId = tid()
+  const [affected] = await ShopRmaRequest.update({ status: 'rejected', rejectReason } as never, {
+    where: { tenantId: tId, id, status: 'pending' },
+  })
+  if (affected === 0) {
+    const row = await ShopRmaRequest.findOne({ where: { tenantId: tId, id } })
+    if (!row) throw new AppError(404, '退货申请不存在')
+    throw new AppError(400, '仅 pending 状态的申请可驳回')
+  }
+  return ShopRmaRequest.findOne({ where: { tenantId: tId, id } })
 }

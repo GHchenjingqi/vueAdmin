@@ -73,11 +73,7 @@ function toListItem(r: ShopRmaRequest): RmaListItem {
 }
 
 /** 提交退货申请：校验订单归属/可退状态/明细，服务端重算退款金额 */
-export async function submitRma(
-  _site: StorefrontSite,
-  input: RmaSubmitInput,
-  auth: RmaAuth,
-): Promise<RmaSubmitResult> {
+export async function submitRma(_site: StorefrontSite, input: RmaSubmitInput, auth: RmaAuth): Promise<RmaSubmitResult> {
   const tId = tid()
   // 同一订单的退货申请放同一事务：锁订单行串行化并发提交，
   // 否则两个请求各自读到「尚无历史申请」都能通过累计校验，合计退款仍会超过订单实付。
@@ -132,18 +128,21 @@ export async function submitRma(
       snapshot!.push({ orderItemId: oi.id, skuId: oi.skuId, qty: it.qty, title: oi.title })
     }
 
-    const row = await ShopRmaRequest.create({
-      tenantId: tId,
-      siteId: _site.shopId ?? 0,
-      orderId: order.id,
-      customerId: auth.customerId,
-      email: auth.email,
-      status: 'pending',
-      reason: input.reason ?? null,
-      items: snapshot,
-      refundAmountCents: refundCents,
-      refundCurrency: order.currency,
-    }, { transaction: t })
+    const row = await ShopRmaRequest.create(
+      {
+        tenantId: tId,
+        siteId: _site.shopId ?? 0,
+        orderId: order.id,
+        customerId: auth.customerId,
+        email: auth.email,
+        status: 'pending',
+        reason: input.reason ?? null,
+        items: snapshot,
+        refundAmountCents: refundCents,
+        refundCurrency: order.currency,
+      },
+      { transaction: t },
+    )
     return {
       id: row.id,
       status: row.status,
@@ -171,21 +170,28 @@ export async function getMyRma(_site: StorefrontSite, id: number, customerId: nu
   return toListItem(row)
 }
 
-/** 顾客取消：仅 pending 可取消 */
-export async function cancelRma(
-  _site: StorefrontSite,
-  id: number,
-  customerId: number,
-): Promise<{ status: string }> {
+/**
+ * 顾客取消：仅 pending 可取消。
+ * CAS 原子流转（UPDATE ... WHERE status='pending'）：并发窗口内与后台审核
+ * （approve/reject）互斥，恰好一方胜出；0 行受影响时回读区分 404/400。
+ */
+export async function cancelRma(_site: StorefrontSite, id: number, customerId: number): Promise<{ status: string }> {
   const tId = tid()
-  const row = await ShopRmaRequest.findOne({ where: { id, tenantId: tId, customerId } })
-  if (!row) throw new AppError(404, '退货申请不存在')
-  if (row.status !== 'pending') throw new AppError(400, '仅 pending 状态的申请可取消')
-  await row.update({ status: 'cancelled' } as never)
+  const [affected] = await ShopRmaRequest.update({ status: 'cancelled' } as never, {
+    where: { id, tenantId: tId, customerId, status: 'pending' },
+  })
+  if (affected === 0) {
+    const row = await ShopRmaRequest.findOne({ where: { id, tenantId: tId, customerId } })
+    if (!row) throw new AppError(404, '退货申请不存在')
+    throw new AppError(400, '仅 pending 状态的申请可取消')
+  }
   return { status: 'cancelled' }
 }
 
-/** 顾客回寄：仅 approved（审核通过）可提交物流单号，状态置 returned */
+/**
+ * 顾客回寄：仅 approved（审核通过）可提交物流单号，状态置 returned。
+ * CAS 原子流转：并发两次回寄只有首次生效，单号不会被后写覆盖。
+ */
 export async function submitReturnTracking(
   _site: StorefrontSite,
   id: number,
@@ -193,9 +199,13 @@ export async function submitReturnTracking(
   customerId: number,
 ): Promise<{ status: string; trackingNo: string }> {
   const tId = tid()
-  const row = await ShopRmaRequest.findOne({ where: { id, tenantId: tId, customerId } })
-  if (!row) throw new AppError(404, '退货申请不存在')
-  if (row.status !== 'approved') throw new AppError(400, '仅审核通过(approved)的申请可回寄')
-  await row.update({ status: 'returned', trackingNo } as never)
+  const [affected] = await ShopRmaRequest.update({ status: 'returned', trackingNo } as never, {
+    where: { id, tenantId: tId, customerId, status: 'approved' },
+  })
+  if (affected === 0) {
+    const row = await ShopRmaRequest.findOne({ where: { id, tenantId: tId, customerId } })
+    if (!row) throw new AppError(404, '退货申请不存在')
+    throw new AppError(400, '仅审核通过(approved)的申请可回寄')
+  }
   return { status: 'returned', trackingNo }
 }
