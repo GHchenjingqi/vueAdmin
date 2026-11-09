@@ -63,6 +63,13 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
   })
   await queryInterface.addIndex('referral_commissions', ['tenantId', 'referrerCustomerId'])
   await queryInterface.addIndex('referral_commissions', ['tenantId', 'status'])
+  // P5-T07 修复：模型声明的 (tenantId, orderId) 唯一约束必须落到迁移。
+  // 项目走 Umzug 而非 sequelize.sync()，模型 indexes 不会自动生效。
+  // 前置：执行前须清理历史重复台账，否则 addIndex(unique) 会失败。
+  await queryInterface.addIndex('referral_commissions', ['tenantId', 'orderId'], {
+    unique: true,
+    name: 'uq_referral_tenant_order',
+  })
 }
 
 export async function down(queryInterface: QueryInterface): Promise<void> {

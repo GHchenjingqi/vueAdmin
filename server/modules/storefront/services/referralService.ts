@@ -1,4 +1,4 @@
-import { Op } from 'sequelize'
+import { Op, UniqueConstraintError } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { isFeatureEnabled } from '../../featureflags/featureFlags.js'
@@ -89,24 +89,58 @@ export async function recordCommission(params: RecordCommissionParams): Promise<
   if (!referrer) return null
 
   const netCents = Math.round(params.orderNetCents)
-  const touchAt = params.referralTouchAt ? new Date(params.referralTouchAt) : new Date()
+  // P5-T07 修复：触点时间不得由调用方任意延长窗口。
+  // 未来时间 / Invalid Date 一律 fail-closed（视作 void 不计佣），
+  // 避免 NaN 比较把非法日期误判成「未过期」而计佣。
+  const now = Date.now()
+  const rawTouch = params.referralTouchAt ? new Date(params.referralTouchAt).getTime() : now
+  const touchMs = Number.isFinite(rawTouch) && rawTouch <= now ? rawTouch : now
+  const touchAt = new Date(touchMs)
   const windowExpiredAt = new Date(touchAt.getTime() + REFERRAL_WINDOW_DAYS * 24 * 60 * 60 * 1000)
-  const expired = Date.now() > windowExpiredAt.getTime()
+  const expired = !Number.isFinite(rawTouch) || rawTouch > now || now > windowExpiredAt.getTime()
 
   const commissionCents = expired ? 0 : computeCommissionCents(netCents, REFERRAL_RATE_PERCENT)
   const status: 'pending' | 'void' = expired ? 'void' : 'pending'
-  const row = await ShopReferralCommission.create({
-    tenantId: tId,
-    orderId: params.orderId,
-    referrerCustomerId: params.referrerCustomerId,
-    code: params.code,
-    orderCurrency: params.orderCurrency,
-    orderNetAmountCents: netCents,
-    commissionRatePercent: REFERRAL_RATE_PERCENT,
-    commissionCents,
-    status,
-    windowExpiredAt,
-  } as never)
+
+  // 幂等：同一订单只保留一条台账（数据库唯一索引为最终兜底）。
+  const existing = await ShopReferralCommission.findOne({ where: { tenantId: tId, orderId: params.orderId } })
+  if (existing) {
+    return {
+      status: existing.status === 'pending' ? 'pending' : 'void',
+      commissionCents: Number(existing.commissionCents),
+      orderCurrency: existing.orderCurrency,
+      windowExpiredAt: existing.windowExpiredAt,
+    }
+  }
+  // 并发下 findOne 与 create 之间存在竞态，唯一索引是最终兜底：
+  // 撞唯一键说明另一调用已写入，回读首笔台账返回，不重复计佣也不抛异常。
+  try {
+    await ShopReferralCommission.create({
+      tenantId: tId,
+      orderId: params.orderId,
+      referrerCustomerId: params.referrerCustomerId,
+      code: params.code,
+      orderCurrency: params.orderCurrency,
+      orderNetAmountCents: netCents,
+      commissionRatePercent: REFERRAL_RATE_PERCENT,
+      commissionCents,
+      status,
+      windowExpiredAt,
+    } as never)
+  } catch (err) {
+    if (err instanceof UniqueConstraintError) {
+      const dup = await ShopReferralCommission.findOne({ where: { tenantId: tId, orderId: params.orderId } })
+      if (dup) {
+        return {
+          status: dup.status === 'pending' ? 'pending' : 'void',
+          commissionCents: Number(dup.commissionCents),
+          orderCurrency: dup.orderCurrency,
+          windowExpiredAt: dup.windowExpiredAt,
+        }
+      }
+    }
+    throw err
+  }
 
   return { status, commissionCents, orderCurrency: params.orderCurrency, windowExpiredAt }
 }

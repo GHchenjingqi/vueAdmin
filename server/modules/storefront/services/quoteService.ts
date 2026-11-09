@@ -189,7 +189,12 @@ export async function createQuote(
   // T-07：券码由服务端校验并重算折扣，前端传入的任何折扣金额一律忽略
   const coupon = await evaluateCoupon(input.couponCode, { currency, subtotalCents })
   const couponDiscountCents = coupon?.discountCents ?? 0
-  const discountCents = bundleDiscountCents + couponDiscountCents
+  // P5-T05 修复：bundle 优惠已在 L165-171 折入行单价并重算 subtotalCents，
+  // 因此 discountCents 只表示「从折后小计额外扣减的券折」。
+  // 原实现把 bundleDiscountCents 再次计入 discountCents，导致同一笔优惠被扣两次
+  // （订单明细合计 != amountCents，商户每单多让利一倍优惠）。
+  // bundle 优惠仍由 bundleDiscountCents / bundle 字段单独暴露给前端展示。
+  const discountCents = couponDiscountCents
   const amountCents = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents)
 
   // P5-T04：订单级配送承诺 = 各 SKU 主仓承诺的最大值（取最不利/最长），无库存记录为 null

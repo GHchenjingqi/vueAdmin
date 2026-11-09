@@ -119,7 +119,12 @@ const SETTLED_PAYMENT_STATUSES = new Set(['captured', 'refunding', 'refunded'])
  * 返回 { ok, status } 供 controller 转化为 HTTP 响应；验签失败抛 401，且不产生任何副作用。
  */
 export async function handleWebhook(provider: string, rawBody: Buffer, signature: string | undefined): Promise<WebhookResult> {
-  const secret = config.payment?.webhookSecret ?? 'storefront_mock_webhook_secret'
+  // P5-T03 修复 1/4：provider 必须已注册；未知 provider 在验签/解析前直接拒绝，
+  // 避免任意路径参数都能进入支付状态机。
+  const def = getProvider(provider)
+  if (!def) return { ok: false, status: 400, message: `未注册的支付 Provider: ${provider}` }
+  // P5-T03 修复 4/4：优先使用 Provider 声明的独立 webhook 密钥。
+  const secret = def.webhookSecret ?? config.payment?.webhookSecret ?? 'storefront_mock_webhook_secret'
 
   // 1) 验签（时序安全比较）
   if (!signature) return { ok: false, status: 401, message: '缺少签名' }
@@ -145,14 +150,25 @@ export async function handleWebhook(provider: string, rawBody: Buffer, signature
 
   if (!providerRef || !orderNo) return { ok: false, status: 400, message: '缺少 providerRef / orderNo' }
 
-  // 3) 去重：同一 provider+providerRef 已存在则直接返回成功（幂等）
-  const prev = await ShopOrderPayment.findOne({ where: { provider, providerRef, tenantId: tId } as never })
+  // P5-T03 修复 3/4：以 providerRef 查绑定记录，换 provider 重投必须拒绝，
+  // 否则同一 providerRef 换一个 provider 就能绕开 (provider,providerRef) 幂等去重。
+  // 兼容策略：无历史支付记录的订单放行（内部建单/回归夹具）；
+  // 是否收紧为「一律拒绝」需业务确认，见 docs/reports/p5-fix-readiness.md。
+  const prev = await ShopOrderPayment.findOne({ where: { providerRef, tenantId: tId } as never })
+  if (prev && prev.provider !== provider) {
+    return { ok: false, status: 400, message: `providerRef 已绑定其它 Provider: ${prev.provider}` }
+  }
   if (prev && prev.status !== 'initiated') {
     return { ok: true, alreadyProcessed: true, status: 200 }
   }
 
   const order = await ShopOrder.findOne({ where: { orderNo, tenantId: tId } })
   if (!order) return { ok: false, status: 404, message: '订单不存在' }
+
+  // P5-T03 修复 2/4：flag 关闭 / 币种不支持的 Provider 不得通过回调改单（关闭态零副作用）。
+  if (!(await isProviderUsable(def, order.currency))) {
+    return { ok: false, status: 403, message: `Provider ${provider} 不可用（flag 关闭或币种不支持）` }
+  }
 
   // 回调币种若与订单快照不一致，以订单快照为准，记录告警（此处仅日志，不改单）
   if (typeof payload?.currency === 'string' && payload.currency !== order.currency) {

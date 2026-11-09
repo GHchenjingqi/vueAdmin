@@ -106,6 +106,59 @@ npx tsc -p tsconfig.json --noEmit
 
 **结论**：B 线就绪包保持有效，落地前置条件未变（等待并行方提交 P5 批次）；本轮零源码改动、零 WIP 暂存。
 
+## 9. 落地记录（2026-11-09）
+
+P5 后端批次已由 `7e1f82c` 入库（16 新文件 + 22 接线），B 线解锁。本节记录补丁实际应用结果与两处偏离预案的修正，**不代勾任何任务行或门禁**。
+
+### 9.1 补丁应用结果
+
+`git apply --check --verbose` 5/5 通过后 `git apply` 成功，5 文件 6 hunk（`+60/-10`）：
+
+| 项 | 内容 | 结果 |
+| --- | --- | --- |
+| A | Bundle 双重折扣：`discountCents = couponDiscountCents`（上线阻断） | 落地，A1~A4 通过 |
+| B | Webhook：provider 注册校验 / `providerRef` 绑定 / `isProviderUsable` / 独立 `webhookSecret` | 落地，W1~W5 通过 |
+| C | `000069` 补 `uq_referral_tenant_order` | **仅对全新环境有效**，见 9.2 |
+| D | 归因窗口未来时间 / Invalid Date fail-closed + 台账幂等 | 落地，C1~C3 通过；并发缺陷另修，见 9.3 |
+| E | `primaryWarehouse()` 统一承诺仓与发货仓口径 | 落地，D1~D3 通过 |
+
+Windows `core.autocrlf=true` 下 `git apply` 把两个原本 LF 的文件（`000069`、`warehouseRoutingService.ts`）规范成 CRLF，已逐字节转回 LF；其余 3 个文件保持纯 CRLF，diff 无行尾污染。
+
+### 9.2 偏离预案：`000069` 已执行，另建 `000070`
+
+实查 `sequelizemeta`，`000066`~`000069` **均已执行**，`referral_commissions` 无重复台账（仅 1 行），但 `uq_referral_tenant_order` 确实缺失。直接改 `000069` 不会让索引落库，故按 §6 预案新增 `server/migrations/20261106_000070_add-referral-commission-unique.ts`：
+
+- `up()` 先 `showIndex` 判存，已存在则跳过（全新环境由 `000069` 建过）；表不存在亦跳过；
+- 建索引前检查历史重复 `(tenantId, orderId)`，**有重复即抛错要求人工核对清理**（fail-closed，不自动删业务数据）；
+- `down()` 同样幂等 `removeIndex`。
+
+`npm run migrate` 执行成功，实查 `information_schema` 确认 `uq_referral_tenant_order`（`tenantId, orderId`，`NON_UNIQUE=0`）已落库。
+
+### 9.3 新增修复：计佣并发唯一键冲突（B2 首次失败）
+
+17 例首次运行 16/17，B2（`Promise.allSettled` 两次 `recordCommission`）失败：补丁 D 的 `findOne` 存在性检查与 `create` 非原子，索引落库后并发的第二个调用撞 `uq_referral_tenant_order` 抛异常。修复参照项目既有惯例（`refundService.ts` / `couponService.ts`）：`referralService.ts` 导入 `UniqueConstraintError`，`create` 包 try/catch，仅捕获唯一键冲突后回读首笔台账返回（不重复计佣、不抛异常），其它错误照常抛出。修复后 **17/17 通过**。
+
+### 9.4 新增修复：回归用例租户 ID 冲突（并行全量 flake）
+
+并行全量第 3 轮出现 4 例 `SKU 4910 库存不足（可用 0）`。根因：用例模板的 `TID=987654` 与既有 `inventory-concurrency.test.ts` **共用同一租户**，后者在 `beforeEach` 执行 `ShopInventory.destroy({ where: { tenantId: TID } })`，把本用例 `beforeAll` 初始化的库存清掉。已将 `server/__tests__/p5-fix-readiness.test.ts` 与模板 `docs/patches/p5-fix-readiness.test.ts.txt` 同步改为专属 `TID=987690`（全仓无占用），两份文件逐字节一致。修复后三轮并行全量中该失败不再出现。
+
+### 9.5 验证与既有 flake
+
+| 验证 | 结果 |
+| --- | --- |
+| 17 例就绪回归 | 单跑 17/17（修复前 16/17） |
+| P5 相关既有回归（6 文件） | 51/51 |
+| 服务端 typecheck | 0 错误 |
+| 并行全量（首轮） | **727/727（79 文件）全绿** |
+| 串行全量 `--no-file-parallelism` | **727/727（79 文件）全绿** |
+| 文档链接 | 72/72 |
+
+并行全量后三轮各 1 例失败，均为既有 `shopPhases.test.ts > 销售报表能聚合订单` 超时（`5000ms` 阈值；单跑两轮 2.3~2.5s、18/18 稳定）。该 flake 在本轮改动前多轮已登记，与本补丁无关；按最小改动约定**未修改既有测试的超时配置**，以串行全量全绿作为干净基线证据。
+
+### 9.6 仍待决策（沿用 §6、§8，本轮未扩改）
+
+Webhook「无历史支付记录放行」兼容策略、Provider 独立 webhook 密钥配置、归因窗口服务端首次触点持久化、账面承诺仓 ≠ 物理发货仓（`reserveItems` 不按仓定向扣减）、`inventory` 组合唯一索引、qty>1 分摊舍入严格相等、以及 `shopPhases` 超时 flake，均保持原状，需业务/环境/CI 责任方决策。
+
 ---
 
 *修复与门禁状态变更须由 P5 各责任方在提交后回填；本报告不代勾任何任务行。*

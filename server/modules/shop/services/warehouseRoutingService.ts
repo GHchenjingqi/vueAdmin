@@ -68,21 +68,26 @@ export async function routeWarehouses(skuId: number, country?: string | null): P
   return rows
 }
 
+/** P5-T04 修复：承诺仓与发货仓共用同一选仓口径（首个有货仓；全无货时回退 rows[0]） */
+function primaryWarehouse(rows: RoutedWarehouse[]): RoutedWarehouse | undefined {
+  return rows.find((r) => r.available > 0) ?? rows[0]
+}
+
 /** 为某 SKU 选取路由后的主仓（优先有货且区域命中的仓库） */
 export async function pickWarehouse(skuId: number, country?: string | null): Promise<number> {
   const rows = await routeWarehouses(skuId, country)
-  const withStock = rows.find((r) => r.available > 0)
-  if (!withStock) throw new AppError(400, `SKU ${skuId} 无可用库存`)
+  const withStock = primaryWarehouse(rows)
+  if (!withStock || withStock.available <= 0) throw new AppError(400, `SKU ${skuId} 无可用库存`)
   return withStock.warehouseId
 }
 
-/** 按仓配送承诺：取路由后的主仓（区域命中 + 优先级 + 可用量） */
+/** 按仓配送承诺：取路由后的主仓（区域命中 + 优先级 + 可用量），与实际发货仓一致 */
 export async function getDeliveryCommitment(
   skuId: number,
   country?: string | null,
 ): Promise<DeliveryCommitment | null> {
   const rows = await routeWarehouses(skuId, country)
-  const primary = rows[0]
+  const primary = primaryWarehouse(rows)
   if (!primary) return null
   return {
     warehouseId: primary.warehouseId,

@@ -6,7 +6,7 @@
  *   cd server && npx vitest run __tests__/p5-fix-readiness.test.ts
  *
  * 17 例：Bundle 4 / 佣金 2 / 归因窗口 3 / 仓网 3 / Webhook 5。
- * 全部使用独立租户 TID=987654 与唯一 SKU/单号，与并行方 dev 数据零共享。
+ * 全部使用独立租户 TID=987690 与唯一 SKU/单号，与并行方 dev 数据零共享。
  * 对应报告：docs/reports/p5-extension-audit.md、docs/reports/p5t03-webhook-audit.md。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
@@ -40,7 +40,7 @@ vi.mock('../modules/featureflags/featureFlags.js', async (importOriginal) => {
   }
 })
 
-const TID = 987654
+const TID = 987690
 const uniq = (): string => `p5${Date.now()}${Math.floor(Math.random() * 1e6)}`
 const inTenant = <T>(fn: () => Promise<T>): Promise<T> => runInTenant({ tenantId: TID }, fn)
 const day = (offset: number): string => {
