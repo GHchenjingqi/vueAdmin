@@ -98,6 +98,8 @@ export interface CredentialFieldView {
   key: string
   label: string
   secret: boolean
+  /** PEM 证书等多行文本：前端用 textarea 录入 */
+  multiline: boolean
   present: boolean
   /** secret 仅末 4 位掩码；非 secret 回显明文（均为非敏感信息，如网关地址/商户号） */
   value: string
@@ -111,7 +113,7 @@ export async function maskCredentials(tenantId: number, provider: string): Promi
     const v = stored[f.key] || process.env[`${def.prefix}_${f.key}`] || ''
     const present = !!v
     const value = f.secret ? (present ? `****${v.slice(-4)}` : '') : v
-    return { key: f.key, label: f.label, secret: f.secret, present, value }
+    return { key: f.key, label: f.label, secret: f.secret, multiline: !!f.multiline, present, value }
   })
 }
 

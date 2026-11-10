@@ -96,6 +96,15 @@ describe('支付凭据加密落库（DB 主、env 兜底）', () => {
     })
   })
 
+  it('PEM 证书字段标记为 multiline（前端用 textarea，避免粘贴丢换行）', async () => {
+    const wechat = (await listCredentialProviders(TID)).find((p) => p.id === 'wechat')!
+    expect(wechat.fields.find((f) => f.key === 'PRIVATE_KEY')?.multiline).toBe(true)
+    expect(wechat.fields.find((f) => f.key === 'PLATFORM_PUBLIC_KEY')?.multiline).toBe(true)
+    expect(wechat.fields.find((f) => f.key === 'MCH_ID')?.multiline).toBe(false)
+    const paypal = (await listCredentialProviders(TID)).find((p) => p.id === 'paypal')!
+    expect(paypal.fields.find((f) => f.key === 'CLIENT_SECRET')?.multiline).toBe(false)
+  })
+
   it('saveCredentials 空字符串字段保留原值（不覆盖）', async () => {
     await inTenant(async () => {
       await saveCredentials(TID, 'paypal', { CLIENT_ID: 'DB_CID', CLIENT_SECRET: 'DB_SECRET', ENV: 'sandbox', WEBHOOK_ID: 'DB_WH' })

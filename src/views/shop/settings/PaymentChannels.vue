@@ -23,6 +23,7 @@ interface CredField {
   key: string
   label: string
   secret: boolean
+  multiline: boolean
   present: boolean
   value: string
 }
@@ -219,8 +220,16 @@ onMounted(reload)
         </div>
         <el-form label-width="160px" class="cred-form">
           <el-form-item v-for="f in p.fields" :key="f.key" :label="f.label">
+            <!-- PEM 私钥/公钥为多行文本：必须用 textarea，单行 input 粘贴会丢换行导致验签失败 -->
             <el-input
-              v-if="f.secret"
+              v-if="f.multiline"
+              v-model="credDrafts[p.id][f.key]"
+              type="textarea"
+              :rows="4"
+              :placeholder="f.present ? `已配置（掩码 ${f.value}，留空保留原值）` : '未配置，请粘贴完整 PEM（含 BEGIN/END 行）'"
+            />
+            <el-input
+              v-else-if="f.secret"
               v-model="credDrafts[p.id][f.key]"
               type="password"
               show-password
