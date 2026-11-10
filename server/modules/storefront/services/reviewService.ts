@@ -1,15 +1,7 @@
-import { Op } from 'sequelize'
+import { Op, Sequelize } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
-import {
-  ShopReview,
-  ShopProductQA,
-  ShopSpu,
-  ShopSku,
-  ShopCustomer,
-  ShopOrder,
-  ShopOrderItem,
-} from '../../shop/models/index.js'
+import { ShopReview, ShopProductQA, ShopSpu, ShopSku, ShopCustomer, ShopOrder, ShopOrderItem } from '../../shop/models/index.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
 
 /**
@@ -58,21 +50,14 @@ export interface ReviewSubmitInput {
 }
 
 /** 提交评价：校验商品/SKU 存在、评分范围，可选 orderId 触发已购验证 */
-export async function submitReview(
-  _site: StorefrontSite,
-  input: ReviewSubmitInput,
-  auth?: ReviewAuth,
-): Promise<{ id: number; status: string }> {
+export async function submitReview(_site: StorefrontSite, input: ReviewSubmitInput, auth?: ReviewAuth): Promise<{ id: number; status: string }> {
   const tId = tid()
   await assertSpu(input.spuId, tId)
   const skuId = await resolveSku(input.spuId, input.skuId, tId)
   if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
     throw new AppError(400, '评分必须为 1-5 的整数')
   }
-  const verified =
-    auth && input.orderId != null
-      ? await verifyPurchase(tId, auth.email, input.orderId, input.spuId, skuId)
-      : false
+  const verified = auth && input.orderId != null ? await verifyPurchase(tId, auth.email, input.orderId, input.spuId, skuId) : false
   const row = await ShopReview.create({
     tenantId: tId,
     spuId: input.spuId,
@@ -97,13 +82,7 @@ export async function submitReview(
  * skuId 省略时评价针对 SPU 整体，须按该 SPU 下全部 SKU 匹配，
  * 否则「买过任意商品」即可给任何商品刷出已购标记。
  */
-async function verifyPurchase(
-  tenantId: number,
-  email: string,
-  orderId: number,
-  spuId: number,
-  skuId: number | null,
-): Promise<boolean> {
+async function verifyPurchase(tenantId: number, email: string, orderId: number, spuId: number, skuId: number | null): Promise<boolean> {
   const order = await ShopOrder.findOne({
     where: {
       id: orderId,
@@ -187,7 +166,7 @@ export async function listReviews(_site: StorefrontSite, q: ReviewListQuery): Pr
     title: r.title,
     content: r.content,
     images: r.images,
-    reviewerName: r.isAnonymous ? '匿名用户' : r.customerId ? names[r.customerId] ?? '顾客' : '顾客',
+    reviewerName: r.isAnonymous ? '匿名用户' : r.customerId ? (names[r.customerId] ?? '顾客') : '顾客',
     isAnonymous: r.isAnonymous,
     verified: r.verified,
     helpfulCount: r.helpfulCount,
@@ -199,11 +178,19 @@ export async function listReviews(_site: StorefrontSite, q: ReviewListQuery): Pr
 /** 「有用」投票：仅对公开评价计数，防越权（不公开的评价不可投票） */
 export async function markHelpful(_site: StorefrontSite, reviewId: number): Promise<{ helpfulCount: number }> {
   const tId = tid()
-  const row = await ShopReview.findOne({ where: { id: reviewId, tenantId: tId, status: 'approved' } })
-  if (!row) throw new AppError(404, '评价不存在或未公开')
-  await row.increment('helpfulCount')
-  await row.reload()
-  return { helpfulCount: row.helpfulCount }
+  // 原子自增 + 守卫：在单条 UPDATE 内完成「校验 approved/tenant + 计数+1」，
+  // 避免先查后增的并发 lost-update；并发调用各自独立原子执行，终态计数 = 实际调用数。
+  // 同时把 approved 守卫放进 WHERE，消除 findOne 与自增之间的状态竞态窗口。
+  const [affected] = await ShopReview.update(
+    { helpfulCount: Sequelize.literal('helpfulCount + 1') },
+    { where: { id: reviewId, tenantId: tId, status: 'approved' } },
+  )
+  if (affected === 0) throw new AppError(404, '评价不存在或未公开')
+  const row = await ShopReview.findOne({
+    where: { id: reviewId, tenantId: tId },
+    attributes: ['id', 'helpfulCount'],
+  })
+  return { helpfulCount: row!.helpfulCount }
 }
 
 // ————————————————————————————————————————————————
@@ -218,11 +205,7 @@ export interface QuestionSubmitInput {
 }
 
 /** 提交问题：校验商品/SKU 存在，进入 pending 待回答 */
-export async function submitQuestion(
-  _site: StorefrontSite,
-  input: QuestionSubmitInput,
-  auth?: ReviewAuth,
-): Promise<{ id: number; status: string }> {
+export async function submitQuestion(_site: StorefrontSite, input: QuestionSubmitInput, auth?: ReviewAuth): Promise<{ id: number; status: string }> {
   const tId = tid()
   await assertSpu(input.spuId, tId)
   const skuId = await resolveSku(input.spuId, input.skuId, tId)
