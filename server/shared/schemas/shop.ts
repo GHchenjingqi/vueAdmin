@@ -359,6 +359,8 @@ export const createRefundSchema = z.object({
   idempotencyKey: z.string().min(1).max(64).optional(),
   /** 仅用于校验；与订单快照不符直接拒绝，不参与落库 */
   currency: z.string().length(3).optional(),
+  /** 关联 RMA 申请：退款成功后将其状态驱动为 refunded（仅 approved/returned 可驱动，幂等） */
+  rmaId: z.number().int().positive().optional(),
 })
 export type CreateRefundInput = z.infer<typeof createRefundSchema>
 

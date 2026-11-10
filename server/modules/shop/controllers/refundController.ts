@@ -12,6 +12,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
       reason: body.reason,
       idempotencyKey: body.idempotencyKey,
       currency: body.currency,
+      rmaId: body.rmaId,
     })
     res.status(201).json({ code: 0, data })
   } catch (err) {

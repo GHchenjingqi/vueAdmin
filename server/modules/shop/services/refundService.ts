@@ -1,9 +1,9 @@
 import crypto from 'node:crypto'
-import { UniqueConstraintError } from 'sequelize'
+import { Op, UniqueConstraintError } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
 import sequelize from '../../../config/database.js'
-import { ShopOrderRefund } from '../models/index.js'
+import { ShopOrderRefund, ShopRmaRequest } from '../models/index.js'
 import { tryEnqueue } from './orderMailService.js'
 import * as auditLogService from './auditLogService.js'
 import { withDeadlockRetry } from './deadlockRetry.js'
@@ -41,6 +41,8 @@ export interface CreateRefundParams {
   idempotencyKey?: string
   /** 仅用于一致性校验，与订单快照不符直接拒绝；不传则以订单快照为准 */
   currency?: string
+  /** 关联 RMA 申请：退款成功后将其状态驱动为 refunded（状态机终态）。仅 approved/returned 可驱动，幂等 */
+  rmaId?: number
 }
 
 export interface RefundView {
@@ -125,87 +127,105 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
   if (existing) return notifyRefund(toView(existing))
 
   try {
-    return await notifyRefund(await withDeadlockRetry(() =>
-      sequelize.transaction(async (tx) => {
-        const [orderRows] = await sequelize.query(
-          'SELECT id, orderNo, amountCents, currency, paymentStatus FROM orders WHERE id = ? AND tenantId = ? FOR UPDATE',
-          { replacements: [params.orderId, tId], transaction: tx },
-        )
-        const order = (orderRows as any[])[0]
-        if (!order) throw new AppError(404, '订单不存在')
+    return await notifyRefund(
+      await withDeadlockRetry(() =>
+        sequelize.transaction(async (tx) => {
+          const [orderRows] = await sequelize.query(
+            'SELECT id, orderNo, amountCents, currency, paymentStatus FROM orders WHERE id = ? AND tenantId = ? FOR UPDATE',
+            { replacements: [params.orderId, tId], transaction: tx },
+          )
+          const order = (orderRows as any[])[0]
+          if (!order) throw new AppError(404, '订单不存在')
 
-        if (!['captured', 'refunding'].includes(order.paymentStatus)) {
-          throw new AppError(400, `ORDER_NOT_REFUNDABLE: 当前支付状态 ${order.paymentStatus} 不可退款`)
-        }
-        if (params.currency && params.currency.toUpperCase() !== order.currency.toUpperCase()) {
-          throw new AppError(400, `REFUND_CURRENCY_MISMATCH: 退款币种须与订单快照 ${order.currency} 一致`)
-        }
-
-        const paidCents = Number(order.amountCents)
-        const [sumRows] = await sequelize.query(
-          "SELECT COALESCE(SUM(amountCents), 0) AS total FROM shop_order_refunds WHERE tenantId = ? AND orderId = ? AND status IN ('pending', 'succeeded')",
-          { replacements: [tId, params.orderId], transaction: tx },
-        )
-        const alreadyRefunded = Number((sumRows as any[])[0]?.total ?? 0)
-        const remaining = paidCents - alreadyRefunded
-        if (remaining <= 0) throw new AppError(400, 'REFUND_EXCEEDS_PAID: 订单已全额退款')
-
-        const amountCents = params.amountCents ?? remaining
-        if (!Number.isInteger(amountCents) || amountCents <= 0) {
-          throw new AppError(400, 'REFUND_INVALID_AMOUNT: 退款金额须为正整数分')
-        }
-        if (amountCents > remaining) {
-          throw new AppError(400, `REFUND_EXCEEDS_PAID: 最多可退 ${remaining} 分`)
-        }
-
-        let providerRef: string | null = null
-        if (refundProvider) {
-          try {
-            const result = await invokeProviderOnce({ refundNo, orderNo: order.orderNo, amountCents, currency: order.currency })
-            providerRef = (result as { providerRef?: string } | undefined)?.providerRef ?? null
-          } catch (err) {
-            throw new AppError(502, `REFUND_PROVIDER_FAILED: ${err instanceof Error ? err.message : String(err)}`)
+          if (!['captured', 'refunding'].includes(order.paymentStatus)) {
+            throw new AppError(400, `ORDER_NOT_REFUNDABLE: 当前支付状态 ${order.paymentStatus} 不可退款`)
           }
-        }
+          if (params.currency && params.currency.toUpperCase() !== order.currency.toUpperCase()) {
+            throw new AppError(400, `REFUND_CURRENCY_MISMATCH: 退款币种须与订单快照 ${order.currency} 一致`)
+          }
 
-        const row = await ShopOrderRefund.create(
-          {
-            tenantId: tId,
-            orderId: params.orderId,
-            orderNo: order.orderNo,
-            refundNo,
-            amountCents,
-            currency: order.currency,
-            reason: params.reason ?? null,
-            status: 'succeeded',
-            providerRef,
-            idempotencyKey,
-          } as never,
-          { transaction: tx },
-        )
+          const paidCents = Number(order.amountCents)
+          const [sumRows] = await sequelize.query(
+            "SELECT COALESCE(SUM(amountCents), 0) AS total FROM shop_order_refunds WHERE tenantId = ? AND orderId = ? AND status IN ('pending', 'succeeded')",
+            { replacements: [tId, params.orderId], transaction: tx },
+          )
+          const alreadyRefunded = Number((sumRows as any[])[0]?.total ?? 0)
+          const remaining = paidCents - alreadyRefunded
+          if (remaining <= 0) throw new AppError(400, 'REFUND_EXCEEDS_PAID: 订单已全额退款')
 
-        // X-T03：审计退款创建（system 事件，写入同事务；失败被服务吞掉，不阻断主流程）
-        await auditLogService.record(
-          {
-            actorType: 'system',
-            action: 'refund.created',
-            entityType: 'refund',
-            entityId: row.id,
-            afterState: { orderId: params.orderId, refundNo, amountCents, currency: order.currency },
-          },
-          tx,
-        )
+          const amountCents = params.amountCents ?? remaining
+          if (!Number.isInteger(amountCents) || amountCents <= 0) {
+            throw new AppError(400, 'REFUND_INVALID_AMOUNT: 退款金额须为正整数分')
+          }
+          if (amountCents > remaining) {
+            throw new AppError(400, `REFUND_EXCEEDS_PAID: 最多可退 ${remaining} 分`)
+          }
 
-        const total = alreadyRefunded + amountCents
-        // 部分退款 → refunding；全额 → refunded（订单状态保持 paid，历史履约事实不改写）
-        await sequelize.query('UPDATE orders SET paymentStatus = ?, updatedAt = NOW() WHERE id = ? AND tenantId = ?', {
-          replacements: [total >= paidCents ? 'refunded' : 'refunding', params.orderId, tId],
-          transaction: tx,
-        })
+          let providerRef: string | null = null
+          if (refundProvider) {
+            try {
+              const result = await invokeProviderOnce({ refundNo, orderNo: order.orderNo, amountCents, currency: order.currency })
+              providerRef = (result as { providerRef?: string } | undefined)?.providerRef ?? null
+            } catch (err) {
+              throw new AppError(502, `REFUND_PROVIDER_FAILED: ${err instanceof Error ? err.message : String(err)}`)
+            }
+          }
 
-        return toView(row)
-      }),
-    ))
+          const row = await ShopOrderRefund.create(
+            {
+              tenantId: tId,
+              orderId: params.orderId,
+              orderNo: order.orderNo,
+              refundNo,
+              amountCents,
+              currency: order.currency,
+              reason: params.reason ?? null,
+              status: 'succeeded',
+              providerRef,
+              idempotencyKey,
+            } as never,
+            { transaction: tx },
+          )
+
+          // RMA↔refund 联动：退款成功后将该 RMA 驱动为 refunded（状态机终态）。
+          // CAS 仅从 approved/returned 驱动，避免把 pending/rejected/cancelled 强行置为已退款；
+          // 同单校验（rma.orderId 须等于退款单）防越权改写其它订单的 RMA；
+          // 已是 refunded 时 0 行影响 → 幂等 no-op。与退款落库同事务，保证原子。
+          if (params.rmaId != null) {
+            await ShopRmaRequest.update({ status: 'refunded' } as never, {
+              where: {
+                id: params.rmaId,
+                tenantId: tId,
+                orderId: params.orderId,
+                status: { [Op.in]: ['approved', 'returned'] },
+              } as never,
+              transaction: tx,
+            })
+          }
+
+          // X-T03：审计退款创建（system 事件，写入同事务；失败被服务吞掉，不阻断主流程）
+          await auditLogService.record(
+            {
+              actorType: 'system',
+              action: 'refund.created',
+              entityType: 'refund',
+              entityId: row.id,
+              afterState: { orderId: params.orderId, refundNo, amountCents, currency: order.currency },
+            },
+            tx,
+          )
+
+          const total = alreadyRefunded + amountCents
+          // 部分退款 → refunding；全额 → refunded（订单状态保持 paid，历史履约事实不改写）
+          await sequelize.query('UPDATE orders SET paymentStatus = ?, updatedAt = NOW() WHERE id = ? AND tenantId = ?', {
+            replacements: [total >= paidCents ? 'refunded' : 'refunding', params.orderId, tId],
+            transaction: tx,
+          })
+
+          return toView(row)
+        }),
+      ),
+    )
   } catch (err) {
     // 并发下同一幂等键已被处理：返回首笔结果，不二次退款
     if (err instanceof UniqueConstraintError) {
