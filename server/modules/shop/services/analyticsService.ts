@@ -7,28 +7,45 @@ import { getTenantContext } from '../../../modules/tenant/context.js'
 const tid = (): number => getTenantContext()?.tenantId ?? 1
 
 /**
- * 汇率换算（基于 rate_snapshots 快照，禁止实时汇率回溯）。
- * 约定：snapshot.rates[currency] = 1 单位该币种折合多少基础币种（默认 USD）。
- * 即 amountUSD = amount * rate。无快照时退化为 1（不换算）。
+ * 批量预取租户全部汇率快照（按 rateDate 升序），供整张报表在内存中换算，
+ * 避免 profitReport / salesReport 对每个订单 / 商品行各打一次 rate_snapshots 查询（N+1）。
+ * 约定：snapshot.rates[currency] = 1 单位该币种折合多少基础币种（默认 USD），即 amountUSD = amount * rate。
  */
-async function toUSD(amount: number, currency: string, date: Date): Promise<number> {
-  if (currency === 'USD') return amount
-  const snap = await ShopRateSnapshot.findOne({
-    where: { tenantId: tid(), rateDate: { [Op.lte]: date.toISOString().slice(0, 10) } },
-    order: [['rateDate', 'DESC']],
+async function loadRateSnapshots(): Promise<{ rateDate: string; rates: Record<string, number> }[]> {
+  const rows = await ShopRateSnapshot.findAll({
+    where: { tenantId: tid() },
+    order: [['rateDate', 'ASC']],
   })
-  if (!snap) return amount
-  const rates = (snap.rates as Record<string, number>) || {}
-  const rate = rates[currency]
-  return typeof rate === 'number' ? amount * rate : amount
+  return rows.map((r) => ({
+    rateDate: String(r.rateDate),
+    rates: (r.rates as Record<string, number>) || {},
+  }))
 }
 
-async function baselineRate(currency: string): Promise<number> {
-  if (currency === 'USD') return 1
-  const snap = await ShopRateSnapshot.findOne({ where: { tenantId: tid() }, order: [['rateDate', 'ASC']] })
-  if (!snap) return 1
-  const rates = (snap.rates as Record<string, number>) || {}
-  return typeof rates[currency] === 'number' ? rates[currency] : 1
+/** 取 dateStr(YYYY-MM-DD) 当日及之前生效的最新快照汇率；无快照退化为 1（不换算） */
+function rateAt(
+  snaps: { rateDate: string; rates: Record<string, number> }[],
+  currency: string,
+  dateStr: string,
+): number {
+  let rates: Record<string, number> | null = null
+  for (const s of snaps) {
+    if (s.rateDate <= dateStr) rates = s.rates
+    else break
+  }
+  if (!rates) return 1
+  const rate = rates[currency]
+  return typeof rate === 'number' ? rate : 1
+}
+
+function toUSDAmount(
+  amount: number,
+  currency: string,
+  dateStr: string,
+  snaps: { rateDate: string; rates: Record<string, number> }[],
+): number {
+  if (currency === 'USD') return amount
+  return amount * rateAt(snaps, currency, dateStr)
 }
 
 function rangeFilter(query: AnalyticsQuery) {
@@ -48,6 +65,7 @@ export async function salesReport(query: AnalyticsQuery) {
   if (query.channelId) where.channelId = query.channelId
   const orders = await ShopOrder.findAll({ where, order: [['createdAt', 'ASC']] })
   const items = await ShopOrderItem.findAll({ where: { tenantId: tid(), orderId: { [Op.in]: orders.map((o) => o.id) } } })
+  const rateSnaps = await loadRateSnapshots()
 
   // sku -> categoryId 映射（用于 category 维度）
   const skuIds = Array.from(new Set(items.map((i) => i.skuId)))
@@ -90,7 +108,7 @@ export async function salesReport(query: AnalyticsQuery) {
     Array.from(groups.entries()).map(async ([key, g]) => {
       let usdTotal = 0
       for (const [cur, amt] of Object.entries(g.amountByCurrency)) {
-        usdTotal += await toUSD(amt, cur, new Date())
+        usdTotal += toUSDAmount(amt, cur, new Date().toISOString().slice(0, 10), rateSnaps)
       }
       return { key, amountByCurrency: g.amountByCurrency, usdTotal: Number(usdTotal.toFixed(2)), orderCount: g.orderIds.size, itemQty: g.itemQty }
     }),
@@ -104,6 +122,7 @@ export async function profitReport(query: AnalyticsQuery) {
   if (query.channelId) where.channelId = query.channelId
   const orders = await ShopOrder.findAll({ where, order: [['createdAt', 'ASC']] })
   const items = await ShopOrderItem.findAll({ where: { tenantId: tid(), orderId: { [Op.in]: orders.map((o) => o.id) } } })
+  const rateSnaps = await loadRateSnapshots()
 
   // SKU 申报价值（COGS 代理）映射
   const skuIds = Array.from(new Set(items.map((i) => i.skuId)))
@@ -118,8 +137,8 @@ export async function profitReport(query: AnalyticsQuery) {
 
   for (const order of orders) {
     const day = (order.createdAt as Date).toISOString().slice(0, 10)
-    const revenueUSD = await toUSD(Number(order.amount), order.currency, order.createdAt as Date)
-    const baseRate = await baselineRate(order.currency)
+    const revenueUSD = toUSDAmount(Number(order.amount), order.currency, day, rateSnaps)
+    const baseRate = rateSnaps.length ? (rateSnaps[0].rates[order.currency] ?? 1) : 1
     const revenueUSDbaseline = order.currency === 'USD' ? Number(order.amount) : Number(order.amount) * baseRate
     const fxGainLoss = Number((revenueUSD - revenueUSDbaseline).toFixed(2))
 
@@ -127,7 +146,7 @@ export async function profitReport(query: AnalyticsQuery) {
     let cost = 0
     for (const it of orderItems) {
       const declared = skuCost.get(it.skuId) ?? 0
-      cost += await toUSD(declared * it.qty, order.currency, order.createdAt as Date)
+      cost += toUSDAmount(declared * it.qty, order.currency, day, rateSnaps)
     }
 
     totalRevenueUSD += revenueUSD
