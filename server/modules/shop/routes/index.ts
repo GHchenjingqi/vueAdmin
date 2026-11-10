@@ -40,6 +40,7 @@ import {
   qaAnswerSchema,
 } from '../../../shared/schemas/shop.js'
 import { articleAdminListQuerySchema, articleCreateSchema, articleUpdateSchema } from '../../../shared/schemas/cmsAdmin.js'
+import { bannerAdminListQuerySchema, bannerCreateSchema, bannerUpdateSchema } from '../../../shared/schemas/bannerAdmin.js'
 import { updatePaymentCredentialsSchema } from '../../../shared/schemas/storefront-commerce.js'
 import * as categoryController from '../controllers/categoryController.js'
 import * as brandController from '../controllers/brandController.js'
@@ -60,6 +61,10 @@ import * as paymentChannelsController from '../controllers/paymentChannelsContro
 import * as refundController from '../controllers/refundController.js'
 import * as orderMailController from '../controllers/orderMailController.js'
 import * as articleAdminController from '../controllers/articleAdminController.js'
+import * as bannerAdminController from '../controllers/bannerAdminController.js'
+import * as customerAdminController from '../controllers/customerAdminController.js'
+import * as mailCampaignController from '../controllers/mailCampaignController.js'
+import * as membershipTierController from '../controllers/membershipTierController.js'
 import * as rmaAdminController from '../controllers/rmaAdminController.js'
 import * as reviewAdminController from '../controllers/reviewAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
@@ -248,5 +253,34 @@ router.post('/articles', authMiddleware, requireAdmin, validate(articleCreateSch
 router.put('/articles/:id', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), validate(articleUpdateSchema), articleAdminController.update)
 router.post('/articles/:id/publish', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), articleAdminController.publish)
 router.post('/articles/:id/unpublish', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), articleAdminController.unpublish)
+// 首页 Banner CRUD
+router.get('/banners', authMiddleware, requireAdmin, validate(bannerAdminListQuerySchema, 'query'), bannerAdminController.list)
+router.post('/banners', authMiddleware, requireAdmin, validate(bannerCreateSchema), bannerAdminController.create)
+router.put('/banners/:id', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), validate(bannerUpdateSchema), bannerAdminController.update)
+router.delete('/banners/:id', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), bannerAdminController.remove)
+
+// 会员系统（C 端顾客管理，admin JWT）——与后台用户管理（users 体系）无关
+router.get('/customers', authMiddleware, requireAdmin, customerAdminController.list)
+router.get('/customers/:id', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), customerAdminController.getById)
+router.patch('/customers/:id/status', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), customerAdminController.updateStatus)
+router.post('/customers/:id/points', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), customerAdminController.adjustPoints)
+
+// 营销邮件（对会员/用户群发，admin JWT）
+router.get('/mail-campaigns', authMiddleware, requireAdmin, mailCampaignController.list)
+router.get('/mail-campaigns/audience-stats', authMiddleware, requireAdmin, mailCampaignController.audienceStats)
+router.post('/mail-campaigns', authMiddleware, requireAdmin, mailCampaignController.create)
+router.post('/mail-campaigns/:id/send', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), mailCampaignController.send)
+router.get('/mail-campaigns/:id/recipients', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), mailCampaignController.recipients)
+
+// 会员等级管理（后台自定义三维度门槛/折扣/策略）
+// 注意：特殊子路由（recalculate/expiry/expire-now）必须注册在 :id 之前，否则被 :id 吞掉
+router.get('/membership-tiers', authMiddleware, requireAdmin, membershipTierController.list)
+router.post('/membership-tiers', authMiddleware, requireAdmin, membershipTierController.create)
+router.post('/membership-tiers/recalculate', authMiddleware, requireAdmin, membershipTierController.recalculate)
+router.get('/membership-tiers/expiry', authMiddleware, requireAdmin, membershipTierController.getExpiry)
+router.put('/membership-tiers/expiry', authMiddleware, requireAdmin, membershipTierController.setExpiry)
+router.post('/membership-tiers/expire-now', authMiddleware, requireAdmin, membershipTierController.expireNow)
+router.put('/membership-tiers/:id', authMiddleware, requireAdmin, membershipTierController.update)
+router.delete('/membership-tiers/:id', authMiddleware, requireAdmin, membershipTierController.remove)
 
 export default router

@@ -3,6 +3,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import type { LoginInput, RegisterInput } from '../../../shared/schemas/customer.js'
 import * as customerService from '../../shop/services/customerService.js'
 import * as cartService from '../services/cartService.js'
+import * as membershipService from '../../shop/services/membershipService.js'
 import { getSite } from '../middleware/siteContext.js'
 
 /**
@@ -37,6 +38,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     })
     // P3-T03：登录后合并游客购物车（前端在后续请求用返回的 cartToken 替换本地购物车 cookie）
     const merged = await cartService.mergeCartOnLogin(site, result.customer.id, body.cartToken)
+    // 会员分级维度三：登录频率（异常隔离，不阻断登录）
+    void membershipService.recordLogin(site.tenantId, result.customer.id)
     res.json({ code: 0, data: { ...result, cartToken: merged.token } })
   } catch (err) {
     next(err)
