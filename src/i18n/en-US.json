@@ -942,6 +942,7 @@
   },
   "sidebar": {
     "shopPaymentChannels": "Payment Channels",
+    "shop-audit-log": "Audit Log",
     "navigation": "Side Navigation",
     "collapsed": "Collapsed Side Navigation",
     "aiProviders": "AI Providers",
@@ -1613,5 +1614,29 @@
     "noCover": "No cover selected",
     "noCoverTip": "Pick an image from the body as the cover",
     "currentCover": "Current Cover"
+  },
+  "auditLog": {
+    "entityType": "Entity Type",
+    "action": "Action",
+    "actorType": "Actor Type",
+    "actorId": "Actor ID",
+    "timeRange": "Time Range",
+    "from": "From",
+    "to": "To",
+    "search": "Search",
+    "all": "All",
+    "actionPlaceholder": "e.g. order.paid (exact match)",
+    "actorIdPlaceholder": "Actor ID",
+    "time": "Time",
+    "entityId": "Entity ID",
+    "actor": "Actor",
+    "afterState": "Change Detail",
+    "count": "{n} records",
+    "prev": "Prev",
+    "next": "Next",
+    "page": "/ page",
+    "entityTypeRequired": "Please select an entity type",
+    "loadFailed": "Failed to load audit logs",
+    "empty": "No audit records"
   }
 }
