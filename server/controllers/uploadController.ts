@@ -11,7 +11,7 @@ import multer from 'multer'
 import { AppError } from '../middleware/errorHandler.js'
 import { validateUploadFiles } from '../middleware/uploadValidator.js'
 import { listUploadedFiles, deleteUploadedFile } from '../services/uploadService.js'
-import { incrUsage } from '../modules/billing/services/usageService.js'
+import { consumeQuota } from '../modules/billing/services/usageService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -123,13 +123,23 @@ export const uploadFile = async (req, res, next) => {
         }
       })
       const tenantId = req.user?.tenantId
-      if (tenantId) incrUsage(tenantId, 'files', files.length).catch(() => {})
+      // 文件配额按实际上传数量原子占用（TOCTOU 安全）；超额直接拒绝，不计数
+      if (tenantId) {
+        const q = await consumeQuota(tenantId, 'files', files.length)
+        if (!q.ok) {
+          return res.status(402).json({
+            code: 402,
+            message: '已达配额上限',
+            data: { metric: 'files', used: q.used, limit: q.limit },
+          })
+        }
+      }
       return res.json({ code: 0, data: files, message: `成功上传 ${files.length} 个文件` })
     })
   }
 
   const singleUpload = upload.single('file')
-  singleUpload(req, res, (err) => {
+  singleUpload(req, res, async (err) => {
     if (err) return handleMulterError(err, next)
     if (!req.file) {
       return next(new AppError(400, '请选择要上传的文件'))
@@ -141,7 +151,17 @@ export const uploadFile = async (req, res, next) => {
     }
     const relPath = relative(UPLOAD_DIR, req.file.path)
     const tenantId = req.user?.tenantId
-    if (tenantId) incrUsage(tenantId, 'files').catch(() => {})
+    // 单文件配额原子占用（按 1 计）
+    if (tenantId) {
+      const q = await consumeQuota(tenantId, 'files', 1)
+      if (!q.ok) {
+        return res.status(402).json({
+          code: 402,
+          message: '已达配额上限',
+          data: { metric: 'files', used: q.used, limit: q.limit },
+        })
+      }
+    }
     res.json({
       code: 0,
       data: {

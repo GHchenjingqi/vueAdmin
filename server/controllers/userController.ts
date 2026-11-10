@@ -11,7 +11,6 @@ import { fileURLToPath } from 'url'
 import * as userService from '../services/userService.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { logOperation } from '../utils/logger.js'
-import { incrUsage } from '../modules/billing/services/usageService.js'
 
 /**
  * 获取用户列表（分页搜索）
@@ -48,8 +47,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const result = await userService.createUser(req.body, req.user!)
     logOperation(req, '创建用户', `ID: ${result.id} 用户名 ${req.body.username}`, JSON.stringify({ id: result.id, ...req.body }))
-    const tenantId = req.user!.tenantId
-    if (tenantId) incrUsage(tenantId, 'users').catch(() => {})
+    // 席位配额由 quotaGuard('users') 在动作前原子占用，这里不再重复计数
     res.status(201).json({ code: 0, data: result, message: '创建成功' })
   } catch (err) {
     next(err)

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // vi.mock 工厂会被提升，需用 vi.hoisted 声明其中引用的 mock（否则访问顶层 const 会 TDZ 报错）
-const { mockCheckQuota } = vi.hoisted(() => ({ mockCheckQuota: vi.fn() }))
+const { mockConsumeQuota } = vi.hoisted(() => ({ mockConsumeQuota: vi.fn() }))
 vi.mock('../modules/billing/services/usageService.js', () => ({
-  checkQuota: mockCheckQuota,
+  consumeQuota: mockConsumeQuota,
 }))
 
 vi.mock('../config/database.js', () => ({ default: {} }))
@@ -28,17 +28,18 @@ describe('quotaGuard', () => {
     expect(next).not.toHaveBeenCalled()
   })
 
-  it('超限时返回 402', async () => {
-    mockCheckQuota.mockResolvedValue({ allowed: false, used: 5, limit: 5 })
+  it('原子占用被拒（超额）时返回 402', async () => {
+    mockConsumeQuota.mockResolvedValue({ ok: false, used: 5, limit: 5 })
     const guard = quotaGuard('users')
     await guard(req, res, next)
+    expect(mockConsumeQuota).toHaveBeenCalledWith(1, 'users', 1)
     expect(res.status).toHaveBeenCalledWith(402)
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 402, data: expect.objectContaining({ metric: 'users', used: 5, limit: 5 }) }))
     expect(next).not.toHaveBeenCalled()
   })
 
-  it('未超限时放行', async () => {
-    mockCheckQuota.mockResolvedValue({ allowed: true, used: 3, limit: 5 })
+  it('原子占用成功时放行', async () => {
+    mockConsumeQuota.mockResolvedValue({ ok: true, used: 3, limit: 5 })
     const guard = quotaGuard('users')
     await guard(req, res, next)
     expect(next).toHaveBeenCalled()

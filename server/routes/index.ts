@@ -1406,7 +1406,7 @@ router.get('/upload/files', authMiddleware, uploadController.listFiles)
  *       201:
  *         description: 上传成功，返回文件信息
  */
-router.post('/upload', authMiddleware, quotaGuard('files'), uploadController.uploadFile)
+router.post('/upload', authMiddleware, uploadController.uploadFile)
 
 /**
  * @openapi
