@@ -6,6 +6,8 @@ import sequelize from '../../../config/database.js'
 import { ShopOrderRefund, ShopRmaRequest } from '../models/index.js'
 import { tryEnqueue } from './orderMailService.js'
 import * as auditLogService from './auditLogService.js'
+import * as membershipService from './membershipService.js'
+import { ShopCustomer } from '../models/index.js'
 import { withDeadlockRetry } from './deadlockRetry.js'
 
 /**
@@ -131,7 +133,7 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
       await withDeadlockRetry(() =>
         sequelize.transaction(async (tx) => {
           const [orderRows] = await sequelize.query(
-            'SELECT id, orderNo, amountCents, currency, paymentStatus FROM orders WHERE id = ? AND tenantId = ? FOR UPDATE',
+            'SELECT id, orderNo, amountCents, currency, paymentStatus, buyer FROM orders WHERE id = ? AND tenantId = ? FOR UPDATE',
             { replacements: [params.orderId, tId], transaction: tx },
           )
           const order = (orderRows as any[])[0]
@@ -221,6 +223,21 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
             replacements: [total >= paidCents ? 'refunded' : 'refunding', params.orderId, tId],
             transaction: tx,
           })
+
+          // 会员积分回补（防薅羊毛）：按退款比例回扣发分/回补抵扣；reason 带 refundNo 幂等。
+          // 异常隔离：回补失败不得让退款失败（捕获后吞掉，凭 refundNo 可人工/重试补偿）。
+          try {
+            const buyer = order.buyer as { customerId?: number | null } | null
+            const orderCustomerId = buyer?.customerId
+            if (orderCustomerId && paidCents > 0) {
+              const customer = await ShopCustomer.findOne({ where: { tenantId: tId, id: orderCustomerId }, attributes: ['id'], transaction: tx })
+              if (customer) {
+                await membershipService.refundClawback(tId, params.orderId, orderCustomerId, refundNo, amountCents / paidCents)
+              }
+            }
+          } catch (err) {
+            console.warn(`[membership] 退款 ${refundNo} 积分回补失败（不阻断退款）：`, err instanceof Error ? err.message : err)
+          }
 
           return toView(row)
         }),

@@ -14,6 +14,9 @@ export const quote = async (req: Request, res: Response, next: NextFunction) => 
       items: body.items as { skuId: number; qty: number }[] | undefined,
       shippingAddress: body.shippingAddress,
       couponCode: body.couponCode,
+      // 会员折扣/积分抵扣：登录态顾客身份 + 抵扣请求（服务端钳制）
+      customerId: req.customer?.customerId,
+      pointsToRedeem: body.pointsToRedeem,
     })
     res.json({ code: 0, data })
   } catch (err) {
@@ -37,6 +40,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       customerId,
       couponCode: body.couponCode,
       attribution: body.attribution,
+      pointsToRedeem: body.pointsToRedeem,
     })
     res.json({ code: 0, data })
   } catch (err) {

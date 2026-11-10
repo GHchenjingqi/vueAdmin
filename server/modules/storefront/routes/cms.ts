@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { validate } from '../../../middleware/validate.js'
-import { cmsListQuerySchema, cmsSlugParamSchema } from '../../../shared/schemas/storefront.js'
+import { cmsListQuerySchema, cmsSlugParamSchema, bannerListQuerySchema } from '../../../shared/schemas/storefront.js'
 import * as cmsController from '../controllers/cmsController.js'
 
 /**
@@ -13,5 +13,6 @@ const router = Router()
 
 router.get('/cms/articles', validate(cmsListQuerySchema, 'query'), cmsController.listArticles)
 router.get('/cms/articles/:slug', validate(cmsSlugParamSchema, 'params'), cmsController.getArticle)
+router.get('/cms/banners', validate(bannerListQuerySchema, 'query'), cmsController.listBanners)
 
 export default router

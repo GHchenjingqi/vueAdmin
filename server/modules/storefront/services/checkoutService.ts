@@ -48,6 +48,8 @@ export interface CreateOrderParams {
   couponCode?: string
   /** 订单来源归因（site / utm），建单时固化进订单快照 */
   attribution?: OrderAttribution
+  /** 要抵扣的积分数（服务端在报价中钳制到余额与应付；captured 时扣减） */
+  pointsToRedeem?: number
 }
 
 export interface OrderItemView {
@@ -133,6 +135,8 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
     items: params.items,
     shippingAddress: params.shippingAddress,
     couponCode: params.couponCode,
+    customerId: params.customerId,
+    pointsToRedeem: params.pointsToRedeem,
   })
 
   // 3) T-07 优惠券占用（幂等键 = orderNo，失败可精确回退）
@@ -184,6 +188,8 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
       taxCents: quote.taxCents,
       amountCents: quote.amountCents,
       couponCode: quote.couponCode ?? null,
+      pointsUsed: quote.pointsToRedeem ?? 0,
+      pointsDiscountCents: quote.pointsDiscountCents ?? 0,
       accessToken,
       idempotencyKey,
       reservationId: reservations[0]?.id ?? null,

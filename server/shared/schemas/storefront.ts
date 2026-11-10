@@ -104,6 +104,8 @@ export const quoteSchema = z
     shippingAddress: z.record(z.unknown()).optional(),
     // T-07：券码仅作输入，折扣金额由服务端重算
     couponCode: z.string().min(1).max(50).optional(),
+    // 会员积分抵扣（服务端钳制到余额与应付；登录态顾客身份取自 JWT）
+    pointsToRedeem: z.number().int().min(0).max(1_000_000).optional(),
   })
   .passthrough()
 
@@ -135,6 +137,7 @@ export const createOrderSchema = z
     items: z.array(cartLineInput).max(100).optional(),
     customerId: z.number().int().positive().optional(),
     couponCode: z.string().min(1).max(50).optional(),
+    pointsToRedeem: z.number().int().min(0).max(1_000_000).optional(),
     attribution: orderAttributionSchema.optional(),
   })
   .passthrough()
@@ -256,6 +259,14 @@ export const cmsSlugParamSchema = z
 
 export type CmsListQueryInput = z.infer<typeof cmsListQuerySchema>
 export type CmsSlugParamInput = z.infer<typeof cmsSlugParamSchema>
+
+/** GET /cms/banners?position=hero|secondary —— 公开首页 Banner（仅启用 + 时段内） */
+export const bannerListQuerySchema = z
+  .object({
+    position: z.enum(['hero', 'secondary']).optional(),
+  })
+  .passthrough()
+export type BannerListQueryInput = z.infer<typeof bannerListQuerySchema>
 
 // ————————————————————————————————————————————————
 // 阶段 5 步骤 5（第四切片）：退货/售后（顾客登录，需校验订单归属与服务端重算退款）

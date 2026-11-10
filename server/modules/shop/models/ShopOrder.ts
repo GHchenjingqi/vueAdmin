@@ -32,6 +32,8 @@ class ShopOrder extends Model<InferAttributes<ShopOrder>, InferCreationAttribute
   /** 应付总额(分) = subtotal + shipping + tax - discount */
   declare amountCents: CreationOptional<number>
   declare couponCode: string | null
+  declare pointsUsed: CreationOptional<number>
+  declare pointsDiscountCents: CreationOptional<number>
   /** 订单访问凭证（防枚举） */
   declare accessToken: string | null
   /** 创建幂等键（租户内唯一） */
@@ -92,6 +94,8 @@ ShopOrder.init(
     shippingCents: { type: DataTypes.BIGINT, allowNull: false, defaultValue: 0, comment: '运费(分)' },
     taxCents: { type: DataTypes.BIGINT, allowNull: false, defaultValue: 0, comment: '税费(分)' },
     amountCents: { type: DataTypes.BIGINT, allowNull: false, defaultValue: 0, comment: '应付总额(分)' },
+    pointsUsed: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, comment: '本单消耗积分数' },
+    pointsDiscountCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, comment: '积分抵扣金额（分）' },
     couponCode: { type: DataTypes.STRING(64), allowNull: true },
     accessToken: { type: DataTypes.STRING(64), allowNull: true, comment: '订单访问凭证（防枚举）' },
     idempotencyKey: { type: DataTypes.STRING(64), allowNull: true, comment: '创建幂等键' },

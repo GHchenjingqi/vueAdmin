@@ -1,6 +1,6 @@
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
-import { ShopSku, ShopSpu, ShopProductPrice } from '../../shop/models/index.js'
+import { ShopSku, ShopSpu, ShopProductPrice, ShopCustomer, ShopMembershipTier } from '../../shop/models/index.js'
 import * as inventoryService from '../../shop/services/inventoryService.js'
 import { getDeliveryCommitment, type DeliveryCommitment } from '../../shop/services/warehouseRoutingService.js'
 import { evaluateBundle, allocateBundleDiscount } from './bundleService.js'
@@ -60,6 +60,14 @@ export interface QuoteResult {
   bundleDiscountCents: number
   /** P5-T05：命中的 Bundle 摘要 */
   bundle: { id: number; name: Record<string, string> } | null
+  /** 会员等级折扣（分；顾客下单且等级 discountPct>0 时 >0） */
+  tierDiscountCents: number
+  /** 会员等级名（游客为 null） */
+  tierName: string | null
+  /** 积分抵扣（分；pointsToRedeem>0 时 >0） */
+  pointsDiscountCents: number
+  /** 服务端校验后实际采用的抵扣积分（≤ 请求值与余额） */
+  pointsToRedeem: number
   amountCents: number
   version: number
   expiresAt: string
@@ -109,6 +117,10 @@ export async function createQuote(
     items?: { skuId: number; qty: number }[]
     shippingAddress?: Record<string, unknown> | null
     couponCode?: string
+    /** 顾客 ID（会员折扣/积分抵扣；游客不传） */
+    customerId?: number
+    /** 要抵扣的积分数（服务端钳制到余额与应付） */
+    pointsToRedeem?: number
   },
 ): Promise<QuoteResult> {
   const { currency, lines } = await resolveQuoteLines(site, input)
@@ -200,7 +212,40 @@ export async function createQuote(
   // （订单明细合计 != amountCents，商户每单多让利一倍优惠）。
   // bundle 优惠仍由 bundleDiscountCents / bundle 字段单独暴露给前端展示。
   const discountCents = couponDiscountCents
-  const amountCents = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents)
+
+  // 会员等级折扣（跨境惯例：按商品小计打折，不含运费/税费；游客/无折扣等级跳过）
+  let tierDiscountCents = 0
+  let tierName: string | null = null
+  if (input.customerId) {
+    const customer = await ShopCustomer.findOne({ where: { id: input.customerId, tenantId: tId }, attributes: ['membershipTierId'] })
+    if (customer?.membershipTierId) {
+      const tier = await ShopMembershipTier.findOne({ where: { id: customer.membershipTierId, tenantId: tId } })
+      if (tier && tier.discountPct > 0 && tier.discountPct < 100) {
+        tierDiscountCents = Math.round((subtotalCents * (100 - tier.discountPct)) / 100)
+        tierName = tier.name
+      }
+    }
+  }
+
+  // 积分抵扣：1 积分 = 1 元本币 = 100 分；服务端钳制（≤ 余额、≤ 折后应付），游客/非法值忽略
+  let pointsToRedeem = 0
+  let pointsDiscountCents = 0
+  if (input.customerId && input.pointsToRedeem && input.pointsToRedeem > 0) {
+    const customer = await ShopCustomer.findOne({ where: { id: input.customerId, tenantId: tId }, attributes: ['points'] })
+    const balance = customer?.points ?? 0
+    pointsToRedeem = Math.min(Math.floor(input.pointsToRedeem), balance)
+    if (pointsToRedeem > 0) {
+      pointsDiscountCents = pointsToRedeem * 100
+      // 抵扣不得使应付为负：钳制到折后应付（含券折/会员折/运费/税费后）
+      const payable = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents - tierDiscountCents)
+      if (pointsDiscountCents > payable) {
+        pointsDiscountCents = payable
+        pointsToRedeem = Math.ceil(pointsDiscountCents / 100)
+      }
+    }
+  }
+
+  const amountCents = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents - tierDiscountCents - pointsDiscountCents)
 
   // P5-T04：订单级配送承诺 = 各 SKU 主仓承诺的最大值（取最不利/最长），无库存记录为 null
   const commitments = quoteLines
@@ -224,6 +269,10 @@ export async function createQuote(
     deliveryCommitment: orderCommitment,
     bundleDiscountCents,
     bundle: bundleInfo,
+    tierDiscountCents,
+    tierName,
+    pointsDiscountCents,
+    pointsToRedeem,
     amountCents,
     version: Date.now(),
     expiresAt: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),

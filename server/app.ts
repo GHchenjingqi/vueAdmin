@@ -221,6 +221,9 @@ void (async () => {
   try {
     const { startOrderMailScanner } = await import('./modules/shop/services/orderMailService.js')
     startOrderMailScanner(60 * 1000)
+    // 积分过期扫描（每 5 分钟；后台可配有效期天数，0=不过期）
+    const { startPointsExpiryScanner } = await import('./modules/shop/services/membershipService.js')
+    startPointsExpiryScanner(5 * 60 * 1000)
   } catch (err) {
     logInfo(`订单邮件扫描器启动失败: ${(err as Error).message}`)
   }

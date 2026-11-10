@@ -66,5 +66,28 @@ export function useCms() {
     }
   }
 
-  return { loading, error, listArticles, getArticle }
+  return { loading, error, listArticles, getArticle, listBanners }
+}
+
+export interface CmsBanner {
+  id: number
+  position: 'hero' | 'secondary'
+  title: string
+  subtitle: string | null
+  linkUrl: string | null
+  buttonLabel: string | null
+  image: string
+  sortOrder: number
+}
+
+/** 首页 Banner 列表（营销首屏）：/api/cms/banners（BFF → 真实后台；空数组 = 无 banner，回退静态 hero） */
+export async function listBanners(position?: 'hero' | 'secondary'): Promise<CmsBanner[]> {
+  const qs = new URLSearchParams()
+  if (position) qs.set('position', position)
+  try {
+    const res = await $fetch<CmsBanner[]>(`/api/cms/banners${qs.size ? `?${qs}` : ''}`)
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
 }

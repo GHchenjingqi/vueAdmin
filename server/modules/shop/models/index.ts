@@ -34,6 +34,14 @@ export { default as ShopBundle } from './ShopBundle.js'
 export { default as ShopCustomer } from './ShopCustomer.js'
 export { default as ShopCustomerAddress } from './ShopCustomerAddress.js'
 
+// 会员系统（C 端）：等级 + 积分流水
+export { default as ShopMembershipTier } from './ShopMembershipTier.js'
+export { default as ShopPointsLog } from './ShopPointsLog.js'
+
+// 营销邮件（会员/用户群发）
+export { default as ShopMailCampaign } from './ShopMailCampaign.js'
+export { default as ShopMailCampaignRecipient } from './ShopMailCampaignRecipient.js'
+
 // 阶段 5 步骤 4：购物车 / 库存预占 / 支付单据（复用 shop 模型层，不建第二套后端）
 export { default as ShopCart } from './ShopCart.js'
 export { default as ShopCartItem } from './ShopCartItem.js'
@@ -50,6 +58,7 @@ export { default as ShopProductQA } from './ShopProductQA.js'
 
 // 阶段 5 步骤 5（第三切片）：内容管理（博客/内容页，复用 shop 模型层，不建第二套后端）
 export { default as ShopArticle } from './ShopArticle.js'
+export { default as ShopBanner } from './ShopBanner.js'
 
 // 阶段 5 步骤 5（第四切片）：退货/售后（复用 shop 模型层，不建第二套后端）
 export { default as ShopRmaRequest } from './ShopRmaRequest.js'

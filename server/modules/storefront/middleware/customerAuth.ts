@@ -44,3 +44,26 @@ export function customerAuth(req: Request, _res: Response, next: NextFunction): 
     next(err)
   }
 }
+
+/**
+ * 可选顾客身份：有 Bearer 令牌则解析注入 req.customer，无/无效令牌静默放行（游客）。
+ * 用于 quote/build 等游客与登录顾客共用的接口（会员折扣/积分抵扣按登录态可选启用）。
+ */
+export function optionalCustomerAuth(req: Request, _res: Response, next: NextFunction): void {
+  const auth = req.headers.authorization
+  if (!auth || !auth.startsWith('Bearer ')) {
+    next()
+    return
+  }
+  try {
+    const payload = verifyCustomerToken(auth.split(' ')[1])
+    req.customer = {
+      customerId: payload.sub,
+      tenantId: payload.tenantId,
+      email: payload.email,
+    }
+  } catch {
+    // 无效令牌按游客处理（不阻断）
+  }
+  next()
+}

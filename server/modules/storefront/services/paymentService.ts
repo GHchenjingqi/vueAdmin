@@ -8,6 +8,7 @@ import { tryEnqueue } from '../../shop/services/orderMailService.js'
 import { assertShippableCountry, extractCountry } from './shippingService.js'
 import { getCounter, incCounter, setGauge } from './monitoringService.js'
 import * as auditLogService from '../../shop/services/auditLogService.js'
+import * as membershipService from '../../shop/services/membershipService.js'
 import { getProvider, defaultProvider, isProviderUsable } from '../payments/providerRegistry.js'
 import { getGateway, assertGatewayConfigured } from '../payments/gatewayRegistry.js'
 import { notifyUrl } from '../payments/gateways/common.js'
@@ -303,6 +304,19 @@ export async function applyGatewayEvent(provider: string, event: GatewayEvent): 
     })
     // P3-T17：订单确认邮件入队（幂等 + 异常隔离，邮件失败不得让支付回调重投失败）
     await tryEnqueue({ orderId: order.id, type: 'confirmed' })
+    // 会员积分（异常隔离：积分失败不得让支付回调重投失败）
+    try {
+      const orderCustomerId = (order.buyer as { customerId?: number | null } | null)?.customerId
+      if (orderCustomerId) {
+        const paidCents = order.amountCents ?? order.amount ?? 0
+        await membershipService.awardPointsForOrder(tId, order.id, orderCustomerId, paidCents)
+        // 积分抵扣落账（订单 pointsUsed>0 时扣减；uq order+reason 幂等）
+        const pointsUsed = Number((order as unknown as { pointsUsed?: number }).pointsUsed ?? 0)
+        if (pointsUsed > 0) await membershipService.redeemPointsForOrder(tId, order.id, orderCustomerId, pointsUsed)
+      }
+    } catch (err) {
+      console.warn(`[membership] 订单 ${order.orderNo} 积分发放失败（不影响支付回调）：`, err instanceof Error ? err.message : err)
+    }
     return { ok: true, status: 200 }
   }
 

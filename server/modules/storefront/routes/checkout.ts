@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { validate } from '../../../middleware/validate.js'
 import { quoteSchema, createOrderSchema } from '../../../shared/schemas/storefront.js'
 import * as checkoutController from '../controllers/checkoutController.js'
-import { customerAuth } from '../middleware/customerAuth.js'
+import { customerAuth, optionalCustomerAuth } from '../middleware/customerAuth.js'
 
 /**
  * 结算路由（公开，挂在 /api/storefront/v1/checkout）
@@ -11,8 +11,8 @@ import { customerAuth } from '../middleware/customerAuth.js'
  */
 const router = Router()
 
-router.post('/quote', validate(quoteSchema, 'body'), checkoutController.quote)
-router.post('/orders', validate(createOrderSchema, 'body'), checkoutController.createOrder)
+router.post('/quote', optionalCustomerAuth, validate(quoteSchema, 'body'), checkoutController.quote)
+router.post('/orders', optionalCustomerAuth, validate(createOrderSchema, 'body'), checkoutController.createOrder)
 router.get('/orders', customerAuth, checkoutController.listMyOrders)
 router.get('/orders/:id', checkoutController.getOrder)
 

@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { getSite } from '../middleware/siteContext.js'
 import * as cmsService from '../services/cmsService.js'
+import * as bannerService from '../services/bannerService.js'
 import { articleDetailEtag, articleListEtag, etagMatches } from '../services/cmsCacheService.js'
 
 const CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=30'
@@ -68,6 +69,20 @@ export const getArticle = async (req: Request, res: Response, next: NextFunction
       return
     }
     setCacheHeaders(res, etag)
+    res.json({ code: 0, data })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** GET /cms/banners?position=hero|secondary —— 公开首页 Banner（仅启用 + 时段内，按 sortOrder） */
+export const listBanners = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const site = getSite(res)
+    const q = req.query as Record<string, unknown>
+    const position = q.position === 'hero' || q.position === 'secondary' ? q.position : undefined
+    const data = await bannerService.listBanners(site, { position })
+    setCacheHeaders(res, `W/"banners-${site.tenantId}-${site.shopId ?? 0}-${position ?? 'all'}"`)
     res.json({ code: 0, data })
   } catch (err) {
     next(err)
