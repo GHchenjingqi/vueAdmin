@@ -25,6 +25,18 @@ import type { GatewayAction, GatewayEvent, GatewayNotifyContext } from '../payme
 
 const tid = (): number => getTenantContext()?.tenantId ?? 1
 
+/**
+ * 订单终态：对账关单释放订单级资源后会把订单落为 cancelled。
+ * 终态订单不得再建支付会话，也不得被任何支付事件改单，
+ * 否则「券已退但订单仍可支付」会让同一张限量券被无限复用。
+ */
+const TERMINAL_ORDER_STATUSES = new Set<ShopOrder['status']>(['cancelled'])
+function assertOrderPayable(order: ShopOrder): void {
+  if (TERMINAL_ORDER_STATUSES.has(order.status)) {
+    throw new AppError(409, '订单已关闭，无法发起支付')
+  }
+}
+
 export interface PaymentSession {
   orderId: number
   orderNo: string
@@ -53,6 +65,7 @@ export async function createSession(site: StorefrontSite, orderId: number, reque
   const tId = tid()
   const order = await ShopOrder.findOne({ where: { id: orderId, tenantId: tId } })
   if (!order) throw new AppError(404, '订单不存在')
+  assertOrderPayable(order)
   if (order.paymentStatus === 'captured') throw new AppError(409, '订单已支付')
 
   // T-08：地址不在配送范围的订单不得进入支付（不能创建可支付订单）
@@ -246,6 +259,10 @@ export async function applyGatewayEvent(provider: string, event: GatewayEvent): 
 
   const order = await ShopOrder.findOne({ where: { orderNo, tenantId: tId } })
   if (!order) return { ok: false, status: 404, message: '订单不存在' }
+  // 已关单订单不得被任何支付事件改单（含迟到 / 伪造 providerRef 的回调）
+  if (TERMINAL_ORDER_STATUSES.has(order.status)) {
+    return { ok: false, status: 409, message: '订单已关闭' }
+  }
 
   // P5-T03 修复 2/4：flag 关闭 / 币种不支持的 Provider 不得通过回调改单（关闭态零副作用）。
   if (!(await isProviderUsable(def, order.currency))) {

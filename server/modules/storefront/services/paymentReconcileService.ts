@@ -1,4 +1,5 @@
 import { Op, fn, col } from 'sequelize'
+import sequelize from '../../../config/database.js'
 import { getTenantContext, runInTenant } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderPayment } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
@@ -37,46 +38,63 @@ function timeoutMs(): number {
 }
 
 /**
- * 关单能否顺带释放订单级资源。
+ * 关单：在订单行锁事务内串行完成「CAS 认领单据终态 → 判断能否释放订单级资源 →
+ * 落订单终态」，事务提交后再释放库存/券（二者各自开事务，不能嵌套）。
  *
- * 同一订单可以有多张支付单据（换通道重试 / 前端重复建会话）。若只看「这张单据
- * 超时」就释放，已支付订单的优惠券流水会被删掉、或正在重试的订单名额被别人占走。
- */
-async function canReleaseOrderResources(row: ShopOrderPayment, tId: number): Promise<boolean> {
-  const order = await ShopOrder.findOne({
-    where: { orderNo: row.orderNo, tenantId: tId } as never,
-    attributes: ['id', 'status', 'paymentStatus'],
-  } as never)
-  if (order && (SETTLED_ORDER_STATUSES.has(order.paymentStatus ?? '') || order.status === 'paid')) return false
-
-  const live = await ShopOrderPayment.count({
-    where: {
-      tenantId: tId,
-      orderNo: row.orderNo,
-      id: { [Op.ne]: row.id },
-      status: { [Op.in]: LIVE_PAYMENT_STATUSES },
-    } as never,
-  })
-  return live === 0
-}
-
-/**
- * 关单：CAS 认领终态（并发扫描器只有一个赢家），再按守卫释放订单级资源。
- * 释放失败必须回滚终态，否则这张单据再也不会被扫描到，库存锁与券占用永久悬挂。
+ * 行锁的目的：同一订单可以有多张支付单据（换通道重试 / 前端重复建会话），
+ * 两个扫描器实例并发关单时若无互斥，会互相看到对方仍为 initiated 而都跳过释放，
+ * 券占用与库存锁将永久悬挂。
  */
 async function closePayment(row: ShopOrderPayment, tId: number): Promise<boolean> {
   const original = row.status
-  const [claimed] = await ShopOrderPayment.update({ status: 'expired' } as never, {
-    where: { id: row.id, tenantId: tId, status: original } as never,
-  })
-  if (claimed !== 1) return false
+  let claimed = false
+  let shouldRelease = false
 
-  if (!(await canReleaseOrderResources(row, tId))) return true
+  await sequelize.transaction(async (tx) => {
+    const order = await ShopOrder.findOne({
+      where: { tenantId: tId, orderNo: row.orderNo } as never,
+      transaction: tx,
+      lock: tx.LOCK.UPDATE,
+    } as never)
+
+    const [n] = await ShopOrderPayment.update(
+      { status: 'expired' } as never,
+      { where: { id: row.id, tenantId: tId, status: original } as never, transaction: tx },
+    )
+    if (n !== 1) return
+    claimed = true
+
+    // 已成交订单：只关这张单据，绝不回退券流水，也绝不把订单置为终态
+    if (order && (SETTLED_ORDER_STATUSES.has(order.paymentStatus ?? '') || order.status === 'paid')) return
+
+    // 同单仍有在途支付单据（用户正在重试）：同样不动订单级资源
+    const live = await ShopOrderPayment.count({
+      where: {
+        tenantId: tId,
+        orderNo: row.orderNo,
+        id: { [Op.ne]: row.id },
+        status: { [Op.in]: LIVE_PAYMENT_STATUSES },
+      } as never,
+      transaction: tx,
+    })
+    if (live > 0) return
+
+    shouldRelease = true
+    // 释放订单级资源 == 订单确实未支付被放弃。同步落终态，堵住
+    // 「券已退但订单仍可支付 → 限量券无限复用」的绕过链。
+    if (order) {
+      await order.update({ status: 'cancelled', paymentStatus: 'failed' } as never, { transaction: tx })
+    }
+  })
+
+  if (!claimed) return false
+  if (!shouldRelease) return true
 
   try {
     await reservationService.releaseReservation(row.orderNo)
     await releaseCoupon(row.orderNo)
   } catch (err) {
+    // 资源没释放成功就不能让单据停在终态，否则下轮不再扫描，占用永久悬挂
     await ShopOrderPayment.update({ status: original } as never, {
       where: { id: row.id, tenantId: tId, status: 'expired' } as never,
     })
