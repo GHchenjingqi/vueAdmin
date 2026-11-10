@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import * as auditLogService from '../services/auditLogService.js'
 import * as spuService from '../services/spuService.js'
 
 export const list = async (req: Request, res: Response, next: NextFunction) => {
@@ -23,6 +24,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const data = await spuService.createSpu(req.body)
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'spu.created', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -32,6 +34,7 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const data = await spuService.updateSpu(Number(req.params.id), req.body)
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'spu.updated', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -43,6 +46,7 @@ export const changeStatus = async (req: Request, res: Response, next: NextFuncti
     const { action, reason } = req.body as { action: string; reason?: string }
     const data = await spuService.changeSpuStatus(Number(req.params.id), action as never, reason)
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'spu.status_changed', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -59,6 +63,7 @@ export const submitForPublish = async (req: Request, res: Response, next: NextFu
     }
     const data = await spuService.submitForPublish(Number(req.params.id), { channelId, shopId, listToChannel, requiredQualifications })
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'spu.submitted', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -83,6 +88,7 @@ export const remove = async (req: Request, res: Response, next: NextFunction) =>
   try {
     await spuService.deleteSpu(Number(req.params.id))
     res.json({ code: 0, data: null })
+    await auditLogService.recordAdminAction(req, 'spu.deleted', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }

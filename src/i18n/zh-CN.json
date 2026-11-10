@@ -1336,6 +1336,7 @@
       "totalCount": "发放总量",
       "totalCountPlaceholder": "留空表示不限量",
       "usedCount": "已使用",
+      "usageLimit": "用量上限",
       "fetchFailed": "营销数据加载失败",
       "deleteConfirm": "确认删除"
     },

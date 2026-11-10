@@ -30,6 +30,8 @@ export const listAuditLogs = async (req: Request, res: Response, next: NextFunct
       entityType,
       entityId: queryInt(req.query.entityId),
       action: queryStr(req.query.action),
+      actorId: queryInt(req.query.actorId),
+      actorType: queryStr(req.query.actorType),
       limit: queryInt(req.query.limit),
       offset: queryInt(req.query.offset),
       from: from ?? undefined,

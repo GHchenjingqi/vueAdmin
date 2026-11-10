@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import * as auditLogService from '../services/auditLogService.js'
 import * as priceService from '../services/priceService.js'
 import * as rateService from '../services/rateService.js'
 
@@ -19,6 +20,7 @@ export const upsert = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const data = await priceService.upsertPrice(Number(req.params.skuId), req.body)
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'price.upserted', 'config', Number(req.params.skuId) || null)
   } catch (err) {
     next(err)
   }
@@ -28,6 +30,7 @@ export const remove = async (req: Request, res: Response, next: NextFunction) =>
   try {
     await priceService.deletePrice(Number(req.params.skuId), String(req.params.currency))
     res.json({ code: 0, data: null })
+    await auditLogService.recordAdminAction(req, 'price.deleted', 'config', Number(req.params.skuId) || null)
   } catch (err) {
     next(err)
   }
@@ -39,6 +42,7 @@ export const saveSnapshot = async (req: Request, res: Response, next: NextFuncti
   try {
     const data = await rateService.saveRateSnapshot(req.body)
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'rate.snapshot_saved', 'config', null)
   } catch (err) {
     next(err)
   }

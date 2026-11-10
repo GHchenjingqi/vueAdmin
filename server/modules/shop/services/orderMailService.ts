@@ -335,8 +335,13 @@ export function startOrderMailScanner(intervalMs = 60 * 1000, tenantIds?: number
       // 固定租户列表（单租户部署/测试）优先；否则按 outbox 待投数据动态枚举
       const tenants = tenantIds?.length ? tenantIds : await dueOutboxTenantIds(new Date())
       for (const tenantId of tenants) {
-        const r = await runInTenant({ tenantId }, () => drainOutbox({ limit: 50 }))
-        if (r.sent > 0 || r.dead > 0) console.log(`[order-mail] tenant=${tenantId} 投递 ${r.sent} 封 / dead ${r.dead} 封`)
+        // 与其它扫描器统一口径：按租户失败隔离，单个租户异常不阻断其余租户
+        try {
+          const r = await runInTenant({ tenantId }, () => drainOutbox({ limit: 50 }))
+          if (r.sent > 0 || r.dead > 0) console.log(`[order-mail] tenant=${tenantId} 投递 ${r.sent} 封 / dead ${r.dead} 封`)
+        } catch (err) {
+          console.warn(`[order-mail] tenant=${tenantId} 投递失败: ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
     } catch (err) {
       console.warn(`[order-mail] 扫描失败: ${err instanceof Error ? err.message : String(err)}`)

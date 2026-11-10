@@ -3,6 +3,7 @@ import sequelize from '../../../config/database.js'
 import { ShopInventoryReservation } from '../models/index.js'
 import { getTenantContext } from '../../tenant/context.js'
 import * as inventoryService from './inventoryService.js'
+import * as auditLogService from './auditLogService.js'
 import * as warehouseRouting from './warehouseRoutingService.js'
 import config from '../../../config/index.js'
 import { logInfo } from '../../../utils/fileLogger.js'
@@ -105,8 +106,9 @@ export async function releaseExpiredReservations(): Promise<number> {
       await row.update({ status: 'released', releasedAt: now } as never)
       if (row.ref) refs.add(row.ref)
       released += 1
-    } catch {
-      // 单条失败不影响其余；留待下次 sweeper
+    } catch (err) {
+      // 单条失败不影响其余；留待下次 sweeper。统一留痕便于监控侧配告警
+      logInfo(`[sweeper] 预占释放失败 id=${row.id} ref=${row.ref}: ${(err as Error).message}`)
     }
   }
   // 预占到期 = 订单未支付被放弃（已支付订单的预占为 committed，不会被扫到）。
@@ -118,6 +120,13 @@ export async function releaseExpiredReservations(): Promise<number> {
         logInfo(`[sweeper] 券占用回退失败 ${ref}: ${(err as Error).message}`),
       )
     }
+    await auditLogService.record({
+      actorType: 'system',
+      action: 'order.reservations_expired_released',
+      entityType: 'inventory',
+      entityId: null,
+      afterState: { released, refs: refs.size },
+    })
   }
   return released
 }

@@ -1,3 +1,4 @@
+import sequelize from '../../../config/database.js'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { Op, UniqueConstraintError } from 'sequelize'
 import { ShopPromotion, ShopCoupon, ShopCouponRedemption } from '../models/index.js'
@@ -75,6 +76,18 @@ const rejectDuplicateCode = (err: unknown, code: string): never => {
   throw err
 }
 
+/**
+ * percent 券面额上界。schema 层不能按 type 分支（updateCouponSchema
+ * = createCouponSchema.partial() 依赖 ZodObject，挂 .superRefine() 会破坏 .partial()），
+ * 因此在 service 层用「本次提交值 + 库中现值」合并后校验。
+ * evaluateCoupon 已把折扣封顶到小计，故这是配置面口径，不是资金漏洞。
+ */
+function assertCouponValue(type: string, value: number): void {
+  if (type === 'percent' && (!Number.isFinite(value) || value < 0 || value > 100)) {
+    throw new AppError(400, 'COUPON_PERCENT_OUT_OF_RANGE: 百分比券面额必须在 0-100 之间')
+  }
+}
+
 export async function listCoupons(params: { page?: number; pageSize?: number } = {}) {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 20
@@ -96,6 +109,7 @@ export async function getCouponById(id: number): Promise<ShopCoupon> {
 export async function createCoupon(input: CreateCouponInput): Promise<ShopCoupon> {
   const code = normalizeCode(input.code)
   if (!code) throw new AppError(400, '券码不能为空')
+  assertCouponValue(input.type, Number(input.value))
   const exists = await ShopCoupon.count({ where: { code, tenantId: tid() } })
   if (exists > 0) throw new AppError(400, `券码 ${code} 已存在`)
   try {
@@ -107,6 +121,8 @@ export async function createCoupon(input: CreateCouponInput): Promise<ShopCoupon
 
 export async function updateCoupon(id: number, input: UpdateCouponInput): Promise<ShopCoupon> {
   const row = await getCouponById(id)
+  // partial 更新可能只改 type 或只改 value，必须用合并后的最终值校验
+  assertCouponValue(input.type ?? row.type, Number(input.value ?? row.value))
   const nextCode = input.code === undefined ? undefined : normalizeCode(input.code)
   if (nextCode === '') throw new AppError(400, '券码不能为空')
 
@@ -133,12 +149,28 @@ export async function updateCoupon(id: number, input: UpdateCouponInput): Promis
 }
 
 export async function deleteCoupon(id: number): Promise<void> {
-  const row = await getCouponById(id)
-  const redeemed = await countRedemptions(id)
-  if (redeemed > 0) {
-    throw new AppError(409, `COUPON_HAS_REDEMPTIONS: 该券已有 ${redeemed} 条核销流水，不可删除（可调整有效期停用）`)
-  }
-  await row.destroy()
+  const tId = tid()
+  await sequelize.transaction(async (tx) => {
+    // 券行锁：与 redeemed 检查、destroy 串行化，避免「查完再删」之间被改码/占用
+    const [locked] = await sequelize.query(
+      'SELECT id FROM coupons WHERE id = ? AND tenantId = ? FOR UPDATE',
+      { replacements: [id, tId], transaction: tx },
+    )
+    if (!(locked as unknown[]).length) throw new AppError(404, '优惠券不存在')
+
+    // 流水行 FOR UPDATE（依赖 idx_cr_tenant_coupon）：MySQL 间隙锁会阻止并发
+    // redeemCoupon 在同一 couponId 上插入流水，直到本事务提交，
+    // 从而消除「count 看不到未提交流水 → 删券 → 流水悬空」的窄窗口。
+    const [redemptions] = await sequelize.query(
+      'SELECT id FROM coupon_redemptions WHERE tenantId = ? AND couponId = ? FOR UPDATE',
+      { replacements: [tId, id], transaction: tx },
+    )
+    const redeemed = (redemptions as unknown[]).length
+    if (redeemed > 0) {
+      throw new AppError(409, `COUPON_HAS_REDEMPTIONS: 该券已有 ${redeemed} 条核销流水，不可删除（可调整有效期停用）`)
+    }
+    await ShopCoupon.destroy({ where: { id, tenantId: tId }, transaction: tx })
+  })
 }
 
 // ==================== Bundle / 搭配购 ====================

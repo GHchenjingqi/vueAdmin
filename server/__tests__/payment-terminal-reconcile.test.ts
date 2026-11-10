@@ -249,7 +249,7 @@ describe('支付单据终态扫描器（reconcilePayments / startPaymentReconcil
         await new Promise((resolve) => setTimeout(resolve, 30))
       }
     } finally {
-      stop()
+      await stop()
     }
     const pa = await ShopOrderPayment.findOne({ where: { providerRef: refA } })
     const pb = await ShopOrderPayment.findOne({ where: { providerRef: refB } })

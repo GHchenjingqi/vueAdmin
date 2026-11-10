@@ -1,8 +1,9 @@
 import { Op, fn, col } from 'sequelize'
 import sequelize from '../../../config/database.js'
 import { getTenantContext, runInTenant } from '../../tenant/context.js'
-import { ShopOrder, ShopOrderPayment } from '../../shop/models/index.js'
+import { ShopOrder, ShopOrderPayment, ShopInventoryReservation } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
+import * as auditLogService from '../../shop/services/auditLogService.js'
 import { releaseCoupon } from './couponService.js'
 import { getGateway } from '../payments/gatewayRegistry.js'
 import { PROVIDERS } from '../payments/providerRegistry.js'
@@ -49,6 +50,7 @@ async function closePayment(row: ShopOrderPayment, tId: number): Promise<boolean
   const original = row.status
   let claimed = false
   let shouldRelease = false
+  let orderId: number | null = null
 
   await sequelize.transaction(async (tx) => {
     const order = await ShopOrder.findOne({
@@ -83,6 +85,7 @@ async function closePayment(row: ShopOrderPayment, tId: number): Promise<boolean
     // 释放订单级资源 == 订单确实未支付被放弃。同步落终态，堵住
     // 「券已退但订单仍可支付 → 限量券无限复用」的绕过链。
     if (order) {
+      orderId = order.id
       await order.update({ status: 'cancelled', paymentStatus: 'failed' } as never, { transaction: tx })
     }
   })
@@ -93,6 +96,14 @@ async function closePayment(row: ShopOrderPayment, tId: number): Promise<boolean
   try {
     await reservationService.releaseReservation(row.orderNo)
     await releaseCoupon(row.orderNo)
+    // 扫描器无 req，按 system 事件留痕；只记状态字面量与单号，不记任何金额/凭据
+    await auditLogService.record({
+      actorType: 'system',
+      action: 'order.reconcile_closed',
+      entityType: 'order',
+      entityId: orderId,
+      afterState: { orderNo: row.orderNo, status: 'cancelled' },
+    })
   } catch (err) {
     // 资源没释放成功就不能让单据停在终态，否则下轮不再扫描，占用永久悬挂
     await ShopOrderPayment.update({ status: original } as never, {
@@ -196,33 +207,77 @@ export async function reconcilePayments(): Promise<number> {
   return closed
 }
 
-/** 枚举当前存在待终态支付单据的租户（不依赖 tenant 表，天然多租户） */
-async function pendingPaymentTenantIds(): Promise<number[]> {
-  const rows = (await ShopOrderPayment.findAll({
-    attributes: [[fn('DISTINCT', col('tenantId')), 'tenantId']],
-    where: { status: { [Op.in]: ['initiated', 'failed'] } } as never,
-    raw: true,
-  })) as unknown as { tenantId: number | string }[]
-  return rows.map((r) => Number(r.tenantId)).filter((n) => Number.isInteger(n) && n > 0)
+/**
+ * 枚举需要跑「未支付订单资源回收」的租户：支付单据与库存预占两张表取并集。
+ * 只从 order_payments 枚举会漏掉「建了单但从未创建支付会话」的订单，其预占
+ * 到期后没有任何扫描器会释放。不依赖 tenant 表，天然多租户。
+ */
+export async function pendingResourceTenantIds(): Promise<number[]> {
+  const [payments, reservations] = await Promise.all([
+    ShopOrderPayment.findAll({
+      attributes: [[fn('DISTINCT', col('tenantId')), 'tenantId']],
+      where: { status: { [Op.in]: ['initiated', 'failed'] } } as never,
+      raw: true,
+    }) as unknown as Promise<{ tenantId: number | string }[]>,
+    ShopInventoryReservation.findAll({
+      attributes: [[fn('DISTINCT', col('tenantId')), 'tenantId']],
+      where: { status: 'active' } as never,
+      raw: true,
+    }) as unknown as Promise<{ tenantId: number | string }[]>,
+  ])
+  const ids = new Set<number>()
+  for (const r of [...payments, ...reservations]) {
+    const n = Number(r.tenantId)
+    if (Number.isInteger(n) && n > 0) ids.add(n)
+  }
+  return [...ids]
 }
 
 /**
- * 注册周期性对账扫描；返回停止函数。intervalMs 默认 5 分钟。
- * 进程全局没有租户上下文，故按待终态单据动态枚举租户（或由调用方显式指定），
- * 每个租户在独立 TenantContext 内扫描，避免只处理 ambient tenant 1。
+ * 「未支付订单资源回收」统一扫描器：同一 tick 内按租户驱动
+ * ①支付单据对账/关单 ②过期库存预占回收，二者失败互相隔离。
+ *
+ * 历史上 releaseExpiredReservations() 只有测试调用、生产从未注册定时器，
+ * 导致 TTL 到期的预占与券占用永久悬挂；此处与对账共用同一个已注册的
+ * 进程级定时器与租户枚举，避免再出现「有实现、无调度」的治理盲区。
+ * 返回停止函数；timer.unref() 避免挂住优雅关闭/测试进程退出。
  */
-export function startPaymentReconcileScanner(intervalMs = 5 * 60 * 1000, tenantIds?: number[]): () => void {
-  const timer = setInterval(async () => {
+export function startPaymentReconcileScanner(intervalMs = 5 * 60 * 1000, tenantIds?: number[]): () => Promise<void> {
+  let inFlight: Promise<void> | null = null
+
+  const tick = async (): Promise<void> => {
     try {
-      const tenants = tenantIds?.length ? tenantIds : await pendingPaymentTenantIds()
+      const tenants = tenantIds?.length ? tenantIds : await pendingResourceTenantIds()
       for (const tenantId of tenants) {
-        const n = await runInTenant({ tenantId }, () => reconcilePayments())
-        if (n > 0) logInfo(`[reconcile] tenant=${tenantId} 关单/补单 ${n} 笔`)
+        await runInTenant({ tenantId }, async () => {
+          try {
+            const n = await reconcilePayments()
+            if (n > 0) logInfo(`[reconcile] tenant=${tenantId} 关单/补单 ${n} 笔`)
+          } catch (err) {
+            logInfo(`[reconcile] tenant=${tenantId} 对账失败: ${(err as Error).message}`)
+          }
+          try {
+            const released = await reservationService.releaseExpiredReservations()
+            if (released > 0) logInfo(`[reconcile] tenant=${tenantId} 释放过期预占 ${released} 笔`)
+          } catch (err) {
+            logInfo(`[reconcile] tenant=${tenantId} 预占回收失败: ${(err as Error).message}`)
+          }
+        })
       }
     } catch (err) {
       logInfo(`[reconcile] 扫描失败: ${(err as Error).message}`)
     }
+  }
+
+  const timer = setInterval(() => {
+    if (inFlight) return // 上一轮未完成则跳过，避免同进程内重入
+    inFlight = tick().catch(() => undefined).finally(() => { inFlight = null })
   }, Math.max(intervalMs, 10))
   timer.unref?.()
-  return () => clearInterval(timer)
+
+  /** 停止并等待在途 tick 结束：优雅关闭时不会有半截事务与后续清理抢锁 */
+  return async () => {
+    clearInterval(timer)
+    if (inFlight) await inFlight
+  }
 }

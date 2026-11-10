@@ -26,7 +26,7 @@
 
       <template #column-validPeriod="{ row }">{{ row.validFrom }} ~ {{ row.validTo }}</template>
 
-      <template #column-usedCount="{ row }">{{ row.usedCount }} / {{ row.totalCount ?? '∞' }}</template>
+      <template #column-usedCount="{ row }">{{ row.usedCount }} / {{ row.usageLimit || '∞' }}</template>
 
       <template #column-actions="{ row }">
         <div class="table-actions">
@@ -87,6 +87,8 @@
 </template>
 
 <script setup lang="ts">
+// 既有文件依赖 Vue 自动导入，显式补全以通过 eslint / vue-tsc（提交钩子会全文件扫描）
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
@@ -103,6 +105,7 @@ const columns = computed(() => [
   { prop: 'type', label: t('shop.marketing.value'), width: 140 },
   { prop: 'validPeriod', label: t('common.operation'), minWidth: 190 },
   { prop: 'usedCount', label: t('shop.marketing.usedCount'), width: 120 },
+  { prop: 'usageLimit', label: t('shop.marketing.usageLimit'), width: 110 },
   { prop: 'createdAt', label: t('common.createdTime'), width: 175 },
   { prop: 'actions', label: t('common.operation'), width: 160, fixed: 'right' },
 ])

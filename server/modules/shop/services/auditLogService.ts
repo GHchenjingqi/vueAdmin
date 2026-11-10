@@ -38,6 +38,10 @@ export interface AuditQuery {
   offset?: number
   /** 精确匹配动作名，如 order.payment_captured / article.published */
   action?: string
+  /** 按操作人 ID 过滤（admin 操作取 req.user.id） */
+  actorId?: number
+  /** 按操作者类型过滤：admin / customer / system */
+  actorType?: string
   /** createdAt 下界（含） */
   from?: Date
   /** createdAt 上界（含） */
@@ -95,6 +99,8 @@ export async function listByEntity(q: AuditQuery): Promise<AuditLog[]> {
     entityType: q.entityType,
     ...(q.entityId != null ? { entityId: q.entityId } : {}),
     ...(q.action ? { action: q.action } : {}),
+    ...(q.actorId != null ? { actorId: q.actorId } : {}),
+    ...(q.actorType ? { actorType: q.actorType } : {}),
   }
   if (q.from || q.to) {
     const range: Record<symbol, Date> = {}

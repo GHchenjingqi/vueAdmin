@@ -1336,6 +1336,7 @@
       "totalCount": "Total Quantity",
       "totalCountPlaceholder": "Empty means unlimited",
       "usedCount": "Used",
+      "usageLimit": "Usage Limit",
       "fetchFailed": "Failed to load marketing data",
       "deleteConfirm": "Delete"
     },

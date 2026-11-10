@@ -161,6 +161,8 @@ export function startTimeoutScanner(intervalMs = 60 * 1000): void {
       running = false
     }
   }, intervalMs)
+  // 与其它扫描器统一口径：unref 避免定时器挂住优雅关闭 / 测试进程退出
+  timer.unref?.()
   logInfo('工作流超时催办/升级扫描器已启动')
 }
 

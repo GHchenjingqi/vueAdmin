@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import * as auditLogService from '../services/auditLogService.js'
 import * as categoryService from '../services/categoryService.js'
 
 export const tree = async (req: Request, res: Response, next: NextFunction) => {
@@ -32,6 +33,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const data = await categoryService.createCategory(req.body)
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'category.created', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -41,6 +43,7 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const data = await categoryService.updateCategory(Number(req.params.id), req.body)
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'category.updated', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -50,6 +53,7 @@ export const remove = async (req: Request, res: Response, next: NextFunction) =>
   try {
     await categoryService.deleteCategory(Number(req.params.id))
     res.json({ code: 0, data: null })
+    await auditLogService.recordAdminAction(req, 'category.deleted', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }

@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
+import * as auditLogService from '../services/auditLogService.js'
 import * as reviewAdminService from '../services/reviewAdminService.js'
 import type { QaAnswerInput } from '../../../shared/schemas/shop.js'
 import { queryInt, queryStr } from '../utils/query.js'
@@ -50,6 +51,7 @@ export const listQuestions = async (req: Request, res: Response, next: NextFunct
 export const approveReview = async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.json({ code: 0, data: await reviewAdminService.approveReview(Number(req.params.id)) })
+    await auditLogService.recordAdminAction(req, 'review.approved', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -59,6 +61,7 @@ export const approveReview = async (req: Request, res: Response, next: NextFunct
 export const rejectReview = async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.json({ code: 0, data: await reviewAdminService.rejectReview(Number(req.params.id)) })
+    await auditLogService.recordAdminAction(req, 'review.rejected', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -70,6 +73,7 @@ export const answerQuestion = async (req: Request, res: Response, next: NextFunc
     const body = req.body as QaAnswerInput
     const data = await reviewAdminService.answerQuestion(Number(req.params.id), body.answer, answeredByOf(req))
     res.json({ code: 0, data })
+    await auditLogService.recordAdminAction(req, 'question.answered', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }
@@ -79,6 +83,7 @@ export const answerQuestion = async (req: Request, res: Response, next: NextFunc
 export const hideQuestion = async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.json({ code: 0, data: await reviewAdminService.hideQuestion(Number(req.params.id)) })
+    await auditLogService.recordAdminAction(req, 'question.hidden', 'config', Number(req.params.id) || null)
   } catch (err) {
     next(err)
   }

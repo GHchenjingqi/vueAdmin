@@ -785,3 +785,41 @@ export const currencyApi = {
     return request.get<ConfigChange[]>('/shop/config-changes')
   },
 }
+
+// ==================== 后台高敏操作审计 ====================
+
+export interface AdminAuditLog {
+  id: number
+  tenantId: number
+  actorType: 'admin' | 'customer' | 'system'
+  actorId: number | null
+  action: string
+  entityType: string
+  entityId: number | null
+  beforeState: unknown
+  afterState: unknown
+  createdAt: string
+}
+
+export interface AdminAuditQuery {
+  /** 必填：order|payment|inventory|refund|config|article */
+  entityType: string
+  entityId?: number
+  action?: string
+  actorId?: number
+  actorType?: 'admin' | 'customer' | 'system'
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+}
+
+/**
+ * 审计日志查询。后端已支持 action / actorId / actorType 组合过滤；
+ * 当前前端尚无消费页面，接入时用此封装即可，避免再造一套查询参数。
+ */
+export const adminAuditApi = {
+  list(params: AdminAuditQuery) {
+    return request.get<AdminAuditLog[]>('/shop/audit-logs', { params })
+  },
+}
