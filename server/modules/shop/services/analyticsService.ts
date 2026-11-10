@@ -77,7 +77,7 @@ export async function salesReport(query: AnalyticsQuery) {
   spus.forEach((s) => spuCat.set(s.id, s.categoryId))
   skus.forEach((s) => skuToCategory.set(s.id, spuCat.get(s.spuId) ?? 0))
 
-  const groups = new Map<string, { amountByCurrency: Record<string, number>; orderIds: Set<number>; itemQty: number }>()
+  const groups = new Map<string, { amountByCurrency: Record<string, number>; orderIds: Set<number>; itemQty: number; usdTotal: number }>()
   const orderMap = new Map(orders.map((o) => [o.id, o]))
 
   for (const it of items) {
@@ -97,22 +97,23 @@ export async function salesReport(query: AnalyticsQuery) {
       default:
         key = `day:${(order.createdAt as Date).toISOString().slice(0, 10)}`
     }
-    if (!groups.has(key)) groups.set(key, { amountByCurrency: {}, orderIds: new Set(), itemQty: 0 })
+    if (!groups.has(key)) groups.set(key, { amountByCurrency: {}, orderIds: new Set(), itemQty: 0, usdTotal: 0 })
     const g = groups.get(key)!
-    g.amountByCurrency[order.currency] = (g.amountByCurrency[order.currency] ?? 0) + Number(it.price) * it.qty
+    const lineAmt = Number(it.price) * it.qty
+    g.amountByCurrency[order.currency] = (g.amountByCurrency[order.currency] ?? 0) + lineAmt
+    // 按订单实际交易日期换算（与 profitReport 口径一致），杜绝用 new Date() 把历史周期错算成今天汇率
+    g.usdTotal += toUSDAmount(lineAmt, order.currency, (order.createdAt as Date).toISOString().slice(0, 10), rateSnaps)
     g.orderIds.add(order.id)
     g.itemQty += it.qty
   }
 
-  const rows = await Promise.all(
-    Array.from(groups.entries()).map(async ([key, g]) => {
-      let usdTotal = 0
-      for (const [cur, amt] of Object.entries(g.amountByCurrency)) {
-        usdTotal += toUSDAmount(amt, cur, new Date().toISOString().slice(0, 10), rateSnaps)
-      }
-      return { key, amountByCurrency: g.amountByCurrency, usdTotal: Number(usdTotal.toFixed(2)), orderCount: g.orderIds.size, itemQty: g.itemQty }
-    }),
-  )
+  const rows = Array.from(groups.entries()).map(([key, g]) => ({
+    key,
+    amountByCurrency: g.amountByCurrency,
+    usdTotal: Number(g.usdTotal.toFixed(2)),
+    orderCount: g.orderIds.size,
+    itemQty: g.itemQty,
+  }))
   return { dimension: query.dimension, rows }
 }
 
