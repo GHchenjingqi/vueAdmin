@@ -6,8 +6,22 @@ import { getGateway } from '../../storefront/payments/gatewayRegistry.js'
 import { listCredentialProviders, saveCredentials } from '../../storefront/payments/credentialService.js'
 import { REAL_PROVIDER_IDS } from '../../storefront/payments/credentialFields.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
-import { record as recordAudit } from '../services/auditLogService.js'
+import { record as recordAudit, recordAdminAction } from '../services/auditLogService.js'
+import { checkKeyedRateLimit } from '../../../middleware/rateLimiter.js'
 import { AppError } from '../../../middleware/errorHandler.js'
+
+/** 凭据接口限流：读宽松（掩码）、写严格（防暴力试错/刷写），按租户 + IP 隔离 */
+const CRED_LIMITS = {
+  read: { windowMs: 60 * 1000, max: 60 },
+  write: { windowMs: 15 * 60 * 1000, max: 20 },
+} as const
+
+async function enforceCredentialRateLimit(req: Request, kind: keyof typeof CRED_LIMITS, tenantId: number): Promise<void> {
+  const { windowMs, max } = CRED_LIMITS[kind]
+  const key = `rate:cred:${kind}:${tenantId}:${req.ip ?? 'unknown'}`
+  const r = await checkKeyedRateLimit(key, windowMs, max)
+  if (!r.allowed) throw new AppError(429, `RATE_LIMITED: 操作过于频繁，请 ${r.retryAfter ?? Math.ceil(windowMs / 1000)}s 后重试`)
+}
 
 /**
  * 支付通道后台配置（P5-T03 扩展）：
@@ -60,6 +74,11 @@ export const updateChannels = async (req: Request, res: Response, next: NextFunc
   try {
     const { enabled, accounts } = req.body as { enabled: string[]; accounts?: Record<string, Record<string, string>> }
     const saved = await saveChannelConfig({ enabled, accounts })
+    // 通道开关决定哪些收款入口可用：留痕「谁/何时/启用了哪些通道」，不记 accounts 的值
+    await recordAdminAction(req, 'payment.channels_updated', 'config', null, {
+      enabled,
+      accountProviders: accounts ? Object.keys(accounts) : [],
+    })
     res.json({ code: 0, data: saved })
   } catch (err) {
     next(err)
@@ -90,9 +109,10 @@ export const channelState = async (req: Request, res: Response, next: NextFuncti
 }
 
 /** 读取全部真实通道的凭据配置状态（掩码，绝不回显明文；secret 仅末 4 位） */
-export const getCredentials = async (_req: Request, res: Response, next: NextFunction) => {
+export const getCredentials = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = getTenantContext()?.tenantId ?? 1
+    await enforceCredentialRateLimit(req, 'read', tenantId)
     const providers = await listCredentialProviders(tenantId)
     res.json({ code: 0, data: { providers } })
   } catch (err) {
@@ -108,6 +128,7 @@ export const updateCredentials = async (req: Request, res: Response, next: NextF
       throw new AppError(400, `PAYMENT_PROVIDER_NOT_CONFIGURABLE: ${provider} 不支持后台配置凭据`)
     }
     const tenantId = getTenantContext()?.tenantId ?? 1
+    await enforceCredentialRateLimit(req, 'write', tenantId)
     const payload = credentials ?? {}
     const saved = await saveCredentials(tenantId, provider, payload)
     // 改收款凭据属高敏操作：留痕「谁/何时/改了哪些字段」，绝不写入任何凭据值（明文或掩码）

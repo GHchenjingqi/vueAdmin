@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import * as rmaAdminService from '../services/rmaAdminService.js'
+import { recordAdminAction } from '../services/auditLogService.js'
 import type { RmaRejectInput } from '../../../shared/schemas/shop.js'
 import { queryInt, queryStr } from '../utils/query.js'
 
@@ -24,6 +25,7 @@ export const list = async (req: Request, res: Response, next: NextFunction) => {
 export const approve = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const row = await rmaAdminService.approveRma(Number(req.params.id))
+    await recordAdminAction(req, 'rma.approved', 'refund', Number(req.params.id) || null, { status: 'approved' })
     res.json({ code: 0, data: row })
   } catch (err) {
     next(err)
@@ -35,6 +37,7 @@ export const reject = async (req: Request, res: Response, next: NextFunction) =>
   try {
     const body = req.body as RmaRejectInput
     const row = await rmaAdminService.rejectRma(Number(req.params.id), body.rejectReason)
+    await recordAdminAction(req, 'rma.rejected', 'refund', Number(req.params.id) || null, { status: 'rejected' })
     res.json({ code: 0, data: row })
   } catch (err) {
     next(err)

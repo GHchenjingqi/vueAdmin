@@ -1,5 +1,5 @@
-import { Op, UniqueConstraintError } from 'sequelize'
-import { getTenantContext } from '../../tenant/context.js'
+import { Op, UniqueConstraintError, fn, col } from 'sequelize'
+import { getTenantContext, runInTenant } from '../../tenant/context.js'
 import { ShopOrder, ShopOrderItem, ShopOrderEmail } from '../models/index.js'
 import type { OrderMailType } from '../models/ShopOrderEmail.js'
 import { ISO_META } from '../../storefront/services/currencyConfig.js'
@@ -302,10 +302,46 @@ export async function drainOutbox(
   return result
 }
 
-/** 运营手动重发：把终态邮件重新入队并清零重试计数 */
+/** 运营手动重发：仅失败终态可重新入队并清零重试计数 */
 export async function retryMail(id: number): Promise<OrderMailView | null> {
   const row = await ShopOrderEmail.findOne({ where: { id, tenantId: tid() } })
   if (!row) return null
+  // sent 邮件重投会对同一事件重复发信（外部邮件不可回滚）；pending 已在队列中亦无需重投
+  if (row.status !== 'failed' && row.status !== 'dead') return null
   await row.update({ status: 'pending', attempts: 0, nextAttemptAt: new Date(), lastError: null, sentAt: null } as never)
   return toView(row)
+}
+
+/** 枚举「当前有到期待投邮件」的租户：直接取自 outbox，不依赖 tenant 表、天然多租户 */
+async function dueOutboxTenantIds(now: Date): Promise<number[]> {
+  const rows = (await ShopOrderEmail.findAll({
+    attributes: [[fn('DISTINCT', col('tenantId')), 'tenantId']],
+    where: { status: { [Op.in]: ['pending', 'failed'] }, nextAttemptAt: { [Op.lte]: now } } as never,
+    raw: true,
+  })) as unknown as { tenantId: number | string }[]
+  return rows.map((r) => Number(r.tenantId)).filter((n) => Number.isInteger(n) && n > 0)
+}
+
+/**
+ * 订单邮件 outbox 投递扫描器：按 nextAttemptAt 周期投递，驱动有界指数退避重试。
+ * 每个租户在独立 TenantContext 内 drain（drainOutbox 自身还有 tenantId WHERE 双保险），
+ * 因此进程全局无租户上下文时也不会只处理 tenant 1。
+ * 多实例同时扫描同一行时由 drainOutbox 的 attempts CAS 抢占保证只发一封。
+ * 返回停止函数；timer.unref() 避免挂住优雅关闭/测试进程退出。
+ */
+export function startOrderMailScanner(intervalMs = 60 * 1000, tenantIds?: number[]): () => void {
+  const timer = setInterval(async () => {
+    try {
+      // 固定租户列表（单租户部署/测试）优先；否则按 outbox 待投数据动态枚举
+      const tenants = tenantIds?.length ? tenantIds : await dueOutboxTenantIds(new Date())
+      for (const tenantId of tenants) {
+        const r = await runInTenant({ tenantId }, () => drainOutbox({ limit: 50 }))
+        if (r.sent > 0 || r.dead > 0) console.log(`[order-mail] tenant=${tenantId} 投递 ${r.sent} 封 / dead ${r.dead} 封`)
+      }
+    } catch (err) {
+      console.warn(`[order-mail] 扫描失败: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }, Math.max(intervalMs, 10))
+  timer.unref?.()
+  return () => clearInterval(timer)
 }

@@ -213,6 +213,19 @@ void (async () => {
   }
 })()
 
+// ---------- 订单邮件 outbox 投递扫描器（默认每 60 秒一次）----------
+// 驱动确认/发货/退款邮件的到期投递与有界指数退避重试；按 outbox 内待投邮件的 tenantId
+// 逐租户 drain，进程全局无租户上下文时也不会只处理 tenant 1。多实例并发由
+// drainOutbox 的 attempts CAS 抢占保证同一封只发一次。
+void (async () => {
+  try {
+    const { startOrderMailScanner } = await import('./modules/shop/services/orderMailService.js')
+    startOrderMailScanner(60 * 1000)
+  } catch (err) {
+    logInfo(`订单邮件扫描器启动失败: ${(err as Error).message}`)
+  }
+})()
+
 // ---------- 优雅关闭（处理 SIGTERM/SIGINT）----------
 process.on('SIGTERM', async () => {
   await closeRedis()

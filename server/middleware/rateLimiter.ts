@@ -8,7 +8,7 @@
  */
 
 import { getRedis } from '../config/redis.js'
-import { MemoryRateLimitStore, RedisRateLimitStore, type RateLimitStore } from './rateLimitStore.js'
+import { MemoryRateLimitStore, RedisRateLimitStore, type CheckResult, type RateLimitStore } from './rateLimitStore.js'
 
 const WINDOW_MS = 15 * 60 * 1000 // 15 分钟窗口
 const MAX_ATTEMPTS = 5 // 窗口内最大失败次数
@@ -60,4 +60,14 @@ export async function recordAttempt(ip: string, username: string) {
 export async function clearAttempts(ip: string, username: string) {
   const key = getKey(ip, username)
   await store.clear(key)
+}
+
+/**
+ * 通用按键限流（非登录场景，如后台支付凭据读写）：每次调用先检查、放行则计数。
+ * 与登录限流共用同一 Redis/内存 store，多实例部署下共享计数。
+ */
+export async function checkKeyedRateLimit(key: string, windowMs: number, maxAttempts: number): Promise<CheckResult> {
+  const result = await store.check(key, windowMs, maxAttempts)
+  if (result.allowed) await store.record(key, windowMs)
+  return result
 }

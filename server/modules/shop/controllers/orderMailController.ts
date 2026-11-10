@@ -28,7 +28,7 @@ export const retry = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const id = Number((req.params as Record<string, unknown>).id)
     const row = await orderMailService.retryMail(id)
-    if (!row) throw new AppError(404, '邮件记录不存在')
+    if (!row) throw new AppError(404, '邮件记录不存在或当前状态不可重投（仅 failed/dead 可重发）')
     res.json({ code: 0, data: row })
   } catch (err) {
     next(err)

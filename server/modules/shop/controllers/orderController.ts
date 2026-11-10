@@ -1,6 +1,12 @@
 import type { Request, Response, NextFunction } from 'express'
 import * as orderService from '../services/orderService.js'
+import { recordAdminAction } from '../services/auditLogService.js'
 import { queryInt, queryStr } from '../utils/query.js'
+
+/** 人工改单会绕过真实收款/发货流程，逐笔留痕（只记状态字面量，不含请求体） */
+function auditOrderAction(req: Request, action: string, status: string): Promise<void> {
+  return recordAdminAction(req, action, 'order', Number(req.params.id) || null, { status })
+}
 
 export const list = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -32,7 +38,9 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
 
 export const markPaid = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json({ code: 0, data: await orderService.markPaid(Number(req.params.id)) })
+    const data = await orderService.markPaid(Number(req.params.id))
+    await auditOrderAction(req, 'order.manually_marked_paid', 'paid')
+    res.json({ code: 0, data })
   } catch (err) {
     next(err)
   }
@@ -40,7 +48,9 @@ export const markPaid = async (req: Request, res: Response, next: NextFunction) 
 
 export const ship = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json({ code: 0, data: await orderService.ship(Number(req.params.id), req.body) })
+    const data = await orderService.ship(Number(req.params.id), req.body)
+    await auditOrderAction(req, 'order.manually_shipped', 'shipped')
+    res.json({ code: 0, data })
   } catch (err) {
     next(err)
   }
@@ -48,7 +58,9 @@ export const ship = async (req: Request, res: Response, next: NextFunction) => {
 
 export const cancel = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json({ code: 0, data: await orderService.cancel(Number(req.params.id)) })
+    const data = await orderService.cancel(Number(req.params.id))
+    await auditOrderAction(req, 'order.manually_cancelled', 'cancelled')
+    res.json({ code: 0, data })
   } catch (err) {
     next(err)
   }

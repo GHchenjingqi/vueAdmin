@@ -527,7 +527,26 @@ async function seedData() {
  * 启动服务：数据库同步、数据迁移、种子数据、前端托管、HTTP 监听
  * @param {import('express').Express} app - Express 应用实例
  */
+/**
+ * 生产环境支付凭据加密密钥启动期校验：
+ * - 显式设置了但长度 < 32：拒绝启动（弱密钥加密商户凭据等同明文）；
+ * - 完全未设置：告警但不阻断，加密将复用 JWT_SECRET（兼容纯 env 部署），
+ *   并提示「轮换 JWT 密钥会让已存密文全部失效」。
+ */
+function validatePaymentCredentialSecret(): void {
+  if (process.env.NODE_ENV !== 'production') return
+  const secret = process.env.PAYMENT_CREDENTIAL_SECRET
+  if (secret && secret.length < 32) {
+    console.error('FATAL: 生产环境 PAYMENT_CREDENTIAL_SECRET 长度必须 >= 32 字符！')
+    process.exit(1)
+  }
+  if (!secret) {
+    logInfo('[config] WARN: 未设置 PAYMENT_CREDENTIAL_SECRET，支付凭据加密将复用 JWT_SECRET；轮换 JWT 密钥会导致已存凭据无法解密')
+  }
+}
+
 export default async function bootstrap(app) {
+  validatePaymentCredentialSecret()
   try {
     // 模型关联
     User.belongsTo(Department, { foreignKey: 'deptId', as: 'dept' })

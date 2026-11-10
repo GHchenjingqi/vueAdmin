@@ -9,6 +9,7 @@
  * - 支持传入事务（tx），与业务操作原子提交；也可独立写入（不传 tx）；
  * - 缺少 tenantId 时回退平台租户 1（与全局租户上下文一致）。
  */
+import type { Request } from 'express'
 import type { Transaction } from 'sequelize'
 import { Op } from 'sequelize'
 import AuditLog from '../models/AuditLog.js'
@@ -63,6 +64,28 @@ export async function record(input: AuditRecordInput, tx?: Transaction): Promise
   } catch (err) {
     console.warn(`[audit] 写入失败（不阻断业务）: ${err instanceof Error ? err.message : String(err)}`)
   }
+}
+
+/**
+ * 后台高敏操作留痕的统一入口：从 req.user 取操作人、从租户上下文取 tenantId。
+ * 调用方只传非敏感的 afterState（ID / 字段名 / 状态字面量），绝不传请求体原文。
+ */
+export async function recordAdminAction(
+  req: Request,
+  action: string,
+  entityType: AuditEntityType,
+  entityId: number | null,
+  afterState?: unknown,
+): Promise<void> {
+  const user = (req as unknown as { user?: { id?: number } }).user
+  await record({
+    actorType: 'admin',
+    actorId: user?.id ?? null,
+    action,
+    entityType,
+    entityId,
+    afterState,
+  })
 }
 
 /** 按实体回溯状态变更链（倒序，最新在前）；支持 action / 时间范围 / 分页过滤 */
