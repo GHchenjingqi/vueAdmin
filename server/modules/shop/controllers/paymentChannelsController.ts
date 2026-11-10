@@ -6,6 +6,7 @@ import { getGateway } from '../../storefront/payments/gatewayRegistry.js'
 import { listCredentialProviders, saveCredentials } from '../../storefront/payments/credentialService.js'
 import { REAL_PROVIDER_IDS } from '../../storefront/payments/credentialFields.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
+import { record as recordAudit } from '../services/auditLogService.js'
 import { AppError } from '../../../middleware/errorHandler.js'
 
 /**
@@ -107,7 +108,19 @@ export const updateCredentials = async (req: Request, res: Response, next: NextF
       throw new AppError(400, `PAYMENT_PROVIDER_NOT_CONFIGURABLE: ${provider} 不支持后台配置凭据`)
     }
     const tenantId = getTenantContext()?.tenantId ?? 1
-    const saved = await saveCredentials(tenantId, provider, credentials ?? {})
+    const payload = credentials ?? {}
+    const saved = await saveCredentials(tenantId, provider, payload)
+    // 改收款凭据属高敏操作：留痕「谁/何时/改了哪些字段」，绝不写入任何凭据值（明文或掩码）
+    const user = (req as unknown as { user?: { id?: number; username?: string } }).user
+    await recordAudit({
+      tenantId,
+      actorType: 'admin',
+      actorId: user?.id ?? null,
+      action: 'payment.credentials_updated',
+      entityType: 'config',
+      beforeState: { provider, requestedKeys: Object.keys(payload), operator: user?.username ?? null },
+      afterState: { provider, configuredKeys: Object.keys(saved) },
+    })
     res.json({ code: 0, data: { provider, configuredKeys: Object.keys(saved) } })
   } catch (err) {
     next(err)
