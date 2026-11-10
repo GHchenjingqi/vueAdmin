@@ -40,6 +40,7 @@ import {
   qaAnswerSchema,
 } from '../../../shared/schemas/shop.js'
 import { articleAdminListQuerySchema, articleCreateSchema, articleUpdateSchema } from '../../../shared/schemas/cmsAdmin.js'
+import { updatePaymentCredentialsSchema } from '../../../shared/schemas/storefront-commerce.js'
 import * as categoryController from '../controllers/categoryController.js'
 import * as brandController from '../controllers/brandController.js'
 import * as attributeController from '../controllers/attributeController.js'
@@ -230,10 +231,13 @@ router.put('/settings/currency', authMiddleware, requireAdmin, validate(updateCu
 router.post('/settings/currency/rollback', authMiddleware, requireAdmin, validate(rollbackCurrencySchema), currencyConfigController.rollbackCurrency)
 router.get('/config-changes', authMiddleware, requireAdmin, currencyConfigController.listConfigChanges)
 
-// 支付通道后台开关：勾选才展示/可结算；密钥走环境变量，不落 settings
+// 支付通道后台开关：勾选才展示/可结算；密钥/证书由后台加密配置（DB 主、env 兜底），绝不落 settings 明文
 router.get('/settings/payment-channels', authMiddleware, paymentChannelsController.getChannels)
 router.put('/settings/payment-channels', authMiddleware, requireAdmin, validate(updatePaymentChannelsSchema), paymentChannelsController.updateChannels)
 router.get('/settings/payment-channels/state', authMiddleware, requireAdmin, paymentChannelsController.channelState)
+// 支付凭据后台配置（加密落库，掩码回显）
+router.get('/settings/payment-channels/credentials', authMiddleware, requireAdmin, paymentChannelsController.getCredentials)
+router.put('/settings/payment-channels/credentials', authMiddleware, requireAdmin, validate(updatePaymentCredentialsSchema), paymentChannelsController.updateCredentials)
 
 // X-T03 审计日志查询（仅 admin 可读，用于回溯订单/支付/库存/退款/文章状态变更链）
 router.get('/audit-logs', authMiddleware, requireAdmin, auditLogController.listAuditLogs)

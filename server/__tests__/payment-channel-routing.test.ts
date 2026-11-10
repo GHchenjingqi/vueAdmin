@@ -148,7 +148,7 @@ describe('真实网关 fail-closed 与不换汇', () => {
     await inTenant(async () => {
       const order = await seedOrder()
       await expect(paymentService.createSession(site, order.id, 'paypal')).rejects.toThrow(/PAYMENT_GATEWAY_NOT_CONFIGURED/)
-      expect(() => assertGatewayConfigured('paypal')).toThrow(/PAYMENT_GATEWAY_NOT_CONFIGURED/)
+      await expect(assertGatewayConfigured('paypal')).rejects.toThrow(/PAYMENT_GATEWAY_NOT_CONFIGURED/)
     })
   })
 

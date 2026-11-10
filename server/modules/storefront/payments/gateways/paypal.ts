@@ -1,6 +1,7 @@
 import { AppError } from '../../../../middleware/errorHandler.js'
 import type { PaymentGateway, GatewayEvent, GatewayOrderContext, GatewayNotifyContext, GatewaySession } from '../types.js'
-import { assertConfig, baseUrl, envConfig, fetchJson, header, money } from './common.js'
+import { assertConfig, baseUrl, fetchJson, header, money } from './common.js'
+import { resolveGatewayConfig } from '../credentialService.js'
 
 /**
  * PayPal Orders v2（USD / EUR / GBP / CAD / AUD）。
@@ -11,11 +12,8 @@ import { assertConfig, baseUrl, envConfig, fetchJson, header, money } from './co
  *   不是本地 HMAC），验签通过后再解析事件；
  * - 退款：/v2/payments/captures/{captureId}/refund。
  *
- * 凭据环境变量：PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET / PAYPAL_ENV /
- * PAYPAL_WEBHOOK_ID；回调域名 PAYMENT_PUBLIC_BASE_URL。
+ * 凭据来源：后台加密配置（DB）为主，PAYPAL_* 环境变量兜底；详见 credentialService。
  */
-const KEYS = ['CLIENT_ID', 'CLIENT_SECRET', 'ENV', 'WEBHOOK_ID']
-
 const apiBase = (config: Record<string, string>): string => (config.ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com')
 
 async function token(config: Record<string, string>): Promise<string> {
@@ -49,13 +47,14 @@ function toEvent(raw: Record<string, unknown>): GatewayEvent {
 export const paypalGateway: PaymentGateway = {
   id: 'paypal',
 
-  assertConfigured() {
-    assertConfig(envConfig('PAYPAL', KEYS), 'paypal')
+  async assertConfigured() {
+    const config = await resolveGatewayConfig('paypal')
+    assertConfig(config, 'paypal')
     if (!baseUrl()) throw new AppError(503, 'PAYMENT_GATEWAY_NOT_CONFIGURED: PAYMENT_PUBLIC_BASE_URL 未配置')
   },
 
   async createPayment(ctx: GatewayOrderContext): Promise<GatewaySession> {
-    const config = envConfig('PAYPAL', KEYS)
+    const config = await resolveGatewayConfig('paypal')
     assertConfig(config, 'paypal')
     const access = await token(config)
     const body = {
@@ -81,7 +80,7 @@ export const paypalGateway: PaymentGateway = {
   },
 
   async verifyAndParse(ctx: GatewayNotifyContext): Promise<GatewayEvent> {
-    const config = { ...envConfig('PAYPAL', KEYS), ...ctx.config }
+    const config = { ...(await resolveGatewayConfig('paypal')), ...ctx.config }
     assertConfig(config, 'paypal')
     const access = await token(config)
     let raw: Record<string, unknown>
@@ -107,8 +106,8 @@ export const paypalGateway: PaymentGateway = {
     return toEvent(raw)
   },
 
-  async capture({ gatewayRef, config }): Promise<GatewayEvent> {
-    const cfg = { ...envConfig('PAYPAL', KEYS), ...config }
+  async capture({ gatewayRef, config }) {
+    const cfg = { ...(await resolveGatewayConfig('paypal')), ...config }
     const access = await token(cfg)
     const raw = await fetchJson<Record<string, unknown>>(`${apiBase(cfg)}/v2/checkout/orders/${encodeURIComponent(gatewayRef)}/capture`, {
       method: 'POST',
@@ -124,7 +123,7 @@ export const paypalGateway: PaymentGateway = {
   },
 
   async query({ providerRef, gatewayRef, config }) {
-    const cfg = { ...envConfig('PAYPAL', KEYS), ...config }
+    const cfg = { ...(await resolveGatewayConfig('paypal')), ...config }
     const access = await token(cfg)
     // PayPal 查单主键是 order id（落在 payment.gatewayRef），providerRef 仅本地幂等键
     const orderId = gatewayRef || providerRef
@@ -139,7 +138,7 @@ export const paypalGateway: PaymentGateway = {
   },
 
   async refund({ refundNo, amountCents, currency, gatewayRef, config }) {
-    const cfg = { ...envConfig('PAYPAL', KEYS), ...config }
+    const cfg = { ...(await resolveGatewayConfig('paypal')), ...config }
     const access = await token(cfg)
     const order = await fetchJson<Record<string, unknown>>(`${apiBase(cfg)}/v2/checkout/orders/${encodeURIComponent(gatewayRef ?? '')}`, {
       method: 'GET',

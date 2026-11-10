@@ -31,3 +31,10 @@ export const paymentChannelsSchema = z.object({
 export const updatePaymentChannelsSchema = paymentChannelsSchema.extend({
   confirmImpact: z.literal(true),
 })
+
+/** 支付凭据后台配置：provider + 凭据字段（密钥/证书由后台加密落库，env 仅兜底；空字符串表示保留原值） */
+export const updatePaymentCredentialsSchema = z.object({
+  provider: z.enum(['paypal', 'wechat', 'alipay', 'unionpay']),
+  credentials: z.record(z.string(), z.string()),
+  confirmImpact: z.literal(true),
+})

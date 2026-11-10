@@ -1,6 +1,7 @@
 import { AppError } from '../../../../middleware/errorHandler.js'
 import type { PaymentGateway, GatewayEvent, GatewayOrderContext, GatewayNotifyContext, GatewaySession, GatewayRefundContext } from '../types.js'
-import { assertConfig, envConfig, fetchJson, header, notifyUrl, parseForm, rsaSign, rsaVerify, sortedKv } from './common.js'
+import { assertConfig, fetchJson, header, notifyUrl, parseForm, rsaSign, rsaVerify, sortedKv } from './common.js'
+import { resolveGatewayConfig } from '../credentialService.js'
 
 /**
  * 银联全渠道 / 云闪付（frontTransReq 前台跳转，backTransReq 退款）。
@@ -13,10 +14,8 @@ import { assertConfig, envConfig, fetchJson, header, notifyUrl, parseForm, rsaSi
  * - 通知：form-urlencoded，验签用银联公钥证书，respCode=00 视为成功；
  * - 退款：txnType=04 / txnSubType=00，orderId = 本地 refundNo。
  *
- * 凭据环境变量：UNIONPAY_MER_ID / UNIONPAY_CERT_ID / UNIONPAY_PRIVATE_KEY(PEM) /
- * UNIONPAY_PUBLIC_KEY(PEM) / UNIONPAY_GATEWAY / UNIONPAY_FRONT_TRANS_URL / UNIONPAY_BACK_TRANS_URL。
+ * 凭据来源：后台加密配置（DB）为主，UNIONPAY_* 环境变量兜底；详见 credentialService。
  */
-const KEYS = ['MER_ID', 'CERT_ID', 'PRIVATE_KEY', 'PUBLIC_KEY', 'GATEWAY', 'FRONT_TRANS_URL', 'BACK_TRANS_URL']
 
 /** ISO 4217 数字货币代码（银联 currencyCode 用数字，不做金额换算） */
 const CURRENCY_CODE: Record<string, string> = { CNY: '156', USD: '840', EUR: '978', GBP: '826', CAD: '124', AUD: '036', JPY: '392', HKD: '344' }
@@ -54,12 +53,12 @@ async function backTrans(config: Record<string, string>, fields: Record<string, 
 export const unionpayGateway: PaymentGateway = {
   id: 'unionpay',
 
-  assertConfigured() {
-    assertConfig(envConfig('UNIONPAY', KEYS), 'unionpay')
+  async assertConfigured() {
+    assertConfig(await resolveGatewayConfig('unionpay'), 'unionpay')
   },
 
   async createPayment(ctx: GatewayOrderContext): Promise<GatewaySession> {
-    const config = envConfig('UNIONPAY', KEYS)
+    const config = await resolveGatewayConfig('unionpay')
     assertConfig(config, 'unionpay')
     const txnTime = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
     const fields = signed(
@@ -88,7 +87,7 @@ export const unionpayGateway: PaymentGateway = {
   },
 
   async verifyAndParse(ctx: GatewayNotifyContext): Promise<GatewayEvent> {
-    const config = { ...envConfig('UNIONPAY', KEYS), ...ctx.config }
+    const config = { ...(await resolveGatewayConfig('unionpay')), ...ctx.config }
     assertConfig(config, 'unionpay')
     const fields = parseForm(ctx.rawBody)
     if (!fields.signature || !rsaVerify(config.PUBLIC_KEY, sortedKv(fields, ['signature']), fields.signature)) throw new AppError(401, '签名无效')
@@ -106,7 +105,7 @@ export const unionpayGateway: PaymentGateway = {
   },
 
   async query({ orderNo, providerRef, config }) {
-    const cfg = { ...envConfig('UNIONPAY', KEYS), ...config }
+    const cfg = { ...(await resolveGatewayConfig('unionpay')), ...config }
     const txnTime = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
     const res = await backTrans(cfg, baseFields(cfg, { txnType: '00', txnSubType: '00', bizType: '000000', orderId: providerRef || orderNo, txnTime }))
     return res.respCode === '00' && res.origRespCode === '00'
@@ -115,7 +114,7 @@ export const unionpayGateway: PaymentGateway = {
   },
 
   async refund(ctx: GatewayRefundContext & { config: Record<string, string> }) {
-    const config = { ...envConfig('UNIONPAY', KEYS), ...ctx.config }
+    const config = { ...(await resolveGatewayConfig('unionpay')), ...ctx.config }
     const txnTime = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
     const res = await backTrans(
       config,

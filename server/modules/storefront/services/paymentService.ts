@@ -66,7 +66,7 @@ export async function createSession(site: StorefrontSite, orderId: number, reque
     throw new AppError(422, `支付方式 ${providerDef.id} 不可用（未启用或不支持 ${order.currency}）`)
   }
   // 真实网关缺配置 fail-closed：不产生会话、不静默降级为 mock
-  if (providerDef.real) assertGatewayConfigured(providerDef.id)
+  if (providerDef.real) await assertGatewayConfigured(providerDef.id)
 
   const provider = providerDef.id
   const providerRef = `pay_${order.orderNo}_${crypto.randomBytes(8).toString('hex')}`

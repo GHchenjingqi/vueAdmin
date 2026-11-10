@@ -1,6 +1,7 @@
 import { AppError } from '../../../../middleware/errorHandler.js'
 import type { PaymentGateway, GatewayEvent, GatewayOrderContext, GatewayNotifyContext, GatewaySession, GatewayRefundContext } from '../types.js'
-import { assertConfig, envConfig, fetchJson, money, notifyUrl, parseForm, rsaSign, rsaVerify, sortedKv } from './common.js'
+import { assertConfig, fetchJson, money, notifyUrl, parseForm, rsaSign, rsaVerify, sortedKv } from './common.js'
+import { resolveGatewayConfig } from '../credentialService.js'
 
 /**
  * 支付宝（电脑网站支付 alipay.trade.page.pay / 统一收单交易退款，CNY）。
@@ -11,10 +12,8 @@ import { assertConfig, envConfig, fetchJson, money, notifyUrl, parseForm, rsaSig
  *   trade_status ∈ TRADE_SUCCESS/TRADE_FINISHED 视为成功，成功应答必须是纯文本 success；
  * - 退款：alipay.trade.refund，out_request_no = 本地 refundNo（部分退款幂等键）。
  *
- * 凭据环境变量：ALIPAY_APP_ID / ALIPAY_PRIVATE_KEY(PEM) / ALIPAY_PUBLIC_KEY(PEM) /
- * ALIPAY_GATEWAY / ALIPAY_NOTIFY_URL。
+ * 凭据来源：后台加密配置（DB）为主，ALIPAY_* 环境变量兜底；详见 credentialService。
  */
-const KEYS = ['APP_ID', 'PRIVATE_KEY', 'PUBLIC_KEY', 'GATEWAY']
 
 interface AliParams {
   [key: string]: string
@@ -65,12 +64,12 @@ async function callGateway<T = Record<string, unknown>>(
 export const alipayGateway: PaymentGateway = {
   id: 'alipay',
 
-  assertConfigured() {
-    assertConfig(envConfig('ALIPAY', KEYS), 'alipay')
+  async assertConfigured() {
+    assertConfig(await resolveGatewayConfig('alipay'), 'alipay')
   },
 
   async createPayment(ctx: GatewayOrderContext): Promise<GatewaySession> {
-    const config = envConfig('ALIPAY', KEYS)
+    const config = await resolveGatewayConfig('alipay')
     assertConfig(config, 'alipay')
     const params = sign(config, {
       ...commonParams(config, 'alipay.trade.page.pay', ctx.notifyUrl || notifyUrl('alipay')),
@@ -86,7 +85,7 @@ export const alipayGateway: PaymentGateway = {
   },
 
   async verifyAndParse(ctx: GatewayNotifyContext): Promise<GatewayEvent> {
-    const config = { ...envConfig('ALIPAY', KEYS), ...ctx.config }
+    const config = { ...(await resolveGatewayConfig('alipay')), ...ctx.config }
     assertConfig(config, 'alipay')
     const fields = parseForm(ctx.rawBody)
     const signature = fields.sign ?? ''
@@ -106,7 +105,7 @@ export const alipayGateway: PaymentGateway = {
   },
 
   async query({ orderNo, providerRef, config }) {
-    const cfg = { ...envConfig('ALIPAY', KEYS), ...config }
+    const cfg = { ...(await resolveGatewayConfig('alipay')), ...config }
     const res = await callGateway(cfg, 'alipay.trade.query', { out_trade_no: providerRef || orderNo })
     return res.trade_status === 'TRADE_SUCCESS'
       ? { type: 'payment.succeeded', gatewayOrderNo: String(res.out_trade_no ?? ''), gatewayRef: String(res.trade_no ?? ''), raw: res }
@@ -114,7 +113,7 @@ export const alipayGateway: PaymentGateway = {
   },
 
   async refund(ctx: GatewayRefundContext & { config: Record<string, string> }) {
-    const config = { ...envConfig('ALIPAY', KEYS), ...ctx.config }
+    const config = { ...(await resolveGatewayConfig('alipay')), ...ctx.config }
     const res = await callGateway(config, 'alipay.trade.refund', {
       out_trade_no: ctx.gatewayRef || ctx.orderNo,
       trade_no: ctx.gatewayRef,

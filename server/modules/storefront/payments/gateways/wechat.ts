@@ -1,7 +1,8 @@
 import crypto from 'crypto'
 import { AppError } from '../../../../middleware/errorHandler.js'
 import type { PaymentGateway, GatewayEvent, GatewayOrderContext, GatewayNotifyContext, GatewaySession, GatewayRefundContext } from '../types.js'
-import { aesGcmDecrypt, assertConfig, envConfig, fetchJson, header, notifyUrl, rsaSign, rsaVerify } from './common.js'
+import { aesGcmDecrypt, assertConfig, fetchJson, header, notifyUrl, rsaSign, rsaVerify } from './common.js'
+import { resolveGatewayConfig } from '../credentialService.js'
 
 /**
  * 微信支付 APIv3（Native 扫码，CNY）。
@@ -12,10 +13,8 @@ import { aesGcmDecrypt, assertConfig, envConfig, fetchJson, header, notifyUrl, r
  *   随后用 APIv3 密钥 AES-256-GCM 解密 resource 得到真实交易数据；
  * - 退款：POST /v3/refund/domestic/refunds，out_refund_no = 本地 refundNo（网关侧幂等键）。
  *
- * 凭据环境变量：WECHAT_MCH_ID / WECHAT_APP_ID / WECHAT_API_V3_KEY / WECHAT_SERIAL_NO /
- * WECHAT_PRIVATE_KEY(PEM) / WECHAT_PLATFORM_PUBLIC_KEY(PEM)。
+ * 凭据来源：后台加密配置（DB）为主，WECHAT_* 环境变量兜底；详见 credentialService。
  */
-const KEYS = ['MCH_ID', 'APP_ID', 'API_V3_KEY', 'SERIAL_NO', 'PRIVATE_KEY', 'PLATFORM_PUBLIC_KEY']
 const BASE = 'https://api.mch.weixin.qq.com'
 
 function authorization(config: Record<string, string>, method: string, urlPath: string, body: string): string {
@@ -42,12 +41,12 @@ async function wxFetch<T>(config: Record<string, string>, method: string, path: 
 export const wechatGateway: PaymentGateway = {
   id: 'wechat',
 
-  assertConfigured() {
-    assertConfig(envConfig('WECHAT', KEYS), 'wechat')
+  async assertConfigured() {
+    assertConfig(await resolveGatewayConfig('wechat'), 'wechat')
   },
 
   async createPayment(ctx: GatewayOrderContext): Promise<GatewaySession> {
-    const config = envConfig('WECHAT', KEYS)
+    const config = await resolveGatewayConfig('wechat')
     assertConfig(config, 'wechat')
     const body = JSON.stringify({
       appid: config.APP_ID,
@@ -63,7 +62,7 @@ export const wechatGateway: PaymentGateway = {
   },
 
   async verifyAndParse(ctx: GatewayNotifyContext): Promise<GatewayEvent> {
-    const config = { ...envConfig('WECHAT', KEYS), ...ctx.config }
+    const config = { ...(await resolveGatewayConfig('wechat')), ...ctx.config }
     assertConfig(config, 'wechat')
     const timestamp = header(ctx.headers, 'wechatpay-timestamp')
     const nonce = header(ctx.headers, 'wechatpay-nonce')
@@ -97,7 +96,7 @@ export const wechatGateway: PaymentGateway = {
   },
 
   async query({ orderNo, providerRef, config }) {
-    const cfg = { ...envConfig('WECHAT', KEYS), ...config }
+    const cfg = { ...(await resolveGatewayConfig('wechat')), ...config }
     const no = providerRef || orderNo
     const res = await wxFetch<Record<string, unknown>>(cfg, 'GET', `/v3/pay/transactions/out-trade-no/${encodeURIComponent(no)}?mchid=${cfg.MCH_ID}`, '')
     return res.trade_state === 'SUCCESS'
@@ -106,7 +105,7 @@ export const wechatGateway: PaymentGateway = {
   },
 
   async refund(ctx: GatewayRefundContext & { config: Record<string, string> }) {
-    const config = { ...envConfig('WECHAT', KEYS), ...ctx.config }
+    const config = { ...(await resolveGatewayConfig('wechat')), ...ctx.config }
     const body = JSON.stringify({
       out_trade_no: ctx.gatewayRef || ctx.orderNo,
       out_refund_no: ctx.refundNo,

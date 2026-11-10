@@ -72,8 +72,8 @@ export interface GatewayRefundContext {
 
 export interface PaymentGateway {
   id: string
-  /** 读取环境变量配置；缺关键项抛 503，禁止静默降级为 mock */
-  assertConfigured(): void
+  /** 读取配置（DB 加密凭据为主、env 兜底）；缺关键项抛 503，禁止静默降级为 mock */
+  assertConfigured(): Promise<void>
   createPayment(ctx: GatewayOrderContext): Promise<GatewaySession>
   /** 验签 + 解析；验签失败抛 AppError(401)，解析失败抛 AppError(400) */
   verifyAndParse(ctx: GatewayNotifyContext): Promise<GatewayEvent>

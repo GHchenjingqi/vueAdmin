@@ -12,7 +12,7 @@ import { unionpayGateway } from './gateways/unionpay.js'
 /** mock / bnpl 沿用 HMAC-SHA256 签名与自定义 JSON 事件（保持既有沙箱链路与回归契约） */
 const mockGateway: PaymentGateway = {
   id: 'mock',
-  assertConfigured() {
+  async assertConfigured() {
     /* 内网沙箱通道，无需外部凭据 */
   },
   async createPayment(_ctx: GatewayOrderContext): Promise<GatewaySession> {
@@ -59,10 +59,10 @@ export function getGateway(providerId: string): PaymentGateway | undefined {
 }
 
 /** 建会话前校验：真实网关缺配置直接 503，禁止静默降级为 mock 或假成功 */
-export function assertGatewayConfigured(providerId: string): void {
+export async function assertGatewayConfigured(providerId: string): Promise<void> {
   const gateway = getGateway(providerId)
   if (!gateway) throw new AppError(422, '支付方式不可用')
-  gateway.assertConfigured()
+  await gateway.assertConfigured()
 }
 
 /** 从请求头提取各网关验签所需信息（供 controller 统一收集） */

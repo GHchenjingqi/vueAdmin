@@ -74,3 +74,6 @@ export { default as ShopReferralCommission } from './ShopReferralCommission.js'
 
 // X-T03 审计日志（订单/支付/库存/退款状态变更留痕；币种配置审计在 config_changes）
 export { default as AuditLog } from './AuditLog.js'
+
+// 支付网关凭据加密存储（替代纯环境变量；DB 主、env 兜底）
+export { default as ShopPaymentCredential } from './ShopPaymentCredential.js'

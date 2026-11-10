@@ -3,20 +3,23 @@ import { getChannelConfig, saveChannelConfig, CHANNEL_IDS } from '../../storefro
 import { getActiveCurrency } from '../../storefront/services/currencyConfig.js'
 import { getProvider, PROVIDERS } from '../../storefront/payments/providerRegistry.js'
 import { getGateway } from '../../storefront/payments/gatewayRegistry.js'
+import { listCredentialProviders, saveCredentials } from '../../storefront/payments/credentialService.js'
+import { REAL_PROVIDER_IDS } from '../../storefront/payments/credentialFields.js'
+import { getTenantContext } from '../../../modules/tenant/context.js'
 import { AppError } from '../../../middleware/errorHandler.js'
 
 /**
  * 支付通道后台配置（P5-T03 扩展）：
  * - 勾选决定前台展示与可结算通道；保存即生效并主动失效缓存；
- * - 密钥/证书一律走环境变量，此处只回显「是否已配置」，绝不返回密钥值；
+ * - 密钥/证书由「后台加密配置（DB）为主、环境变量兜底」，此处只回显「是否已配置」，绝不返回密钥明文；
  * - 银联 supportedCurrencies='*'，任何币种都展示（外币按订单快照原样送网关）。
  */
 
-function credentialsState(id: string): { configured: boolean; missing?: string } {
+async function credentialsState(id: string): Promise<{ configured: boolean; missing?: string }> {
   const def = getProvider(id)
   if (!def?.real) return { configured: true }
   try {
-    getGateway(id)?.assertConfigured()
+    await getGateway(id)?.assertConfigured()
     return { configured: true }
   } catch (err) {
     return { configured: false, missing: err instanceof Error ? err.message : '未知错误' }
@@ -34,15 +37,17 @@ export const getChannels = async (_req: Request, res: Response, next: NextFuncti
         enabled: cfg.enabled,
         accounts: cfg.accounts,
         activeCurrency: currency,
-        channels: PROVIDERS.map((p) => ({
-          id: p.id,
-          label: p.label,
-          kind: p.kind,
-          supportedCurrencies: p.supportedCurrencies === '*' ? ['*'] : p.supportedCurrencies,
-          allCurrencies: p.supportedCurrencies === '*',
-          enabled: cfg.enabled.includes(p.id),
-          ...credentialsState(p.id),
-        })),
+        channels: await Promise.all(
+          PROVIDERS.map(async (p) => ({
+            id: p.id,
+            label: p.label,
+            kind: p.kind,
+            supportedCurrencies: p.supportedCurrencies === '*' ? ['*'] : p.supportedCurrencies,
+            allCurrencies: p.supportedCurrencies === '*',
+            enabled: cfg.enabled.includes(p.id),
+            ...(await credentialsState(p.id)),
+          })),
+        ),
       },
     })
   } catch (err) {
@@ -72,11 +77,39 @@ export const channelState = async (req: Request, res: Response, next: NextFuncti
       data: {
         currency,
         legacyMode: !cfg.configured,
-        usable: usable.map((p) => ({ id: p.id, label: p.label, ...credentialsState(p.id) })),
+        usable: await Promise.all(
+          usable.map(async (p) => ({ id: p.id, label: p.label, ...(await credentialsState(p.id)) })),
+        ),
         knownIds: CHANNEL_IDS,
       },
     })
   } catch (err) {
     next(err instanceof AppError ? err : err)
+  }
+}
+
+/** 读取全部真实通道的凭据配置状态（掩码，绝不回显明文；secret 仅末 4 位） */
+export const getCredentials = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = getTenantContext()?.tenantId ?? 1
+    const providers = await listCredentialProviders(tenantId)
+    res.json({ code: 0, data: { providers } })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** 保存某通道凭据：加密落库（DB 主、env 兜底）；空字符串字段表示保留原值，不覆盖 */
+export const updateCredentials = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { provider, credentials } = req.body as { provider: string; credentials?: Record<string, string> }
+    if (!REAL_PROVIDER_IDS.includes(provider)) {
+      throw new AppError(400, `PAYMENT_PROVIDER_NOT_CONFIGURABLE: ${provider} 不支持后台配置凭据`)
+    }
+    const tenantId = getTenantContext()?.tenantId ?? 1
+    const saved = await saveCredentials(tenantId, provider, credentials ?? {})
+    res.json({ code: 0, data: { provider, configuredKeys: Object.keys(saved) } })
+  } catch (err) {
+    next(err)
   }
 }
