@@ -295,9 +295,10 @@ describe('阶段4：营销中心', () => {
       })
       expect(promo.id).toBeGreaterThan(0)
       const code = 'CPN' + uniq()
-      const coupon = await marketingService.createCoupon({ code, type: 'fixed', value: 5, currency: 'USD', validFrom: '2026-11-01', validTo: '2026-11-30' })
-      expect(coupon.code).toBe(code)
-      await expect(marketingService.createCoupon({ code, type: 'fixed', value: 5, currency: 'USD', validFrom: '2026-11-01', validTo: '2026-11-30' })).rejects.toThrow(/已存在/)
+      const coupon = await marketingService.createCoupon({ code, type: 'fixed', value: 5, currency: 'USD', validFrom: '2026-11-01', validTo: '2026-11-30', usageLimit: 0 })
+      // 券码后台落库统一 trim + 大写，与 evaluateCoupon 的查询口径一致
+      expect(coupon.code).toBe(code.trim().toUpperCase())
+      await expect(marketingService.createCoupon({ code, type: 'fixed', value: 5, currency: 'USD', validFrom: '2026-11-01', validTo: '2026-11-30', usageLimit: 0 })).rejects.toThrow(/已存在/)
     })
   })
 })

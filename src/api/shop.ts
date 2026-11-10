@@ -576,7 +576,7 @@ export interface Coupon {
   validFrom: string
   validTo: string
   usedCount: number
-  totalCount: number | null
+  usageLimit: number
   createdAt: string
 }
 
@@ -602,15 +602,7 @@ export const marketingApi = {
   getCoupon(id: number) {
     return request.get<Coupon>(`/shop/coupons/${id}`)
   },
-  createCoupon(data: {
-    code: string
-    type: 'fixed' | 'percent'
-    value: number
-    currency: string
-    validFrom: string
-    validTo: string
-    totalCount?: number | null
-  }) {
+  createCoupon(data: { code: string; type: 'fixed' | 'percent'; value: number; currency: string; validFrom: string; validTo: string; usageLimit?: number }) {
     return request.post<Coupon>('/shop/coupons', data)
   },
   updateCoupon(id: number, data: Partial<Omit<Coupon, 'id' | 'createdAt'>>) {

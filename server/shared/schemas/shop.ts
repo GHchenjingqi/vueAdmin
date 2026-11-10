@@ -306,6 +306,8 @@ export const createCouponSchema = z.object({
   currency: z.string().length(3).default('USD'),
   validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   validTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** 最大使用次数，0=不限量。此前缺失导致后台「发放总量」被 zod strip，券永远不限量 */
+  usageLimit: z.number().int().min(0).default(0),
 })
 export type CreateCouponInput = z.infer<typeof createCouponSchema>
 

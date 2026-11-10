@@ -70,7 +70,7 @@
           <el-date-picker v-model="form.validTo" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
         </el-form-item>
         <el-form-item :label="t('shop.marketing.totalCount')">
-          <el-input-number v-model="form.totalCount" :min="0" :precision="0" style="width: 100%" />
+          <el-input-number v-model="form.usageLimit" :min="0" :precision="0" style="width: 100%" />
           <div class="form-tip">{{ t('shop.marketing.totalCountPlaceholder') }}</div>
         </el-form-item>
       </el-form>
@@ -142,14 +142,14 @@ const submitLoading = ref(false)
 const formRef = ref<FormInstance | null>(null)
 const currentId = ref<number | null>(null)
 
-const form = reactive<{ code: string; type: 'fixed' | 'percent'; value: number; currency: string; validFrom: string; validTo: string; totalCount: number }>({
+const form = reactive<{ code: string; type: 'fixed' | 'percent'; value: number; currency: string; validFrom: string; validTo: string; usageLimit: number }>({
   code: '',
   type: 'fixed',
   value: 5,
   currency: 'USD',
   validFrom: '',
   validTo: '',
-  totalCount: 0,
+  usageLimit: 0,
 })
 
 const rules = computed<FormRules>(() => ({
@@ -171,7 +171,7 @@ const openDialog = (row?: Record<string, unknown>): void => {
     form.currency = (row.currency as string) || 'USD'
     form.validFrom = String(row.validFrom ?? '').slice(0, 10)
     form.validTo = String(row.validTo ?? '').slice(0, 10)
-    form.totalCount = Number(row.totalCount ?? 0)
+    form.usageLimit = Number(row.usageLimit ?? 0)
   } else {
     isEdit.value = false
     currentId.value = null
@@ -181,7 +181,7 @@ const openDialog = (row?: Record<string, unknown>): void => {
     form.currency = 'USD'
     form.validFrom = ''
     form.validTo = ''
-    form.totalCount = 0
+    form.usageLimit = 0
   }
   dialogVisible.value = true
 }
@@ -199,7 +199,7 @@ const handleSubmit = async (): Promise<void> => {
       currency: form.currency.trim().toUpperCase(),
       validFrom: form.validFrom,
       validTo: form.validTo,
-      totalCount: form.totalCount > 0 ? form.totalCount : null,
+      usageLimit: form.usageLimit > 0 ? form.usageLimit : 0,
     }
     if (isEdit.value && currentId.value != null) {
       await marketingApi.updateCoupon(currentId.value, payload)

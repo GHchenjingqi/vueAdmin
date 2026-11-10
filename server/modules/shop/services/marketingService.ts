@@ -1,6 +1,6 @@
 import { AppError } from '../../../middleware/errorHandler.js'
-import { Op } from 'sequelize'
-import { ShopPromotion, ShopCoupon } from '../models/index.js'
+import { Op, UniqueConstraintError } from 'sequelize'
+import { ShopPromotion, ShopCoupon, ShopCouponRedemption } from '../models/index.js'
 import type { CreatePromotionInput, UpdatePromotionInput, CreateCouponInput, UpdateCouponInput } from '../../../shared/schemas/shop.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
 
@@ -59,6 +59,22 @@ export async function activePromotions(): Promise<ShopPromotion[]> {
 
 // ==================== 优惠券 ====================
 
+/**
+ * 券码统一口径：evaluateCoupon 查询时会 trim + toUpperCase，
+ * 后台落库必须用同一口径，否则「小写/带空格」的券在前台永远核销不到。
+ */
+const normalizeCode = (code: string): string => String(code).trim().toUpperCase()
+
+/** 已有核销流水的券不允许物理删除 / 改码：会造成流水悬空，并可被「删+同码重建」绕过用量上限 */
+const countRedemptions = (couponId: number): Promise<number> =>
+  ShopCouponRedemption.count({ where: { couponId, tenantId: tid() } })
+
+/** 并发建/改券时 count 检查非原子，唯一索引兜底；统一归一为可读的 400 而非 Sequelize 原始 409 */
+const rejectDuplicateCode = (err: unknown, code: string): never => {
+  if (err instanceof UniqueConstraintError) throw new AppError(400, `券码 ${code} 已存在`)
+  throw err
+}
+
 export async function listCoupons(params: { page?: number; pageSize?: number } = {}) {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 20
@@ -78,23 +94,50 @@ export async function getCouponById(id: number): Promise<ShopCoupon> {
 }
 
 export async function createCoupon(input: CreateCouponInput): Promise<ShopCoupon> {
-  const exists = await ShopCoupon.count({ where: { code: input.code, tenantId: tid() } })
-  if (exists > 0) throw new AppError(400, `券码 ${input.code} 已存在`)
-  return ShopCoupon.create({ ...input, tenantId: tenantId() } as never)
+  const code = normalizeCode(input.code)
+  if (!code) throw new AppError(400, '券码不能为空')
+  const exists = await ShopCoupon.count({ where: { code, tenantId: tid() } })
+  if (exists > 0) throw new AppError(400, `券码 ${code} 已存在`)
+  try {
+    return await ShopCoupon.create({ ...input, code, tenantId: tenantId() } as never)
+  } catch (err) {
+    return rejectDuplicateCode(err, code)
+  }
 }
 
 export async function updateCoupon(id: number, input: UpdateCouponInput): Promise<ShopCoupon> {
   const row = await getCouponById(id)
-  if (input.code && input.code !== row.code) {
-    const exists = await ShopCoupon.count({ where: { code: input.code, tenantId: tid() } })
-    if (exists > 0) throw new AppError(400, `券码 ${input.code} 已存在`)
+  const nextCode = input.code === undefined ? undefined : normalizeCode(input.code)
+  if (nextCode === '') throw new AppError(400, '券码不能为空')
+
+  // ① 有核销流水时禁止改码：历史流水 couponCode 会与券定义分裂，对账口径不一致
+  if (nextCode !== undefined && nextCode !== row.code && (await countRedemptions(id)) > 0) {
+    throw new AppError(409, 'COUPON_HAS_REDEMPTIONS: 该券已有核销流水，不可修改券码（可调整有效期停用）')
   }
-  await row.update(input as never)
+  if (nextCode !== undefined && nextCode !== row.code) {
+    const exists = await ShopCoupon.count({ where: { code: nextCode, tenantId: tid() } })
+    if (exists > 0) throw new AppError(400, `券码 ${nextCode} 已存在`)
+  }
+
+  // ② 上限不得低于已核销次数，否则 usedCount > usageLimit 的不一致会让券永久失效
+  if (input.usageLimit !== undefined && input.usageLimit > 0 && input.usageLimit < Number(row.usedCount)) {
+    throw new AppError(400, `COUPON_USAGE_LIMIT_TOO_LOW: 已使用 ${row.usedCount} 次，上限不能低于已使用次数`)
+  }
+
+  try {
+    await row.update({ ...input, ...(nextCode === undefined ? {} : { code: nextCode }) } as never)
+  } catch (err) {
+    return rejectDuplicateCode(err, nextCode ?? row.code)
+  }
   return row
 }
 
 export async function deleteCoupon(id: number): Promise<void> {
   const row = await getCouponById(id)
+  const redeemed = await countRedemptions(id)
+  if (redeemed > 0) {
+    throw new AppError(409, `COUPON_HAS_REDEMPTIONS: 该券已有 ${redeemed} 条核销流水，不可删除（可调整有效期停用）`)
+  }
   await row.destroy()
 }
 
