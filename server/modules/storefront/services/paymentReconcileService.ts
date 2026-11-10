@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopOrderPayment } from '../../shop/models/index.js'
 import * as reservationService from '../../shop/services/reservationService.js'
+import { releaseCoupon } from './couponService.js'
 import { getGateway } from '../payments/gatewayRegistry.js'
 import { applyGatewayEvent } from './paymentService.js'
 import { logInfo } from '../../../utils/fileLogger.js'
@@ -16,7 +17,7 @@ import { logInfo } from '../../../utils/fileLogger.js'
  *  - 若网关不支持主动查单，则按超时硬上限直接关单（释放库存预占）；
  *  - 查单结果为空（进行中）且未超硬上限时，留待下一轮扫描。
  *
- * 关单：标记 payment.status='expired' 并释放该订单的库存预占（幂等）。
+ * 关单：标记 payment.status='expired'，释放库存预占与优惠券占用（均幂等）。
  */
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000 // 30 分钟：超过此时间仍未确认即视为放弃
@@ -73,6 +74,10 @@ export async function reconcilePayments(): Promise<number> {
       if (!gateway?.query || created < cap) {
         await row.update({ status: 'expired' } as never)
         await reservationService.releaseReservation(row.orderNo).catch(() => null)
+        // 关单 = 未支付被放弃，券占用必须一并回退，否则限量券名额被永久消耗
+        await releaseCoupon(row.orderNo).catch((err) =>
+          logInfo(`[reconcile] 券占用回退失败 ${row.orderNo}: ${(err as Error).message}`),
+        )
         closed++
       }
     }

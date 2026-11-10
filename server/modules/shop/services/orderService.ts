@@ -1,8 +1,9 @@
 import { AppError } from '../../../middleware/errorHandler.js'
 import sequelize from '../../../config/database.js'
-import { ShopOrder, ShopOrderItem, ShopOrderShipment, ShopSku, ShopChannel, ShopShop } from '../models/index.js'
+import { ShopOrder, ShopOrderItem, ShopOrderShipment, ShopSku, ShopChannel, ShopShop, ShopInventoryReservation } from '../models/index.js'
 import type { CreateOrderInput, ShipOrderInput } from '../../../shared/schemas/shop.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
+import { logInfo } from '../../../utils/fileLogger.js'
 import * as inventoryService from './inventoryService.js'
 import { createShipment } from './channelAdapter.js'
 import { tryEnqueue } from './orderMailService.js'
@@ -162,7 +163,7 @@ export async function cancel(id: number): Promise<ShopOrder> {
   const tId = tid()
   // 与 ship/markPaid 共用订单行锁，保证状态检查与变更原子：
   // 否则取消与发货并发时两者都成功返回，订单最终状态与库存账不一致。
-  return sequelize.transaction(async (t) => {
+  const { order, marked } = await sequelize.transaction(async (t) => {
     const order = await ShopOrder.findOne({
       where: { id, tenantId: tId },
       transaction: t,
@@ -176,7 +177,24 @@ export async function cancel(id: number): Promise<ShopOrder> {
     for (const item of items) {
       await inventoryService.release(item.skuId, item.qty, order.orderNo)
     }
+    // 关闭收口：库存已按明细释放，这里只把该单 active 预占标记为 released。
+    // 若留着 active，TTL sweeper 到期会再释放一次，误放掉同 SKU 其它在途订单的占用。
+    const [marked] = await ShopInventoryReservation.update(
+      { status: 'released', releasedAt: new Date() } as never,
+      { where: { tenantId: tId, ref: order.orderNo, status: 'active' } as never, transaction: t },
+    )
     await order.update({ status: 'cancelled' }, { transaction: t })
-    return order
+    return { order, marked }
   })
+
+  // 券占用回收仅针对「本次标记了 active 预占」的未支付订单：
+  // 已支付订单预占为 committed，券已用于成交，退款应走独立链路，不能在此释放。
+  // releaseCoupon 自身开事务，故放在订单事务提交之后；幂等，失败只告警不阻断取消。
+  if (marked > 0) {
+    const { releaseCoupon } = await import('../../storefront/services/couponService.js')
+    await releaseCoupon(order.orderNo).catch((err) =>
+      logInfo(`[order.cancel] 券占用回退失败 ${order.orderNo}: ${(err as Error).message}`),
+    )
+  }
+  return order
 }

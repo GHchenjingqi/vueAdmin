@@ -5,6 +5,7 @@ import { getTenantContext } from '../../tenant/context.js'
 import * as inventoryService from './inventoryService.js'
 import * as warehouseRouting from './warehouseRoutingService.js'
 import config from '../../../config/index.js'
+import { logInfo } from '../../../utils/fileLogger.js'
 
 /**
  * 库存预占服务（阶段 5 步骤 4 / P3-T08）
@@ -97,13 +98,25 @@ export async function releaseExpiredReservations(): Promise<number> {
     where: { status: 'active', expiresAt: { [Op.lt]: now } as never, tenantId: tId } as never,
   })
   let released = 0
+  const refs = new Set<string>()
   for (const row of expired) {
     try {
       await inventoryService.release(row.skuId, row.qty, row.ref ?? 'sweeper')
       await row.update({ status: 'released', releasedAt: now } as never)
+      if (row.ref) refs.add(row.ref)
       released += 1
     } catch {
       // 单条失败不影响其余；留待下次 sweeper
+    }
+  }
+  // 预占到期 = 订单未支付被放弃（已支付订单的预占为 committed，不会被扫到）。
+  // 按 ref 去重后回退券占用；releaseCoupon 幂等，失败只告警不影响库存释放结果。
+  if (refs.size > 0) {
+    const { releaseCoupon } = await import('../../storefront/services/couponService.js')
+    for (const ref of refs) {
+      await releaseCoupon(ref).catch((err) =>
+        logInfo(`[sweeper] 券占用回退失败 ${ref}: ${(err as Error).message}`),
+      )
     }
   }
   return released
