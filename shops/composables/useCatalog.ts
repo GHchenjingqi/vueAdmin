@@ -25,11 +25,12 @@ export function useCatalog() {
   }
 
   async function listProducts(
-    params: { category?: string; sort?: string; page?: number; pageSize?: number; attr?: Record<string, string> } = {},
+    params: { category?: string; sort?: string; page?: number; pageSize?: number; ids?: number[]; attr?: Record<string, string> } = {},
   ): Promise<ProductListResult> {
     const qs = new URLSearchParams()
     if (params.category) qs.set('category', params.category)
     if (params.sort) qs.set('sort', params.sort)
+    if (params.ids?.length) qs.set('ids', params.ids.join(','))
     qs.set('page', String(params.page ?? 1))
     qs.set('pageSize', String(params.pageSize ?? 24))
     for (const [k, v] of Object.entries(params.attr ?? {})) qs.set(`attr.${k}`, v)

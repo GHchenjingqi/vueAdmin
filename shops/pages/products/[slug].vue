@@ -100,6 +100,32 @@ onMounted(async () => {
     related.value = []
   }
 })
+
+// 收藏（详情页心形）：游客本地 / 登录云端，进入页面初始化收藏 id 集合
+const wishlist = useWishlist()
+const wishBusy = ref(false)
+const wishAdded = ref(false)
+onMounted(async () => {
+  await wishlist.load()
+})
+const isWished = computed(() => (product.value ? wishlist.isWishlisted(product.value.id) : false))
+async function toggleWishlist(): Promise<void> {
+  if (!product.value || wishBusy.value) return
+  wishBusy.value = true
+  try {
+    if (isWished.value) {
+      await wishlist.remove(product.value.id)
+    } else {
+      await wishlist.add(product.value.id, true)
+      wishAdded.value = true
+      setTimeout(() => (wishAdded.value = false), 2000)
+    }
+  } catch {
+    // 收藏失败不阻断浏览
+  } finally {
+    wishBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -156,12 +182,27 @@ onMounted(async () => {
           >
             {{ added ? t('product.added') : t('product.addToCart') }}
           </button>
+          <button
+            type="button"
+            class="rounded-lg border px-4 py-3 text-sm font-medium transition disabled:opacity-50"
+            :class="isWished ? 'border-red-300 bg-red-50 text-red-600' : 'border-stone-300 text-stone-600 hover:border-stone-500'"
+            :disabled="wishBusy"
+            :aria-pressed="isWished"
+            @click="toggleWishlist"
+          >
+            <span aria-hidden="true">{{ isWished ? '♥' : '♡' }}</span>
+            {{ isWished ? (wishAdded ? t('wishlist.added') : t('wishlist.remove')) : t('wishlist.title') }}
+          </button>
           <p v-if="!inStock" class="text-xs text-stone-500">{{ stockNote ?? t('product.unavailable') }}</p>
         </div>
+        <p v-if="!wishlist.isLoggedIn()" class="text-xs text-stone-500">{{ t('wishlist.loginToSync') }}</p>
       </div>
 
       <ProductReviews v-if="product" :spu-id="product.id" class="lg:col-span-2" />
     </div>
+
+    <!-- 最近看过：复用 view_item 埋点，游客/登录均记录 -->
+    <ViewHistory :exclude-id="product?.id ?? 0" :limit="8" />
 
     <!-- P5-T08：product_recommendation 变体 → 推荐数量（control=4 / variant_b=8 / variant_c=12） -->
     <section v-if="related.length" class="mt-14" :aria-label="t('product.youMayLike')">

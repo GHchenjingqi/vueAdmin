@@ -60,6 +60,7 @@ useSeo({ title: () => t('account.title'), description: () => t('account.descript
         <h1 class="mt-1 text-xl font-semibold">{{ customer?.nickname || customer?.email }}</h1>
         <div class="mt-5 space-y-2 text-sm">
           <NuxtLink to="/account/orders" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.title') }}</NuxtLink>
+          <NuxtLink to="/account/wishlist" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('wishlist.title') }}</NuxtLink>
           <NuxtLink to="/account/addresses" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.addressBook') }}</NuxtLink>
           <NuxtLink to="/account/rma" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.rma') }}</NuxtLink>
           <NuxtLink to="/policies/returns" class="block rounded-lg border border-stone-200 px-4 py-3 hover:border-stone-400">{{ t('account.returnsPolicy') }}</NuxtLink>
