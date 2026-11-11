@@ -5,6 +5,7 @@ import { useCatalog } from '~/composables/useCatalog'
 import { useI18n } from '~/composables/useI18n'
 import ProductCard from '~/components/commerce/ProductCard.vue'
 import { getToken, getStoredCustomer, type CustomerPublic } from '@shared/customer/auth'
+import type { CatalogProduct } from '@shared/types/api'
 
 /**
  * 我的收藏页（account/wishlist）：收藏列表 + 取消收藏 + 清空 + 降价提醒开关。

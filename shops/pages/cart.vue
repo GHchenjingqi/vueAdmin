@@ -35,6 +35,7 @@ useSeo({ title: () => t('cart.title'), description: () => t('cart.description'),
 
 // P6 买了又买：购物车非空时取 cross-sell 推荐（行为优先 + 同分类兜底，BFF mock 已兜底）
 const crossSell = ref<CatalogProduct[]>([])
+const crossSellStrategy = ref<string>('unknown')
 onMounted(async () => {
   const list = items.value ?? []
   if (!list.length) return
@@ -44,6 +45,7 @@ onMounted(async () => {
       body: { lines: list.map((l) => ({ skuId: l.skuId, qty: l.qty })), limit: 6 },
     })
     crossSell.value = res.items
+    crossSellStrategy.value = res.strategy
   } catch {
     crossSell.value = []
   }
@@ -99,8 +101,13 @@ onMounted(async () => {
         {{ t('cart.checkout') }}
       </NuxtLink>
 
-      <!-- P6 买了又买：购物车交叉销售（行为优先，空时组件自隐藏） -->
-      <RecommendSection :title="t('reco.crossSell')" :items="crossSell" />
+      <!-- P6 买了又买：购物车交叉销售（行为优先，空时组件自隐藏）；埋点 CTR 看板 -->
+      <RecommendSection
+        :title="t('reco.crossSell')"
+        :items="crossSell"
+        placement="cross_sell"
+        :strategy="crossSellStrategy"
+      />
     </template>
   </div>
 </template>

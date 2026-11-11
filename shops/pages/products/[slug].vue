@@ -7,6 +7,7 @@ import { useStoreConfig } from '~/composables/useStoreConfig'
 import { useI18n } from '~/composables/useI18n'
 import { trackViewItem, trackAddToCart } from '@shared/analytics/ecommerce'
 import ProductReviews from '~/components/commerce/ProductReviews.vue'
+import RecommendSection from '~/components/commerce/RecommendSection.vue'
 import type { CatalogProduct } from '@shared/types/api'
 
 /**
@@ -89,6 +90,7 @@ useSeo({
 // 关闭/未知 fail-closed → control。推荐仅浏览行为，不碰报价与库存。
 const { assign: assignExperiment } = useExperiment()
 const related = ref<CatalogProduct[]>([])
+const relatedStrategy = ref<string>('unknown')
 onMounted(async () => {
   const a = await assignExperiment('product_recommendation')
   const count = a.enabled && a.variant === 'variant_c' ? 12 : a.enabled && a.variant === 'variant_b' ? 8 : 4
@@ -98,8 +100,10 @@ onMounted(async () => {
       query: { productId: product.value?.id, limit: count },
     })
     related.value = res.items.filter((p) => p.slug !== product.value?.slug).slice(0, count)
+    relatedStrategy.value = res.strategy
   } catch {
     // 端点不可用 → 退回按分类列表（旧行为）
+    relatedStrategy.value = 'fallback_category'
     try {
       const res = await catalog.listProducts({ category: product.value?.category?.slug, page: 1, pageSize: count + 1 })
       related.value = res.list.filter((p) => p.slug !== product.value?.slug).slice(0, count)
@@ -213,24 +217,12 @@ async function toggleWishlist(): Promise<void> {
     <ViewHistory :exclude-id="product?.id ?? 0" :limit="8" />
 
     <!-- P5-T08：product_recommendation 变体 → 推荐数量（control=4 / variant_b=8 / variant_c=12） -->
-    <section v-if="related.length" class="mt-14" :aria-label="t('product.youMayLike')">
-      <h2 class="mb-5 text-lg font-semibold">{{ t('product.youMayLike') }}</h2>
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <NuxtLink
-          v-for="p in related"
-          :key="p.slug"
-          :to="`/products/${p.slug}`"
-          class="group overflow-hidden rounded-xl border border-stone-200 transition hover:border-stone-400"
-        >
-          <div class="aspect-square w-full bg-stone-100">
-            <img v-if="p.cover" :src="p.cover" :alt="p.title" loading="lazy" width="600" height="600" class="h-full w-full object-cover" />
-          </div>
-          <div class="p-3">
-            <p class="truncate text-sm font-medium">{{ p.title }}</p>
-            <p v-if="p.price" class="mt-1 text-xs tabular-nums text-stone-600">{{ cfg.format(p.price.amount) }}</p>
-          </div>
-        </NuxtLink>
-      </div>
-    </section>
+    <!-- P6 埋点：view_item_list（曝光）+ select_item（点击），CTR 看板用 -->
+    <RecommendSection
+      :title="t('product.youMayLike')"
+      :items="related"
+      placement="related"
+      :strategy="relatedStrategy"
+    />
   </div>
 </template>
