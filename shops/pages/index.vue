@@ -15,6 +15,10 @@ const bannerList = computed<CmsBanner[]>(() => banners.value ?? [])
 const activeBanner = ref(0)
 const hasBanners = computed(() => bannerList.value.length > 0)
 
+// 次屏营销 Banner（活动 / 促销入口）：后台可配 position='secondary'
+const { data: secondaryBanners } = await useAsyncData('home-secondary-banners', () => listBanners('secondary'))
+const secondaryList = computed<CmsBanner[]>(() => secondaryBanners.value ?? [])
+
 let bannerTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   if (bannerList.value.length > 1) {
@@ -138,6 +142,25 @@ useHead({
       <p class="mx-auto mt-3 max-w-xl text-sm text-stone-300">{{ t('home.heroSubtitle') }}</p>
       <NuxtLink to="/c/lace-wigs" class="mt-6 inline-block rounded-lg bg-white px-6 py-3 text-sm font-semibold text-stone-900 hover:bg-stone-100">
         {{ t('home.shopLaceWigs') }}
+      </NuxtLink>
+    </section>
+
+    <!-- 次屏营销 Banner（活动 / 促销入口） -->
+    <section v-if="secondaryList.length" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <NuxtLink
+        v-for="b in secondaryList"
+        :key="b.id"
+        :to="b.linkUrl || '#'"
+        class="group relative overflow-hidden rounded-2xl bg-stone-100"
+      >
+        <img :src="b.image" :alt="b.title" class="h-44 w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        <div class="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/55 to-transparent p-4">
+          <h3 class="text-base font-semibold text-white">{{ b.title }}</h3>
+          <p v-if="b.subtitle" class="mt-1 text-xs text-stone-200">{{ b.subtitle }}</p>
+          <span v-if="b.buttonLabel" class="mt-2 w-fit rounded-lg bg-white px-4 py-1.5 text-xs font-semibold text-stone-900">
+            {{ b.buttonLabel }}
+          </span>
+        </div>
       </NuxtLink>
     </section>
 
