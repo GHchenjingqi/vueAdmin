@@ -16,8 +16,6 @@
   3. `articles` — CMS 文章后台管理（list / create / update / publish / unpublish）
   4. `bundles` — 搭配购 / 捆绑销售管理（list / create / update / delete）
   5. `channel-products` — 渠道商品发布（list / publish）
-- **需确认的疑点**：`factory`（生产排产）模块在 `D:/codes/web` 仓库中**零文件**，与用户 profile 记录的「当前聚焦 factory 模块」不符，疑似属于另一工程或尚未起步（见第七节）。
-
 ---
 
 ## 二、后台后端 ↔ 前端对照表（完整）
@@ -117,9 +115,10 @@
 
 ---
 
-## 七、需用户确认的疑点
+## 七、审计范围边界
 
-- **工厂排产模块（factory）**：`D:/codes/web` 仓库检索 `factory / 排产 / SelectOrder / taskList` **零命中**。若该功能属于本仓库，则尚未起步；若属于另一工程，请告知路径以便后续协同。
+- 本报告仅覆盖 `D:/codes/web` 仓库（Vue Admin 后台、独立站 `shops/`、Express 后端）。
+- 其他工程的模块不属于本仓库范围，不纳入前后端对照与缺口统计。
 
 ---
 
@@ -148,4 +147,3 @@
 - 菜单种子迁移：`20261111_000001`（RMA）、`000002`（评价问答）、`000003`（推荐效果）、`000004`（4 个运营补充页），均已 `migrate:status` 确认 executed。
 - 真实登录验证：菜单树同时包含 `/shop-rma`、`/shop-review-qa`、`/shop-reco-ctr`、`/shop-order-mails`、`/shop-articles`、`/shop-bundles`、`/shop-channel-products`。
 - 全部门禁：admin typecheck / lint / build 通过；双语 `sidebar.*` 与业务子块键已补齐。
-- **仍待用户确认**：`factory`（生产排产）模块在本仓库零文件，疑属另一工程；本轮未处理。
