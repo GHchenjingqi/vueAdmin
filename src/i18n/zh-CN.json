@@ -988,7 +988,8 @@
     "shopCoupon": "优惠券",
     "shopAnalytics": "数据参谋",
     "shopRma": "退货审核",
-    "shopReviewQa": "评价与问答审核"
+    "shopReviewQa": "评价与问答审核",
+    "shopRecoCtr": "推荐效果"
   },
   "shop": {
     "dashboard": {
@@ -1440,7 +1441,17 @@
       "avgStock": "平均库存",
       "dailyOut": "日均出库",
       "turnoverDays": "周转天数",
-      "loadFailed": "数据加载失败"
+      "loadFailed": "数据加载失败",
+      "recoTitle": "推荐效果看板",
+      "recoPlacement": "推荐位",
+      "recoStrategy": "推荐策略",
+      "recoImpressions": "曝光",
+      "recoClicks": "点击",
+      "recoCtr": "CTR",
+      "recoRelated": "看了又看（详情页）",
+      "recoCrossSell": "买了又买（购物车）",
+      "recoEmpty": "所选区间暂无推荐埋点数据",
+      "recoLoadFailed": "推荐效果数据加载失败"
     },
     "publish": {
       "title": "发布到渠道",

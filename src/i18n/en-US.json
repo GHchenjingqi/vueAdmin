@@ -988,7 +988,8 @@
     "shopCoupon": "Coupons",
     "shopAnalytics": "Analytics",
     "shopRma": "Returns",
-    "shopReviewQa": "Reviews & Q&A"
+    "shopReviewQa": "Reviews & Q&A",
+    "shopRecoCtr": "Recommendation CTR"
   },
   "shop": {
     "dashboard": {
@@ -1440,7 +1441,17 @@
       "avgStock": "Avg Stock",
       "dailyOut": "Daily Outbound",
       "turnoverDays": "Turnover Days",
-      "loadFailed": "Failed to load analytics"
+      "loadFailed": "Failed to load analytics",
+      "recoTitle": "Recommendation CTR",
+      "recoPlacement": "Placement",
+      "recoStrategy": "Strategy",
+      "recoImpressions": "Impressions",
+      "recoClicks": "Clicks",
+      "recoCtr": "CTR",
+      "recoRelated": "You may also like (PDP)",
+      "recoCrossSell": "Bought together (Cart)",
+      "recoEmpty": "No recommendation events in the selected period",
+      "recoLoadFailed": "Failed to load recommendation CTR"
     },
     "publish": {
       "title": "Publish to Channel",
