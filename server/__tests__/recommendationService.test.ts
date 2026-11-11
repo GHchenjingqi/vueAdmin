@@ -5,6 +5,7 @@ import { Op } from 'sequelize'
  * 推荐服务测试（mock 模型层）：
  * - relatedForProduct：有协同（买了又买）→ strategy='coPurchase'；无协同但有同分类 → 'sameCategory'；无 → 'none'
  * - crossSellForCart：cart lines 协同 → 'coPurchase'；空协同 → 回退首 SKU 同分类 → 'sameCategory'
+ * - homeForYou：全站热销 → 最新公开兜底 → 'none'；limit 钳制在 1~12
  * - 仅取已支付订单（status in paid/fulfilled/shipped/done）；未支付订单不构成信号
  * - 公开 SPU 过滤：exclude 下架 SPU
  */
@@ -88,7 +89,12 @@ vi.mock('../modules/shop/models/index.js', () => ({
     }),
   },
   ShopSpu: {
-    findAll: vi.fn(async (args: { where: Record<string, unknown>; attributes?: string[] }) => {
+    findAll: vi.fn(async (args: {
+      where: Record<string, unknown>
+      attributes?: string[]
+      order?: [string, string][]
+      limit?: number
+    }) => {
       const where = args.where
       const publicStatuses = ['listed', 'published']
       const statusFilter = statusValues(where.status)
@@ -101,7 +107,13 @@ vi.mock('../modules/shop/models/index.js', () => ({
         if (idNotIn && idNotIn.includes(s.id)) return false
         return true
       })
-      return args.attributes?.length === 1 && args.attributes[0] === 'id' ? result.map((s) => ({ id: s.id })) : result
+      // latestSpuIds / sameCategorySpuIds 会带 id DESC + limit，mock 需还原排序与截断
+      let ordered = result
+      if (args.order?.some(([field, dir]) => field === 'id' && dir === 'DESC')) {
+        ordered = [...result].sort((a, b) => b.id - a.id)
+      }
+      if (typeof args.limit === 'number') ordered = ordered.slice(0, args.limit)
+      return args.attributes?.length === 1 && args.attributes[0] === 'id' ? ordered.map((s) => ({ id: s.id })) : ordered
     }),
     findOne: vi.fn(async (args: { where: Record<string, unknown> }) =>
       hoist.spus.find((s) => s.id === args.where.id) ?? null),
@@ -226,4 +238,53 @@ it('crossSellForCart 空购物车 → none', async () => {
   const r = await recommendationService.crossSellForCart([], { limit: 6 })
   expect(r.strategy).toBe('none')
   expect(r.items).toEqual([])
+})
+
+// ── 首页「为你推荐」：全站热销 → 最新公开兜底 → none ──────────────────────
+
+it('homeForYou hot: 已支付订单频次倒序，过滤未支付订单与下架 SPU', async () => {
+  seedProductSet()
+  hoist.spus[1].status = 'draft' // spu 2 下架，即使销量高也不得曝光
+  hoist.orders.push({ id: 100, status: 'paid' })
+  hoist.orders.push({ id: 101, status: 'paid' })
+  hoist.orders.push({ id: 102, status: 'created' }) // 未支付不计入热销
+  // spu3(sku3) 3 次 > spu2(sku2) 2 次 > spu1(sku1) 1 次
+  hoist.orderItems.push({ orderId: 100, skuId: 3 })
+  hoist.orderItems.push({ orderId: 101, skuId: 3 })
+  hoist.orderItems.push({ orderId: 102, skuId: 3 })
+  hoist.orderItems.push({ orderId: 100, skuId: 2 })
+  hoist.orderItems.push({ orderId: 101, skuId: 2 })
+  hoist.orderItems.push({ orderId: 100, skuId: 1 })
+
+  const r = await recommendationService.homeForYou({ limit: 3 })
+  expect(r.strategy).toBe('hot')
+  expect(r.items.map((x) => x.id)).toEqual([3, 1])
+})
+
+it('homeForYou new: 无已支付订单 → 最新公开 SPU（id 倒序）', async () => {
+  seedProductSet()
+  hoist.orders.push({ id: 100, status: 'created' })
+  hoist.orderItems.push({ orderId: 100, skuId: 1 })
+
+  const r = await recommendationService.homeForYou({ limit: 2 })
+  expect(r.strategy).toBe('new')
+  expect(r.items.map((x) => x.id)).toEqual([5, 3])
+})
+
+it('homeForYou none: 无订单且无公开 SPU → 空结果静默降级', async () => {
+  const r = await recommendationService.homeForYou()
+  expect(r.strategy).toBe('none')
+  expect(r.items).toEqual([])
+})
+
+it('homeForYou limit 钳制在 1~12', async () => {
+  for (let i = 1; i <= 15; i++) hoist.spus.push({ id: i, categoryId: 10, status: 'listed' })
+
+  const capped = await recommendationService.homeForYou({ limit: 99 })
+  expect(capped.strategy).toBe('new')
+  expect(capped.items).toHaveLength(12)
+  expect(capped.items[0]?.id).toBe(15)
+
+  const floored = await recommendationService.homeForYou({ limit: -5 })
+  expect(floored.items).toHaveLength(1)
 })

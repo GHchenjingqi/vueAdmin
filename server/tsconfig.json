@@ -19,5 +19,5 @@
     "isolatedModules": true
   },
   "include": ["./**/*.ts"],
-  "exclude": ["node_modules", "dist", "logs", "uploads", "**/node_modules/**"]
+  "exclude": ["node_modules", "dist", "logs", "uploads", "**/node_modules/**", "_e2e_*.ts"]
 }
