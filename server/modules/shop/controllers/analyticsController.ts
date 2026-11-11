@@ -54,3 +54,18 @@ export const listEvents = async (req: Request, res: Response, next: NextFunction
     next(err)
   }
 }
+
+/** P6 推荐效果看板：CTR 聚合（曝光/点击/CTR，按 placement+strategy 分组） */
+export const recoCtr = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({
+      code: 0,
+      data: await analyticsService.recommendationCtrReport({
+        startAt: queryStr(req.query.startAt),
+        endAt: queryStr(req.query.endAt),
+      }),
+    })
+  } catch (err) {
+    next(err)
+  }
+}

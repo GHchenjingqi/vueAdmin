@@ -226,6 +226,8 @@ router.get('/analytics/profit', authMiddleware, validate(analyticsQuerySchema, '
 router.get('/analytics/turnover', authMiddleware, validate(analyticsQuerySchema, 'query'), analyticsController.turnover)
 // G4 埋点对账：原始事件抽样查询（P4-T17 / docs/reports/g4-gate-checklist.md §3）
 router.get('/analytics/events', authMiddleware, analyticsController.listEvents)
+// P6 推荐效果看板：CTR 聚合（曝光/点击/CTR，按 placement+strategy 分组）
+router.get('/analytics/reco-ctr', authMiddleware, analyticsController.recoCtr)
 
 // ==================== 商城设置：币种配置治理（P0-T05b / P5-T02 / X-T03） ====================
 // 二次确认（confirmImpact + ackNoConversion）、审计 config_changes、定时生效与回滚；

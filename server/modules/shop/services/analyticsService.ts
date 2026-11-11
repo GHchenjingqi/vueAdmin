@@ -225,3 +225,72 @@ export async function listEventsForReconcile(q: {
   const limit = Math.min(Math.max(q.limit ?? 100, 1), 500)
   return ShopAnalyticsEvent.findAll({ where, order: [['createdAt', 'DESC'], ['id', 'DESC']], limit })
 }
+
+/**
+ * P6 推荐效果看板：推荐位 CTR 聚合。
+ *
+ * 数据源复用 shop_analytics_events（零新表）：
+ * - 曝光 = eventName='view_item_list' 且 params.placement 非空
+ * - 点击 = eventName='select_item' 且 params.placement 非空
+ * 按 (placement, strategy) 分组统计 impressions / clicks / ctr。
+ * params 是 JSON 列，MySQL 无通用 JSON 聚合跨版本兼容写法，故取近期窗口在内存分组（窗口默认 7 天，量级可控）。
+ */
+export async function recommendationCtrReport(q: { startAt?: string; endAt?: string } = {}) {
+  const where: Record<string, unknown> = {
+    tenantId: tid(),
+    eventName: { [Op.in]: ['view_item_list', 'select_item'] },
+  }
+  const start = q.startAt ? new Date(q.startAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const end = q.endAt ? new Date(q.endAt) : new Date()
+  where.createdAt = { [Op.gte]: start, [Op.lte]: end }
+
+  const rows = await ShopAnalyticsEvent.findAll({
+    where,
+    order: [['createdAt', 'ASC']],
+    limit: 20000, // 内存聚合窗口上限，防失控
+    attributes: ['eventName', 'params', 'createdAt'],
+  })
+
+  interface Agg { impressions: number; clicks: number }
+  const groups = new Map<string, Agg>()
+  for (const ev of rows) {
+    const params = (ev.params ?? {}) as Record<string, unknown>
+    const placement = typeof params.placement === 'string' ? params.placement : ''
+    if (!placement) continue
+    const strategy = typeof params.strategy === 'string' ? params.strategy : 'unknown'
+    const key = `${placement}|${strategy}`
+    const agg = groups.get(key) ?? { impressions: 0, clicks: 0 }
+    if (ev.eventName === 'view_item_list') agg.impressions++
+    else if (ev.eventName === 'select_item') agg.clicks++
+    groups.set(key, agg)
+  }
+
+  const items = [...groups.entries()].map(([key, agg]) => {
+    const [placement, strategy] = key.split('|')
+    const ctr = agg.impressions > 0 ? agg.clicks / agg.impressions : 0
+    return {
+      placement,
+      strategy,
+      impressions: agg.impressions,
+      clicks: agg.clicks,
+      ctr: Number(ctr.toFixed(4)), // 4 位小数，避免浮点噪声
+    }
+  })
+
+  // 汇总行：按 placement 汇总
+  const totals = new Map<string, Agg>()
+  for (const it of items) {
+    const t = totals.get(it.placement) ?? { impressions: 0, clicks: 0 }
+    t.impressions += it.impressions
+    t.clicks += it.clicks
+    totals.set(it.placement, t)
+  }
+  const summary = [...totals.entries()].map(([placement, t]) => ({
+    placement,
+    impressions: t.impressions,
+    clicks: t.clicks,
+    ctr: Number((t.impressions > 0 ? t.clicks / t.impressions : 0).toFixed(4)),
+  }))
+
+  return { startAt: start.toISOString(), endAt: end.toISOString(), items, summary }
+}
