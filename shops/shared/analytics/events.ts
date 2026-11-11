@@ -24,6 +24,8 @@ export const EVENT_DICTIONARY = {
   add_shipping_info: { required: ['currency', 'value', 'items'] },
   add_payment_info: { required: ['currency', 'value', 'items'] },
   purchase: { required: ['transaction_id', 'currency', 'value', 'items'] },
+  /** GA4 search 事件：站点内搜索，用于热搜词聚合（params.search_term） */
+  search: { required: ['search_term'] },
 } as const
 
 export type EventName = keyof typeof EVENT_DICTIONARY

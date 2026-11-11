@@ -27,8 +27,8 @@ describe('error scrubbing (P1-T10)', () => {
 })
 
 describe('event dictionary (P4-T10)', () => {
-  it('has exactly nine tracked events', () => {
-    expect(Object.keys(EVENT_DICTIONARY).length).toBe(9)
+  it('has exactly ten tracked events', () => {
+    expect(Object.keys(EVENT_DICTIONARY).length).toBe(10)
   })
 
   it('purchase requires transaction_id + currency + value + items', () => {

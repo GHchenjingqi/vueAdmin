@@ -1,5 +1,5 @@
 import { mockStore } from '@shared/mock/store'
-import { MOCK_BLOG_POSTS, MOCK_REVIEWS, MOCK_BANNERS } from '@shared/mock/fixtures'
+import { MOCK_BLOG_POSTS, MOCK_REVIEWS, MOCK_BANNERS, MOCK_PRODUCTS } from '@shared/mock/fixtures'
 import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
 
 /**
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // ---- 直通域（并行后端已交付的扩展能力；auto/real 下透传，4xx 业务错误原样返回） ----
-  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses|referrals|membership|wishlist|view-history|experiments)\b/.exec(url)
+  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses|referrals|membership|wishlist|view-history|search|experiments)\b/.exec(url)
   if (extMatch && source !== 'mock') {
     const res = await commerceRealFetch(url, {
       method,
@@ -346,6 +346,30 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
         datePublished: post.date,
       },
     }
+  }
+  // 搜索增强 mock 兜底（真实模式走 BFF 直通 /storefront/v1/search/*）
+  if (url.startsWith('search/suggest') && method === 'GET') {
+    const params = new URLSearchParams(url.split('?')[1] ?? '')
+    const term = String(params.get('q') ?? '').trim().toLowerCase()
+    const limit = Number(params.get('limit') ?? 5) || 5
+    const suggestions = term.length >= 2
+      ? [...new Set(MOCK_PRODUCTS.flatMap((p) => p.title.toLowerCase().split(/[\s\-–—/,.]+/)).filter((w) => w.length >= 3 && w.includes(term.slice(0, 3))))].slice(0, limit)
+      : []
+    return { code: 0, data: { query: term, suggestions } }
+  }
+  if (url.startsWith('search/hot-keywords') && method === 'GET') {
+    const params = new URLSearchParams(url.split('?')[1] ?? '')
+    const limit = Number(params.get('limit') ?? 10) || 10
+    const preset = ['hd lace wig', 'glueless wig', 'deep wave', 'body wave', 'transparent lace', 'closure', 'frontal', 'human hair']
+    return { code: 0, data: { keywords: preset.slice(0, limit).map((term) => ({ term, count: 0 })), days: Number(params.get('days') ?? 7) || 7 } }
+  }
+  if (url.startsWith('search/fallback') && method === 'GET') {
+    const params = new URLSearchParams(url.split('?')[1] ?? '')
+    const term = String(params.get('q') ?? '').trim().toLowerCase()
+    const limit = Number(params.get('limit') ?? 8) || 8
+    const matches = term ? MOCK_PRODUCTS.filter((p) => p.title.toLowerCase().includes(term)) : []
+    if (matches.length) return { code: 0, data: { items: [], strategy: 'none' } }
+    return { code: 0, data: { items: MOCK_PRODUCTS.slice(0, limit), strategy: 'hot' } }
   }
   if (url === 'cart' && method === 'GET') {
     return mockStore.presentCart(mockStore.getOrCreateCart('guest', 'USD', locale))

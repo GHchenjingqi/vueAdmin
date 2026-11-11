@@ -59,6 +59,30 @@ export const storefrontSlugParamSchema = z
   })
   .passthrough()
 
+/** 搜索纠错建议：q 关键词 + limit 候选数 */
+export const storefrontSearchQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(200),
+    limit: optionalQueryInt(5),
+  })
+  .passthrough()
+
+/** 热搜词：days 时间窗 + limit 条数 */
+export const storefrontSearchHotQuerySchema = z
+  .object({
+    days: optionalQueryInt(7),
+    limit: optionalQueryInt(10),
+  })
+  .passthrough()
+
+/** 无结果兜底：q 关键词 + limit 回退商品数 */
+export const storefrontSearchFallbackQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(200),
+    limit: optionalQueryInt(8),
+  })
+  .passthrough()
+
 export const storefrontRateQuerySchema = z
   .object({
     base: z.preprocess((v) => {
