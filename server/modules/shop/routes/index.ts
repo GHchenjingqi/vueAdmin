@@ -252,6 +252,7 @@ router.get('/audit-logs', authMiddleware, requireAdmin, auditLogController.listA
 // P5-T06 CMS 后台写入（复用 shop_articles；发布/下线触发缓存失效 + X-T03 审计）
 router.get('/articles', authMiddleware, requireAdmin, validate(articleAdminListQuerySchema, 'query'), articleAdminController.list)
 router.post('/articles', authMiddleware, requireAdmin, validate(articleCreateSchema), articleAdminController.create)
+router.get('/articles/:id', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), articleAdminController.detail)
 router.put('/articles/:id', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), validate(articleUpdateSchema), articleAdminController.update)
 router.post('/articles/:id/publish', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), articleAdminController.publish)
 router.post('/articles/:id/unpublish', authMiddleware, requireAdmin, validate(idParamSchema, 'params'), articleAdminController.unpublish)

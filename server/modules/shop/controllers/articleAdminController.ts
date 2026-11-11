@@ -44,6 +44,15 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
   }
 }
 
+/** GET /shop/articles/:id —— 后台详情（含正文，供编辑弹窗回填） */
+export const detail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ code: 0, data: await cmsService.getAdminArticle(siteOf(req), Number(req.params.id)) })
+  } catch (err) {
+    next(err)
+  }
+}
+
 /** PUT /shop/articles/:id —— 编辑内容（slug 冲突 → 409） */
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {

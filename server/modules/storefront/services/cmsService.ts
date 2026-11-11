@@ -234,6 +234,11 @@ async function findAdminArticle(site: StorefrontSite, id: number): Promise<ShopA
   return row
 }
 
+/** 后台详情：编辑弹窗需回填正文等完整字段，列表接口只投影摘要字段 */
+export async function getAdminArticle(site: StorefrontSite, id: number): Promise<ShopArticle> {
+  return findAdminArticle(site, id)
+}
+
 /** 后台列表：含草稿，id 倒序分页 */
 export async function listAllArticles(
   site: StorefrontSite,
