@@ -7,8 +7,6 @@
  * - CSS 变量应用到 DOM
  * - 配置持久化（使用 pinia-plugin-persistedstate）
  */
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
 
 // 预设主色
 export const presetPrimaryColors = [

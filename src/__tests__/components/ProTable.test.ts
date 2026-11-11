@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia } from 'pinia'
-import { ElLoading } from 'element-plus'
 import ProTable from '@/components/ProTable/index.vue'
 
 // TableColumn 接口定义（与组件内部接口保持一致）

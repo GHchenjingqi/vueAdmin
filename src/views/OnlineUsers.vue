@@ -31,7 +31,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import ProTable from '@/components/ProTable/index.vue'

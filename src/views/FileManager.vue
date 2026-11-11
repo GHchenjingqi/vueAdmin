@@ -76,7 +76,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Delete, Link } from '@element-plus/icons-vue'
 import MenuIcon from '@/components/MenuIcon.vue'
 import { uploadApi } from '@/api'

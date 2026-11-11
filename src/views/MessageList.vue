@@ -92,7 +92,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Select } from '@element-plus/icons-vue'
 import ProTable from '@/components/ProTable/index.vue'
 import { messageApi } from '@/api/message'

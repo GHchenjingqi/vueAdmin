@@ -6,7 +6,6 @@
  * - 支持配置 keepAlive: false 禁止缓存
  * - 支持按需清除缓存（如编辑后强制刷新列表）
  */
-import { ref, computed, nextTick } from 'vue'
 
 // 缓存白名单（路由 name）
 const cachedRoutes = ref<Set<string>>(new Set())

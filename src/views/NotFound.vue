@@ -66,8 +66,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { ArrowLeft, HomeFilled, Search } from '@element-plus/icons-vue'
 import { useI18n } from '@/i18n'
 import { addDynamicRoutes } from '@/router/dynamicRoutes'

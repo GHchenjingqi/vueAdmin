@@ -80,7 +80,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, ArrowDown } from '@element-plus/icons-vue'
 import ProTable from '@/components/ProTable/index.vue'
 import { workflowApi, type Workflow } from '@/api/workflow'

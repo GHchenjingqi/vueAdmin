@@ -96,7 +96,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { marketingApi, type I18nText, type Promotion, type PromotionScope, type PromotionType } from '@/api/shop'

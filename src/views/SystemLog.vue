@@ -140,7 +140,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Warning, Delete } from '@element-plus/icons-vue'
 import { logApi } from '@/api'
 import type { LogQueryParams } from '@/api/log'

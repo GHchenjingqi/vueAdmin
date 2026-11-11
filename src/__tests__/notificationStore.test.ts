@@ -8,7 +8,6 @@ const elNotificationMock = vi.fn()
 vi.mock('element-plus', () => ({
   ElNotification: (...args: unknown[]) => elNotificationMock(...args),
 }))
-import { setActivePinia, createPinia } from 'pinia'
 
 vi.mock('@/api/notice', () => ({
   noticeApi: {

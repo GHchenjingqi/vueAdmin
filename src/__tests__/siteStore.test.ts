@@ -3,7 +3,6 @@
  * 覆盖：站点信息管理、页面标题、DOM 更新
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 import { useSiteStore, updateFavicon, updateMeta } from '../stores/siteStore'
 
 describe('siteStore.ts', () => {

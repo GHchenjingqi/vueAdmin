@@ -39,7 +39,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import { ElTableV2 } from 'element-plus'
 import type { Column } from 'element-plus'
 

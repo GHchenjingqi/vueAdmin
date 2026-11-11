@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import { useMenuStore } from '@/stores/menuStore'
 import type { Menu } from '@/types/api'
 

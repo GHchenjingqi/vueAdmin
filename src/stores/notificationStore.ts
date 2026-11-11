@@ -6,9 +6,6 @@
  * - SSE 连接管理（委托给 useSSE composable）
  * - 铃铛预览列表缓存
  */
-import { defineStore } from 'pinia'
-import { ElNotification } from 'element-plus'
-import { ref, computed } from 'vue'
 import { noticeApi } from '@/api/notice'
 import { messageApi } from '@/api/message'
 import { useSSE } from '@/composables/useSSE'

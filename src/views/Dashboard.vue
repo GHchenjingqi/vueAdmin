@@ -83,7 +83,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import { dashboardApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'

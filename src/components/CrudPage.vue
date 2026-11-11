@@ -59,7 +59,6 @@
 </template>
 
 <script setup lang="ts" generic="T extends { id: number }">
-import { onMounted } from 'vue'
 import { Plus, Edit, Delete, Download } from '@element-plus/icons-vue'
 import ProTable from '@/components/ProTable/index.vue'
 import type { TableColumn } from '@/types/table'

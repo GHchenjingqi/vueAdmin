@@ -154,7 +154,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, DataAnalysis, Search, Refresh } from '@element-plus/icons-vue'
 import { dictApi } from '@/api'
 import type { DictType, DictData } from '@/types/api'

@@ -4,8 +4,6 @@
  * 封装列表查询、分页、搜索、创建/更新/删除/批量删除逻辑
  * 配合 ProTable 和 FormDialog 使用，减少重复代码
  */
-import { ref, reactive, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ApiResponse, PaginatedData } from '@/types/response'
 
 export interface CrudApi<T extends { id?: number }> {

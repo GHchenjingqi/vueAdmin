@@ -7,8 +7,6 @@
  * - 强制改密状态
  * - 替代 localStorage 直接读写模式
  */
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 import { setAccessToken, getAccessToken } from '@/utils/request'
 import type { User } from '@/types/api'
 import { useNotificationStore } from './notificationStore'

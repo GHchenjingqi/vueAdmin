@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import { useSettingStore } from '@/stores/settingStore'
 
 vi.mock('@/api/setting', () => ({

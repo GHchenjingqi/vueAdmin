@@ -102,7 +102,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { attributeApi, categoryApi, type Attribute, type CategoryOption } from '@/api/shop'

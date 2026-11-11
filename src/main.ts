@@ -1,4 +1,3 @@
-import { createApp } from 'vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 // Element Plus CSS：暗黑模式 CSS 变量（必须），完整样式由 unplugin-vue-components
 // 按组件异步导入（importStyle: 'sass'），节省首屏 CSS ~450KB

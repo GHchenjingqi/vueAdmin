@@ -59,9 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
 import { publishApi, spuApi, type Spu, type ShopStatus, type StatusAction } from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'
 import ProTable from '@/components/ProTable/index.vue'

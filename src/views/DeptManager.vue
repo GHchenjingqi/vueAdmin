@@ -53,7 +53,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { deptApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'

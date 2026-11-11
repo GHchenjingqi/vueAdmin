@@ -66,8 +66,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { aiApi, type AiProvider } from '@/api/ai'
 import { getErrorMessage } from '@/utils/error'

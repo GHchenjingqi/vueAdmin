@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
 
 const mocks = vi.hoisted(() => {
   const mockRouterPush = vi.fn()

@@ -4,8 +4,7 @@
  * - 相同 key 的并发请求合并为一次，避免重复请求
  * - 缓存有效期内直接返回缓存数据，减少网络开销
  * - 支持手动清除缓存
- */
-import { ref, type Ref } from 'vue'
+ */ import { type Ref } from 'vue'
 
 interface CacheEntry<T = unknown> {
   data: T

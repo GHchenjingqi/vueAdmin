@@ -88,8 +88,6 @@
 
 <script setup lang="ts">
 // 既有文件依赖 Vue 自动导入，显式补全以通过 eslint / vue-tsc（提交钩子会全文件扫描）
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { marketingApi, type Coupon } from '@/api/shop'

@@ -6,8 +6,6 @@
  * - 配置持久化（使用 pinia-plugin-persistedstate）
  * - 与 i18n/index.ts 的 currentLocale 保持同步
  */
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
 import { setLocale as setI18nLocale } from '@/i18n'
 
 export type LocaleKey = 'zh-CN' | 'en-US'

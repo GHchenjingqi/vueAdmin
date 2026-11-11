@@ -6,8 +6,6 @@
  * - 水印配置管理
  * - 避免重复请求
  */
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 import { settingApi } from '@/api/setting'
 
 export interface WatermarkConfig {

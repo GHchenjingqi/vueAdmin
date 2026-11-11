@@ -66,9 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { useRouter, useRoute } from 'vue-router'
 import { spuApi, categoryApi, brandApi, type SpuDetail, type ShopStatus, type CategoryTreeNode } from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'
 import SkuManager from './SkuManager.vue'

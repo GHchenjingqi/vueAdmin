@@ -10,7 +10,6 @@
  * ```
  */
 import type { Component } from 'vue'
-import { shallowRef } from 'vue'
 
 /** 响应式图标注册表：iconName -> Component 定义 */
 const registry = shallowRef<Record<string, Component>>({})

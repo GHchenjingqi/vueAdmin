@@ -24,7 +24,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import { CircleCheckFilled, CircleCloseFilled, Aim, EditPen, Bell } from '@element-plus/icons-vue'
 import type { Component } from 'vue'

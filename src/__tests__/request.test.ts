@@ -86,7 +86,6 @@ vi.mock('axios', () => {
 
 import axios from 'axios'
 import { setAccessToken, getAccessToken, extractData, performLogout } from '../utils/request'
-import { ElMessage } from 'element-plus'
 import { getCache, setCache, invalidateByUrl } from '../utils/requestCache'
 
 const handlers = (axios as any).__handlers

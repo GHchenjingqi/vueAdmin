@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia } from 'pinia'
 import ProForm from '@/components/ProForm/index.vue'
 
 // Element Plus 组件直接注册为全局 stubs，避免模板解析警告

@@ -231,7 +231,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { Search, Rank, Loading } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
 import { useI18n } from '@/i18n'

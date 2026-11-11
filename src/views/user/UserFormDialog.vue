@@ -21,8 +21,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import { userApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 import ProForm from '@/components/ProForm/index.vue'

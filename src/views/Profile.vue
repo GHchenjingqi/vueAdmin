@@ -91,7 +91,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { Camera, Upload } from '@element-plus/icons-vue'
 import { authApi, userApi } from '@/api'
 import { getAccessToken } from '@/utils/request'

@@ -109,9 +109,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
 import { workflowApi, type Workflow, type WorkflowFormField } from '@/api/workflow'
 import { uploadApi } from '@/api/upload'

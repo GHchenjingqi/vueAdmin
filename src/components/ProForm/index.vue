@@ -44,7 +44,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick, useSlots } from 'vue'
 import ProFormItem from './ProformItem.vue'
 
 interface FormSchemaItem {

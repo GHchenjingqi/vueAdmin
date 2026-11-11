@@ -8,8 +8,6 @@
  * - 字体大小缩放
  * - 配置持久化（使用 pinia-plugin-persistedstate）
  */
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 
 export type LayoutMode = 'classic' | 'top' | 'mixed'
 export type NavMode = 'breadcrumb' | 'tabs'

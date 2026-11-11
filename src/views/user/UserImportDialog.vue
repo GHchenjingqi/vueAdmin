@@ -42,7 +42,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import type { UploadFile, UploadFiles } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
 import { userApi } from '@/api'

@@ -36,7 +36,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { userApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 import { createPasswordStrengthValidator, createConfirmValidator } from '@/utils/validators'

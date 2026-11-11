@@ -32,7 +32,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { channelApi, channelProductApi, shopStoreApi, type ChannelOption, type ShopOption } from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'
 import { useI18n } from '@/i18n'

@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 import router from '@/router/index'
 import { addDynamicRoutes, clearDynamicRoutes } from '@/router/dynamicRoutes'
 import { useMenuStore } from '@/stores/menuStore'

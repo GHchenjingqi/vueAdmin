@@ -198,8 +198,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Close, Picture, CircleCheck } from '@element-plus/icons-vue'
 import { knowledgeCategoryApi, knowledgeTagApi, knowledgeContentApi } from '../api'
 import { useI18n } from '@/i18n'

@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 
 describe('v-permission 权限指令逻辑', () => {
   beforeEach(() => {

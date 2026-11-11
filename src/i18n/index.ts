@@ -14,7 +14,6 @@
  *   - 语言偏好由 localeStore（pinia-plugin-persistedstate）负责写入 localStorage
  *   - 本模块不再写入 localStorage，避免与 pinia 的 `locale` 键互相覆盖
  */
-import { ref, computed } from 'vue'
 import zhCN from './zh-CN.json'
 
 export type LocaleKey = 'zh-CN' | 'en-US'

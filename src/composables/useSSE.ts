@@ -23,7 +23,6 @@
  *
  *   onUnmounted(() => sse.disconnect())  // 组件卸载时清理
  */
-import { ref, onUnmounted } from 'vue'
 import { setAccessToken } from '@/utils/request'
 import { authApi } from '@/api/auth'
 

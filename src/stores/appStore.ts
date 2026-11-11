@@ -10,8 +10,6 @@
  * - useLocaleStore（国际化语言）
  * - useSiteStore（站点信息/页面标题）
  */
-import { defineStore } from 'pinia'
-import { computed } from 'vue'
 import { useThemeStore, presetPrimaryColors } from './themeStore'
 import {
   useLayoutStore,

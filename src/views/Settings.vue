@@ -306,7 +306,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { Upload, Delete, Check, Refresh, FolderOpened, Search, Document } from '@element-plus/icons-vue'
 import { settingApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'

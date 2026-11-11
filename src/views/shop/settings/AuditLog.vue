@@ -6,8 +6,6 @@
  * 审计基建（recordAdminAction + 查询接口）的可视化消费端，使管理员可回溯
  * 订单 / 支付 / 库存 / 退款 / 配置等状态变更的留痕。
  */
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useI18n } from '@/i18n'
 import { adminAuditApi } from '@/api/shop'
 import type { AdminAuditLog, AdminAuditQuery } from '@/api/shop'

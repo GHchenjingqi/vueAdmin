@@ -49,7 +49,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { authApi } from '@/api'
 import { useUserStore } from '@/stores'

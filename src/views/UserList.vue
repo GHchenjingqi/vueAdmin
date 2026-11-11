@@ -103,7 +103,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Key, Download, Upload, ArrowDown } from '@element-plus/icons-vue'
 import { userApi, deptApi, roleApi } from '@/api'
 import request from '@/utils/request'

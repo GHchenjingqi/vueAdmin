@@ -128,7 +128,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import ProTable from '@/components/ProTable/index.vue'
 import { workflowApi, type WorkflowInstance, type ApprovalTask } from '@/api/workflow'
 import { useI18n } from '@/i18n'

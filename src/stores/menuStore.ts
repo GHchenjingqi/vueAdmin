@@ -7,8 +7,6 @@
  * - 查找当前激活菜单
  * - 替代模块级变量和散落的 localStorage 读写
  */
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 import { menuApi } from '@/api/menu'
 import type { Menu } from '@/types/api'
 

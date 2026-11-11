@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest'
-import { nextTick } from 'vue'
 
 vi.mock('@element-plus/icons-vue', () => ({
   Lock: { name: 'Lock', render: () => null },

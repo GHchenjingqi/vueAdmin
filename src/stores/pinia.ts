@@ -15,7 +15,6 @@
  * - localeStore: 语言 → localStorage
  * - 其他 store 不持久化（如 userStore、siteStore 等）
  */
-import { createPinia } from 'pinia'
 import piniaPersistedstate from 'pinia-plugin-persistedstate'
 
 export const pinia = createPinia()

@@ -17,7 +17,6 @@
  * - 指令通过 display:none 隐藏，DOM 仍存在
  * - 组件通过 v-if 控制，不渲染 DOM
  */
-import { computed } from 'vue'
 import { useUserStore } from '@/stores'
 
 const props = withDefaults(

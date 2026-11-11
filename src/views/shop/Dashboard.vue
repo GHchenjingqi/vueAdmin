@@ -45,7 +45,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
 import { useI18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/error'
 import { shopApi } from '@/api/shop'

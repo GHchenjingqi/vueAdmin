@@ -153,7 +153,6 @@
 
 <script setup lang="ts">
 import { type ComponentPublicInstance } from 'vue'
-import { ElMessage } from 'element-plus'
 import { Cpu, Coin, FolderOpened, Refresh, Setting } from '@element-plus/icons-vue'
 import type { ECharts } from 'echarts'
 import { serverApi } from '@/api'

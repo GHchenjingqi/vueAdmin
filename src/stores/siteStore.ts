@@ -6,8 +6,6 @@
  * - 页面标题管理
  * - DOM 元素（favicon、meta）自动更新
  */
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
 
 export const useSiteStore = defineStore('site', () => {
   // ==================== State ====================

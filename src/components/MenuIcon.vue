@@ -6,7 +6,6 @@
 
 <script setup lang="ts">
 import { iconRegistry, loadIcon } from '@/utils/dynamicIcons'
-import { computed, onMounted, watch } from 'vue'
 
 const props = defineProps<{
   name?: string

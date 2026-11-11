@@ -13,7 +13,6 @@
  *       `res.data` 访问业务数据，使用 `res.code` 访问业务状态码。
  */
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type AxiosError } from 'axios'
-import { ElMessage } from 'element-plus'
 import type { ApiResponse } from '@/types/response'
 import { getCache, setCache, invalidateByUrl, buildGetCacheKey } from './requestCache'
 import { startProgress, doneProgress } from './nprogress'

@@ -3,7 +3,6 @@
  *
  * 封装文件导出（Excel/CSV）的下载逻辑，配合 Blob 响应使用
  */
-import { ElMessage } from 'element-plus'
 
 export interface UseExportOptions {
   exportFn?: (params: Record<string, unknown>) => Promise<Blob>

@@ -151,7 +151,6 @@
 
 <script setup lang="ts">
 import { Odometer, User, Lock, Key, ArrowDown, Check } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { authApi, siteApi } from '@/api'
 import { sanitizeSvg } from '@/utils/sanitize'
 import type { LoginParams, LoginResult } from '@/api/auth'

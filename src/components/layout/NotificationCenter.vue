@@ -126,8 +126,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
-import { defineAsyncComponent } from 'vue'
 import { Bell } from '@element-plus/icons-vue'
 import { noticeApi } from '@/api'
 import { messageApi } from '@/api/message'

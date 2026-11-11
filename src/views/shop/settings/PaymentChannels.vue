@@ -4,8 +4,6 @@
  * 支付凭据（密钥/证书）现由本页录入：保存后 AES-256-GCM 加密落库（DB 主），
  * 未配置项回退到服务端环境变量，绝不回显明文、绝不落 settings 全局明文表。
  */
-import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 
 interface Channel {

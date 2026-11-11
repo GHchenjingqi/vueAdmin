@@ -110,7 +110,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { analyticsApi, channelApi, type AnalyticsDimension, type ChannelOption, type SalesRow, type ProfitPoint, type TurnoverRow } from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'

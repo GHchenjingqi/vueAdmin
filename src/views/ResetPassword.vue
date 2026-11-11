@@ -77,7 +77,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { Key } from '@element-plus/icons-vue'
 import { authApi } from '@/api'

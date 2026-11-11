@@ -70,7 +70,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { menuApi } from '@/api'
 import type { Menu } from '@/types/api'

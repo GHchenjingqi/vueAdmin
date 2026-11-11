@@ -85,7 +85,6 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { authApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 import { debounce } from '@/utils/debounce'
