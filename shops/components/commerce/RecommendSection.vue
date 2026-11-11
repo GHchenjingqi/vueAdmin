@@ -23,8 +23,8 @@ interface RecoItem {
 const props = defineProps<{
   title: string
   items: RecoItem[]
-  /** 推荐位标识：related（详情页看了又看）| cross_sell（购物车买了又买） */
-  placement: 'related' | 'cross_sell'
+  /** 推荐位标识：related（详情页看了又看）| cross_sell（购物车买了又买）| home（首页为你推荐） */
+  placement: 'related' | 'cross_sell' | 'home'
   /** 推荐策略（后端返回）：coPurchase / sameCategory / mixed / none */
   strategy?: string
 }>()

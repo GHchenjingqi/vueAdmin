@@ -5,6 +5,7 @@ import { listRecommendedBundles } from '../services/bundleService.js'
 import {
   crossSellForCart,
   relatedForProduct,
+  homeForYou,
 } from '../services/recommendationService.js'
 
 /**
@@ -82,6 +83,29 @@ export const crossSell = async (req: Request, res: Response, next: NextFunction)
     const lang = typeof body.lang === 'string' && body.lang ? body.lang : site.defaultLocale
 
     const result = await crossSellForCart(lines, { limit, currency, lang })
+    res.json({ code: 0, data: result })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * P6 首页「为你推荐」：游客落地页（无 productId、无购物车）。
+ * GET /api/storefront/v1/recommendations/home?limit=<1-12>&currency=&lang=
+ * 全站热销（已支付订单频次）→ 最新公开兜底。
+ */
+export const homeRecommendations = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const site = getSite(res)
+    const limitRaw = Number(req.query.limit)
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 12) : 8
+    const currency =
+      typeof req.query.currency === 'string' && /^[A-Z]{3}$/.test(req.query.currency)
+        ? req.query.currency
+        : site.defaultCurrency
+    const lang = typeof req.query.lang === 'string' && req.query.lang ? req.query.lang : site.defaultLocale
+
+    const result = await homeForYou({ limit, currency, lang })
     res.json({ code: 0, data: result })
   } catch (err) {
     next(err)

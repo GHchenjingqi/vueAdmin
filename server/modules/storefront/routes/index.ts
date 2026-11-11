@@ -76,6 +76,7 @@ router.get('/flags/:key', flagsController.publicCheck)
 router.use('/experiments', experimentsPublicRouter)
 router.get('/recommendations', recommendationController.recommendations)
 router.get('/recommendations/related', validate(recommendationRelatedQuerySchema, 'query'), recommendationController.related)
+router.get('/recommendations/home', recommendationController.homeRecommendations)
 router.post('/recommendations/cross-sell', validate(recommendationCrossSellSchema), recommendationController.crossSell)
 
 export default router

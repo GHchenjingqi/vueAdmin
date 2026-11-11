@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import ProductCard from '~/components/commerce/ProductCard.vue'
+import RecommendSection from '~/components/commerce/RecommendSection.vue'
 import { useI18n } from '~/composables/useI18n'
 import { listBanners, type CmsBanner } from '~/composables/useCms'
+import type { CatalogProduct } from '@shared/types/api'
 
 const { t } = useI18n()
 const catalog = useCatalog()
 const siteUrl = useRuntimeConfig().public.siteUrl as string
 const { data: categories } = await useAsyncData('home-categories', () => catalog.loadCategories())
 const { data: featured } = await useAsyncData('home-featured', () => catalog.listProducts({ pageSize: 8 }))
+
+// 首页「为你推荐」：全站热销 → 最新兜底（游客落地页大众化推荐）
+const { data: homeReco } = await useAsyncData('home-reco', () =>
+  $fetch<{ items: CatalogProduct[]; strategy: string }>('/api/recommendations/home', { query: { limit: 8 } }).catch(() => ({ items: [], strategy: 'none' })),
+)
+const recoItems = computed(() => homeReco.value?.items ?? [])
+const recoStrategy = computed(() => homeReco.value?.strategy ?? 'none')
 
 // 首页 Banner 轮播（营销首屏）：无 banner 时回退静态 hero
 const { data: banners } = await useAsyncData('home-banners', () => listBanners('hero'))
@@ -195,6 +204,15 @@ useHead({
         <ProductCard v-for="p in featured?.list ?? []" :key="p.id" :product="p" />
       </div>
     </section>
+
+    <!-- 为你推荐：全站热销 → 最新兜底（大众化推荐，游客落地页） -->
+    <RecommendSection
+      v-if="recoItems.length"
+      :title="t('home.forYou')"
+      :items="recoItems"
+      placement="home"
+      :strategy="recoStrategy"
+    />
 
     <!-- 博客精选 -->
     <section v-if="blogPosts?.length">

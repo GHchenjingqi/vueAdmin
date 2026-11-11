@@ -218,3 +218,91 @@ export async function crossSellForCart(
   }
   return { items: [], strategy: 'none' }
 }
+
+/** 全站热销 SPU id（已支付订单行 skuId→spuId 频次 Top N，过滤公开） */
+async function hotSpuIds(limit: number): Promise<number[]> {
+  const tId = tid()
+  const items = await ShopOrderItem.findAll({
+    where: { tenantId: tId },
+    attributes: ['skuId'],
+    raw: true,
+    limit: 5000,
+  })
+  if (!items.length) return []
+
+  // 已支付过滤
+  const orderIds = [...new Set(items.map((i) => i.orderId))]
+  const paid = await ShopOrder.findAll({
+    where: { tenantId: tId, id: { [Op.in]: orderIds }, status: { [Op.in]: ['paid', 'fulfilled', 'shipped', 'done'] } },
+    attributes: ['id'],
+    raw: true,
+  })
+  const paidSet = new Set(paid.map((o) => o.id))
+  const paidItems = items.filter((i) => paidSet.has(i.orderId))
+  if (!paidItems.length) return []
+
+  // skuId→spuId
+  const skuIds = [...new Set(paidItems.map((i) => i.skuId))]
+  const skuRows = await ShopSku.findAll({
+    where: { tenantId: tId, id: { [Op.in]: skuIds } },
+    attributes: ['id', 'spuId'],
+    raw: true,
+  })
+  const skuToSpu = new Map(skuRows.map((s) => [s.id, s.spuId]))
+
+  const counts = new Map<number, number>()
+  for (const item of paidItems) {
+    const spuId = skuToSpu.get(item.skuId)
+    if (spuId === undefined) continue
+    counts.set(spuId, (counts.get(spuId) ?? 0) + 1)
+  }
+
+  // 过滤公开
+  const candIds = [...counts.keys()]
+  const publicRows = await ShopSpu.findAll({
+    where: { tenantId: tId, id: { [Op.in]: candIds }, status: { [Op.in]: PUBLIC_STATUSES } },
+    attributes: ['id'],
+    raw: true,
+  })
+  const publicSet = new Set(publicRows.map((r) => r.id))
+
+  return [...counts.entries()]
+    .filter(([spuId]) => publicSet.has(spuId))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([spuId]) => spuId)
+}
+
+/** 最新公开 SPU id（兜底：全站无订单历史时展示新品） */
+async function latestSpuIds(limit: number): Promise<number[]> {
+  const rows = await ShopSpu.findAll({
+    where: { tenantId: tid(), status: { [Op.in]: PUBLIC_STATUSES } },
+    order: [['id', 'DESC']],
+    limit,
+    attributes: ['id'],
+    raw: true,
+  })
+  return rows.map((r) => r.id)
+}
+
+/**
+ * 首页「为你推荐」：全站热销 → 最新兜底。
+ * 游客默认落地页（无 productId、无购物车），基于全站行为给出大众化推荐。
+ */
+export async function homeForYou(
+  opts: { limit?: number; currency?: string; lang?: string } = {},
+): Promise<{ items: StorefrontProductListItem[]; strategy: 'hot' | 'new' | 'none' }> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 8), 12)
+
+  const hotIds = await hotSpuIds(limit)
+  if (hotIds.length) {
+    return { items: await pickOrdered(hotIds, limit, opts), strategy: 'hot' }
+  }
+
+  const latestIds = await latestSpuIds(limit)
+  if (latestIds.length) {
+    return { items: await pickOrdered(latestIds, limit, opts), strategy: 'new' }
+  }
+
+  return { items: [], strategy: 'none' }
+}

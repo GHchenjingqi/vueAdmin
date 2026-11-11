@@ -4,6 +4,7 @@ import { getCommerceSource } from '../../utils/commerce'
 
 /**
  * BFF recommendation proxy（P6 推荐 + 相关商品）：
+ * - GET  /api/recommendations/home?limit=              首页「为你推荐」（热销→最新兜底）
  * - GET  /api/recommendations/related?productId=&limit=   详情页看了又看
  * - POST /api/recommendations/cross-sell   body={lines:[{skuId,qty}]}   购物车买了又买
  *
@@ -25,7 +26,7 @@ interface RecItem {
 
 interface RecResponse {
   items: RecItem[]
-  strategy: 'coPurchase' | 'sameCategory' | 'mixed' | 'none'
+  strategy: 'coPurchase' | 'sameCategory' | 'mixed' | 'hot' | 'new' | 'none'
 }
 
 /** mock：同分类兜底（MOCK_PRODUCTS 已有 category.id/slug） */
@@ -53,6 +54,28 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const isMock = getCommerceSource() === 'mock'
   const apiBase = useRuntimeConfig().apiBase as string
+
+  if (method === 'GET' && url.pathname.endsWith('/home')) {
+    const limit = Math.min(Math.max(1, Number(query.limit) || 8), 12)
+
+    if (isMock) return mockRecommend(null, [], limit)
+
+    const qs = new URLSearchParams({ limit: String(limit) })
+    if (typeof query.currency === 'string' && query.currency) qs.set('currency', query.currency)
+    if (typeof query.lang === 'string' && query.lang) qs.set('lang', query.lang)
+
+    try {
+      const raw = await apiFetch<RawEnvelope<RecResponse>>(`${apiBase}/api/storefront/v1/recommendations/home?${qs}`, {
+        timeoutMs: 5000,
+        retries: 0,
+        requestId: event.context.requestId as string | undefined,
+      })
+      if (raw && typeof raw === 'object' && 'code' in raw && raw.code === 0 && raw.data) return raw.data
+    } catch {
+      /* 网络失败 → 空返回（推荐位静默降级，不打断主链路） */
+    }
+    return { items: [], strategy: 'none' } as RecResponse
+  }
 
   if (method === 'GET' && url.pathname.endsWith('/related')) {
     const productId = Number(query.productId)
