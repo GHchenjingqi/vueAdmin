@@ -22,6 +22,8 @@ import analyticsRouter from './analytics.js'
 import addressRouter from './address.js'
 import referralRouter from './referral.js'
 import membershipRouter from './membership.js'
+import wishlistRouter from './wishlist.js'
+import viewHistoryRouter from './viewHistory.js'
 import monitoringRouter from './monitoring.js'
 import * as flagsController from '../../featureflags/flagsController.js'
 import { publicRouter as experimentsPublicRouter } from '../../experiments/routes.js'
@@ -60,6 +62,8 @@ router.use('/', trackingRouter)
 router.use('/', analyticsRouter)
 router.use('/addresses', addressRouter)
 router.use('/referrals', referralRouter)
+router.use('/wishlist', wishlistRouter)
+router.use('/view-history', viewHistoryRouter)
 router.use('/membership', membershipRouter)
 router.use('/monitoring', monitoringRouter)
 router.get('/flags/:key', flagsController.publicCheck)
