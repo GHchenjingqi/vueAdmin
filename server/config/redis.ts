@@ -35,7 +35,13 @@ export function getRedis(): RedisType | null {
         return Math.min(times * 200, 2000)
       },
       lazyConnect: true,
-      enableOfflineQueue: false,
+      // 注意：不要设 enableOfflineQueue: false。
+      // 在 lazyConnect + fire-and-forget connect() 场景下，连接未就绪时
+      // enableOfflineQueue:false 会让命令既不排队也不快速失败，而是挂起重连
+      // （retryStrategy 每次 connectTimeout 默认 10s × 多次），导致依赖 Redis 的
+      // /api/v1 路由（如登录限流）永久挂起。保留默认 true：命令先入队，
+      // 连接成功后执行；连接彻底失败则 reject，由调用方 try/catch 降级放行。
+      connectTimeout: 5000,
     })
 
     redis.on('connect', () => logInfo('Redis 连接成功'))
