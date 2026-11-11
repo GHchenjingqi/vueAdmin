@@ -1534,6 +1534,7 @@
       "recoCtr": "CTR",
       "recoRelated": "看了又看（详情页）",
       "recoCrossSell": "买了又买（购物车）",
+      "recoHome": "为你推荐（首页）",
       "recoEmpty": "所选区间暂无推荐埋点数据",
       "recoLoadFailed": "推荐效果数据加载失败"
     },

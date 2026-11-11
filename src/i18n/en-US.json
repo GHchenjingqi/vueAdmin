@@ -1534,6 +1534,7 @@
       "recoCtr": "CTR",
       "recoRelated": "You may also like (PDP)",
       "recoCrossSell": "Bought together (Cart)",
+      "recoHome": "Recommended for You (Home)",
       "recoEmpty": "No recommendation events in the selected period",
       "recoLoadFailed": "Failed to load recommendation CTR"
     },

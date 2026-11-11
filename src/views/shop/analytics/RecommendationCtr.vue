@@ -70,6 +70,7 @@ const query = reactive<{ startAt: string; endAt: string }>({ startAt: '', endAt:
 const placementLabel = (placement: string): string => {
   if (placement === 'related') return t('shop.analytics.recoRelated')
   if (placement === 'cross_sell') return t('shop.analytics.recoCrossSell')
+  if (placement === 'home') return t('shop.analytics.recoHome')
   return placement
 }
 
