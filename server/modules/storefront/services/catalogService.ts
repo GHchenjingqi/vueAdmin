@@ -181,6 +181,16 @@ export async function listProducts(
   const categoryId = positiveInt(params.categoryId, 0)
   const where: Record<string | symbol, unknown> = categoryId > 0 ? { ...base, categoryId } : { ...base }
 
+  // 按 SPU id 列表精确取（收藏夹/最近看过）：显式带 tenantId + publicWhere，保持传入顺序
+  const idsParam = typeof params.ids === 'string' ? params.ids : ''
+  const idFilter = idsParam
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0)
+  if (idFilter.length) {
+    where.id = { [Op.in]: idFilter }
+  }
+
   // keyword 推入 SQL：JSON_SEARCH 大小写敏感，两侧均 LOWER 以保证不敏感
   const keyword = typeof params.keyword === 'string' ? params.keyword.trim() : ''
   if (keyword) {
@@ -191,6 +201,12 @@ export async function listProducts(
   }
 
   const rows = await ShopSpu.findAll({ where, order: [['id', 'DESC']] })
+
+  // ids 精确取时保持调用方传入顺序（收藏按收藏时间、最近看过按浏览时间倒序）
+  if (idFilter.length) {
+    const orderMap = new Map(idFilter.map((id, idx) => [id, idx]))
+    rows.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0))
+  }
 
   const total = rows.length
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize)

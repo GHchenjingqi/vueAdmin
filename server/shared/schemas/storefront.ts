@@ -33,6 +33,8 @@ export const storefrontProductQuerySchema = z
     pageSize: optionalQueryInt(60),
     keyword: optionalQueryStr(100),
     categoryId: optionalQueryInt(),
+    /** 按 SPU id 列表精确取（收藏夹/最近看过复用商品卡渲染）；逗号分隔数字串 */
+    ids: optionalQueryStr(2000),
     currency: z.preprocess((v) => {
       if (typeof v !== 'string') return undefined
       const s = v.trim().toUpperCase()
@@ -344,3 +346,41 @@ export const trackEventSchema = z
   .passthrough()
 
 export type TrackEventInputSchema = z.infer<typeof trackEventSchema>
+
+// ————————————————————————————————————————————————
+// 收藏夹 Wishlist（C 端顾客，顾客 JWT）
+// ————————————————————————————————————————————————
+
+/** POST /wishlist —— 收藏一个商品（productId=spus.id）；uq(customer,product) 幂等 */
+export const wishlistAddSchema = z
+  .object({
+    productId: z.coerce.number().int().positive(),
+    notifyOnSale: z.boolean().optional(),
+  })
+  .passthrough()
+export type WishlistAddInputSchema = z.infer<typeof wishlistAddSchema>
+
+/** DELETE /wishlist/:productId —— 取消收藏 */
+export const wishlistProductIdParamSchema = z
+  .object({
+    productId: z.coerce.number().int().positive(),
+  })
+  .passthrough()
+
+/** GET /wishlist —— 我的收藏（分页 + 可选 notifyOnSale 过滤） */
+export const wishlistListQuerySchema = z
+  .object({
+    page: optionalQueryInt(),
+    pageSize: optionalQueryInt(60),
+    notifyOnSale: z.enum(['true', 'false']).optional(),
+  })
+  .passthrough()
+export type WishlistListQueryInput = z.infer<typeof wishlistListQuerySchema>
+
+/** PATCH /wishlist/:productId/notify —— 开关降价提醒 */
+export const wishlistNotifySchema = z
+  .object({
+    notifyOnSale: z.boolean(),
+  })
+  .passthrough()
+export type WishlistNotifyInputSchema = z.infer<typeof wishlistNotifySchema>

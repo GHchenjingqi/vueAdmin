@@ -86,3 +86,9 @@ export { default as AuditLog } from './AuditLog.js'
 
 // 支付网关凭据加密存储（替代纯环境变量；DB 主、env 兜底）
 export { default as ShopPaymentCredential } from './ShopPaymentCredential.js'
+
+// 收藏夹（C 端顾客，推荐数据底座）
+export { default as ShopWishlist } from './ShopWishlist.js'
+
+// 通用营销通知 outbox（降价提醒 / 到货通知 / 弃购召回）
+export { default as ShopMailOutbox } from './ShopMailOutbox.js'
