@@ -1,5 +1,5 @@
 import { mockStore } from '@shared/mock/store'
-import { MOCK_BLOG_POSTS, MOCK_REVIEWS } from '@shared/mock/fixtures'
+import { MOCK_BLOG_POSTS, MOCK_REVIEWS, MOCK_BANNERS } from '@shared/mock/fixtures'
 import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
 
 /**
@@ -313,6 +313,12 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
       publishedAt: p.date,
     }))
     return { items, total: MOCK_BLOG_POSTS.length, page, pageSize }
+  }
+  // 首页 Banner mock 兜底（真实模式走 BFF 直通 /storefront/v1/cms/banners）
+  if (url.startsWith('cms/banners') && method === 'GET') {
+    const position = new URLSearchParams(url.split('?')[1] ?? '').get('position')
+    const list = position === 'hero' || position === 'secondary' ? MOCK_BANNERS[position] : [...MOCK_BANNERS.hero, ...MOCK_BANNERS.secondary]
+    return list
   }
   const articleMatch = /^cms\/articles\/([^/?]+)(\?.*)?$/.exec(url)
   if (articleMatch && method === 'GET') {

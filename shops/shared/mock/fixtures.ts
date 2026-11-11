@@ -204,3 +204,54 @@ export const MOCK_BLOG_POSTS = [
     body: 'Wash every 8-10 wears with sulfate-free shampoo...',
   },
 ]
+
+/**
+ * 首页 Banner mock（营销首屏 + 次屏）。
+ * 真实模式走 BFF 直通 /storefront/v1/cms/banners；mock 模式回退静态 hero（首页已处理空数组）。
+ */
+export const MOCK_BANNERS = {
+  hero: [
+    {
+      id: 1,
+      position: 'hero',
+      title: 'HD Lace, Invisible Hairline',
+      subtitle: 'Glueless wigs that blend seamlessly — shop the new HD lace collection.',
+      linkUrl: '/c/lace-wigs',
+      buttonLabel: 'Shop Lace Wigs',
+      image: '/img/banners/hero-hd-lace.jpg',
+      sortOrder: 10,
+    },
+    {
+      id: 2,
+      position: 'hero',
+      title: 'Body Wave Bestsellers',
+      subtitle: 'Soft, bouncy waves with pre-plucked natural hairline.',
+      linkUrl: '/c/body-wave',
+      buttonLabel: 'Shop Body Wave',
+      image: '/img/banners/hero-body-wave.jpg',
+      sortOrder: 5,
+    },
+  ],
+  secondary: [
+    {
+      id: 3,
+      position: 'secondary',
+      title: 'New Season Apparel',
+      subtitle: 'Coordinate your look with our latest drops.',
+      linkUrl: '/c/apparel',
+      buttonLabel: 'Shop Apparel',
+      image: '/img/banners/secondary-apparel.jpg',
+      sortOrder: 10,
+    },
+    {
+      id: 4,
+      position: 'secondary',
+      title: 'Wig Care Essentials',
+      subtitle: 'Shampoos, deep conditioners, and lace glue — everything you need.',
+      linkUrl: '/c/care',
+      buttonLabel: 'Shop Care',
+      image: '/img/banners/secondary-care.jpg',
+      sortOrder: 5,
+    },
+  ],
+}
