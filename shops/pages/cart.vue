@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useCart } from '~/composables/useCart'
 import Price from '~/components/commerce/Price.vue'
+import RecommendSection from '~/components/commerce/RecommendSection.vue'
 import { useI18n } from '~/composables/useI18n'
 import { buildCartLineAttrs } from '@shared/commerce/cart-line'
 import { trackViewCart } from '@shared/analytics/ecommerce'
+import type { CatalogProduct } from '@shared/types/api'
 
 /**
  * 购物车页（P3-T02）：数量修改、删除、行小计；金额由 Price 组件渲染（配置驱动零硬编码）。
@@ -30,6 +32,22 @@ watchEffect(() => {
 })
 
 useSeo({ title: () => t('cart.title'), description: () => t('cart.description'), path: '/cart', noindex: true })
+
+// P6 买了又买：购物车非空时取 cross-sell 推荐（行为优先 + 同分类兜底，BFF mock 已兜底）
+const crossSell = ref<CatalogProduct[]>([])
+onMounted(async () => {
+  const list = items.value ?? []
+  if (!list.length) return
+  try {
+    const res = await $fetch<{ items: CatalogProduct[]; strategy: string }>('/api/recommendations/cross-sell', {
+      method: 'POST',
+      body: { lines: list.map((l) => ({ skuId: l.skuId, qty: l.qty })), limit: 6 },
+    })
+    crossSell.value = res.items
+  } catch {
+    crossSell.value = []
+  }
+})
 </script>
 
 <template>
@@ -80,6 +98,9 @@ useSeo({ title: () => t('cart.title'), description: () => t('cart.description'),
       <NuxtLink to="/checkout" class="mt-6 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700">
         {{ t('cart.checkout') }}
       </NuxtLink>
+
+      <!-- P6 买了又买：购物车交叉销售（行为优先，空时组件自隐藏） -->
+      <RecommendSection :title="t('reco.crossSell')" :items="crossSell" />
     </template>
   </div>
 </template>

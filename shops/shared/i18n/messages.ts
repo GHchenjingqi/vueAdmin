@@ -306,6 +306,8 @@ const zh: Record<string, string> = {
   'history.title': '最近看过',
   'history.empty': '暂无浏览记录',
   'history.clear': '清空记录',
+  'reco.related': '看了又看',
+  'reco.crossSell': '买了又买',
 }
 const en: Record<string, string> = {
   'shop.title': 'Aurora Hair Studio',
@@ -609,6 +611,8 @@ const en: Record<string, string> = {
   'history.title': 'Recently Viewed',
   'history.empty': 'No browsing history yet',
   'history.clear': 'Clear history',
+  'reco.related': 'You may also like',
+  'reco.crossSell': 'Frequently bought together',
 }
 
 const messages: Record<Locale, Record<string, string>> = { 'en-US': en, 'zh-CN': zh }

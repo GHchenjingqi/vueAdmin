@@ -28,6 +28,10 @@ import monitoringRouter from './monitoring.js'
 import * as flagsController from '../../featureflags/flagsController.js'
 import { publicRouter as experimentsPublicRouter } from '../../experiments/routes.js'
 import * as recommendationController from '../controllers/recommendationController.js'
+import {
+  recommendationRelatedQuerySchema,
+  recommendationCrossSellSchema,
+} from '../../../shared/schemas/storefront.js'
 
 /**
  * Storefront 公开接口路由
@@ -69,5 +73,7 @@ router.use('/monitoring', monitoringRouter)
 router.get('/flags/:key', flagsController.publicCheck)
 router.use('/experiments', experimentsPublicRouter)
 router.get('/recommendations', recommendationController.recommendations)
+router.get('/recommendations/related', validate(recommendationRelatedQuerySchema, 'query'), recommendationController.related)
+router.post('/recommendations/cross-sell', validate(recommendationCrossSellSchema), recommendationController.crossSell)
 
 export default router

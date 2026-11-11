@@ -384,3 +384,39 @@ export const wishlistNotifySchema = z
   })
   .passthrough()
 export type WishlistNotifyInputSchema = z.infer<typeof wishlistNotifySchema>
+
+/** GET /recommendations/related —— 详情页相关商品（行为优先 + 同分类兜底） */
+export const recommendationRelatedQuerySchema = z
+  .object({
+    productId: z.coerce.number().int().positive(),
+    limit: z.coerce.number().int().positive().max(12).optional(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .optional(),
+    lang: optionalQueryStr(10),
+  })
+  .passthrough()
+export type RecommendationRelatedQuery = z.infer<typeof recommendationRelatedQuerySchema>
+
+/** POST /recommendations/cross-sell —— 购物车买了又买（body: lines + 选项） */
+export const recommendationCrossSellSchema = z
+  .object({
+    lines: z
+      .array(
+        z.object({
+          skuId: z.coerce.number().int().positive(),
+          qty: z.coerce.number().int().positive(),
+        }),
+      )
+      .min(1)
+      .max(50),
+    limit: z.coerce.number().int().positive().max(12).optional(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .optional(),
+    lang: optionalQueryStr(10),
+  })
+  .passthrough()
+export type RecommendationCrossSellInput = z.infer<typeof recommendationCrossSellSchema>

@@ -92,12 +92,20 @@ const related = ref<CatalogProduct[]>([])
 onMounted(async () => {
   const a = await assignExperiment('product_recommendation')
   const count = a.enabled && a.variant === 'variant_c' ? 12 : a.enabled && a.variant === 'variant_b' ? 8 : 4
+  // P6：走 /api/recommendations/related（行为优先 + 同分类兜底）；mock 模式 BFF 自动兜底
   try {
-    const res = await catalog.listProducts({ category: product.value?.category?.slug, page: 1, pageSize: count + 1 })
-    // 排除当前商品后取 count 条
-    related.value = res.list.filter((p) => p.slug !== product.value?.slug).slice(0, count)
+    const res = await $fetch<{ items: CatalogProduct[]; strategy: string }>(`/api/recommendations/related`, {
+      query: { productId: product.value?.id, limit: count },
+    })
+    related.value = res.items.filter((p) => p.slug !== product.value?.slug).slice(0, count)
   } catch {
-    related.value = []
+    // 端点不可用 → 退回按分类列表（旧行为）
+    try {
+      const res = await catalog.listProducts({ category: product.value?.category?.slug, page: 1, pageSize: count + 1 })
+      related.value = res.list.filter((p) => p.slug !== product.value?.slug).slice(0, count)
+    } catch {
+      related.value = []
+    }
   }
 })
 
