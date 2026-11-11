@@ -106,12 +106,37 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 推荐效果看板：CTR（曝光/点击/转化率） -->
+    <el-card shadow="never" class="report-card">
+      <template #header>
+        <span class="card-title">{{ t('shop.analytics.recoTitle') }}</span>
+      </template>
+      <el-table v-loading="loading" :data="recoCtrRows" border stripe max-height="360">
+        <el-table-column prop="placement" :label="t('shop.analytics.recoPlacement')" min-width="140" />
+        <el-table-column prop="strategy" :label="t('shop.analytics.recoStrategy')" min-width="160" />
+        <el-table-column prop="impressions" :label="t('shop.analytics.recoImpressions')" width="120" />
+        <el-table-column prop="clicks" :label="t('shop.analytics.recoClicks')" width="110" />
+        <el-table-column :label="t('shop.analytics.recoCtr')" width="120">
+          <template #default="{ row }">{{ (Number(row.ctr) * 100).toFixed(2) }}%</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { Search, Refresh } from '@element-plus/icons-vue'
-import { analyticsApi, channelApi, type AnalyticsDimension, type ChannelOption, type SalesRow, type ProfitPoint, type TurnoverRow } from '@/api/shop'
+import {
+  analyticsApi,
+  channelApi,
+  type AnalyticsDimension,
+  type ChannelOption,
+  type SalesRow,
+  type ProfitPoint,
+  type TurnoverRow,
+  type RecoCtrRow,
+} from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'
 import { useI18n } from '@/i18n'
 
@@ -130,6 +155,7 @@ const query = reactive<{ dimension: AnalyticsDimension; startAt: string; endAt: 
 const salesRows = ref<SalesRow[]>([])
 const profitSeries = ref<ProfitPoint[]>([])
 const turnoverRows = ref<TurnoverRow[]>([])
+const recoCtrRows = ref<RecoCtrRow[]>([])
 const profitSummary = ref<{ revenueUSD: number; costUSD: number; grossProfitUSD: number; fxGainLossUSD: number } | null>(null)
 
 const metrics = computed(() => [
@@ -171,10 +197,19 @@ const loadTurnover = async (): Promise<void> => {
   }
 }
 
+const loadRecoCtr = async (): Promise<void> => {
+  try {
+    const res = await analyticsApi.recoCtr({ startAt: query.startAt, endAt: query.endAt })
+    recoCtrRows.value = res.data.items
+  } catch (err: unknown) {
+    ElMessage.error(t('shop.analytics.loadFailed') + ': ' + getErrorMessage(err))
+  }
+}
+
 const loadAll = async (): Promise<void> => {
   loading.value = true
   try {
-    await Promise.all([loadSales(), loadProfit(), loadTurnover()])
+    await Promise.all([loadSales(), loadProfit(), loadTurnover(), loadRecoCtr()])
   } finally {
     loading.value = false
   }

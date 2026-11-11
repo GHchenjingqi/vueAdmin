@@ -668,6 +668,28 @@ export interface TurnoverReport {
   rows: TurnoverRow[]
 }
 
+export interface RecoCtrRow {
+  placement: string
+  strategy: string
+  impressions: number
+  clicks: number
+  ctr: number
+}
+
+export interface RecoCtrSummary {
+  placement: string
+  impressions: number
+  clicks: number
+  ctr: number
+}
+
+export interface RecoCtrReport {
+  startAt: string
+  endAt: string
+  items: RecoCtrRow[]
+  summary: RecoCtrSummary[]
+}
+
 export const analyticsApi = {
   sales(query?: AnalyticsQuery) {
     return request.get<SalesReport>('/shop/analytics/sales', { params: query })
@@ -677,6 +699,9 @@ export const analyticsApi = {
   },
   turnover(query?: AnalyticsQuery) {
     return request.get<TurnoverReport>('/shop/analytics/turnover', { params: query })
+  },
+  recoCtr(query?: { startAt?: string; endAt?: string }) {
+    return request.get<RecoCtrReport>('/shop/analytics/reco-ctr', { params: query })
   },
 }
 
