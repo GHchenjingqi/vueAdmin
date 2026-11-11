@@ -46,6 +46,10 @@ let mailProvider: MailProvider | null = null
 export function setMailProvider(fn: MailProvider | null): void {
   mailProvider = fn
 }
+/** 取当前 provider（供营销 outbox 扫描器复用同一注入点） */
+export function getMailProvider(): MailProvider {
+  return mailProvider ?? defaultProvider
+}
 
 async function defaultProvider(msg: MailMessage): Promise<void> {
   const transporter = await getTransporter()

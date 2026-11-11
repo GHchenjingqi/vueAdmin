@@ -227,6 +227,9 @@ void (async () => {
     // 弃购召回扫描（每 60 分钟；1h/24h 两档自动提醒）
     const { startAbandonedCartScanner } = await import('./modules/storefront/services/abandonedCartService.js')
     startAbandonedCartScanner(60 * 60 * 1000)
+    // 营销邮件 outbox 投递扫描（每 60 秒；wishlist 降价/补货提醒 + 弃购召回邮件真正发出）
+    const { startMailOutboxScanner } = await import('./modules/storefront/services/mailOutboxService.js')
+    startMailOutboxScanner(60 * 1000)
   } catch (err) {
     logInfo(`订单邮件扫描器启动失败: ${(err as Error).message}`)
   }
