@@ -8,7 +8,7 @@
 
 ## 一、总体结论
 
-- **后台商城模块 28 个业务域**中，**23 个已有对应后台管理页面**，**5 个后端已就绪但缺后台页面**（孤儿后端）。
+- **后台商城模块 28 个业务域**中，初次审计时 **23 个已有对应后台管理页面、5 个后端已就绪但缺后台页面**（孤儿后端）；**后续批次已全部补齐，现为 28/28**（详见第九节）。
 - **C 端独立站**：商品浏览 / 顾客 / 购物车 / 结算 / 支付 / 订阅 / 评价 / CMS / RMA / 物流 / 埋点 等公开接口与页面基本齐备；仅「次屏 Banner」此前未在前台渲染（本次已修复）。
 - **明确缺后台页面的后端（按业务优先级）**：
   1. `order-mails` — 订单邮件发件箱监控（list / drain / retry）
@@ -129,3 +129,23 @@
 2. **中**：补「CMS 文章后台管理」与「订单邮件发件箱监控」。
 3. **低**：补「搭配购 / 渠道商品发布」页面。
 4. 运行 `npm run dev` 后于浏览器验证 RMA 菜单入口与次屏 Banner 渲染（dev server 当前未运行，需启动）。
+
+---
+
+## 九、后续批次闭环（2026-11-11 更新）
+
+> 本节为审计后的增量交付记录。第二、三节表格为初次审计快照，状态以本节为准。完整优先级与批次划分见 `docs/P0-P10_BACKLOG_2026-11-11.md`。
+
+| 初次审计缺口 | 本轮交付 | 菜单路径 | 验证 |
+|---|---|---|---|
+| `reviews` + `qa` 评价/问答审核台 | `src/views/shop/order/ReviewModeration.vue` + `src/api/shopReview.ts` | `/shop-review-qa` | `/shop/reviews` 200 total=2309；`/shop/qa` 200 total=420 |
+| `order-mails` 订单邮件发件箱 | `src/views/shop/order/OrderMailMonitor.vue` + `src/api/shopOrderMail.ts` | `/shop-order-mails` | `GET /shop/order-mails?orderId=1` 200 |
+| `articles` CMS 文章后台 | `src/views/shop/content/ArticleAdmin.vue` + `src/api/shopArticle.ts`；补 `GET /shop/articles/:id` 详情接口回填正文 | `/shop-articles` | `GET /shop/articles` 200（rows/total/page/pageSize）；详情路由 404 业务错误（id=1 无数据） |
+| `bundles` 搭配购 | `src/views/shop/marketing/BundleList.vue` + `src/api/shopBundle.ts` | `/shop-bundles` | `GET /shop/bundles` 200（list/total/page/pageSize） |
+| `channel-products` 渠道商品 | `src/views/shop/channel/ChannelProductList.vue` + `src/api/shopChannelProduct.ts` | `/shop-channel-products` | `GET /shop/channel-products` 200（list/total/page/pageSize） |
+| 推荐位效果度量（新增能力） | `RecommendationCtr.vue` + `GET /shop/analytics/reco-ctr`（复用 `shop_analytics_events`，零新表） | `/shop-reco-ctr` | 接口 200 code=0；按 placement+strategy 聚合曝光/点击/CTR |
+
+- 菜单种子迁移：`20261111_000001`（RMA）、`000002`（评价问答）、`000003`（推荐效果）、`000004`（4 个运营补充页），均已 `migrate:status` 确认 executed。
+- 真实登录验证：菜单树同时包含 `/shop-rma`、`/shop-review-qa`、`/shop-reco-ctr`、`/shop-order-mails`、`/shop-articles`、`/shop-bundles`、`/shop-channel-products`。
+- 全部门禁：admin typecheck / lint / build 通过；双语 `sidebar.*` 与业务子块键已补齐。
+- **仍待用户确认**：`factory`（生产排产）模块在本仓库零文件，疑属另一工程；本轮未处理。

@@ -13,7 +13,6 @@
  * 独立租户 987790，真实 MySQL；每例 beforeEach 清理。
  */
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import { runInTenant } from '../modules/tenant/context.js'
 import {
@@ -100,7 +99,7 @@ describe('A. 审计覆盖与查询过滤', () => {
       ],
     }
     for (const [file, actions] of Object.entries(matrix)) {
-      const src = readFileSync(resolve('modules/shop/controllers', file + '.ts'), 'utf8')
+      const src = readFileSync(new URL(`../modules/shop/controllers/${file}.ts`, import.meta.url), 'utf8')
       expect(src).toContain('recordAdminAction')
       for (const action of actions) expect(src, `${file} 缺少 ${action}`).toContain(`'${action}'`)
     }

@@ -20,7 +20,7 @@ describe('P5-T06 admin 端点鉴权（源码回归）', () => {
     const lines = src
       .split('\n')
       .filter((l) => /router\.(get|post|put|delete)\('\/articles/.test(l))
-    expect(lines.length).toBe(5)
+    expect(lines.length).toBe(6)
     for (const line of lines) {
       expect(line).toContain('authMiddleware')
       expect(line).toContain('requireAdmin')

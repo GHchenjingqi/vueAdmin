@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -18,6 +19,7 @@ export default defineConfig({
     vue(),
     AutoImport({
       imports: ['vue', 'vue-router', 'pinia'],
+      resolvers: [ElementPlusResolver()],
       dts: false,
     }),
   ],
