@@ -224,6 +224,9 @@ void (async () => {
     // 积分过期扫描（每 5 分钟；后台可配有效期天数，0=不过期）
     const { startPointsExpiryScanner } = await import('./modules/shop/services/membershipService.js')
     startPointsExpiryScanner(5 * 60 * 1000)
+    // 弃购召回扫描（每 60 分钟；1h/24h 两档自动提醒）
+    const { startAbandonedCartScanner } = await import('./modules/storefront/services/abandonedCartService.js')
+    startAbandonedCartScanner(60 * 60 * 1000)
   } catch (err) {
     logInfo(`订单邮件扫描器启动失败: ${(err as Error).message}`)
   }
