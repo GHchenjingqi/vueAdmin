@@ -255,3 +255,53 @@ export const MOCK_BANNERS = {
     },
   ],
 }
+
+/**
+ * FAQ mock 兜底（真实模式走 BFF 直通 /storefront/v1/cms/faqs，复用 articles 表 tags 含 'faq'）
+ * 结构对齐 server 端 cmsService.listFaqs 返回：question/answer/shortAnswer/category。
+ */
+export interface MockFaq {
+  question: string
+  answer: string
+  shortAnswer: string
+  category: string
+  slug: string
+}
+
+export const MOCK_FAQS: MockFaq[] = [
+  {
+    question: 'How long does shipping take?',
+    answer: '<p>Standard shipping takes 5-7 business days within the US. Expedited options (2-3 days) are available at checkout.</p>',
+    shortAnswer: '5-7 business days standard; 2-3 days expedited.',
+    category: 'shipping',
+    slug: 'faq-shipping-time',
+  },
+  {
+    question: 'What is your return policy?',
+    answer: '<p>Unopened items can be returned within 30 days of delivery. Opened hair products are final sale for hygiene reasons.</p>',
+    shortAnswer: '30 days for unopened items; opened hair products are final sale.',
+    category: 'returns',
+    slug: 'faq-return-policy',
+  },
+  {
+    question: 'How do I choose the right wig size?',
+    answer: '<p>Measure your head circumference at the hairline. Most wigs fit 21.5"-22.5". See our <a href="/size-guide">size guide</a> for details.</p>',
+    shortAnswer: 'Measure head circumference; most fit 21.5-22.5 inches.',
+    category: 'sizing',
+    slug: 'faq-wig-sizing',
+  },
+  {
+    question: 'Are the wigs human hair or synthetic?',
+    answer: '<p>Our premium collection is 100% human hair (Remy). We also offer heat-resistant synthetic options clearly labeled on each product.</p>',
+    shortAnswer: 'Premium = 100% human hair; synthetic options are labeled.',
+    category: 'product',
+    slug: 'faq-hair-type',
+  },
+  {
+    question: 'Do you ship internationally?',
+    answer: '<p>Yes, we ship to over 40 countries. International orders typically arrive in 7-14 business days and may incur customs duties.</p>',
+    shortAnswer: 'Yes, to 40+ countries; 7-14 business days, duties may apply.',
+    category: 'shipping',
+    slug: 'faq-international-shipping',
+  },
+]

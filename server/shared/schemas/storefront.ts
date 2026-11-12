@@ -294,6 +294,15 @@ export const bannerListQuerySchema = z
   .passthrough()
 export type BannerListQueryInput = z.infer<typeof bannerListQuerySchema>
 
+/** GET /cms/faqs?category=&keyword= —— 公开 FAQ 列表（复用 cms articles 表，tags 含 'faq'） */
+export const faqListQuerySchema = z
+  .object({
+    category: optionalQueryStr(40),
+    keyword: optionalQueryStr(100),
+  })
+  .passthrough()
+export type FaqListQueryInput = z.infer<typeof faqListQuerySchema>
+
 // ————————————————————————————————————————————————
 // 阶段 5 步骤 5（第四切片）：退货/售后（顾客登录，需校验订单归属与服务端重算退款）
 // ————————————————————————————————————————————————

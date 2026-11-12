@@ -92,3 +92,22 @@ export function etagMatches(header: unknown, etag: string): boolean {
     .map((v) => v.trim())
     .includes(etag)
 }
+
+// ————— FAQ（复用 shop_articles 表，tags 含 'faq'；沿用站点 revision） —————
+
+/** FAQ 列表 ETag：与文章列表共用 revision，FAQ 增删改发布/下线均触发变化 */
+export function faqListEtag(
+  tenantId: number,
+  siteId: number,
+  q: { category?: string; keyword?: string } = {},
+): string {
+  const factors = [tenantId, siteId, getArticleRevision(tenantId, siteId), q.category ?? '', q.keyword ?? '']
+  return `"faqs-${hash(factors.join('|'))}"`
+}
+
+/** FAQ 详情 ETag：revision + slug + 自身 updatedAt；分类下线后仍须返回 404（controller 先查库） */
+export function faqDetailEtag(tenantId: number, siteId: number, slug: string, updatedAt: Date | null): string {
+  const stamp = updatedAt ? updatedAt.getTime() : 0
+  const factors = [tenantId, siteId, getArticleRevision(tenantId, siteId), slug, stamp]
+  return `"faq-${hash(factors.join('|'))}"`
+}

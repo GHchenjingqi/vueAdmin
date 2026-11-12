@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { getSite } from '../middleware/siteContext.js'
 import * as cmsService from '../services/cmsService.js'
 import * as bannerService from '../services/bannerService.js'
-import { articleDetailEtag, articleListEtag, etagMatches } from '../services/cmsCacheService.js'
+import { articleDetailEtag, articleListEtag, etagMatches, faqDetailEtag, faqListEtag } from '../services/cmsCacheService.js'
 
 const CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=30'
 const VARY = 'Host, X-Forwarded-Proto'
@@ -83,6 +83,45 @@ export const listBanners = async (req: Request, res: Response, next: NextFunctio
     const position = q.position === 'hero' || q.position === 'secondary' ? q.position : undefined
     const data = await bannerService.listBanners(site, { position })
     setCacheHeaders(res, `W/"banners-${site.tenantId}-${site.shopId ?? 0}-${position ?? 'all'}"`)
+    res.json({ code: 0, data })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** GET /cms/faqs?category=&keyword= —— 公开 FAQ 列表（tags 含 'faq' + published，按 sortOrder） */
+export const listFaqs = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const site = getSite(res)
+    const q = req.query as Record<string, unknown>
+    const category = typeof q.category === 'string' ? q.category : undefined
+    const keyword = typeof q.keyword === 'string' ? q.keyword : undefined
+    const etag = faqListEtag(site.tenantId, site.shopId ?? 0, { category, keyword })
+    if (etagMatches(req.headers['if-none-match'], etag)) {
+      setNotModified(res, etag)
+      return
+    }
+    const data = await cmsService.listFaqs(site, { category, keyword })
+    setCacheHeaders(res, etag)
+    res.json({ code: 0, data })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** GET /cms/faqs/:slug —— 公开 FAQ 详情（tags 含 'faq' + published；否则 404） */
+export const getFaq = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const site = getSite(res)
+    const slug = (req.params as Record<string, unknown>).slug as string
+    // 必须先查库：FAQ 下线后即使持有旧 ETag 也须返回 404
+    const data = await cmsService.getFaqBySlug(site, slug)
+    const etag = faqDetailEtag(site.tenantId, site.shopId ?? 0, slug, data.updatedAt)
+    if (etagMatches(req.headers['if-none-match'], etag)) {
+      setNotModified(res, etag)
+      return
+    }
+    setCacheHeaders(res, etag)
     res.json({ code: 0, data })
   } catch (err) {
     next(err)

@@ -304,3 +304,95 @@ export async function unpublishArticle(
   await auditArticle('unpublished', id, before, snapshot(row))
   return { id: row.id, status: 'draft', changed: true }
 }
+
+// ==================== FAQ（复用 shop_articles 表，tags 含 'faq'） ====================
+// C-FAQ 需求：零新表——把 FAQ 作为文章的一种，tags 内含 'faq' 标记。
+// 结构映射：title=问题，content=答案（富文本），summary=可选简短答案（列表折叠显示），
+// category 复用 tags（除 'faq' 外的第一个 tag 即分类，如 'faq:shipping'），sortOrder 控制顺序。
+
+/** FAQ 固定标记 tag；写入时由调用方保证存在，读取时按此过滤 */
+export const FAQ_TAG = 'faq'
+
+export interface FaqItem {
+  id: number
+  /** 问题 */
+  question: string
+  /** 答案（富文本 HTML） */
+  answer: string
+  /** 可选简短答案（列表折叠态展示，无则前端截断 answer） */
+  shortAnswer: string | null
+  /** 分类（除 faq 外的第一个 tag；无则 null） */
+  category: string | null
+  slug: string
+  sortOrder: number
+  updatedAt: Date
+}
+
+function faqCategoryOf(tags: unknown): string | null {
+  if (!Array.isArray(tags)) return null
+  const rest = (tags as string[]).filter((tg) => tg !== FAQ_TAG)
+  return rest.length ? rest[0] : null
+}
+
+function toFaqItem(row: ShopArticle, withAnswer: boolean): FaqItem {
+  return {
+    id: row.id,
+    question: row.title,
+    answer: withAnswer ? row.content : '',
+    shortAnswer: row.summary,
+    category: faqCategoryOf(row.tags),
+    slug: row.slug,
+    sortOrder: row.sortOrder,
+    updatedAt: row.updatedAt,
+  }
+}
+
+export interface FaqListQuery {
+  category?: string
+  keyword?: string
+}
+
+/** 公开 FAQ 列表：tags 含 'faq' 且 published，按 sortOrder 升序（同序按 id 倒序） */
+export async function listFaqs(
+  site: StorefrontSite,
+  q: FaqListQuery = {},
+): Promise<{ items: FaqItem[]; categories: string[] }> {
+  const tId = tid()
+  const siteId = site.shopId ?? 0
+  const where: Record<string | symbol, unknown> = { tenantId: tId, siteId, status: 'published' as const }
+  const replacements: Record<string, unknown> = {}
+  ;(where as Record<string | symbol, unknown>)[Op.and] = Sequelize.literal('JSON_CONTAINS(tags, :faqTag)')
+  replacements.faqTag = JSON.stringify(FAQ_TAG)
+  if (q.keyword) where.title = { [Op.like]: `%${q.keyword}%` }
+
+  const rows = await ShopArticle.findAll({
+    where,
+    replacements,
+    attributes: ['id', 'title', 'slug', 'summary', 'tags', 'sortOrder', 'updatedAt', 'content'],
+    order: [
+      ['sortOrder', 'ASC'],
+      ['id', 'DESC'],
+    ],
+    limit: 200,
+  })
+
+  // 分类聚合：按出现顺序去重；category 过滤在内存完成（tag 组合查询复杂度不值当）
+  const seen: string[] = []
+  let items = rows.map((r) => toFaqItem(r, true))
+  for (const it of items) {
+    if (it.category && !seen.includes(it.category)) seen.push(it.category)
+  }
+  if (q.category) items = items.filter((it) => it.category === q.category)
+  return { items, categories: seen }
+}
+
+/** 公开 FAQ 详情：仅 published + 含 faq 标记；否则 404 */
+export async function getFaqBySlug(site: StorefrontSite, slug: string): Promise<FaqItem> {
+  const tId = tid()
+  const siteId = site.shopId ?? 0
+  const row = await ShopArticle.findOne({ where: { tenantId: tId, siteId, slug, status: 'published' } })
+  if (!row) throw new AppError(404, 'FAQ 不存在或未发布')
+  const tags = (row.tags as string[] | null) ?? []
+  if (!tags.includes(FAQ_TAG)) throw new AppError(404, 'FAQ 不存在')
+  return toFaqItem(row, true)
+}

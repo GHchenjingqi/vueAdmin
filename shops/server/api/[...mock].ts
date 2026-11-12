@@ -1,5 +1,5 @@
 import { mockStore } from '@shared/mock/store'
-import { MOCK_BLOG_POSTS, MOCK_REVIEWS, MOCK_BANNERS, MOCK_PRODUCTS } from '@shared/mock/fixtures'
+import { MOCK_BLOG_POSTS, MOCK_REVIEWS, MOCK_BANNERS, MOCK_PRODUCTS, MOCK_FAQS } from '@shared/mock/fixtures'
 import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
 
 /**
@@ -319,6 +319,30 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
     const position = new URLSearchParams(url.split('?')[1] ?? '').get('position')
     const list = position === 'hero' || position === 'secondary' ? MOCK_BANNERS[position] : [...MOCK_BANNERS.hero, ...MOCK_BANNERS.secondary]
     return list
+  }
+  // FAQ mock 兜底（真实模式走 BFF 直通 /storefront/v1/cms/faqs；结构对齐 cmsService.listFaqs）
+  if (url === 'cms/faqs' && method === 'GET') {
+    const params = new URLSearchParams(url.split('?')[1] ?? '')
+    const category = params.get('category')
+    const keyword = params.get('keyword')
+    let list = MOCK_FAQS
+    if (category) list = list.filter((f) => f.category === category)
+    if (keyword) list = list.filter((f) => f.question.includes(keyword))
+    const categories: string[] = []
+    for (const f of MOCK_FAQS) if (!categories.includes(f.category)) categories.push(f.category)
+    return {
+      items: list.map((f, i) => ({
+        id: i + 1,
+        question: f.question,
+        answer: f.answer,
+        shortAnswer: f.shortAnswer,
+        category: f.category,
+        slug: f.slug,
+        sortOrder: i,
+        updatedAt: new Date().toISOString(),
+      })),
+      categories,
+    }
   }
   const articleMatch = /^cms\/articles\/([^/?]+)(\?.*)?$/.exec(url)
   if (articleMatch && method === 'GET') {
