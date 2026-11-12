@@ -85,6 +85,38 @@
             </el-form-item>
           </el-form>
         </el-tab-pane>
+
+        <!-- ====== 登录安全历史 ====== -->
+        <el-tab-pane :label="t('profile.securityTab')" name="security">
+          <div class="tab-hint">{{ t('profile.securityHint') }}</div>
+          <el-table v-loading="historyLoading" :data="loginHistory" border stripe size="small">
+            <el-table-column :label="t('profile.historyTime')" width="180">
+              <template #default="{ row }">{{ formatTime((row as LoginHistoryItem).time) }}</template>
+            </el-table-column>
+            <el-table-column prop="action" :label="t('profile.historyAction')" min-width="140" />
+            <el-table-column prop="ip" :label="t('profile.historyIp')" width="150" />
+            <el-table-column prop="device" :label="t('profile.historyDevice')" min-width="170" />
+          </el-table>
+          <el-empty v-if="!historyLoading && !loginHistory.length" :description="t('profile.historyEmpty')" />
+        </el-tab-pane>
+
+        <!-- ====== 通知偏好 ====== -->
+        <el-tab-pane :label="t('profile.notifyTab')" name="notify">
+          <div class="tab-hint">{{ t('profile.notifyHint') }}</div>
+          <div v-loading="prefsLoading">
+            <div v-for="ch in notifyChannels" :key="ch.id" class="notify-row">
+              <div>
+                <div class="notify-name">{{ ch.name }}</div>
+                <div class="notify-type">{{ ch.type.toUpperCase() }}</div>
+              </div>
+              <el-switch v-model="notifyEnabled[ch.id]" />
+            </div>
+            <el-empty v-if="!prefsLoading && !notifyChannels.length" :description="t('profile.notifyEmpty')" />
+          </div>
+          <el-button type="primary" :loading="prefsSaving" :disabled="!notifyChannels.length" @click="savePreferences">
+            {{ t('profile.notifySave') }}
+          </el-button>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
   </div>
@@ -93,6 +125,7 @@
 <script setup lang="ts">
 import { Camera, Upload } from '@element-plus/icons-vue'
 import { authApi, userApi } from '@/api'
+import { profileApi, type LoginHistoryItem, type NotificationPreferences } from '@/api/profile'
 import { getAccessToken } from '@/utils/request'
 import { useUserStore } from '@/stores'
 import { createPasswordStrengthValidator, createConfirmValidator } from '@/utils/validators'
@@ -109,6 +142,15 @@ const uploadRef = ref(null)
 const saving = ref(false)
 const changingPwd = ref(false)
 const originalData: Record<string, string> = {}
+
+// P2-10：登录安全历史 + 通知偏好
+type ActiveChannel = NotificationPreferences['channels'][number]
+const historyLoading = ref(false)
+const loginHistory = ref<LoginHistoryItem[]>([])
+const prefsLoading = ref(false)
+const prefsSaving = ref(false)
+const notifyChannels = ref<ActiveChannel[]>([])
+const notifyEnabled = reactive<Record<number, boolean>>({})
 
 let form = reactive({
   username: '',
@@ -289,8 +331,53 @@ const handleResetPwd = () => {
   pwdFormRef.value?.clearValidate()
 }
 
+// ==================== P2-10：登录安全历史 / 通知偏好 ====================
+const formatTime = (value: string): string => (value ? new Date(value).toLocaleString() : '')
+
+const fetchLoginHistory = async (): Promise<void> => {
+  historyLoading.value = true
+  try {
+    loginHistory.value = (await profileApi.loginHistory(20)).data
+  } catch (err: unknown) {
+    ElMessage.error(t('profile.historyFailed') + ': ' + (getErrorMessage(err) || t('common.unknownError')))
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+const fetchPreferences = async (): Promise<void> => {
+  prefsLoading.value = true
+  try {
+    const data = (await profileApi.getNotificationPreferences()).data
+    notifyChannels.value = data.channels
+    const disabled = new Set(data.disabledIds)
+    for (const ch of data.channels) notifyEnabled[ch.id] = !disabled.has(ch.id)
+  } catch (err: unknown) {
+    ElMessage.error(t('profile.notifyFailed') + ': ' + (getErrorMessage(err) || t('common.unknownError')))
+  } finally {
+    prefsLoading.value = false
+  }
+}
+
+const savePreferences = async (): Promise<void> => {
+  prefsSaving.value = true
+  try {
+    const disabledIds = notifyChannels.value.filter((ch) => !notifyEnabled[ch.id]).map((ch) => ch.id)
+    const data = (await profileApi.saveNotificationPreferences(disabledIds)).data
+    const disabled = new Set(data.disabledIds)
+    for (const ch of data.channels) notifyEnabled[ch.id] = !disabled.has(ch.id)
+    ElMessage.success(t('profile.notifySaved'))
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err) || t('common.unknownError'))
+  } finally {
+    prefsSaving.value = false
+  }
+}
+
 onMounted(() => {
   fetchProfile()
+  fetchLoginHistory()
+  fetchPreferences()
 })
 </script>
 
@@ -309,5 +396,31 @@ onMounted(() => {
   padding: 14px 20px;
   border-bottom: 1px solid var(--border-light);
   background: var(--card-header-bg);
+}
+
+.tab-hint {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.notify-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.notify-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notify-type {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

@@ -877,4 +877,7 @@ export const adminAuditApi = {
   list(params: AdminAuditQuery) {
     return request.get<AdminAuditLog[]>('/shop/audit-logs', { params })
   },
+  export(params: AdminAuditQuery) {
+    return request.get<Blob>('/shop/audit-logs/export', { params, responseType: 'blob' })
+  },
 }

@@ -8,6 +8,7 @@
  */
 import { useI18n } from '@/i18n'
 import { adminAuditApi } from '@/api/shop'
+import { downloadBlob } from '@/utils/download'
 import type { AdminAuditLog, AdminAuditQuery } from '@/api/shop'
 
 const { t } = useI18n()
@@ -105,6 +106,57 @@ function search(): void {
   void query()
 }
 
+// ===== P2-8：导出 + 改前/改后 diff =====
+function exportLogs(): void {
+  adminAuditApi
+    .export(buildParams())
+    .then((res) => {
+      downloadBlob(new Blob([res.data]), `审计日志_${filters.value.entityType}.xlsx`)
+    })
+    .catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err)
+      ElMessage.error(t('auditLog.exportFailed', {}, '导出失败') + (msg ? '：' + msg : ''))
+    })
+}
+
+interface DiffField {
+  key: string
+  before: unknown
+  after: unknown
+  status: 'added' | 'removed' | 'changed' | 'same'
+}
+const diffVisible = ref(false)
+const diffRow = ref<AdminAuditLog | null>(null)
+const diffFields = computed<DiffField[]>(() => {
+  const r = diffRow.value
+  if (!r) return []
+  const b = r.beforeState && typeof r.beforeState === 'object' ? (r.beforeState as Record<string, unknown>) : {}
+  const a = r.afterState && typeof r.afterState === 'object' ? (r.afterState as Record<string, unknown>) : {}
+  const keys = Array.from(new Set([...Object.keys(b), ...Object.keys(a)]))
+  return keys.map((k) => {
+    const bv = b[k]
+    const av = a[k]
+    let status: DiffField['status'] = 'same'
+    if (!(k in b)) status = 'added'
+    else if (!(k in a)) status = 'removed'
+    else if (JSON.stringify(bv) !== JSON.stringify(av)) status = 'changed'
+    return { key: k, before: bv, after: av, status }
+  })
+})
+function openDiff(row: unknown): void {
+  diffRow.value = row as AdminAuditLog
+  diffVisible.value = true
+}
+function fmtVal(v: unknown): string {
+  if (v == null) return '—'
+  if (typeof v === 'string') return v
+  try {
+    return JSON.stringify(v)
+  } catch {
+    return String(v)
+  }
+}
+
 function prevPage(): void {
   if (offset.value === 0) return
   offset.value = Math.max(0, offset.value - limit.value)
@@ -152,6 +204,7 @@ onMounted(() => {
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="search">{{ t('auditLog.search') }}</el-button>
+          <el-button :loading="loading" @click="exportLogs">{{ t('auditLog.export') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -173,7 +226,30 @@ onMounted(() => {
             <pre class="whitespace-pre-wrap break-all text-xs leading-5">{{ fmtState(row.afterState) }}</pre>
           </template>
         </el-table-column>
+        <el-table-column :label="t('auditLog.actions')" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" :disabled="!row.beforeState && !row.afterState" @click="openDiff(row)">
+              {{ t('auditLog.viewDiff') }}
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
+
+      <el-dialog v-model="diffVisible" :title="t('auditLog.diffTitle')" width="680px">
+        <el-table :data="diffFields" border size="small" max-height="420">
+          <el-table-column prop="key" :label="t('auditLog.field')" width="180" show-overflow-tooltip />
+          <el-table-column :label="t('auditLog.before')" min-width="200">
+            <template #default="{ row }">
+              <span :class="row.status === 'removed' ? 'diff-removed' : ''">{{ fmtVal(row.before) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('auditLog.after')" min-width="200">
+            <template #default="{ row }">
+              <span :class="row.status === 'added' ? 'diff-added' : row.status === 'changed' ? 'diff-changed' : ''">{{ fmtVal(row.after) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-dialog>
 
       <div class="flex items-center justify-between mt-3">
         <span class="text-gray-500 text-sm">
@@ -190,3 +266,18 @@ onMounted(() => {
     </el-card>
   </div>
 </template>
+
+<style scoped>
+.diff-added {
+  color: #52c41a;
+  font-weight: 600;
+}
+.diff-removed {
+  color: #f5222d;
+  text-decoration: line-through;
+}
+.diff-changed {
+  color: #fa8c16;
+  font-weight: 600;
+}
+</style>

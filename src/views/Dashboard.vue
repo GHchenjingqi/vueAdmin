@@ -62,6 +62,29 @@
       </el-row>
     </section>
 
+    <!-- 趋势图表（P2-12 ECharts 增强） -->
+    <section class="trend-section">
+      <el-card shadow="hover" class="chart-card">
+        <template #header>
+          <div class="chart-head">
+            <span class="card-title">{{ t('dashboard.trendTitle') }}</span>
+            <el-radio-group v-model="trendDays" size="small" @change="loadTrends">
+              <el-radio-button :value="7">7D</el-radio-button>
+              <el-radio-button :value="14">14D</el-radio-button>
+              <el-radio-button :value="30">30D</el-radio-button>
+            </el-radio-group>
+          </div>
+        </template>
+        <div ref="trendChartRef" class="chart-box" />
+      </el-card>
+      <el-card shadow="hover" class="chart-card">
+        <template #header>
+          <span class="card-title">{{ t('dashboard.revenueTitle') }}</span>
+        </template>
+        <div ref="revenueChartRef" class="chart-box" />
+      </el-card>
+    </section>
+
     <!-- 快速入?提示 - 骨架屏 -->
     <el-card v-if="loading" shadow="hover" class="info-card">
       <template #header>
@@ -88,6 +111,9 @@ import { dashboardApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
+import { onBeforeUnmount } from 'vue'
+import type { ECharts } from 'echarts'
+import type { DashboardTrend } from '@/api/dashboard'
 
 const userStore = useUserStore()
 const { t } = useI18n()
@@ -177,6 +203,79 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+// ===== P2-12 ECharts 增强 =====
+const trendDays = ref(30)
+const trendChartRef = ref<HTMLDivElement | null>(null)
+const revenueChartRef = ref<HTMLDivElement | null>(null)
+let echartsMod: typeof import('echarts') | null = null
+let echartsPromise: Promise<typeof import('echarts')> | null = null
+async function getEcharts(): Promise<typeof import('echarts')> {
+  if (echartsMod) return echartsMod
+  if (!echartsPromise) echartsPromise = import('echarts')
+  echartsMod = await echartsPromise
+  return echartsMod
+}
+let trendChart: ECharts | null = null
+let revenueChart: ECharts | null = null
+
+async function renderTrend(d: DashboardTrend): Promise<void> {
+  const echarts = await getEcharts()
+  if (!trendChartRef.value) return
+  trendChart?.dispose()
+  trendChart = echarts.init(trendChartRef.value)
+  trendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: [t('dashboard.newUsers'), t('dashboard.newOrders')] },
+    grid: { left: 44, right: 16, top: 40, bottom: 30 },
+    xAxis: { type: 'category', data: d.days, boundaryGap: false },
+    yAxis: { type: 'value' },
+    series: [
+      { name: t('dashboard.newUsers'), type: 'line', smooth: true, data: d.newUsers, itemStyle: { color: '#409eff' }, areaStyle: { opacity: 0.08 } },
+      { name: t('dashboard.newOrders'), type: 'line', smooth: true, data: d.newOrders, itemStyle: { color: '#67c23a' } },
+    ],
+  })
+}
+
+async function renderRevenue(d: DashboardTrend): Promise<void> {
+  const echarts = await getEcharts()
+  if (!revenueChartRef.value) return
+  revenueChart?.dispose()
+  revenueChart = echarts.init(revenueChartRef.value)
+  revenueChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 56, right: 16, top: 24, bottom: 30 },
+    xAxis: { type: 'category', data: d.days, boundaryGap: true },
+    yAxis: { type: 'value', name: t('dashboard.revenueUnit') },
+    series: [{ name: t('dashboard.revenue'), type: 'bar', data: d.revenue, itemStyle: { color: '#e6a23c' }, barMaxWidth: 18 }],
+  })
+}
+
+async function loadTrends(): Promise<void> {
+  try {
+    const res = await dashboardApi.getTrends(trendDays.value)
+    await renderTrend(res.data)
+    await renderRevenue(res.data)
+  } catch (err: unknown) {
+    // 趋势图加载失败不阻断主卡片展示
+    console.warn('[dashboard] trends load failed:', err)
+  }
+}
+
+function handleResize(): void {
+  trendChart?.resize()
+  revenueChart?.resize()
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+  void loadTrends()
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  trendChart?.dispose()
+  revenueChart?.dispose()
 })
 </script>
 
@@ -326,5 +425,34 @@ onMounted(async () => {
 .info-card b {
   color: var(--mainColor);
   font-weight: 500;
+}
+
+/* 趋势图表（P2-12 ECharts 增强） */
+.trend-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .trend-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card {
+  margin-bottom: 0;
+}
+
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chart-box {
+  width: 100%;
+  height: 300px;
 }
 </style>
