@@ -1955,6 +1955,13 @@
     "deleteSuccess": "Deleted",
     "testSuccess": "Test succeeded",
     "testFailed": "Test failed",
-    "confirmDelete": "Delete channel \"{name}\"?"
+    "confirmDelete": "Delete channel \"{name}\"?",
+    "deliveries": "Delivery log",
+    "deliveryAt": "Time",
+    "deliveryEvent": "Event",
+    "deliveryChannel": "Channel",
+    "deliveryResult": "Result",
+    "deliveryMessage": "Detail",
+    "deliveryEmpty": "No deliveries yet (cleared on restart)"
   }
 }

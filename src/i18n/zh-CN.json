@@ -1955,6 +1955,13 @@
     "deleteSuccess": "删除成功",
     "testSuccess": "测试成功",
     "testFailed": "测试未通过",
-    "confirmDelete": "确定删除渠道「{name}」？"
+    "confirmDelete": "确定删除渠道「{name}」？",
+    "deliveries": "最近投递",
+    "deliveryAt": "时间",
+    "deliveryEvent": "事件",
+    "deliveryChannel": "渠道",
+    "deliveryResult": "结果",
+    "deliveryMessage": "详情",
+    "deliveryEmpty": "暂无投递记录（进程重启后清空）"
   }
 }

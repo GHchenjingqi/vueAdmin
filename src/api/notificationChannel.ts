@@ -54,9 +54,22 @@ export interface ChannelQuery {
   enabled?: boolean
 }
 
+/** 系统事件投递记录（进程内最近 100 条，重启后清空） */
+export interface DeliveryRecord {
+  at: string
+  event: string
+  subject: string
+  channelId: number
+  channelName: string
+  type: ChannelType
+  ok: boolean
+  message: string
+}
+
 export const notificationChannelApi = {
   list: (params?: ChannelQuery) => request.get<NotificationChannel[]>('/notification-channels', { params }),
   active: () => request.get<ActiveChannel[]>('/notification-channels/active'),
+  deliveries: () => request.get<DeliveryRecord[]>('/notification-channels/deliveries'),
   create: (data: ChannelInput) => request.post<NotificationChannel>('/notification-channels', data),
   update: (id: number, data: ChannelInput) => request.put<NotificationChannel>(`/notification-channels/${id}`, data),
   toggle: (id: number, enabled: boolean) => request.put<NotificationChannel>(`/notification-channels/${id}/toggle`, { enabled }),

@@ -16,6 +16,7 @@
           <el-option label="Webhook" value="webhook" />
         </el-select>
         <el-button :icon="Refresh" @click="fetchList">{{ t('notificationChannel.refresh') }}</el-button>
+        <el-button :icon="Bell" @click="openDeliveries">{{ t('notificationChannel.deliveries') }}</el-button>
       </div>
 
       <el-table v-loading="loading" :data="channels" border stripe>
@@ -120,14 +121,34 @@
         <el-button type="primary" :loading="saving" @click="submit">{{ t('notificationChannel.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="deliveriesVisible" :title="t('notificationChannel.deliveries')" width="900px">
+      <el-table :data="deliveries" border stripe size="small" max-height="420" :empty-text="t('notificationChannel.deliveryEmpty')">
+        <el-table-column prop="at" :label="t('notificationChannel.deliveryAt')" width="180" />
+        <el-table-column prop="event" :label="t('notificationChannel.deliveryEvent')" width="200" show-overflow-tooltip />
+        <el-table-column prop="channelName" :label="t('notificationChannel.deliveryChannel')" width="130" show-overflow-tooltip />
+        <el-table-column :label="t('notificationChannel.deliveryResult')" width="90">
+          <template #default="{ row }">
+            <el-tag :type="(row as DeliveryRecord).ok ? 'success' : 'danger'" size="small" disable-transitions>
+              {{ (row as DeliveryRecord).ok ? 'OK' : 'FAIL' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="message" :label="t('notificationChannel.deliveryMessage')" min-width="200" show-overflow-tooltip />
+      </el-table>
+      <template #footer>
+        <el-button @click="deliveriesVisible = false">{{ t('notificationChannel.cancel') }}</el-button>
+        <el-button :icon="Refresh" @click="fetchDeliveries">{{ t('notificationChannel.refresh') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
-import { notificationChannelApi, type NotificationChannel, type ChannelType, type ChannelConfig } from '@/api/notificationChannel'
+import { Plus, Refresh, Bell } from '@element-plus/icons-vue'
+import { notificationChannelApi, type NotificationChannel, type ChannelType, type ChannelConfig, type DeliveryRecord } from '@/api/notificationChannel'
 import { getErrorMessage } from '@/utils/error'
 import { useI18n } from '@/i18n'
 
@@ -142,6 +163,8 @@ const testingId = ref<number | null>(null)
 const saving = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const deliveriesVisible = ref(false)
+const deliveries = ref<DeliveryRecord[]>([])
 
 const form = reactive<{ name: string; type: ChannelType; enabled: boolean; remark: string; config: ChannelConfig }>({
   name: '',
@@ -176,6 +199,20 @@ const fetchList = async (): Promise<void> => {
   } finally {
     loading.value = false
   }
+}
+
+const fetchDeliveries = async (): Promise<void> => {
+  try {
+    const res = await notificationChannelApi.deliveries()
+    deliveries.value = res.data
+  } catch (err: unknown) {
+    ElMessage.error(t('notificationChannel.fetchFailed') + ': ' + getErrorMessage(err))
+  }
+}
+
+const openDeliveries = async (): Promise<void> => {
+  deliveriesVisible.value = true
+  await fetchDeliveries()
 }
 
 function typeTag(type: ChannelType): 'primary' | 'warning' | 'success' {
