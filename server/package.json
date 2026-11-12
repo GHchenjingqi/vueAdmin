@@ -10,8 +10,9 @@
     "migrate:reset": "tsx scripts/migrate.ts reset",
     "migrate:status": "tsx scripts/migrate.ts status",
     "start": "node dist/app.js",
-    "dev": "tsx app.ts",
-    "build": "tsc",
+  "dev": "tsx app.ts",
+  "dev:watch": "tsx watch app.ts",
+  "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

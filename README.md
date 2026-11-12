@@ -587,12 +587,16 @@ npm run dev
 
 - 前端由 Vite 开发服务器热更新
 - 后端由 Express 直接运行
-- 访问地址：https://localhost:5173（自签名证书，首次需在浏览器信任）
+- 访问地址：https://localhost:5173（自签名证书由 `server/utils/generateCert.ts` 在首次启动时生成到 `.cert/`，**不入库**；首次需在浏览器信任。换机器会生成新证书，需重新信任）
 
 > 开发模式下，Vite 中间件内嵌在 Express 中，前端代码由 Vite 提供实时编译和 HMR（热模块替换）。
 
 > ⚠️ **后端没有 watch**：`server` 的 `dev` 脚本是 `tsx app.ts`，进程启动后改动后端源码不会生效。
 > 新增路由 / 服务后必须重启 `npm run dev`；否则未挂载的路径可能被 Vite 中间件代理回自身，表现为请求长时间挂起。
+>
+> 可选：`cd server && npm run dev:watch`（`tsx watch app.ts`）会在源码改动后自动重启。
+> 但每次重启都会重跑 `bootstrap()`（迁移检查、种子检查、扫描器与定时任务）并重建 DB / Redis 连接，
+> 多人共用同一 dev 服务或跑长任务时建议仍用默认 `npm run dev` + 手动重启。
 
 ### 独立站（shops/）启动
 
@@ -1255,7 +1259,7 @@ vue-admin/
 │   └── workflows/
 │       ├── ci.yml                   # GitHub Actions CI（lint → typecheck → test → build → e2e）
 │       └── release.yml              # GitHub Actions Release（自动打 tag + 发布）
-├── .cert/                           # HTTPS 自签名证书
+├── .cert/                           # HTTPS 自签名证书（本地生成、已 gitignore，不入库）
 │   ├── server.crt
 │   └── server.key
 ├── .husky/                          # Git Hooks（commit-msg / pre-commit）

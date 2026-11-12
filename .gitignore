@@ -12,6 +12,10 @@ server/.env
 server/.env.*
 # 模板需随代码入库（README 首启步骤依赖它），仅排除真实配置
 !server/.env.example
+
+# 开发用自签名证书由 server/utils/generateCert.ts 首次启动时生成。
+# 私钥随机且属于本机，禁止入库（换机器会生成新证书，需重新信任）。
+.cert/
 server/logs/*.log
 logs/*.log
 *.log
