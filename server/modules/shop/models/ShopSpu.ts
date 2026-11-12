@@ -12,6 +12,7 @@ class ShopSpu extends Model<InferAttributes<ShopSpu>, InferCreationAttributes<Sh
   declare description: Record<string, string> | null
   declare cover: string | null
   declare images: string[] | null
+  declare videos: string[] | null
   declare slug: string | null
   declare status: CreationOptional<SpuStatus>
   declare tenantId: number
@@ -56,6 +57,11 @@ ShopSpu.init(
       type: DataTypes.JSON,
       allowNull: true,
       comment: '图集 URL 列表',
+    },
+    videos: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: '视频 URL 列表（本地 /uploads/ 或 CDN）',
     },
     slug: {
       type: DataTypes.STRING(200),

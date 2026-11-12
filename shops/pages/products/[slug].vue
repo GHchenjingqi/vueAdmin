@@ -7,6 +7,7 @@ import { useStoreConfig } from '~/composables/useStoreConfig'
 import { useI18n } from '~/composables/useI18n'
 import { trackViewItem, trackAddToCart } from '@shared/analytics/ecommerce'
 import ProductReviews from '~/components/commerce/ProductReviews.vue'
+import ProductQA from '~/components/commerce/ProductQA.vue'
 import RecommendSection from '~/components/commerce/RecommendSection.vue'
 import type { CatalogProduct } from '@shared/types/api'
 
@@ -160,6 +161,17 @@ async function toggleWishlist(): Promise<void> {
           <img v-if="product.cover" :src="product.cover" :alt="product.title" width="1200" height="1200" class="h-full w-full object-cover" />
           <div v-else class="flex h-full w-full items-center justify-center text-6xl text-stone-300" aria-hidden="true">✦</div>
         </div>
+        <!-- A-视频（本地存储）：spus.videos 透传；有视频时在主图下方播放（首个视频，原生 controls） -->
+        <div v-if="product.videos?.length" class="mt-4 space-y-2">
+          <h3 class="text-sm font-semibold text-stone-700">{{ t('product.video') }}</h3>
+          <video
+            :src="product.videos[0]"
+            controls
+            preload="metadata"
+            playsinline
+            class="w-full rounded-xl bg-stone-900"
+          />
+        </div>
       </div>
 
       <div class="space-y-6">
@@ -211,6 +223,7 @@ async function toggleWishlist(): Promise<void> {
       </div>
 
       <ProductReviews v-if="product" :spu-id="product.id" class="lg:col-span-2" />
+      <ProductQA v-if="product" :spu-id="product.id" class="lg:col-span-2" />
     </div>
 
     <!-- 最近看过：复用 view_item 埋点，游客/登录均记录 -->

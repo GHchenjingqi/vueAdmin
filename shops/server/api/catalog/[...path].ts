@@ -31,6 +31,7 @@ interface RawListItem {
   title: string
   cover: string | null
   images: string[] | null
+  videos?: string[] | null
   categoryId: number
   price: { currency: string; min: number; max: number } | null
   inStock: boolean
@@ -43,6 +44,7 @@ interface RawDetail {
   description: string
   cover: string | null
   images: string[] | null
+  videos?: string[] | null
   category: { id: number; name: string } | null
   currency: string
   price: { min: number; max: number } | null
@@ -67,6 +69,7 @@ function adaptList(raw: { list: RawListItem[]; total: number; page: number; page
     description: '',
     cover: p.cover,
     images: p.images ?? [],
+    videos: p.videos ?? [],
     category: p.categoryId ? { id: p.categoryId, name: '', slug: `c-${p.categoryId}` } : null,
     price: p.price ? { amount: toCents(p.price.min), currency: p.price.currency } : null,
     inStock: !!p.inStock,
@@ -90,6 +93,7 @@ function adaptDetail(raw: RawDetail): CatalogProduct {
     description: raw.description ?? '',
     cover: raw.cover,
     images: raw.images ?? [],
+    videos: raw.videos ?? [],
     category: raw.category ? { id: raw.category.id, name: raw.category.name, slug: `c-${raw.category.id}` } : null,
     price: raw.price ? { amount: toCents(raw.price.min), currency: raw.currency } : null,
     inStock: variants.some((v) => v.inStock),

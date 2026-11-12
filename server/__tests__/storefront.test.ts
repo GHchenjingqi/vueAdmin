@@ -118,7 +118,7 @@ describe('阶段5：Storefront 商品列表', () => {
       const { list } = await catalogService.listProducts({ keyword: publishedKeyword })
       const item = list[0]
       expect(Object.keys(item).sort()).toEqual(
-        ['brandId', 'categoryId', 'cover', 'id', 'images', 'inStock', 'price', 'slug', 'title'].sort(),
+        ['brandId', 'categoryId', 'cover', 'id', 'images', 'inStock', 'price', 'slug', 'title', 'videos'].sort(),
       )
       expect(item.price).toEqual({ currency: 'USD', min: 129.9, max: 129.9 })
       expect(item.inStock).toBe(true)

@@ -42,6 +42,7 @@ export interface StorefrontProductListItem {
   title: string
   cover: string | null
   images: string[]
+  videos: string[]
   categoryId: number
   brandId: number | null
   price: { currency: string; min: number; max: number } | null
@@ -64,6 +65,7 @@ export interface StorefrontProductDetail {
   description: string
   cover: string | null
   images: string[]
+  videos: string[]
   category: { id: number; name: string } | null
   brand: { id: number; name: string } | null
   currency: string
@@ -252,6 +254,7 @@ export async function listProducts(
       title,
       cover: spu.cover,
       images: spu.images ?? [],
+      videos: spu.videos ?? [],
       categoryId: spu.categoryId,
       brandId: spu.brandId,
       price: values.length ? { currency, min: Math.min(...values), max: Math.max(...values) } : null,
@@ -347,6 +350,7 @@ export async function getProductBySlug(
     description,
     cover: spu.cover,
     images: spu.images ?? [],
+    videos: spu.videos ?? [],
     category: category ? { id: category.id, name: localized(category.name, lang) } : null,
     brand: brand ? { id: brand.id, name: brand.name } : null,
     currency: effectiveCurrency,

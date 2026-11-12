@@ -29,6 +29,8 @@ export interface CatalogProduct {
   description: string
   cover: string | null
   images: string[]
+  /** 视频地址列表（本地 /uploads/ 或 CDN）；为空则详情页仅显示图片。真实后台未迁移/videos 缺省时 undefined */
+  videos?: string[]
   category: { id: number; name: string; slug: string } | null
   price: Money | null
   inStock: boolean

@@ -64,6 +64,10 @@ onMounted(() => {
           <NuxtLink to="/policies/shipping" class="hover:underline">{{ t('nav.shipping') }}</NuxtLink>
           ·
           <NuxtLink to="/policies/returns" class="hover:underline">{{ t('nav.returns') }}</NuxtLink>
+          ·
+          <NuxtLink to="/faq" class="hover:underline">{{ t('nav.faq') }}</NuxtLink>
+          ·
+          <NuxtLink to="/size-guide" class="hover:underline">{{ t('nav.sizeGuide') }}</NuxtLink>
         </p>
       </div>
     </footer>
