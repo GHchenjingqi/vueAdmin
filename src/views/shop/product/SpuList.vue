@@ -16,6 +16,9 @@
         <el-button type="primary" :icon="Plus" @click="router.push('/shop-product-edit')">
           {{ t('shop.product.add') }}
         </el-button>
+        <el-button type="success" plain :icon="Upload" @click="router.push('/shop-product-import')">
+          {{ t('shop.product.import.title') }}
+        </el-button>
       </template>
 
       <template #column-name="{ row }">
@@ -59,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Upload } from '@element-plus/icons-vue'
 import { publishApi, spuApi, type Spu, type ShopStatus, type StatusAction } from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'
 import ProTable from '@/components/ProTable/index.vue'

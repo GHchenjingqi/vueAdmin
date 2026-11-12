@@ -156,6 +156,25 @@ export interface SpuDetail {
   allowedActions: ShopStatus[]
 }
 
+/** 商品批量导入：预校验结果 */
+export interface ImportPreviewResult {
+  filename: string
+  totalRows: number
+  skippedEmpty: number
+  header: string[]
+  errors: { row: number; field: string | null; message: string }[]
+  willCreateSpus: number
+  willCreateSkus: number
+}
+
+/** 商品批量导入：执行结果 */
+export interface ImportCommitResult {
+  createdSpus: number
+  createdSkus: number
+  failed: { skuCode: string; message: string }[]
+  dryRun: boolean
+}
+
 export type StatusAction = 'submit' | 'withdraw' | 'reject' | 'list' | 'publish' | 'unlist' | 'archive'
 
 export const spuApi = {
@@ -186,6 +205,22 @@ export const spuApi = {
   },
   remove(id: number) {
     return request.delete<null>(`/shop/spus/${id}`)
+  },
+  /** 批量导入预校验（dryRun，不写库） */
+  importPreview(file: File) {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request.post<ImportPreviewResult>('/shop/spus/import/preview', fd)
+  },
+  /** 批量导入执行（写库） */
+  importCommit(file: File) {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request.post<ImportCommitResult>('/shop/spus/import/commit', fd)
+  },
+  /** 下载 CSV 导入模板（带鉴权，blob） */
+  importTemplate() {
+    return request.get<Blob>('/shop/spus/import-template', { responseType: 'blob' })
   },
 }
 
