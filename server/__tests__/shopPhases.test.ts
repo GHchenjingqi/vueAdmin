@@ -306,7 +306,8 @@ describe('阶段4：营销中心', () => {
 describe('阶段4：数据参谋', () => {
   // 本用例共享 TID=1 的历史订单/流水，数据随运行轮次累积；analyticsService 的
   // salesReport/profitReport 是全量聚合 + 逐单汇率快照查询，实测 7–11s 会撞上
-  // vitest 默认 5s。生产报表逻辑本身无缺陷，这里单独放宽超时避免历轮回归噪声。
+  // vitest 默认 5s；全量并行跑时 DB/连接池争用还会把耗时推到 30s 以上，故放宽到 60s。
+  // 生产报表逻辑本身无缺陷，单独复跑稳定在 13s 左右，这里只消除历轮回归噪声。
   it('销售报表能聚合订单', async () => {
     await runInTenant({ tenantId: TID }, async () => {
       const channel = await channelService.createChannel({ name: '报表渠道' + uniq(), type: 'amazon' })
@@ -330,5 +331,5 @@ describe('阶段4：数据参谋', () => {
       expect(Array.isArray(turnover.rows)).toBe(true)
       void order
     })
-  }, 30_000)
+  }, 60_000)
 })
