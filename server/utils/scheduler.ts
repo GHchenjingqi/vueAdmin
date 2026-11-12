@@ -21,6 +21,13 @@ const handlers = {
   async heartbeat() {
     return '心跳检测正常'
   },
+
+  /** 订单自动完结：动态导入避免调度器启动时拖入商城模型依赖 */
+  async autoCompleteOrders() {
+    const { autoCompleteShippedOrders } = await import('../modules/shop/services/orderCompletionService.js')
+    const r = await autoCompleteShippedOrders()
+    return `扫描 ${r.scanned} 单/${r.tenants} 租户，完结 ${r.completed} 单；跳过 售后中 ${r.skippedRma}、无运单 ${r.skippedNoShipment}、未到期 ${r.skippedNotDue}（${r.days} 天规则）`
+  },
 }
 
 async function startJob(task) {

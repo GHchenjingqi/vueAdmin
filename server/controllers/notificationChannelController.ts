@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import * as channelService from '../services/notificationChannelService.js'
 import type { ChannelInput, ChannelType } from '../services/notificationChannelService.js'
+import { getRecentDeliveries } from '../services/notificationDispatcher.js'
 import { AppError } from '../middleware/errorHandler.js'
 
 /** 通知渠道管理控制器（P2-11） */
@@ -36,6 +37,11 @@ export const active = async (_req: Request, res: Response, next: NextFunction): 
   } catch (err) {
     next(err)
   }
+}
+
+/** 最近系统事件投递记录（进程内环形缓冲，重启后清空） */
+export const deliveries = (_req: Request, res: Response): void => {
+  res.json({ code: 0, data: getRecentDeliveries() })
 }
 
 export const create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

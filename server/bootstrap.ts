@@ -46,6 +46,8 @@ import './modules/billing/models/Payment.js'
 import { registerTenantScope } from './modules/tenant/hooks/sequelizeTenantScope.js'
 import { updateUserActivity, initKickSubscriber, closeKickSubscriber } from './utils/onlineUsers.js'
 import { initScheduler } from './utils/scheduler.js'
+import { setAlertSink } from './modules/storefront/services/monitoringService.js'
+import { notifyAsync } from './services/notificationDispatcher.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -627,6 +629,16 @@ export default async function bootstrap(app) {
         updateUserActivity(req.user.id, ip, req.headers['user-agent'], { tenantId: req.user.tenantId })
       }
       next()
+    })
+
+    // 告警出口：把监控规则触发的告警投递到已启用的通知渠道（规则自带 cooldown，故此处不重复冷却）
+    setAlertSink((alert) => {
+      notifyAsync({
+        event: 'system.alert',
+        subject: `[告警] ${alert.name}`,
+        text: `${alert.metric} ${alert.operator} ${alert.threshold}，当前 ${alert.value}。\n规则: ${alert.id}\n处置手册: ${alert.runbook}\n触发时间: ${alert.firedAt}`,
+        cooldownMs: 0,
+      })
     })
 
     // 初始化定时任务调度器

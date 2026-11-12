@@ -1446,6 +1446,7 @@ router.get('/dashboard/trends', authMiddleware, dashboardController.getTrends)
 
 // ==================== 通知渠道管理（P2-11） ====================
 router.get('/notification-channels/active', authMiddleware, notificationChannelController.active)
+router.get('/notification-channels/deliveries', authMiddleware, notificationChannelController.deliveries)
 router.get('/notification-channels', authMiddleware, notificationChannelController.list)
 router.post('/notification-channels', authMiddleware, notificationChannelController.create)
 router.put('/notification-channels/:id', authMiddleware, notificationChannelController.update)

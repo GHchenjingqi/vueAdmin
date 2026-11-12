@@ -9,6 +9,7 @@ import { getGateway } from '../payments/gatewayRegistry.js'
 import { PROVIDERS } from '../payments/providerRegistry.js'
 import { applyGatewayEvent } from './paymentService.js'
 import { logInfo } from '../../../utils/fileLogger.js'
+import { notifyAsync } from '../../../services/notificationDispatcher.js'
 
 /**
  * 支付对账/补单调度器（A2 收口项之一）。
@@ -254,18 +255,36 @@ export function startPaymentReconcileScanner(intervalMs = 5 * 60 * 1000, tenantI
             const n = await reconcilePayments()
             if (n > 0) logInfo(`[reconcile] tenant=${tenantId} 关单/补单 ${n} 笔`)
           } catch (err) {
-            logInfo(`[reconcile] tenant=${tenantId} 对账失败: ${(err as Error).message}`)
+            const message = (err as Error).message
+            logInfo(`[reconcile] tenant=${tenantId} 对账失败: ${message}`)
+            notifyAsync({
+              event: 'payment.reconcile_failed',
+              subject: `[对账异常] 租户 ${tenantId}`,
+              text: `支付单据对账/补单扫描失败，本轮该租户未处理。\n错误: ${message}\n请检查网关连通性与数据库连接。`,
+            })
           }
           try {
             const released = await reservationService.releaseExpiredReservations()
             if (released > 0) logInfo(`[reconcile] tenant=${tenantId} 释放过期预占 ${released} 笔`)
           } catch (err) {
-            logInfo(`[reconcile] tenant=${tenantId} 预占回收失败: ${(err as Error).message}`)
+            const message = (err as Error).message
+            logInfo(`[reconcile] tenant=${tenantId} 预占回收失败: ${message}`)
+            notifyAsync({
+              event: 'inventory.reservation_release_failed',
+              subject: `[库存预占] 租户 ${tenantId} 回收失败`,
+              text: `过期库存预占与券占用本轮未释放，可能存在悬挂占用。\n错误: ${message}\n扫描器将在下一轮自动重试。`,
+            })
           }
         })
       }
     } catch (err) {
-      logInfo(`[reconcile] 扫描失败: ${(err as Error).message}`)
+      const message = (err as Error).message
+      logInfo(`[reconcile] 扫描失败: ${message}`)
+      notifyAsync({
+        event: 'payment.reconcile_scan_failed',
+        subject: '[对账异常] 全局扫描失败',
+        text: `未支付订单资源回收扫描器本轮整体失败（租户枚举阶段）。\n错误: ${message}\n请检查数据库连接与 orders / order_payments 表状态。`,
+      })
     }
   }
 

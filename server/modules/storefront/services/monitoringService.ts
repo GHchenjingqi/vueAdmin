@@ -3,7 +3,7 @@
  *
  * 轻量内存指标注册表：计数器（counter）、延迟直方图（latency，含 P95）、瞬时值（gauge）。
  * 不做外部依赖（避免引入 prom-client），对外提供 snapshot() 供看板/指标端点读取，
- * 以及 evaluate() 按规则阈值评估并记录告警（当前为日志 + 内存环形缓冲 sink，可替换为通知通道）。
+ * 以及 evaluate() 按规则阈值评估并记录告警（日志 + 内存环形缓冲兜底；可通过 setAlertSink 注册真实通知通道）。
  *
  * 覆盖指标（与验收对应）：
  * - SSR 错误率          ssr_error_rate       （gauge，0..1）
@@ -123,6 +123,18 @@ export interface FiredAlert {
   firedAt: string
 }
 
+/**
+ * 告警出口（降本 P0-1）：默认 null，行为与历史一致（仅日志 + 内存），
+ * 由 bootstrap 注册为系统通知分发器。保持同步回调，evaluate() 无需改为 async，
+ * 因此现有控制器与单测的调用方式、返回类型都不变；sink 自身异常被吞掉，不影响评估。
+ */
+export type AlertSink = (alert: FiredAlert) => void
+let alertSink: AlertSink | null = null
+
+export function setAlertSink(sink: AlertSink | null): void {
+  alertSink = sink
+}
+
 /** 记录一次请求延迟（ms），保留最近 MAX_LATENCY_SAMPLES 个样本用于 P95 */
 export function recordLatency(key: string, ms: number): void {
   const arr = latencies.get(key)
@@ -198,8 +210,15 @@ export function evaluate(rules: AlertRule[] = DEFAULT_ALERT_RULES): FiredAlert[]
     }
     alerts.push(alert)
     fired.push(alert)
-    // 当前为日志 + 内存 sink；上线时在此接通知通道（channel 由规则声明）
+    // 日志 + 内存 sink 始终保留（无渠道时也可排障）；已注册则额外投递到真实通知渠道
     console.warn(`[alert] ${alert.name} 触发: ${alert.metric} ${alert.operator} ${rule.threshold}（当前 ${value}），runbook=${rule.runbook}`)
+    if (alertSink) {
+      try {
+        alertSink(alert)
+      } catch {
+        // 通知通道异常不得影响告警评估与内存记录
+      }
+    }
   }
   return fired
 }
