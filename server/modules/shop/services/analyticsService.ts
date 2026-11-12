@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 import { ShopOrder, ShopOrderItem, ShopRateSnapshot, ShopSku, ShopSpu, ShopInventory, ShopInventoryLog, ShopAnalyticsEvent } from '../models/index.js'
 import type { AnalyticsQuery } from '../../../shared/schemas/shop.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
+import { canonicalTerm } from '../../storefront/services/searchSynonymsService.js'
 
 /** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
 const tid = (): number => getTenantContext()?.tenantId ?? 1
@@ -293,4 +294,135 @@ export async function recommendationCtrReport(q: { startAt?: string; endAt?: str
   }))
 
   return { startAt: start.toISOString(), endAt: end.toISOString(), items, summary }
+}
+
+/**
+ * 搜索热词看板（admin 运营增强）：复用 shop_analytics_events 的 search 事件（零新表）。
+ * - 词频：按 params.search_term 计数，别名经 canonicalTerm 归并（bodywave→body wave）；
+ * - 零结果词：同一 search 事件 params.results 为 0（前端无结果页埋点带 results 计数）；
+ *   该字段缺失时零结果占比为 null（口径退化，不臆造）。
+ * 内存聚合窗口默认 7 天、上限 20000 行（与 reco-ctr 同策略）。
+ */
+export async function searchHotReport(q: { startAt?: string; endAt?: string; limit?: number } = {}) {
+  const start = q.startAt ? new Date(q.startAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const end = q.endAt ? new Date(q.endAt) : new Date()
+  const limit = Math.min(Math.max(q.limit ?? 20, 1), 100)
+
+  const rows = await ShopAnalyticsEvent.findAll({
+    where: {
+      tenantId: tid(),
+      eventName: 'search',
+      createdAt: { [Op.gte]: start, [Op.lte]: end },
+    },
+    order: [['createdAt', 'DESC']],
+    limit: 20000,
+    attributes: ['params'],
+  })
+
+  const termCounts = new Map<string, number>()
+  let zeroResult = 0
+  let hasResultSignal = false // 是否至少有一条 events 带 results 字段
+  for (const ev of rows) {
+    const p = (ev.params ?? {}) as Record<string, unknown>
+    const term = typeof p.search_term === 'string' ? p.search_term.trim().toLowerCase() : ''
+    if (!term) continue
+    const canonical = canonicalTerm(term)
+    termCounts.set(canonical, (termCounts.get(canonical) ?? 0) + 1)
+    if (typeof p.results === 'number') {
+      hasResultSignal = true
+      if (p.results === 0) zeroResult++
+    }
+  }
+
+  const totalSearches = rows.length
+  const keywords = [...termCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([term, count]) => ({ term, count }))
+
+  return {
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    totalSearches,
+    zeroResultSearches: hasResultSignal ? zeroResult : null,
+    zeroResultRate: hasResultSignal && totalSearches > 0 ? Number((zeroResult / totalSearches).toFixed(4)) : null,
+    keywords,
+  }
+}
+
+/**
+ * 搜索转化漏斗（admin 运营增强）：复用现有事件链（零新表），按 sessionId 串联。
+ * 步骤：search → view_item → add_to_cart → purchase。
+ * 串联口径：同一 sessionId 内，各步骤「首次发生」是否晚于 search 首次发生（时序归因）；
+ * 无 sessionId 的游客事件（history 模式匿名）不参与漏斗，仅计入 totalEvents。
+ * 各步转化率相对 search 会话数。
+ */
+export async function searchFunnelReport(q: { startAt?: string; endAt?: string } = {}) {
+  const start = q.startAt ? new Date(q.startAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const end = q.endAt ? new Date(q.endAt) : new Date()
+
+  const rows = await ShopAnalyticsEvent.findAll({
+    where: {
+      tenantId: tid(),
+      eventName: { [Op.in]: ['search', 'view_item', 'add_to_cart', 'purchase'] },
+      createdAt: { [Op.gte]: start, [Op.lte]: end },
+    },
+    order: [['createdAt', 'ASC']],
+    limit: 50000,
+    attributes: ['eventName', 'sessionId', 'createdAt'],
+  })
+
+  interface SessionState {
+    searchAt: number | null
+    view: boolean
+    add: boolean
+    purchase: boolean
+  }
+  const sessions = new Map<string, SessionState>()
+  let noSessionEvents = 0
+  for (const ev of rows) {
+    const sid = ev.sessionId
+    if (!sid) {
+      noSessionEvents++
+      continue
+    }
+    const st = sessions.get(sid) ?? { searchAt: null, view: false, add: false, purchase: false }
+    const at = new Date(ev.createdAt).getTime()
+    if (ev.eventName === 'search') {
+      if (st.searchAt === null) st.searchAt = at
+    } else if (ev.eventName === 'view_item') {
+      if (st.searchAt !== null && at >= st.searchAt) st.view = true
+    } else if (ev.eventName === 'add_to_cart') {
+      if (st.searchAt !== null && at >= st.searchAt) st.add = true
+    } else if (ev.eventName === 'purchase') {
+      if (st.searchAt !== null && at >= st.searchAt) st.purchase = true
+    }
+    sessions.set(sid, st)
+  }
+
+  let searched = 0
+  let viewed = 0
+  let added = 0
+  let purchased = 0
+  for (const st of sessions.values()) {
+    if (st.searchAt === null) continue
+    searched++
+    if (st.view) viewed++
+    if (st.add) added++
+    if (st.purchase) purchased++
+  }
+
+  const rate = (n: number): number => (searched > 0 ? Number((n / searched).toFixed(4)) : 0)
+  return {
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    searched,
+    viewed,
+    added,
+    purchased,
+    viewRate: rate(viewed),
+    addRate: rate(added),
+    purchaseRate: rate(purchased),
+    noSessionEvents,
+  }
 }

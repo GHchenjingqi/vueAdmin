@@ -69,3 +69,34 @@ export const recoCtr = async (req: Request, res: Response, next: NextFunction) =
     next(err)
   }
 }
+
+/** 搜索热词看板（admin 运营增强）：复用 search 事件，别名归并到 canonical */
+export const searchHot = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({
+      code: 0,
+      data: await analyticsService.searchHotReport({
+        startAt: queryStr(req.query.startAt),
+        endAt: queryStr(req.query.endAt),
+        limit: queryInt(req.query.limit),
+      }),
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** 搜索转化漏斗看板（admin 运营增强）：search→view_item→add_to_cart→purchase，按 sessionId 串联 */
+export const searchFunnel = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({
+      code: 0,
+      data: await analyticsService.searchFunnelReport({
+        startAt: queryStr(req.query.startAt),
+        endAt: queryStr(req.query.endAt),
+      }),
+    })
+  } catch (err) {
+    next(err)
+  }
+}
