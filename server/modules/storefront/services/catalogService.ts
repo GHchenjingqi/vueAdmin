@@ -259,6 +259,24 @@ export async function listProducts(
     }
   })
 
+  // 二期：keyword 检索排序加权（仅 keyword 非空且非 ids 精确取时启用；当前页内存重排，零额外查询）
+  // 优先级：标题含完整关键词 > 标题含任一同义变体 > 有货 > 原顺序（id DESC 稳定兜底）
+  if (keyword && !idFilter.length) {
+    const variants = expandTerm(keyword)
+    const normTitle = (t: string) => t.toLowerCase()
+    const kwLower = keyword.toLowerCase()
+    const score = (item: StorefrontProductListItem): number => {
+      const title = normTitle(item.title)
+      let s = 0
+      if (title.includes(kwLower)) s += 100
+      else if (variants.some((v) => v !== kwLower && title.includes(v))) s += 60
+      if (item.inStock) s += 10
+      return s
+    }
+    // 稳定排序：JS sort 在现代引擎为稳定排序，同分保持原顺序（id DESC）
+    list.sort((a, b) => score(b) - score(a))
+  }
+
   return { list, total, page, pageSize, currency, lang }
 }
 
