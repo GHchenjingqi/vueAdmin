@@ -122,12 +122,17 @@
 
 ---
 
-## 八、建议下一步（按性价比）
+## 八、建议下一步（2026-11-11 已全部完成）
 
-1. **高**：补「评价 / 问答审核台」（模式与本次 RMA 页完全同构，可快速复制）。
-2. **中**：补「CMS 文章后台管理」与「订单邮件发件箱监控」。
-3. **低**：补「搭配购 / 渠道商品发布」页面。
-4. 运行 `npm run dev` 后于浏览器验证 RMA 菜单入口与次屏 Banner 渲染（dev server 当前未运行，需启动）。
+> 本节保留初次审计时的建议快照，便于追溯；**实际状态以第九节为准**，
+> 完整批次与验收记录见 `docs/P0-P10_BACKLOG_2026-11-11.md`。
+
+| 初次建议 | 状态 | 交付 |
+| --- | --- | --- |
+| 高：评价 / 问答审核台 | ✅ | `ReviewModeration.vue`，菜单 `/shop-review-qa` |
+| 中：CMS 文章后台 + 订单邮件发件箱监控 | ✅ | `ArticleAdmin.vue` / `OrderMailMonitor.vue`，菜单 `/shop-articles`、`/shop-order-mails` |
+| 低：搭配购 / 渠道商品发布页面 | ✅ | `BundleList.vue` / `ChannelProductList.vue`，菜单 `/shop-bundles`、`/shop-channel-products` |
+| 启动 dev 验证 RMA 菜单与次屏 Banner | ✅ | 已完成真实登录闭环：菜单树含 `/shop-rma` 等 7 个新路径，次屏 Banner 与首页推荐位 SSR 渲染均已核对；当时「dev server 未运行」的前置条件已消除（后端 5173/5174、C 端 3000 均在运行） |
 
 ---
 
