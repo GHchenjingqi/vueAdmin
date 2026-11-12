@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // ---- 直通域（并行后端已交付的扩展能力；auto/real 下透传，4xx 业务错误原样返回） ----
-  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses|referrals|membership|wishlist|view-history|search|experiments)\b/.exec(url)
+  const extMatch = /^(reviews|qa|rma|cms|track|track-event|auth|addresses|referrals|membership|wishlist|view-history|search|experiments|coupons)\b/.exec(url)
   if (extMatch && source !== 'mock') {
     const res = await commerceRealFetch(url, {
       method,
@@ -457,6 +457,16 @@ async function mockHandle(url: string, method: string, event: Parameters<Paramet
   const expMatch = /^experiments\/([^/]+)\/assign/.exec(url)
   if (expMatch && method === 'GET') {
     return { code: 0, data: { key: decodeURIComponent(expMatch[1]), enabled: false, variant: 'control', reason: 'feature_disabled' } }
+  }
+  // #13 mock 兜底：顾客可领用券列表（结构对齐 storefront AvailableCoupon）
+  if (/^coupons\/available(\?.*)?$/.test(url) && method === 'GET') {
+    const now = Date.now()
+    const from = new Date(now - 7 * 86400000).toISOString().slice(0, 10)
+    const to = new Date(now + 30 * 86400000).toISOString().slice(0, 10)
+    return [
+      { id: 1, code: 'WELCOME10', type: 'percent', value: 10, minSpend: 0, currency: 'USD', validFrom: from, validTo: to, usageLimit: 0, usedCount: 0, remaining: -1 },
+      { id: 2, code: 'SAVE20', type: 'fixed', value: 20, minSpend: 100, currency: 'USD', validFrom: from, validTo: to, usageLimit: 100, usedCount: 12, remaining: 88 },
+    ]
   }
   setResponseStatus(event, 404)
   return { code: 'NOT_FOUND', message: `no handler for ${method} /api/${url}` }
