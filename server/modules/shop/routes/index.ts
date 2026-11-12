@@ -68,6 +68,7 @@ import * as membershipTierController from '../controllers/membershipTierControll
 import * as rmaAdminController from '../controllers/rmaAdminController.js'
 import * as reviewAdminController from '../controllers/reviewAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
+import * as referralCommissionController from '../controllers/referralCommissionController.js'
 import { updateCurrencySchema, rollbackCurrencySchema, updatePaymentChannelsSchema } from '../../../shared/schemas/storefront-commerce.js'
 
 /**
@@ -250,6 +251,11 @@ router.put('/settings/payment-channels/credentials', authMiddleware, requireAdmi
 
 // X-T03 审计日志查询（仅 admin 可读，用于回溯订单/支付/库存/退款/文章状态变更链）
 router.get('/audit-logs', authMiddleware, requireAdmin, auditLogController.listAuditLogs)
+router.get('/audit-logs/export', authMiddleware, requireAdmin, auditLogController.exportAuditLogs)
+
+// P5-T07 分销佣金台账（admin 可查 + 结算/作废 pending 项）
+router.get('/referral-commissions', authMiddleware, validate(shopPaginationSchema, 'query'), referralCommissionController.list)
+router.post('/referral-commissions/:id/settle', authMiddleware, validate(idParamSchema, 'params'), referralCommissionController.settle)
 
 // P5-T06 CMS 后台写入（复用 shop_articles；发布/下线触发缓存失效 + X-T03 审计）
 router.get('/articles', authMiddleware, requireAdmin, validate(articleAdminListQuerySchema, 'query'), articleAdminController.list)

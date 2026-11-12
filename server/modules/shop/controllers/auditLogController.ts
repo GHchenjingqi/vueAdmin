@@ -42,3 +42,37 @@ export const listAuditLogs = async (req: Request, res: Response, next: NextFunct
     next(err)
   }
 }
+
+/**
+ * P2-8 审计日志导出端点（admin，与 list 同过滤口径）
+ * GET /api/v1/shop/audit-logs/export?entityType=order&...
+ */
+export const exportAuditLogs = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const entityType = queryStr(req.query.entityType)
+    if (!entityType) {
+      res.status(400).json({ code: 400, message: 'entityType 必填' })
+      return
+    }
+    const from = parseDate(queryStr(req.query.from))
+    const to = parseDate(queryStr(req.query.to))
+    if (from === null || to === null) {
+      res.status(400).json({ code: 400, message: 'from/to 必须为合法日期' })
+      return
+    }
+    const { buffer, filename } = await auditLogService.exportAuditLogs({
+      entityType,
+      entityId: queryInt(req.query.entityId),
+      action: queryStr(req.query.action),
+      actorId: queryInt(req.query.actorId),
+      actorType: queryStr(req.query.actorType),
+      from: from ?? undefined,
+      to: to ?? undefined,
+    })
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`)
+    res.send(buffer)
+  } catch (err) {
+    next(err)
+  }
+}

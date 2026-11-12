@@ -1,4 +1,4 @@
-import { UniqueConstraintError, type Transaction } from 'sequelize'
+import { Op, UniqueConstraintError, type Transaction } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import sequelize from '../../../config/database.js'
@@ -161,4 +161,54 @@ export async function releaseCoupon(orderNo: string): Promise<void> {
       )
     }),
   )
+}
+
+export interface AvailableCoupon {
+  id: number
+  code: string
+  type: 'fixed' | 'percent'
+  value: number
+  minSpend: number
+  currency: string
+  validFrom: string
+  validTo: string
+  usageLimit: number
+  usedCount: number
+  /** 剩余可领用次数；-1 表示不限量 */
+  remaining: number
+}
+
+/**
+ * 顾客可用券列表（C 端「我的优惠券」）。
+ * 规则：生效期内（validFrom<=today<=validTo）且未达用量上限的券。
+ * 注意：redeem 占用按全局 usedCount 计，未绑定顾客，故返回租户下全部当前可领用券。
+ */
+export async function listAvailableCoupons(_customerId?: number): Promise<AvailableCoupon[]> {
+  const today = new Date().toISOString().slice(0, 10)
+  const rows = await ShopCoupon.findAll({
+    where: {
+      tenantId: tid(),
+      validFrom: { [Op.lte]: today },
+      validTo: { [Op.gte]: today },
+    },
+    order: [['validTo', 'ASC']],
+  })
+  return rows
+    .filter((c) => Number(c.usageLimit) === 0 || Number(c.usedCount) < Number(c.usageLimit))
+    .map((c) => {
+      const limit = Number(c.usageLimit)
+      return {
+        id: c.id,
+        code: c.code,
+        type: c.type,
+        value: Number(c.value),
+        minSpend: Number(c.minSpend),
+        currency: c.currency,
+        validFrom: String(c.validFrom).slice(0, 10),
+        validTo: String(c.validTo).slice(0, 10),
+        usageLimit: limit,
+        usedCount: Number(c.usedCount),
+        remaining: limit === 0 ? -1 : limit - Number(c.usedCount),
+      }
+    })
 }

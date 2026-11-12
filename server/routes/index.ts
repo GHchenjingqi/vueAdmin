@@ -16,6 +16,8 @@ import * as noticeController from '../controllers/noticeController.js'
 import * as logController from '../controllers/logController.js'
 import * as uploadController from '../controllers/uploadController.js'
 import * as dashboardController from '../controllers/dashboardController.js'
+import * as notificationChannelController from '../controllers/notificationChannelController.js'
+import * as profileController from '../controllers/profileController.js'
 import * as deptController from '../controllers/deptController.js'
 import * as roleController from '../controllers/roleController.js'
 import * as searchController from '../controllers/searchController.js'
@@ -1440,6 +1442,21 @@ router.delete('/upload/:id', authMiddleware, uploadController.removeFile)
  *         description: 统计数据（用户数、访问量、在线人数等）
  */
 router.get('/dashboard/stats', authMiddleware, dashboardController.getStats)
+router.get('/dashboard/trends', authMiddleware, dashboardController.getTrends)
+
+// ==================== 通知渠道管理（P2-11） ====================
+router.get('/notification-channels/active', authMiddleware, notificationChannelController.active)
+router.get('/notification-channels', authMiddleware, notificationChannelController.list)
+router.post('/notification-channels', authMiddleware, notificationChannelController.create)
+router.put('/notification-channels/:id', authMiddleware, notificationChannelController.update)
+router.put('/notification-channels/:id/toggle', authMiddleware, notificationChannelController.toggle)
+router.post('/notification-channels/:id/test', authMiddleware, notificationChannelController.test)
+router.delete('/notification-channels/:id', authMiddleware, notificationChannelController.remove)
+
+// ==================== 个人中心增强（P2-10） ====================
+router.get('/profile/login-history', authMiddleware, profileController.loginHistory)
+router.get('/profile/notification-preferences', authMiddleware, profileController.getPreferences)
+router.put('/profile/notification-preferences', authMiddleware, profileController.savePreferences)
 
 // ==================== 部门管理 ====================
 

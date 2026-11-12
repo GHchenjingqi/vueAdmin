@@ -13,6 +13,7 @@ import type { Request } from 'express'
 import type { Transaction } from 'sequelize'
 import { Op } from 'sequelize'
 import AuditLog from '../models/AuditLog.js'
+import { exportExcel } from '../../../utils/exportExcel.js'
 import { getTenantContext } from '../../tenant/context.js'
 
 export type AuditActorType = 'admin' | 'customer' | 'system'
@@ -114,4 +115,50 @@ export async function listByEntity(q: AuditQuery): Promise<AuditLog[]> {
     limit: Math.min(Math.max(q.limit ?? 100, 1), 500),
     offset: Math.max(q.offset ?? 0, 0),
   })
+}
+
+/** P2-8：审计日志导出为 Excel（与 listByEntity 同过滤口径，最多 5000 行） */
+export async function exportAuditLogs(q: AuditQuery) {
+  const where: Record<string | symbol, unknown> = {
+    tenantId: q.tenantId ?? getTenantContext()?.tenantId ?? 1,
+    entityType: q.entityType,
+    ...(q.entityId != null ? { entityId: q.entityId } : {}),
+    ...(q.action ? { action: q.action } : {}),
+    ...(q.actorId != null ? { actorId: q.actorId } : {}),
+    ...(q.actorType ? { actorType: q.actorType } : {}),
+  }
+  if (q.from || q.to) {
+    const range: Record<symbol, Date> = {}
+    if (q.from) range[Op.gte] = q.from
+    if (q.to) range[Op.lte] = q.to
+    where.createdAt = range
+  }
+  const rows = await AuditLog.findAll({ where, order: [['id', 'DESC']], limit: 5000 })
+  const fmt = (v: unknown): string => {
+    if (v == null) return ''
+    if (typeof v === 'string') return v
+    try {
+      return JSON.stringify(v)
+    } catch {
+      return String(v)
+    }
+  }
+  const data = rows.map((r) => ({
+    createdAt: r.createdAt ? new Date(r.createdAt).toLocaleString() : '',
+    action: r.action,
+    entityType: r.entityType,
+    entityId: r.entityId ?? '',
+    actor: `${r.actorType}${r.actorId != null ? ' #' + r.actorId : ''}`,
+    afterState: fmt(r.afterState),
+  }))
+  const columns = [
+    { prop: 'createdAt', label: '时间', width: 22 },
+    { prop: 'action', label: '动作', width: 30 },
+    { prop: 'entityType', label: '实体类型', width: 14 },
+    { prop: 'entityId', label: '实体ID', width: 12 },
+    { prop: 'actor', label: '操作人', width: 16 },
+    { prop: 'afterState', label: '变更后状态', width: 60 },
+  ]
+  const { buffer, filename } = await exportExcel({ columns, data, filename: '审计日志.xlsx', sheetName: '审计日志' })
+  return { buffer, filename }
 }

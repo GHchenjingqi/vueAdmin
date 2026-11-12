@@ -23,6 +23,7 @@ import addressRouter from './address.js'
 import referralRouter from './referral.js'
 import membershipRouter from './membership.js'
 import wishlistRouter from './wishlist.js'
+import couponRouter from './coupon.js'
 import viewHistoryRouter from './viewHistory.js'
 import searchRouter from './search.js'
 import monitoringRouter from './monitoring.js'
@@ -71,6 +72,7 @@ router.use('/wishlist', wishlistRouter)
 router.use('/view-history', viewHistoryRouter)
 router.use('/search', searchRouter)
 router.use('/membership', membershipRouter)
+router.use('/coupons', couponRouter)
 router.use('/monitoring', monitoringRouter)
 router.get('/flags/:key', flagsController.publicCheck)
 router.use('/experiments', experimentsPublicRouter)
