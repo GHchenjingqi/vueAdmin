@@ -30,6 +30,7 @@ export const FLAG_DEFS: FlagDef[] = [
   { key: 'multi_warehouse', description: '多仓与精细配送策略（P5-T04）', defaultEnabled: false },
   { key: 'blog', description: '博客 CMS 与内容 SEO（P5-T06）', defaultEnabled: false },
   { key: 'bnpl', description: '区域 BNPL 支付方式（P5-T03）', defaultEnabled: false },
+  { key: 'moderation_auto_approve', description: '审核规则化：低风险评价自动批准，高风险转人工（RMA / 退款仍需人工）', defaultEnabled: false },
 ]
 
 const FLAG_SETTING_KEY = 'feature.flags'

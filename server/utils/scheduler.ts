@@ -28,6 +28,14 @@ const handlers = {
     const r = await autoCompleteShippedOrders()
     return `扫描 ${r.scanned} 单/${r.tenants} 租户，完结 ${r.completed} 单；跳过 售后中 ${r.skippedRma}、无运单 ${r.skippedNoShipment}、未到期 ${r.skippedNotDue}（${r.days} 天规则）`
   },
+
+  /** 审核规则化：低风险评价自动批、高风险转人工；动态导入避免拖入商城模型依赖 */
+  async autoModeration() {
+    const { runAutoModeration } = await import('../modules/shop/services/autoModerationService.js')
+    const r = await runAutoModeration()
+    if (!r.enabled) return `未启用（功能开关 moderation_auto_approve 关闭），本轮零变更`
+    return `扫描 ${r.scannedReviews} 条评价/${r.tenants} 租户，自动批准 ${r.autoApproved} 条、转人工 ${r.manualReviews} 条（阈值 ${r.threshold}）；待审售后 ${r.scannedRmas} 单，其中高风险 ${r.highRiskRmas} 单需人工优先处理；失败 ${r.failed}`
+  },
 }
 
 async function startJob(task) {
