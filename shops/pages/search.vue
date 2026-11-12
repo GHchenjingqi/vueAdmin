@@ -59,14 +59,13 @@ watchEffect(async () => {
   fallbackStrategy.value = res.strategy
 })
 
-// ---- search 埋点（q 变化时上报一次，去抖） ----
+// ---- search 埋点（等结果返回后上报，带真实 results 数供零结果率统计） ----
 const trackedTerm = ref('')
-watch(q, (val) => {
-  const term = val.trim()
-  if (term && term !== trackedTerm.value) {
-    trackedTerm.value = term
-    trackSearch(term)
-  }
+watch([q, pending], ([val, isPending]) => {
+  const term = String(val ?? '').trim()
+  if (isPending || !term || term === trackedTerm.value) return
+  trackedTerm.value = term
+  trackSearch(term, results.value.length)
 }, { immediate: true })
 
 useSeo({

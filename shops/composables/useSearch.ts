@@ -62,9 +62,12 @@ export async function fetchSearchFallback(q: string, limit = 8): Promise<SearchF
   }
 }
 
-/** GA4 search 事件埋点（search_term） */
-export function trackSearch(searchTerm: string): void {
+/**
+ * GA4 search 事件埋点（search_term + results）
+ * - results：本次搜索命中商品数，供后台零结果率统计（缺失时后台该指标降级为 null）
+ */
+export function trackSearch(searchTerm: string, results = 0): void {
   const term = String(searchTerm ?? '').trim()
   if (!term) return
-  trackEvent('search', { search_term: term })
+  trackEvent('search', { search_term: term, results: Number(results) || 0 })
 }
