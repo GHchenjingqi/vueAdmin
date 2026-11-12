@@ -690,6 +690,30 @@ export interface RecoCtrReport {
   summary: RecoCtrSummary[]
 }
 
+/** 搜索热词看板（admin 运营增强） */
+export interface SearchHotReport {
+  startAt: string
+  endAt: string
+  totalSearches: number
+  zeroResultSearches: number | null
+  zeroResultRate: number | null
+  keywords: { term: string; count: number }[]
+}
+
+/** 搜索转化漏斗看板（admin 运营增强） */
+export interface SearchFunnelReport {
+  startAt: string
+  endAt: string
+  searched: number
+  viewed: number
+  added: number
+  purchased: number
+  viewRate: number
+  addRate: number
+  purchaseRate: number
+  noSessionEvents: number
+}
+
 export const analyticsApi = {
   sales(query?: AnalyticsQuery) {
     return request.get<SalesReport>('/shop/analytics/sales', { params: query })
@@ -702,6 +726,12 @@ export const analyticsApi = {
   },
   recoCtr(query?: { startAt?: string; endAt?: string }) {
     return request.get<RecoCtrReport>('/shop/analytics/reco-ctr', { params: query })
+  },
+  searchHot(query?: { startAt?: string; endAt?: string; limit?: number }) {
+    return request.get<SearchHotReport>('/shop/analytics/search-hot', { params: query })
+  },
+  searchFunnel(query?: { startAt?: string; endAt?: string }) {
+    return request.get<SearchFunnelReport>('/shop/analytics/search-funnel', { params: query })
   },
 }
 
