@@ -7,7 +7,7 @@ import { incCounter } from './monitoringService.js'
 /**
  * 单一启用币种服务（P1-T06 / C1/C7/C8）——后端侧
  *
- * 唯一数据源：settings.optionKey='shop.currency'（JSON CurrencyConfig，迁移 000050 种子 USD）。
+ * 唯一数据源：settings.optionKey='shop.currency'（JSON CurrencyConfig，迁移 20261112_000001 种子 USD）。
  * - 缺失/非法 → fail-closed（SHOP_CURRENCY_CONFIG_MISSING / _INVALID，503），禁止默认 USD 兜底
  * - 进程内缓存 TTL 60s（C8）+ 管理端保存/回滚/定时应用后主动失效
  * - siteContext.defaultCurrency 跟随本服务（缺失时回退站点 credentials 并告警，保证目录可浏览）

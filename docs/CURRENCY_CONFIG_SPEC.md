@@ -9,7 +9,7 @@
 | 存储 | `settings` 表，`optionKey='shop.currency'`，`optionValue` 为 JSON 文本，`autoload=1` |
 | 结构 | `{ code, symbol, decimalDigits, symbolPosition, thousandsSeparator, decimalSeparator, locale }` |
 | 校验 | code ∈ ISO-4217 白名单（USD/CNY/EUR/GBP/CAD/AUD 起步）；decimalDigits 0–4；symbol/locale 缺省取 ISO 元数据 |
-| 当前值 | USD（迁移 20261104_000050 显式种子；显式写入 ≠ 隐式默认） |
+| 当前值 | USD（迁移 `20261112_000001` 幂等种子；显式写入 ≠ 隐式默认）。历史上的 `20261104_000050` 文件已不在仓库，改由该迁移在空库首次部署时补种；已存在该键时不覆盖运营配置 |
 | 定时变更 | `settings.optionKey='shop.currency.pending'` = `{config, changeId, effectiveAt}`，由 sweeper 到点应用 |
 
 ## 2. 读取与缓存（C7/C8）
