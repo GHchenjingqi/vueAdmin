@@ -175,6 +175,45 @@ export interface ImportCommitResult {
   dryRun: boolean
 }
 
+/** 1688 采集预览：单个商品抓取结果 */
+export interface Scrape1688Item {
+  url: string
+  error: string | null
+  product: {
+    slug: string
+    title: string
+    description: string | null
+    cover: string | null
+    images: string[]
+    skus: { spec: Record<string, string>; price: number | null }[]
+    categoryPath: string[] | null
+    imageErrors: { url: string; error: string }[]
+  } | null
+}
+
+/** 1688 采集预览：整体结果 */
+export interface Scrape1688PreviewResult {
+  total: number
+  succeeded: number
+  failed: number
+  items: Scrape1688Item[]
+}
+
+/** 1688 采集入库请求载荷 */
+export interface Scrape1688CommitPayload {
+  items: {
+    url: string
+    title: string
+    description: string | null
+    cover: string | null
+    images: string[]
+    categoryId: number
+    skus: { spec: Record<string, string>; price: number | null }[]
+  }[]
+  fxRate: number
+  currency: string
+}
+
 export type StatusAction = 'submit' | 'withdraw' | 'reject' | 'list' | 'publish' | 'unlist' | 'archive'
 
 export const spuApi = {
@@ -221,6 +260,14 @@ export const spuApi = {
   /** 下载 CSV 导入模板（带鉴权，blob） */
   importTemplate() {
     return request.get<Blob>('/shop/spus/import-template', { responseType: 'blob' })
+  },
+  /** 1688 采集预览（抓取 + 图片转存，不写库） */
+  scrape1688Preview(urls: string[]) {
+    return request.post<Scrape1688PreviewResult>('/shop/spus/scrape-1688/preview', { urls })
+  },
+  /** 1688 采集入库（写库为 draft） */
+  scrape1688Commit(data: Scrape1688CommitPayload) {
+    return request.post<ImportCommitResult>('/shop/spus/scrape-1688/commit', data)
   },
 }
 

@@ -69,6 +69,7 @@ import * as rmaAdminController from '../controllers/rmaAdminController.js'
 import * as reviewAdminController from '../controllers/reviewAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
 import * as productImportController from '../controllers/productImportController.js'
+import * as scrape1688Controller from '../controllers/scrape1688Controller.js'
 import { importMulterErrorHandler } from '../controllers/productImportController.js'
 import * as referralCommissionController from '../controllers/referralCommissionController.js'
 import { updateCurrencySchema, rollbackCurrencySchema, updatePaymentChannelsSchema } from '../../../shared/schemas/storefront-commerce.js'
@@ -122,6 +123,9 @@ router.delete('/attributes/:id', authMiddleware, validate(idParamSchema, 'params
 router.get('/spus/import-template', authMiddleware, productImportController.template)
 router.post('/spus/import/preview', authMiddleware, productImportController.preview, importMulterErrorHandler)
 router.post('/spus/import/commit', authMiddleware, productImportController.commit, importMulterErrorHandler)
+// 1688 采集（preview 抓取+转存图片不写库；commit 写库为 draft）
+router.post('/spus/scrape-1688/preview', authMiddleware, scrape1688Controller.scrapePreview)
+router.post('/spus/scrape-1688/commit', authMiddleware, scrape1688Controller.scrapeCommit)
 router.get('/spus', authMiddleware, spuController.list)
 router.get('/spus/:id', authMiddleware, validate(idParamSchema, 'params'), spuController.detail)
 router.post('/spus', authMiddleware, validate(createSpuSchema), spuController.create)

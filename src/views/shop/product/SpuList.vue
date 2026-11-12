@@ -19,6 +19,9 @@
         <el-button type="success" plain :icon="Upload" @click="router.push('/shop-product-import')">
           {{ t('shop.product.import.title') }}
         </el-button>
+        <el-button type="warning" plain :icon="Download" @click="router.push('/shop-product-scrape-1688')">
+          {{ t('shop.product.scrape1688.title') }}
+        </el-button>
       </template>
 
       <template #column-name="{ row }">
@@ -62,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { Plus, Edit, Delete, Upload } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Upload, Download } from '@element-plus/icons-vue'
 import { publishApi, spuApi, type Spu, type ShopStatus, type StatusAction } from '@/api/shop'
 import { getErrorMessage } from '@/utils/error'
 import ProTable from '@/components/ProTable/index.vue'
