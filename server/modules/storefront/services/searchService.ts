@@ -3,13 +3,15 @@ import { Op } from 'sequelize'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopAnalyticsEvent, ShopSpu } from '../../shop/models/index.js'
 import * as catalogService from './catalogService.js'
+import { canonicalTerm, mergeByCanonical } from './searchSynonymsService.js'
 
 /**
- * Storefront 搜索增强（P6）控制器：关键词纠错建议 + 热搜词 + 无结果兜底。
+ * Storefront 搜索增强（P6 + 二期）控制器：关键词纠错建议 + 热搜词 + 无结果兜底。
  *
  * 纯读、零新表：
  * - 纠错建议：Levenshtein 距离 ≤2 在商品名词表内找最近候选；
- * - 热搜词：聚合 shop_analytics_events 里 search 事件（params.search_term）近 N 天 Top K；
+ * - 热搜词：聚合 shop_analytics_events 里 search 事件（params.search_term）近 N 天 Top K，
+ *   并按同义词表把别名归并到 canonical（二期）；
  * - 无结果兜底：该词确实 0 结果时，回退同分类或全站热门商品。
  */
 
@@ -107,7 +109,10 @@ export async function hotKeywords(req: Request, res: Response): Promise<void> {
     counts.set(term, (counts.get(term) ?? 0) + 1)
   }
 
-  const keywords = [...counts.entries()]
+  // 二期：别名归并到 canonical（bodywave→body wave 等），避免同义热词分散排名
+  const merged = mergeByCanonical(counts.entries())
+
+  const keywords = [...merged.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, limit)
     .map(([term, count]) => ({ term, count }))

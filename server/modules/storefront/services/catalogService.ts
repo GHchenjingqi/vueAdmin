@@ -2,6 +2,7 @@ import { Op, Sequelize } from 'sequelize'
 import { AppError } from '../../../middleware/errorHandler.js'
 import type { StorefrontProductQuery } from '../../../shared/schemas/storefront.js'
 import { getTenantContext } from '../../tenant/context.js'
+import { expandTerm } from './searchSynonymsService.js'
 import {
   ShopBrand,
   ShopCategory,
@@ -192,12 +193,15 @@ export async function listProducts(
   }
 
   // keyword 推入 SQL：JSON_SEARCH 大小写敏感，两侧均 LOWER 以保证不敏感
+  // 二期：同义词 OR 展开（body wave 也命中 bodywave），整词精确别名组，不模糊
   const keyword = typeof params.keyword === 'string' ? params.keyword.trim() : ''
   if (keyword) {
-    const kw = escapeLike(keyword.toLowerCase())
-    where[Op.and] = Sequelize.literal(
-      `(JSON_SEARCH(LOWER(CAST(name AS JSON)),'all','%${kw}%') IS NOT NULL OR JSON_SEARCH(LOWER(CAST(description AS JSON)),'all','%${kw}%') IS NOT NULL)`,
-    )
+    const variants = expandTerm(keyword)
+    const orClauses = variants.map((v) => {
+      const kw = escapeLike(v.toLowerCase())
+      return `(JSON_SEARCH(LOWER(CAST(name AS JSON)),'all','%${kw}%') IS NOT NULL OR JSON_SEARCH(LOWER(CAST(description AS JSON)),'all','%${kw}%') IS NOT NULL)`
+    })
+    where[Op.and] = Sequelize.literal(`(${orClauses.join(' OR ')})`)
   }
 
   const rows = await ShopSpu.findAll({ where, order: [['id', 'DESC']] })
