@@ -416,7 +416,7 @@ Windows 若未把 `mysql` 加 PATH，可用：
 npm run install:all
 ```
 
-该命令会安装 **根目录前端** 与 **server/ 后端** 依赖。
+该命令会依次安装 **根目录前端（admin）**、**server/ 后端** 与 **shops/ 独立站** 三处依赖（`shops/` 使用 `package-lock.json`，用 npm，无需 pnpm）。
 
 ### 5. 初始化表结构与种子数据（两种方式）
 
@@ -447,6 +447,12 @@ npm run dev
 ```
 
 默认管理员：`admin` / `123456`
+
+> **首次启动的商城默认配置**：迁移会幂等种入 `shop.currency`（USD）与 `shop.shipping`（配送范围 / 分区运费），
+> 所以全新空库上 `/api/storefront/v1/store-config`、结算与下单链路可直接工作，**无需手工初始化币种**。
+> 该配置是 fail-closed 的：若被误删，会返回 503 `SHOP_CURRENCY_CONFIG_MISSING`；币种种子迁移也不会覆盖后台已保存的值。
+> 需要切换币种请到后台「商城 → 币种设置」（`/shop-currency`）保存。
+> 商品、分类、Banner、优惠券、支付方式等**业务数据不会自动注入**，需另行准备。
 
 ### 6. 常见失败与处理
 
@@ -584,6 +590,23 @@ npm run dev
 - 访问地址：https://localhost:5173（自签名证书，首次需在浏览器信任）
 
 > 开发模式下，Vite 中间件内嵌在 Express 中，前端代码由 Vite 提供实时编译和 HMR（热模块替换）。
+
+> ⚠️ **后端没有 watch**：`server` 的 `dev` 脚本是 `tsx app.ts`，进程启动后改动后端源码不会生效。
+> 新增路由 / 服务后必须重启 `npm run dev`；否则未挂载的路径可能被 Vite 中间件代理回自身，表现为请求长时间挂起。
+
+### 独立站（shops/）启动
+
+依赖已由 `npm run install:all` 安装，另需单独配置并启动：
+
+```bash
+cd shops
+cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
+npm run dev                   # http://localhost:3000
+```
+
+- 首次联调必须在 `shops/.env` 设置 `NUXT_API_INSECURE_TLS=1`（后端为自签证书时跳过 TLS 校验，**生产严禁设置**）；`NUXT_API_BASE` 默认指向 `https://127.0.0.1:5173`。
+- BFF 数据源在代码中默认为 `auto`（real 优先、网络级失败回退 mock）；模板里的 `NUXT_COMMERCE_SOURCE=mock` 会强制走 mock 数据，接真实后端时改为 `auto` 或 `real`。
+- C 端 dev 只监听 IPv6 `[::1]:3000`，访问 `127.0.0.1:3000` 会连接失败，请使用 `localhost:3000`。
 
 ---
 

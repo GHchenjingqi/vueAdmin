@@ -10,6 +10,8 @@ server/node_modules/
 .env.*.local
 server/.env
 server/.env.*
+# 模板需随代码入库（README 首启步骤依赖它），仅排除真实配置
+!server/.env.example
 server/logs/*.log
 logs/*.log
 *.log
