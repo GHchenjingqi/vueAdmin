@@ -68,6 +68,8 @@ import * as membershipTierController from '../controllers/membershipTierControll
 import * as rmaAdminController from '../controllers/rmaAdminController.js'
 import * as reviewAdminController from '../controllers/reviewAdminController.js'
 import * as auditLogController from '../controllers/auditLogController.js'
+import * as productImportController from '../controllers/productImportController.js'
+import { importMulterErrorHandler } from '../controllers/productImportController.js'
 import * as referralCommissionController from '../controllers/referralCommissionController.js'
 import { updateCurrencySchema, rollbackCurrencySchema, updatePaymentChannelsSchema } from '../../../shared/schemas/storefront-commerce.js'
 
@@ -116,6 +118,10 @@ router.put('/attributes/:id', authMiddleware, validate(idParamSchema, 'params'),
 router.delete('/attributes/:id', authMiddleware, validate(idParamSchema, 'params'), attributeController.remove)
 
 // ==================== SPU（商品） ====================
+// 批量导入（须在 /spus/:id 之前注册，否则 :id 会吞掉 import-template / import 子路径）
+router.get('/spus/import-template', authMiddleware, productImportController.template)
+router.post('/spus/import/preview', authMiddleware, productImportController.preview, importMulterErrorHandler)
+router.post('/spus/import/commit', authMiddleware, productImportController.commit, importMulterErrorHandler)
 router.get('/spus', authMiddleware, spuController.list)
 router.get('/spus/:id', authMiddleware, validate(idParamSchema, 'params'), spuController.detail)
 router.post('/spus', authMiddleware, validate(createSpuSchema), spuController.create)
