@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { mockStore } from '@shared/mock/store'
 import { MOCK_BLOG_POSTS, MOCK_REVIEWS, MOCK_BANNERS, MOCK_PRODUCTS, MOCK_FAQS } from '@shared/mock/fixtures'
 import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
@@ -53,12 +54,15 @@ export default defineEventHandler(async (event) => {
       cookie,
       authorization,
       requestId: event.context.requestId as string | undefined,
+      locale, // P2-7：扩展域（reviews/qa/rma/coupons…）透传语言，避免真实后台回落默认语言
     })
     console.log(`[ext] ${method} ${url} -> status=${res.status} networkError=${res.networkError} body=${JSON.stringify(res.body)?.slice(0, 140)}`)
     // P4-T07：reviews 在 auto 网络级失败时回退 mock（与 cart 一致），保证本地演示可见评论/验证购买标记
     if (url.startsWith('reviews') && res.networkError && source === 'auto') {
       return mockHandle(url, method, event, locale)
     }
+    // P2-8：网络级失败（status=0）一律 502，不伪装成 200 假成功；4xx 业务错误仍原样透传
+    if (res.networkError) return upstreamFail(event, res)
     setResponseStatus(event, res.status)
     return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'ext upstream error' })
   }
@@ -180,7 +184,13 @@ async function handleReal(
     const res = await commerceRealFetch('checkout/orders', {
       method: 'POST',
       body: {
-        idempotencyKey: body.idempotencyKey ?? crypto.randomUUID(),
+        // P2-5：客户端未传幂等键时，用下单要素的内容哈希兜底（同请求重试内容一致→同一键→后端去重），
+        // 避免此前 randomUUID 兜底导致重试生成新键、可能重复下单/占库存占券
+        idempotencyKey:
+          body.idempotencyKey ??
+          createHash('sha256')
+            .update(JSON.stringify({ cartToken, email: body.email, address: body.address, note: body.note, attribution: body.attribution }))
+            .digest('hex'),
         email: body.email,
         shippingAddress: body.address,
         note: body.note,
