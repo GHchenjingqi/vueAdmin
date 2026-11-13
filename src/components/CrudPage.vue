@@ -113,7 +113,9 @@ async function handleExport(): Promise<void> {
   if (props.onExport) {
     await props.onExport()
   } else if (props.api.export) {
-    const blob = await props.api.export({ ...crud.searchParams })
+    const result = await props.api.export({ ...crud.searchParams })
+    // 拦截器对 blob 响应已将真实文件置于 res.data，此处取 .data 得到 Blob
+    const blob = (result as { data?: Blob }).data ?? (result as unknown as Blob)
     downloadBlob(new Blob([blob]), `${props.title}.xlsx`)
   }
 }

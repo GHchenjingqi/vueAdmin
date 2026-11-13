@@ -149,7 +149,10 @@ function performLogout(message?: string): void {
   try {
     setAccessToken(null)
     isRefreshing = false
+    // 清空刷新队列前，让仍在排队的请求以「登录失效」失败，避免 Promise 永久挂起（按钮 loading 不结束）
+    const queue = pendingRequests
     pendingRequests = []
+    queue.forEach((cb) => cb(null))
   } catch {
     // 重置刷新队列状态失败，忽略
   }
@@ -175,12 +178,10 @@ export { performLogout }
 
 const responseFulfilled = (response: AxiosResponse<ApiResponse | Blob>): AxiosResponse<ApiResponse> | ApiResponse => {
   doneProgress()
-  // blob 类型直接返回（文件下载场景），构造一个符合 ApiResponse 结构的结果
+  // blob 类型：与 JSON 路径保持一致，返回的 data 直接是业务载荷（真实 Blob），
+  // 消费方用 res.data 即可拿到文件，无需再解包一层信封（此前包成 {code,data:blob} 导致导出文件损坏）。
   if (response.config.responseType === 'blob') {
-    return {
-      ...response,
-      data: { code: 0, data: response.data as unknown, message: 'ok' },
-    } as AxiosResponse<ApiResponse>
+    return { code: 0, data: response.data as unknown, message: 'ok' }
   }
   const res = response.data as ApiResponse
 

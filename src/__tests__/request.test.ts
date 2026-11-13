@@ -238,11 +238,11 @@ describe('request.ts - 响应拦截器（成功分支）', () => {
     expect(setCache).toHaveBeenCalled()
   })
 
-  it('blob 响应类型包裹为 code 0 结构', async () => {
+  it('blob 响应类型直接解包为真实 Blob（data 即文件本身，无需再解包信封）', async () => {
     const blob = new Blob(['x'])
     const res: any = await handlers.response.fulfilled(baseResponse({ config: { method: 'get', url: '/d', responseType: 'blob' }, data: blob }))
-    expect(res.data.code).toBe(0)
-    expect(res.data.data).toBe(blob)
+    expect(res.code).toBe(0)
+    expect(res.data).toBe(blob)
     expect(setCache).not.toHaveBeenCalled()
   })
 
