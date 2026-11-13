@@ -54,13 +54,14 @@ export async function createManualOrder(input: CreateOrderInput): Promise<ShopOr
   if (!shop) throw new AppError(400, '店铺不存在')
   if (shop.channelId !== input.channelId) throw new AppError(400, '店铺不属于该渠道')
 
-  // 预校验 SKU 合法 + 计算金额
-  let amount = 0
+  // 预校验 SKU 合法 + 以「分」为整数计算金额，避免浮点累加误差（如 13.33*3=39.98 而非 39.99）
+  let amountCents = 0
   for (const item of input.items) {
     const sku = await ShopSku.findOne({ where: { id: item.skuId, tenantId: tId } })
     if (!sku) throw new AppError(400, `SKU ${item.skuId} 不存在`)
-    amount += Number(item.price) * item.qty
+    amountCents += Math.round(Number(item.price) * 100) * item.qty
   }
+  const amount = Number((amountCents / 100).toFixed(2))
 
   const orderNo = genOrderNo()
   return sequelize.transaction(async (t) => {
@@ -71,6 +72,8 @@ export async function createManualOrder(input: CreateOrderInput): Promise<ShopOr
       buyer: input.buyer,
       currency: input.currency,
       amount,
+      amountCents,
+      subtotalCents: amountCents,
       status: 'created',
       tenantId: tId,
     } as never, { transaction: t })

@@ -87,4 +87,11 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
   process.exit(1)
 }
 
+// P1：生产环境必须设置自定义 PAYMENT_WEBHOOK_SECRET，否则 mock 等通道的回调验签
+// 会回退到硬编码默认密钥；攻击者可据此伪造「支付成功」回调把订单标记为已支付，造成资损。
+if (process.env.NODE_ENV === 'production' && (!process.env.PAYMENT_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET === 'storefront_mock_webhook_secret')) {
+  console.error('FATAL: 生产环境必须设置自定义 PAYMENT_WEBHOOK_SECRET 环境变量！')
+  process.exit(1)
+}
+
 export default config

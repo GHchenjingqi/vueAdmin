@@ -41,7 +41,7 @@ async function paidOrder(): Promise<{ id: number; orderNo: string; amountCents: 
   return { id: order.id, orderNo: order.orderNo, amountCents: order.amountCents }
 }
 
-async function makeRma(orderId: number, status: string): Promise<ShopRmaRequest> {
+async function makeRma(orderId: number, status: string, refundAmountCents = 0): Promise<ShopRmaRequest> {
   return ShopRmaRequest.create({
     tenantId: TID,
     siteId: 1,
@@ -50,7 +50,7 @@ async function makeRma(orderId: number, status: string): Promise<ShopRmaRequest>
     email: 'rma-link@example.com',
     status,
     items: null,
-    refundAmountCents: 0,
+    refundAmountCents,
     refundCurrency: 'USD',
   } as never)
 }
@@ -87,7 +87,7 @@ describe('RMA↔refund 联动', () => {
   it('退款成功后 RMA(returned) → refunded', async () => {
     await inTenant(async () => {
       const order = await paidOrder()
-      const rma = await makeRma(order.id, 'returned')
+      const rma = await makeRma(order.id, 'returned', order.amountCents)
       await refundService.createRefund({ orderId: order.id, amountCents: order.amountCents, rmaId: rma.id })
       expect(await rmaStatus(rma.id)).toBe('refunded')
     })
@@ -96,7 +96,7 @@ describe('RMA↔refund 联动', () => {
   it('退款成功后 RMA(approved) 亦可驱动为 refunded', async () => {
     await inTenant(async () => {
       const order = await paidOrder()
-      const rma = await makeRma(order.id, 'approved')
+      const rma = await makeRma(order.id, 'approved', order.amountCents)
       await refundService.createRefund({ orderId: order.id, amountCents: order.amountCents, rmaId: rma.id })
       expect(await rmaStatus(rma.id)).toBe('refunded')
     })
@@ -105,7 +105,7 @@ describe('RMA↔refund 联动', () => {
   it('幂等重放（同 idempotencyKey）不重复、RMA 保持 refunded', async () => {
     await inTenant(async () => {
       const order = await paidOrder()
-      const rma = await makeRma(order.id, 'returned')
+      const rma = await makeRma(order.id, 'returned', order.amountCents)
       const key = 'idem-' + Date.now() + '-' + Math.floor(Math.random() * 1e6)
       await refundService.createRefund({ orderId: order.id, amountCents: order.amountCents, rmaId: rma.id, idempotencyKey: key })
       await refundService.createRefund({ orderId: order.id, amountCents: order.amountCents, rmaId: rma.id, idempotencyKey: key })
@@ -116,7 +116,7 @@ describe('RMA↔refund 联动', () => {
   it('RMA(pending) 退款成功但保持 pending（不强行置 refunded）', async () => {
     await inTenant(async () => {
       const order = await paidOrder()
-      const rma = await makeRma(order.id, 'pending')
+      const rma = await makeRma(order.id, 'pending', order.amountCents)
       await refundService.createRefund({ orderId: order.id, amountCents: order.amountCents, rmaId: rma.id })
       expect(await rmaStatus(rma.id)).toBe('pending')
     })
@@ -125,9 +125,22 @@ describe('RMA↔refund 联动', () => {
   it('RMA 已是 refunded：退款成功且为 no-op', async () => {
     await inTenant(async () => {
       const order = await paidOrder()
-      const rma = await makeRma(order.id, 'refunded')
+      const rma = await makeRma(order.id, 'refunded', order.amountCents)
       await refundService.createRefund({ orderId: order.id, amountCents: order.amountCents, rmaId: rma.id })
       expect(await rmaStatus(rma.id)).toBe('refunded')
+    })
+  })
+
+  it('关联 RMA 退款金额超过售后审批额度被拒（防超额退款）', async () => {
+    await inTenant(async () => {
+      const order = await paidOrder()
+      // RMA 仅审批退半单
+      const rma = await makeRma(order.id, 'approved', Math.floor(order.amountCents / 2))
+      await expect(
+        refundService.createRefund({ orderId: order.id, amountCents: order.amountCents, rmaId: rma.id }),
+      ).rejects.toThrow(/REFUND_EXCEEDS_RMA/)
+      // RMA 未被驱动为 refunded
+      expect(await rmaStatus(rma.id)).toBe('approved')
     })
   })
 
@@ -135,7 +148,7 @@ describe('RMA↔refund 联动', () => {
     await inTenant(async () => {
       const orderA = await paidOrder()
       const orderB = await paidOrder()
-      const rmaB = await makeRma(orderB.id, 'returned')
+      const rmaB = await makeRma(orderB.id, 'returned', orderB.amountCents)
       // 对 orderA 退款却携带 orderB 的 rmaId → 同单校验拦截，RMA 不变
       await refundService.createRefund({ orderId: orderA.id, amountCents: orderA.amountCents, rmaId: rmaB.id })
       expect(await rmaStatus(rmaB.id)).toBe('returned')

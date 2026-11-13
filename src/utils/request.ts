@@ -14,7 +14,7 @@
  */
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type AxiosError } from 'axios'
 import type { ApiResponse } from '@/types/response'
-import { getCache, setCache, invalidateByUrl, buildGetCacheKey } from './requestCache'
+import { getCache, setCache, invalidateByUrl, buildGetCacheKey, clearAll } from './requestCache'
 import { startProgress, doneProgress } from './nprogress'
 import { createAppError, AppError } from './errors'
 
@@ -149,6 +149,8 @@ function performLogout(message?: string): void {
   try {
     setAccessToken(null)
     isRefreshing = false
+    // 清空请求缓存：登出后同浏览器下一账号不应命中上一账号的 GET 缓存（跨用户数据泄漏）
+    clearAll()
     // 清空刷新队列前，让仍在排队的请求以「登录失效」失败，避免 Promise 永久挂起（按钮 loading 不结束）
     const queue = pendingRequests
     pendingRequests = []

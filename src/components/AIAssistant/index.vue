@@ -466,10 +466,78 @@ marked.setOptions({
 
 function renderMarkdown(text: string): string {
   try {
-    return marked.parse(text) as string
+    return sanitizeHtml(marked.parse(text) as string)
   } catch {
     return text
   }
+}
+
+/**
+ * 白名单净化 markdown 渲染后的 HTML，防止 AI 返回内容中的脚本 / 事件处理器造成 DOM XSS。
+ * 仅浏览器环境执行；非 DOM 环境（如 SSR / 测试）直接返回原文。
+ */
+const ALLOWED_TAGS = new Set([
+  'P',
+  'BR',
+  'STRONG',
+  'EM',
+  'B',
+  'I',
+  'U',
+  'S',
+  'CODE',
+  'PRE',
+  'UL',
+  'OL',
+  'LI',
+  'A',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'BLOCKQUOTE',
+  'TABLE',
+  'THEAD',
+  'TBODY',
+  'TR',
+  'TD',
+  'TH',
+  'HR',
+  'SPAN',
+  'DIV',
+  'IMG',
+  'DEL',
+  'INS',
+  'SUB',
+  'SUP',
+])
+const ALLOWED_ATTRS = new Set(['HREF', 'TITLE', 'TARGET', 'REL', 'SRC', 'ALT', 'CLASS'])
+function sanitizeHtml(html: string): string {
+  if (typeof window === 'undefined' || !window.DOMParser) return html
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const walk = (node: Element): void => {
+    for (const child of Array.from(node.children)) {
+      if (!ALLOWED_TAGS.has(child.tagName)) {
+        child.replaceWith(document.createTextNode(child.textContent || ''))
+        continue
+      }
+      for (const attr of Array.from(child.attributes)) {
+        const name = attr.name.toUpperCase()
+        const value = attr.value
+        const dangerous =
+          !ALLOWED_ATTRS.has(name) || (name === 'HREF' && /^\s*javascript:/i.test(value)) || (name === 'SRC' && /^\s*(javascript:|data:)/i.test(value))
+        if (dangerous) child.removeAttribute(attr.name)
+      }
+      if (child.tagName === 'A' && child.getAttribute('target') === '_blank') {
+        child.setAttribute('rel', 'noopener noreferrer')
+      }
+      walk(child)
+    }
+  }
+  walk(doc.body)
+  return doc.body.innerHTML
 }
 
 function highlightCode(code: string, language?: string): string {

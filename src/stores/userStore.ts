@@ -8,6 +8,7 @@
  * - 替代 localStorage 直接读写模式
  */
 import { setAccessToken, getAccessToken } from '@/utils/request'
+import { clearAll as clearRequestCache } from '@/utils/requestCache'
 import type { User } from '@/types/api'
 import { useNotificationStore } from './notificationStore'
 
@@ -56,6 +57,9 @@ export const useUserStore = defineStore('user', () => {
     token.value = null
     setAccessToken(null)
     clearUserFromStorage()
+    // 清空请求缓存：GET 缓存 key 不含用户维度，不清会导致同浏览器下一账号命中上一账号的
+    // 缓存响应，造成跨用户数据泄漏（机密性缺陷）。
+    clearRequestCache()
     passwordResetRequired.value = false
     try {
       useNotificationStore().reset()

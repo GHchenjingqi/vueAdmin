@@ -155,12 +155,31 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
           const remaining = paidCents - alreadyRefunded
           if (remaining <= 0) throw new AppError(400, 'REFUND_EXCEEDS_PAID: 订单已全额退款')
 
-          const amountCents = params.amountCents ?? remaining
+          // 关联 RMA 退款：加载本单的售后单（approved/returned）并约束退款金额不超过其审批额度；
+          // 杜绝管理员对仅审批退半单的 RMA 签发整单金额退款，亦防止用失效/伪造 rmaId 放大退款。
+          // rmaId 不属本单时（含越权/状态不符）不加载，保持原「退款照常、RMA 不驱动」行为。
+          let rmaRefundCents: number | null = null
+          if (params.rmaId != null) {
+            const rma = await ShopRmaRequest.findOne({
+              where: { id: params.rmaId, tenantId: tId, orderId: params.orderId, status: { [Op.in]: ['approved', 'returned'] } } as never,
+              transaction: tx,
+            })
+            if (rma) rmaRefundCents = Number(rma.refundAmountCents)
+          }
+
+          let amountCents = params.amountCents ?? remaining
+          if (rmaRefundCents != null && params.amountCents == null) {
+            // 关联 RMA 的退款默认取售后审批额度，避免整单金额被退
+            amountCents = rmaRefundCents
+          }
           if (!Number.isInteger(amountCents) || amountCents <= 0) {
             throw new AppError(400, 'REFUND_INVALID_AMOUNT: 退款金额须为正整数分')
           }
           if (amountCents > remaining) {
             throw new AppError(400, `REFUND_EXCEEDS_PAID: 最多可退 ${remaining} 分`)
+          }
+          if (rmaRefundCents != null && amountCents > rmaRefundCents) {
+            throw new AppError(400, `REFUND_EXCEEDS_RMA: 退款金额超出售后审批额度 ${rmaRefundCents} 分`)
           }
 
           let providerRef: string | null = null
