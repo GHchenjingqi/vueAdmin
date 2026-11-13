@@ -3,6 +3,7 @@ import sequelize from '../config/database.js'
 
 class Message extends Model<InferAttributes<Message>, InferCreationAttributes<Message>> {
   declare id: CreationOptional<number>
+  declare tenantId: CreationOptional<number>
   declare fromUserId: number | null
   declare toUserId: number | null
   declare title: string
@@ -21,6 +22,12 @@ Message.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     fromUserId: {
       type: DataTypes.INTEGER.UNSIGNED,

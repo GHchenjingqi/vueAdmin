@@ -3,6 +3,7 @@ import sequelize from '../config/database.js'
 
 class Department extends Model<InferAttributes<Department>, InferCreationAttributes<Department>> {
   declare id: CreationOptional<number>
+  declare tenantId: CreationOptional<number>
   declare parentId: number
   declare name: string
   declare sort: CreationOptional<number>
@@ -21,6 +22,12 @@ Department.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     parentId: {
       type: DataTypes.INTEGER.UNSIGNED,
