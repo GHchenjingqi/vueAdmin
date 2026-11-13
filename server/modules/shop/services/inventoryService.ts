@@ -124,39 +124,38 @@ export async function occupy(skuId: number, qty: number, ref: string): Promise<v
   await auditLogService.record({ actorType: 'system', action: 'inventory.reserved', entityType: 'inventory', entityId: skuId, afterState: { qty, ref } })
 }
 
-/** 释放占用（取消订单时） */
-export async function release(skuId: number, qty: number, ref: string): Promise<void> {
+/** 释放占用（取消订单时）；可传入外部事务以加入调用方事务边界，保证原子性 */
+export async function release(skuId: number, qty: number, ref: string, transaction?: Transaction): Promise<void> {
   if (qty <= 0) throw new AppError(400, '释放数量必须大于 0')
   const tId = tid()
-  await withDeadlockRetry(() =>
-    sequelize.transaction(async (t) => {
-      // 固定加锁顺序（主键升序）：避免不同事务以相反顺序锁同一组仓行而互等死锁
-      const rows = await ShopInventory.findAll({
-        where: { skuId, tenantId: tId },
-        order: [['id', 'ASC']],
-        transaction: t,
-        lock: t.LOCK.UPDATE,
-      } as any)
-      let remain = qty
-      for (const r of rows) {
-        if (remain <= 0) break
-        const give = Math.min(r.locked, remain)
-        if (give <= 0) continue
-        await r.update({ locked: r.locked - give }, { transaction: t })
-        await ShopInventoryLog.create({
-          skuId,
-          warehouseId: r.warehouseId,
-          delta: -give,
-          type: 'unlock',
-          ref,
-          tenantId: tId,
-        } as never, { transaction: t })
-        remain -= give
-      }
-    }),
-  )
-  // X-T03：审计库存释放（system 事件，不阻断主流程）
-  await auditLogService.record({ actorType: 'system', action: 'inventory.released', entityType: 'inventory', entityId: skuId, afterState: { qty, ref } })
+  const run = async (t: Transaction) => {
+    // 固定加锁顺序（主键升序）：避免不同事务以相反顺序锁同一组仓行而互等死锁
+    const rows = await ShopInventory.findAll({
+      where: { skuId, tenantId: tId },
+      order: [['id', 'ASC']],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    } as any)
+    let remain = qty
+    for (const r of rows) {
+      if (remain <= 0) break
+      const give = Math.min(r.locked, remain)
+      if (give <= 0) continue
+      await r.update({ locked: r.locked - give }, { transaction: t })
+      await ShopInventoryLog.create({
+        skuId,
+        warehouseId: r.warehouseId,
+        delta: -give,
+        type: 'unlock',
+        ref,
+        tenantId: tId,
+      } as never, { transaction: t })
+      remain -= give
+    }
+  }
+  // 传入外部事务时直接复用，不再开新事务（避免嵌套）；否则独立事务 + 死锁重试
+  if (transaction) return run(transaction)
+  return withDeadlockRetry(() => sequelize.transaction(run))
 }
 
 /** 跨仓聚合可用量 */
@@ -165,38 +164,38 @@ export async function available(skuId: number): Promise<number> {
   return rows.reduce((sum, r) => sum + (r.quantity - r.locked), 0)
 }
 
-/** 实际扣减在库量（发货时调用，与 release 配套：release 解锁，deduct 出账） */
-export async function deduct(skuId: number, qty: number, ref: string): Promise<void> {
+/** 实际扣减在库量（发货时调用，与 release 配套：release 解锁，deduct 出账）；可传入外部事务加入调用方事务边界 */
+export async function deduct(skuId: number, qty: number, ref: string, transaction?: Transaction): Promise<void> {
   if (qty <= 0) throw new AppError(400, '扣减数量必须大于 0')
   const tId = tid()
-  await withDeadlockRetry(() =>
-    sequelize.transaction(async (t) => {
-      // 固定加锁顺序（主键升序）：避免不同事务以相反顺序锁同一组仓行而互等死锁
-      const rows = await ShopInventory.findAll({
-        where: { skuId, tenantId: tId },
-        order: [['id', 'ASC']],
-        transaction: t,
-        lock: t.LOCK.UPDATE,
-      } as any)
-      let remain = qty
-      for (const r of rows) {
-        if (remain <= 0) break
-        const take = Math.min(r.quantity, remain)
-        if (take <= 0) continue
-        await r.update({ quantity: r.quantity - take }, { transaction: t })
-        await ShopInventoryLog.create({
-          skuId,
-          warehouseId: r.warehouseId,
-          delta: -take,
-          type: 'out',
-          ref,
-          tenantId: tId,
-        } as never, { transaction: t })
-        remain -= take
-      }
-      if (remain > 0) throw new AppError(400, `库存不足，无法扣减（缺口 ${remain}）`)
-    }),
-  )
+  const run = async (t: Transaction) => {
+    // 固定加锁顺序（主键升序）：避免不同事务以相反顺序锁同一组仓行而互等死锁
+    const rows = await ShopInventory.findAll({
+      where: { skuId, tenantId: tId },
+      order: [['id', 'ASC']],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    } as any)
+    let remain = qty
+    for (const r of rows) {
+      if (remain <= 0) break
+      const take = Math.min(r.quantity, remain)
+      if (take <= 0) continue
+      await r.update({ quantity: r.quantity - take }, { transaction: t })
+      await ShopInventoryLog.create({
+        skuId,
+        warehouseId: r.warehouseId,
+        delta: -take,
+        type: 'out',
+        ref,
+        tenantId: tId,
+      } as never, { transaction: t })
+      remain -= take
+    }
+    if (remain > 0) throw new AppError(400, `库存不足，无法扣减（缺口 ${remain}）`)
+  }
+  if (transaction) return run(transaction)
+  return withDeadlockRetry(() => sequelize.transaction(run))
 }
 
 

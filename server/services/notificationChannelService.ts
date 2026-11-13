@@ -63,7 +63,8 @@ function maskConfig(cfg: ChannelConfig): ChannelConfig {
 
 /** 编辑时提交脱敏占位符表示「不修改原密钥」 */
 function mergeSecrets(next: ChannelConfig, prev: ChannelConfig): ChannelConfig {
-  const out: ChannelConfig = { ...next }
+  // 先继承旧配置的全部字段，再叠加本次提交，避免「部分更新漏传密钥字段」时整列覆盖导致已存密钥丢失
+  const out: ChannelConfig = { ...prev, ...next }
   for (const key of SECRET_KEYS) {
     if (out[key] === MASK) {
       if (prev[key] !== undefined) out[key] = prev[key]

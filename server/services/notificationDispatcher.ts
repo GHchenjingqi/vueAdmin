@@ -66,7 +66,9 @@ export function resetDeliveries(): void {
  * 返回各渠道投递汇总；调用方可据此记录结果。
  */
 export async function dispatchNotification(input: NotifyEventInput): Promise<DispatchResult> {
-  const key = `${input.event}|${input.subject ?? ''}|${input.userId ?? 0}`
+  const tenantId = getTenantContext()?.tenantId ?? 1
+  // 冷却键必须含租户维度：否则多租户下，租户 A 的运维告警会把 5 分钟内租户 B 同事件/同 subject 的告警判为 skipped 吞掉
+  const key = `${tenantId}|${input.event}|${input.subject ?? ''}|${input.userId ?? 0}`
   const cooldown = input.cooldownMs ?? DEFAULT_COOLDOWN_MS
   const now = Date.now()
   if (cooldown > 0 && now - (lastSentAt.get(key) ?? 0) < cooldown) {
@@ -74,7 +76,6 @@ export async function dispatchNotification(input: NotifyEventInput): Promise<Dis
   }
   lastSentAt.set(key, now)
 
-  const tenantId = getTenantContext()?.tenantId ?? 1
   const rows = await NotificationChannel.findAll({
     where: { tenantId, enabled: true },
     order: [['id', 'ASC']],

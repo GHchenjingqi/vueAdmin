@@ -139,8 +139,10 @@ export async function ship(id: number, input: ShipOrderInput): Promise<ShopOrder
     const trackingNo = input.trackingNo || logistics.trackingNo
 
     for (const item of items) {
-      await inventoryService.release(item.skuId, item.qty, order.orderNo)
-      await inventoryService.deduct(item.skuId, item.qty, order.orderNo)
+      // 传入订单事务 t，使「释放占用 + 实际扣减 + 建运单 + 置发货」在同一事务内原子提交；
+      // 否则 deduct 各自独立提交，建运单/置发货失败回滚时库存已被永久扣减（账实不一致）。
+      await inventoryService.release(item.skuId, item.qty, order.orderNo, t)
+      await inventoryService.deduct(item.skuId, item.qty, order.orderNo, t)
     }
     await ShopOrderShipment.create({
       orderId: id,

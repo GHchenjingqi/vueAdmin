@@ -32,9 +32,14 @@ const tid = (): number => getTenantContext()?.tenantId ?? 1
  * 否则「券已退但订单仍可支付」会让同一张限量券被无限复用。
  */
 const TERMINAL_ORDER_STATUSES = new Set<ShopOrder['status']>(['cancelled'])
+// 已支付/退款中/已退款的订单不得再建支付会话，否则已退款单可被二次扣款（资损）
+const NON_PAYABLE_PAYMENT_STATUSES = new Set(['captured', 'refunding', 'refunded'])
 function assertOrderPayable(order: ShopOrder): void {
   if (TERMINAL_ORDER_STATUSES.has(order.status)) {
     throw new AppError(409, '订单已关闭，无法发起支付')
+  }
+  if (NON_PAYABLE_PAYMENT_STATUSES.has(order.paymentStatus)) {
+    throw new AppError(409, '订单已支付或已退款，无法发起支付')
   }
 }
 
@@ -67,7 +72,6 @@ export async function createSession(site: StorefrontSite, orderId: number, reque
   const order = await ShopOrder.findOne({ where: { id: orderId, tenantId: tId } })
   if (!order) throw new AppError(404, '订单不存在')
   assertOrderPayable(order)
-  if (order.paymentStatus === 'captured') throw new AppError(409, '订单已支付')
 
   // T-08：地址不在配送范围的订单不得进入支付（不能创建可支付订单）
   const country = extractCountry(order.shippingAddress)
