@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { slugify, makeSlug, inferImageExt } from '../modules/shop/utils/scrape1688.js'
+import { normalizeImageUrl } from '../modules/shop/services/scrape1688Service.js'
 
 describe('slugify', () => {
   it('英文标题转小写连字符串', () => {
@@ -75,5 +76,21 @@ describe('inferImageExt', () => {
 
   it('白名单外扩展名默认 jpg', () => {
     expect(inferImageExt('https://cbu01.alicdn.com/img/abc.svg')).toBe('.jpg')
+  })
+})
+
+describe('normalizeImageUrl', () => {
+  it('xxx.jpg_.webp 归一化为 xxx.jpg（1688 CDN 转码后缀）', () => {
+    expect(normalizeImageUrl('https://cbu01.alicdn.com/img/ibank/O1CN01WfQUoz_!!x-0-cib.jpg_.webp')).toBe(
+      'https://cbu01.alicdn.com/img/ibank/O1CN01WfQUoz_!!x-0-cib.jpg',
+    )
+  })
+
+  it('普通 URL 不变', () => {
+    expect(normalizeImageUrl('https://cbu01.alicdn.com/img/ibank/x.jpg')).toBe('https://cbu01.alicdn.com/img/ibank/x.jpg')
+  })
+
+  it('无点的 _webp 后缀不误伤', () => {
+    expect(normalizeImageUrl('https://x.com/a.png_webp')).toBe('https://x.com/a.png_webp')
   })
 })
