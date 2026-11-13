@@ -94,4 +94,12 @@ if (process.env.NODE_ENV === 'production' && (!process.env.PAYMENT_WEBHOOK_SECRE
   process.exit(1)
 }
 
+// P1：生产环境必须设置自定义 JWT_CUSTOMER_SECRET，否则顾客 JWT 会回退到硬编码默认密钥；
+// 任何知道默认值的人可伪造顾客令牌（sub/tenantId 任意），冒充任意顾客访问其订单、
+// 购物车、积分与地址（顾客令牌与 admin 令牌虽用不同密钥，但默认值是公开可猜的）。
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_CUSTOMER_SECRET || process.env.JWT_CUSTOMER_SECRET === 'storefront_customer_secret_key_2024')) {
+  console.error('FATAL: 生产环境必须设置自定义 JWT_CUSTOMER_SECRET 环境变量！请在 .env 文件中配置。')
+  process.exit(1)
+}
+
 export default config

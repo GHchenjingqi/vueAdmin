@@ -384,7 +384,8 @@ describe('阶段5：Storefront 顾客认证（步骤 3）', () => {
 
       const req: any = { headers: { authorization: `Bearer ${token}` } }
       const nextOk = (err?: unknown) => { if (err) throw err }
-      customerAuth(req, {} as any, nextOk as any)
+      // customerAuth 为异步中间件（需实时校验账号状态），故须 await
+      await customerAuth(req, {} as any, nextOk as any)
       expect(req.customer?.customerId).toBe(customer.id)
       expect(req.customer?.tenantId).toBe(TID)
 
@@ -392,7 +393,7 @@ describe('阶段5：Storefront 顾客认证（步骤 3）', () => {
       const adminToken = jwt.sign({ id: 1, username: 'admin', type: 'admin' }, config.jwt.secret)
       const reqBad: any = { headers: { authorization: `Bearer ${adminToken}` } }
       const rejectNext = (err?: unknown) => { if (err) throw err }
-      expect(() => customerAuth(reqBad, {} as any, rejectNext as any)).toThrow()
+      await expect(customerAuth(reqBad, {} as any, rejectNext as any)).rejects.toThrow()
     })
   })
 })

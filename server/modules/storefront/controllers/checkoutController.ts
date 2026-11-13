@@ -28,8 +28,19 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
   try {
     const site = getSite(res)
     const body = req.body as CreateOrderInput
-    // 登录态下以顾客身份归属（未被显式传入时）
-    const customerId = body.customerId ?? req.customer?.customerId
+    /**
+     * 订单归属一律以认证身份为准，**忽略请求体传入的 customerId**。
+     *
+     * 安全整改：原实现为 `body.customerId ?? req.customer?.customerId`，
+     * 请求体优先且无任何校验。POST /checkout/orders 挂 optionalCustomerAuth
+     * （游客可调），故任意调用方可指定他人 customerId 建单，导致：
+     *  - 冒用他人身份：套用他人会员折扣、消耗他人积分抵扣（服务端按该 customerId
+     *    钳制余额并在 captured 时扣减），订单归属他人（buyer.customerId）；
+     *  - 积分发放/返佣记到他人名下。
+     * 其余 storefront 控制器（地址/购物车/会员/返佣/评价/RMA）均以
+     * req.customer.customerId 为唯一来源，此处此前属遗漏。
+     */
+    const customerId = req.customer?.customerId
     const data = await checkoutService.createOrder(site, {
       idempotencyKey: body.idempotencyKey,
       email: body.email,

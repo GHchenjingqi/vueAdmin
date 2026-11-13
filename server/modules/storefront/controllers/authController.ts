@@ -35,6 +35,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       tenantId: site.tenantId,
       email: body.email,
       password: body.password,
+      // 登录失败限流的 IP 维度（req.socket 在部分非标准适配器下可能缺失）
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || '',
     })
     // P3-T03：登录后合并游客购物车（前端在后续请求用返回的 cartToken 替换本地购物车 cookie）
     const merged = await cartService.mergeCartOnLogin(site, result.customer.id, body.cartToken)

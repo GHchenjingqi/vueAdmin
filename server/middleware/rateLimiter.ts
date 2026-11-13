@@ -71,3 +71,23 @@ export async function checkKeyedRateLimit(key: string, windowMs: number, maxAtte
   if (result.allowed) await store.record(key, windowMs)
   return result
 }
+
+/**
+ * 通用按键「失败计数」限流：check 只读不计数，需显式调用 recordKeyedAttempt 记失败。
+ *
+ * 用于「只有失败才计数」的场景（如 C 端顾客登录：成功登录不应占用额度），
+ * 与 checkKeyedRateLimit（每次调用即计数）语义区分。
+ */
+export async function checkKeyedAttempts(key: string, windowMs: number, maxAttempts: number): Promise<CheckResult> {
+  return store.check(key, windowMs, maxAttempts)
+}
+
+/** 记一次失败（配合 checkKeyedAttempts 使用） */
+export async function recordKeyedAttempt(key: string, windowMs: number): Promise<void> {
+  await store.record(key, windowMs)
+}
+
+/** 清除失败计数（成功后调用） */
+export async function clearKeyedAttempts(key: string): Promise<void> {
+  await store.clear(key)
+}

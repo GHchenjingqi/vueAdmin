@@ -221,7 +221,17 @@ export async function createQuote(
     if (customer?.membershipTierId) {
       const tier = await ShopMembershipTier.findOne({ where: { id: customer.membershipTierId, tenantId: tId } })
       if (tier && tier.discountPct > 0 && tier.discountPct < 100) {
-        tierDiscountCents = Math.round((subtotalCents * (100 - tier.discountPct)) / 100)
+        // 会员折与券折同为「商品级」优惠，二者叠加不得超过商品小计：
+        // 否则券抵满小计后会员折会继续从「小计 + 运费 + 税费」中扣减，
+        // 把运费/税费一并吃掉（与本注释「不含运费/税费」的语义相悖，商家少收运费成本）。
+        // 例：商品 100 元 + 100 元券 + 95 折会员 + 运费 20 元
+        //   修复前应付 = 100 + 20 - 100 - 5 = 15 元（运费被吃 5 元）
+        //   修复后应付 = 100 + 20 - 100 - 0  = 20 元（券抵满商品，运费照收）
+        const tierDiscountRoom = Math.max(0, subtotalCents - couponDiscountCents)
+        tierDiscountCents = Math.min(
+          Math.round((subtotalCents * (100 - tier.discountPct)) / 100),
+          tierDiscountRoom,
+        )
         tierName = tier.name
       }
     }

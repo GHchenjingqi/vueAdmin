@@ -2,9 +2,14 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import config from '../../../config/index.js'
 import { AppError } from '../../../middleware/errorHandler.js'
+import { checkKeyedAttempts, recordKeyedAttempt, clearKeyedAttempts } from '../../../middleware/rateLimiter.js'
 import { ShopCustomer } from '../../shop/models/index.js'
 
 const SALT_ROUNDS = 10
+
+/** 顾客登录失败限流：15 分钟窗口内最多 10 次失败 */
+const LOGIN_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_MAX_ATTEMPTS = 10
 
 /** 对外暴露的顾客信息（绝不携带 passwordHash） */
 export interface CustomerPublic {
@@ -43,6 +48,8 @@ export interface LoginParams {
   tenantId: number
   email: string
   password: string
+  /** 客户端 IP（用于登录失败限流；缺省时按未知 IP 聚合） */
+  ip?: string
 }
 
 /**
@@ -69,12 +76,34 @@ export async function registerCustomer(params: RegisterParams): Promise<{ custom
 /** 邮箱 + 密码登录，返回顾客信息与独立 JWT。 */
 export async function authenticateCustomer(params: LoginParams): Promise<{ customer: CustomerPublic; token: string }> {
   const { tenantId, email, password } = params
+
+  /**
+   * 登录失败限流（按 IP + 邮箱，仅失败计数）。
+   *
+   * 安全整改：C 端登录为公开接口，此前无任何失败计数/限流（admin 侧有
+   * checkRateLimit + 账号锁定），可被无限次爆破顾客密码。
+   */
+  const limitKey = `rate:customer-login:${tenantId}:${params.ip ?? ''}:${email.toLowerCase()}`
+  const limit = await checkKeyedAttempts(limitKey, LOGIN_WINDOW_MS, LOGIN_MAX_ATTEMPTS)
+  if (!limit.allowed) {
+    throw new AppError(429, `登录尝试过于频繁，请 ${limit.retryAfter ?? 60} 秒后再试`)
+  }
+
   const customer = await ShopCustomer.findOne({ where: { tenantId, email } })
-  if (!customer) throw new AppError(401, '邮箱或密码错误')
+  if (!customer) {
+    await recordKeyedAttempt(limitKey, LOGIN_WINDOW_MS)
+    throw new AppError(401, '邮箱或密码错误')
+  }
 
   const ok = await bcrypt.compare(password, customer.passwordHash)
-  if (!ok) throw new AppError(401, '邮箱或密码错误')
+  if (!ok) {
+    await recordKeyedAttempt(limitKey, LOGIN_WINDOW_MS)
+    throw new AppError(401, '邮箱或密码错误')
+  }
   if (customer.status === 'blocked') throw new AppError(403, '账号已被禁用')
+
+  // 登录成功：清除失败计数
+  await clearKeyedAttempts(limitKey)
 
   return { customer: toPublic(customer), token: signCustomerToken(customer) }
 }
