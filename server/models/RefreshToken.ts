@@ -4,6 +4,7 @@ import crypto from 'crypto'
 
 class RefreshToken extends Model<InferAttributes<RefreshToken>, InferCreationAttributes<RefreshToken>> {
   declare id: CreationOptional<number>
+  declare tenantId: number
   declare userId: number
   declare token: string
   declare expiresAt: Date
@@ -26,6 +27,12 @@ RefreshToken.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     userId: {
       type: DataTypes.INTEGER.UNSIGNED,

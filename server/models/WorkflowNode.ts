@@ -3,6 +3,7 @@ import sequelize from '../config/database.js'
 
 class WorkflowNode extends Model<InferAttributes<WorkflowNode>, InferCreationAttributes<WorkflowNode>> {
   declare id: CreationOptional<number>
+  declare tenantId: number
   declare workflowId: number
   declare versionId: number
   declare nodeKey: string
@@ -22,6 +23,12 @@ WorkflowNode.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     workflowId: {
       type: DataTypes.INTEGER.UNSIGNED,

@@ -7,6 +7,7 @@ import sequelize from '../config/database.js'
  */
 class AiProvider extends Model<InferAttributes<AiProvider>, InferCreationAttributes<AiProvider>> {
   declare id: CreationOptional<number>
+  declare tenantId: number
   declare name: string
   declare apiBaseUrl: string
   declare apiKey: string
@@ -26,6 +27,12 @@ AiProvider.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     name: {
       type: DataTypes.STRING(100),

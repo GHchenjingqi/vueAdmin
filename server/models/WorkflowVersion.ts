@@ -3,6 +3,7 @@ import sequelize from '../config/database.js'
 
 class WorkflowVersion extends Model<InferAttributes<WorkflowVersion>, InferCreationAttributes<WorkflowVersion>> {
   declare id: CreationOptional<number>
+  declare tenantId: number
   declare workflowId: number
   declare versionNo: number
   declare status: string
@@ -19,6 +20,12 @@ WorkflowVersion.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     workflowId: {
       type: DataTypes.INTEGER.UNSIGNED,

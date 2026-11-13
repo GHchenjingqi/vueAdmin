@@ -7,6 +7,7 @@ import sequelize from '../config/database.js'
  */
 class DictType extends Model<InferAttributes<DictType>, InferCreationAttributes<DictType>> {
   declare id: CreationOptional<number>
+  declare tenantId: number
   declare name: string
   declare type: string
   declare status: CreationOptional<number>
@@ -22,6 +23,12 @@ DictType.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     name: {
       type: DataTypes.STRING(50),

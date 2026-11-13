@@ -3,6 +3,7 @@ import sequelize from '../config/database.js'
 
 class NoticeRead extends Model<InferAttributes<NoticeRead>, InferCreationAttributes<NoticeRead>> {
   declare id: CreationOptional<number>
+  declare tenantId: number
   declare noticeId: number
   declare userId: number
   declare readAt: CreationOptional<Date>
@@ -17,6 +18,12 @@ NoticeRead.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     noticeId: {
       type: DataTypes.INTEGER.UNSIGNED,

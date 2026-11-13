@@ -3,6 +3,7 @@ import sequelize from '../config/database.js'
 
 class WorkflowInstanceLog extends Model<InferAttributes<WorkflowInstanceLog>, InferCreationAttributes<WorkflowInstanceLog>> {
   declare id: CreationOptional<number>
+  declare tenantId: number
   declare instanceId: number
   declare nodeKey: string
   declare nodeName: string | null
@@ -25,6 +26,12 @@ WorkflowInstanceLog.init(
       type: DataTypes.INTEGER.UNSIGNED,
       primaryKey: true,
       autoIncrement: true,
+    },
+    tenantId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '租户ID',
     },
     instanceId: {
       type: DataTypes.INTEGER.UNSIGNED,
