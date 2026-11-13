@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
+import { requireManage, requirePlatformAdmin } from '../middleware/authorize.js'
 import { quotaGuard } from '../modules/billing/middleware/quotaGuard.js'
 import { validate } from '../middleware/validate.js'
 import { paginationSchema, idParamSchema } from '../shared/schemas/common.js'
@@ -431,7 +432,7 @@ router.get('/users/template', authMiddleware, userController.downloadTemplate)
  *       200:
  *         description: 导入结果
  */
-router.post('/users/import', authMiddleware, userController.importUsers)
+router.post('/users/import', authMiddleware, requireManage, userController.importUsers)
 
 /**
  * @openapi
@@ -458,7 +459,7 @@ router.post('/users/import', authMiddleware, userController.importUsers)
  *       200:
  *         description: 密码重置成功
  */
-router.patch('/users/:id/password', authMiddleware, validate(idParamSchema, 'params'), userController.changePassword)
+router.patch('/users/:id/password', authMiddleware, requireManage, validate(idParamSchema, 'params'), userController.changePassword)
 
 /**
  * @openapi
@@ -504,7 +505,7 @@ router.get('/users/:id', authMiddleware, validate(idParamSchema, 'params'), user
  *       201:
  *         description: 创建成功
  */
-router.post('/users', authMiddleware, quotaGuard('users'), validate(createUserSchema), userController.create)
+router.post('/users', authMiddleware, requireManage, quotaGuard('users'), validate(createUserSchema), userController.create)
 
 /**
  * @openapi
@@ -537,7 +538,7 @@ router.post('/users', authMiddleware, quotaGuard('users'), validate(createUserSc
  *       200:
  *         description: 更新成功
  */
-router.put('/users/:id', authMiddleware, validate(idParamSchema, 'params'), validate(updateUserSchema), userController.update)
+router.put('/users/:id', authMiddleware, requireManage, validate(idParamSchema, 'params'), validate(updateUserSchema), userController.update)
 
 /**
  * @openapi
@@ -562,7 +563,7 @@ router.put('/users/:id', authMiddleware, validate(idParamSchema, 'params'), vali
  *       200:
  *         description: 批量删除成功
  */
-router.delete('/users/batch', authMiddleware, userController.batchRemove)
+router.delete('/users/batch', authMiddleware, requireManage, userController.batchRemove)
 
 /**
  * @openapi
@@ -583,7 +584,7 @@ router.delete('/users/batch', authMiddleware, userController.batchRemove)
  *       404:
  *         description: 用户不存在
  */
-router.delete('/users/:id', authMiddleware, validate(idParamSchema, 'params'), userController.remove)
+router.delete('/users/:id', authMiddleware, requireManage, validate(idParamSchema, 'params'), userController.remove)
 
 // ==================== 菜单管理 ====================
 
@@ -664,7 +665,7 @@ router.get('/menus/:id', authMiddleware, menuController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/menus', authMiddleware, menuController.create)
+router.post('/menus', authMiddleware, requirePlatformAdmin, menuController.create)
 
 /**
  * @openapi
@@ -699,7 +700,7 @@ router.post('/menus', authMiddleware, menuController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/menus/:id', authMiddleware, menuController.update)
+router.put('/menus/:id', authMiddleware, requirePlatformAdmin, menuController.update)
 
 /**
  * @openapi
@@ -717,7 +718,7 @@ router.put('/menus/:id', authMiddleware, menuController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/menus/:id', authMiddleware, menuController.remove)
+router.delete('/menus/:id', authMiddleware, requirePlatformAdmin, menuController.remove)
 
 // ==================== 系统设置 ====================
 
@@ -782,7 +783,7 @@ router.get('/settings/:key', authMiddleware, settingController.getByKey)
  *       200:
  *         description: 保存成功
  */
-router.put('/settings', authMiddleware, settingController.save)
+router.put('/settings', authMiddleware, requirePlatformAdmin, settingController.save)
 
 /**
  * @openapi
@@ -802,7 +803,7 @@ router.put('/settings', authMiddleware, settingController.save)
  *       404:
  *         description: 设置项不存在
  */
-router.delete('/settings/:key', authMiddleware, settingController.remove)
+router.delete('/settings/:key', authMiddleware, requirePlatformAdmin, settingController.remove)
 
 // ==================== 字典类型管理 ====================
 
@@ -875,7 +876,7 @@ router.get('/dict/types/:id', authMiddleware, dictTypeController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/dict/types', authMiddleware, dictTypeController.create)
+router.post('/dict/types', authMiddleware, requireManage, dictTypeController.create)
 
 /**
  * @openapi
@@ -905,7 +906,7 @@ router.post('/dict/types', authMiddleware, dictTypeController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/dict/types/:id', authMiddleware, dictTypeController.update)
+router.put('/dict/types/:id', authMiddleware, requireManage, dictTypeController.update)
 
 /**
  * @openapi
@@ -923,7 +924,7 @@ router.put('/dict/types/:id', authMiddleware, dictTypeController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/dict/types/:id', authMiddleware, dictTypeController.remove)
+router.delete('/dict/types/:id', authMiddleware, requireManage, dictTypeController.remove)
 
 /**
  * @openapi
@@ -937,7 +938,7 @@ router.delete('/dict/types/:id', authMiddleware, dictTypeController.remove)
  *       200:
  *         description: 缓存刷新成功
  */
-router.post('/dict/cache/refresh', authMiddleware, dictTypeController.refreshCache)
+router.post('/dict/cache/refresh', authMiddleware, requireManage, dictTypeController.refreshCache)
 
 // ==================== 字典数据管理 ====================
 
@@ -1018,7 +1019,7 @@ router.get('/dict/data/:id', authMiddleware, dictDataController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/dict/data', authMiddleware, dictDataController.create)
+router.post('/dict/data', authMiddleware, requireManage, dictDataController.create)
 
 /**
  * @openapi
@@ -1049,7 +1050,7 @@ router.post('/dict/data', authMiddleware, dictDataController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/dict/data/:id', authMiddleware, dictDataController.update)
+router.put('/dict/data/:id', authMiddleware, requireManage, dictDataController.update)
 
 /**
  * @openapi
@@ -1067,7 +1068,7 @@ router.put('/dict/data/:id', authMiddleware, dictDataController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/dict/data/:id', authMiddleware, dictDataController.remove)
+router.delete('/dict/data/:id', authMiddleware, requireManage, dictDataController.remove)
 
 // ==================== 通知管理 ====================
 
@@ -1345,7 +1346,7 @@ router.get('/logs', authMiddleware, logController.list)
  *       200:
  *         description: 清理成功
  */
-router.delete('/logs', authMiddleware, logController.cleanup)
+router.delete('/logs', authMiddleware, requirePlatformAdmin, logController.cleanup)
 
 /**
  * @openapi
@@ -1448,11 +1449,11 @@ router.get('/dashboard/trends', authMiddleware, dashboardController.getTrends)
 router.get('/notification-channels/active', authMiddleware, notificationChannelController.active)
 router.get('/notification-channels/deliveries', authMiddleware, notificationChannelController.deliveries)
 router.get('/notification-channels', authMiddleware, notificationChannelController.list)
-router.post('/notification-channels', authMiddleware, notificationChannelController.create)
-router.put('/notification-channels/:id', authMiddleware, notificationChannelController.update)
-router.put('/notification-channels/:id/toggle', authMiddleware, notificationChannelController.toggle)
-router.post('/notification-channels/:id/test', authMiddleware, notificationChannelController.test)
-router.delete('/notification-channels/:id', authMiddleware, notificationChannelController.remove)
+router.post('/notification-channels', authMiddleware, requireManage, notificationChannelController.create)
+router.put('/notification-channels/:id', authMiddleware, requireManage, notificationChannelController.update)
+router.put('/notification-channels/:id/toggle', authMiddleware, requireManage, notificationChannelController.toggle)
+router.post('/notification-channels/:id/test', authMiddleware, requireManage, notificationChannelController.test)
+router.delete('/notification-channels/:id', authMiddleware, requireManage, notificationChannelController.remove)
 
 // ==================== 个人中心增强（P2-10） ====================
 router.get('/profile/login-history', authMiddleware, profileController.loginHistory)
@@ -1524,7 +1525,7 @@ router.get('/departments/:id', authMiddleware, deptController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/departments', authMiddleware, deptController.create)
+router.post('/departments', authMiddleware, requireManage, deptController.create)
 
 /**
  * @openapi
@@ -1556,7 +1557,7 @@ router.post('/departments', authMiddleware, deptController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/departments/:id', authMiddleware, deptController.update)
+router.put('/departments/:id', authMiddleware, requireManage, deptController.update)
 
 /**
  * @openapi
@@ -1574,7 +1575,7 @@ router.put('/departments/:id', authMiddleware, deptController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/departments/:id', authMiddleware, deptController.remove)
+router.delete('/departments/:id', authMiddleware, requireManage, deptController.remove)
 
 // ==================== 角色管理 ====================
 
@@ -1644,7 +1645,7 @@ router.get('/roles/:id', authMiddleware, roleController.getById)
  *       201:
  *         description: 创建成功
  */
-router.post('/roles', authMiddleware, roleController.create)
+router.post('/roles', authMiddleware, requireManage, roleController.create)
 
 /**
  * @openapi
@@ -1675,7 +1676,7 @@ router.post('/roles', authMiddleware, roleController.create)
  *       200:
  *         description: 更新成功
  */
-router.put('/roles/:id', authMiddleware, roleController.update)
+router.put('/roles/:id', authMiddleware, requireManage, roleController.update)
 
 /**
  * @openapi
@@ -1693,7 +1694,7 @@ router.put('/roles/:id', authMiddleware, roleController.update)
  *       200:
  *         description: 删除成功
  */
-router.delete('/roles/:id', authMiddleware, roleController.remove)
+router.delete('/roles/:id', authMiddleware, requireManage, roleController.remove)
 
 // ==================== 消息通知 ====================
 

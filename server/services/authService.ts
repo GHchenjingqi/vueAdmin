@@ -144,6 +144,8 @@ interface TokenPayload {
   tenantId: number
   /** 是否为平台超管 */
   isPlatformAdmin: boolean
+  /** 生效的角色码集合（后端授权守卫据此判定，避免每请求查库） */
+  roles: string[]
 }
 
 /**
@@ -154,9 +156,18 @@ async function buildTokenPayload(user: { id: number; username: string; nickname:
   const userRoles = await UserRole.findAll({ where: { userId: user.id }, attributes: ['roleId'] })
   const roleIds = [...new Set(userRoles.map((ur) => ur.roleId))]
   const { dataScope, deptId } = await resolveDataScope(user.deptId ?? null, roleIds)
+  const roleCodes = await getRoleCodes(roleIds)
 
-  // 判断平台超管：username === 'admin' 或拥有 platform_admin 角色
-  const isPlatformAdmin = user.username === 'admin' || (await isPlatformAdminByRole(roleIds))
+  // 判断平台超管：持有 platform_admin 角色。
+  //
+  // 安全整改：此前判定为 `username === 'admin' || 持有 platform_admin 角色`。
+  // 但 users 表的用户名唯一性是 (tenantId, username) 复合唯一——任意租户都可
+  // 创建一个名为 'admin' 的账号，该账号登录后即被判定为平台超管，
+  // 从而绕过全部租户隔离（tenantContext 的 bypass 置 true，Sequelize 全局
+  // 租户钩子随之失效）。实测该路径可跨租户读写数据。
+  // 现改为仅以 platform_admin 角色为准——角色归属由平台超管显式授予，
+  // 且授予路径已在 userService 层做归属校验。
+  const isPlatformAdmin = await isPlatformAdminByRole(roleIds)
 
   return {
     id: user.id,
@@ -166,9 +177,24 @@ async function buildTokenPayload(user: { id: number; username: string; nickname:
     dataScope,
     tenantId: user.tenantId ?? 1,
     isPlatformAdmin,
+    roles: roleCodes,
   }
 }
 
+/**
+ * 取出角色码集合。
+ * 角色表为全局表（code/name 全局唯一），故此处按 id 取 code 即可。
+ */
+async function getRoleCodes(roleIds: number[]): Promise<string[]> {
+  if (roleIds.length === 0) return []
+  const roles = await Role.findAll({ where: { id: { [Op.in]: roleIds } }, attributes: ['code'] })
+  return roles.map((r) => (r as unknown as { code: string }).code).filter(Boolean)
+}
+
+/**
+ * 是否持有平台超管角色。
+ * 角色表为全局表（code/name 全局唯一），故此处按角色码匹配即可。
+ */
 async function isPlatformAdminByRole(roleIds: number[]): Promise<boolean> {
   if (roleIds.length === 0) return false
   const adminRole = await Role.findOne({ where: { code: 'platform_admin' } })

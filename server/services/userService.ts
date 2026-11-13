@@ -2,6 +2,15 @@
  * 用户管理 Service 层
  *
  * 职责：封装用户管理相关的所有业务逻辑
+ *
+ * 安全整改（越权修复）：
+ *   角色授予属于「管理权本身」。此前用户写接口仅校验登录态，任意登录用户可
+ *   给自己授予 platform_admin 角色完成提权（实测已复现），也可重置 admin 密码
+ *   接管账号。故在此层做归属校验：
+ *   - 授予管理权角色（admin / platform_admin）需平台级权限；
+ *   - 不可给自己新增高于自身权限的角色（阻断自我提权）；
+ *   - 受保护账号（admin）仅平台级可变更。
+ *   路由守卫（requireManage）只做粗粒度拦截，两者缺一不可。
  */
 
 import { Op } from 'sequelize'
@@ -13,12 +22,81 @@ import { exportExcel } from '../utils/exportExcel.js'
 import { normalizeIds, prepareChangeLog } from '../utils/helpers.js'
 import { applyDataScopeWhere, isTargetInScope } from '../utils/dataScope.js'
 import { createCache, stableKey } from '../utils/cache.js'
+import { resolveOperatorAuthority, type OperatorLike } from '../utils/operator.js'
 import User from '../models/User.js'
 import Department from '../models/Department.js'
 import Role from '../models/Role.js'
 import UserRole from '../models/UserRole.js'
 
 const USER_PROFILE_ATTRS = ['id', 'username', 'nickname', 'email', 'phone', 'avatar', 'bio', 'status', 'deptId', 'createdAt', 'updatedAt']
+
+/** 管理权角色码：授予这些角色等价于授予管理权 */
+const ADMIN_ROLE_CODES = ['admin', 'super_admin', 'platform_admin']
+
+/** 受保护的用户名：不可被非平台级操作者改动或停用 */
+const PROTECTED_USERNAMES = ['admin']
+
+/** 操作者上下文（由控制器从 req.user 传入） */
+export type UserOperator = OperatorLike & {
+  dataScope?: number
+  deptId?: number
+  deptIds?: number[]
+}
+
+/**
+ * 断言操作者可变更目标用户的角色分配。
+ *
+ * 规则：
+ *  1. 需具备管理级权限（admin / super_admin / platform_admin 角色）；
+ *  2. 授予管理权角色（admin / platform_admin）额外需平台级权限——
+ *     否则 admin 角色持有者可自授 platform_admin 完成跨租户提权；
+ *  3. 不可给自己新增高于自身权限的角色（阻断自我提权这一独立路径）；
+ *  4. 不可变更自己的角色分配（防止把自己降级造成不可逆锁死）。
+ */
+async function assertCanAssignRoles(targetUserId: number, roleIds: number[] | undefined, op?: UserOperator): Promise<void> {
+  if (roleIds === undefined) return
+
+  const authority = await resolveOperatorAuthority(op)
+  if (!authority.isManager) {
+    throw new AppError(403, 'FORBIDDEN: 角色分配仅管理员可操作')
+  }
+
+  if (roleIds.length > 0) {
+    const roles = await Role.findAll({ where: { id: { [Op.in]: roleIds } }, attributes: ['id', 'code'] })
+    const grantsAdmin = roles.some((r) => ADMIN_ROLE_CODES.includes((r as unknown as { code: string }).code))
+    if (grantsAdmin && !authority.isPlatformAdmin) {
+      throw new AppError(403, 'FORBIDDEN: 授予管理权角色需平台管理员权限')
+    }
+  }
+
+  // 自我提权：不可给自己新增自身不具备的角色
+  if (op?.id != null && op.id === targetUserId) {
+    const ownRoles = await UserRole.findAll({ where: { userId: op.id }, attributes: ['roleId'] })
+    const ownRoleIds = new Set(ownRoles.map((ur) => ur.roleId))
+    const granted = await Role.findAll({ where: { id: { [Op.in]: roleIds } }, attributes: ['id', 'code'] })
+    const escalation = granted.some((r) => {
+      const row = r as unknown as { id: number; code: string }
+      if (ownRoleIds.has(row.id)) return false
+      return ADMIN_ROLE_CODES.includes(row.code) || !authority.roleCodes.includes(row.code)
+    })
+    if (escalation) {
+      throw new AppError(403, 'FORBIDDEN: 不可给自己新增角色')
+    }
+  }
+}
+
+/**
+ * 断言操作者可变更目标用户的账号属性。
+ * 规则：受保护用户名（admin）的状态/用户名变更仅平台级可为。
+ */
+async function assertCanMutateProtectedUser(target: { username: string }, op?: UserOperator): Promise<void> {
+  if (!PROTECTED_USERNAMES.includes(target.username)) return
+  const authority = await resolveOperatorAuthority(op)
+  if (!authority.isPlatformAdmin) {
+    throw new AppError(403, 'FORBIDDEN: 受保护账号仅平台管理员可操作')
+  }
+}
+
 
 const USER_INCLUDES = [
   { model: Department, as: 'dept', attributes: ['id', 'name'] },
@@ -115,10 +193,22 @@ export async function createUser(
     deptId: number
     roleIds?: number[] | number
   },
-  reqUser: { id: number; username: string },
+  reqUser: UserOperator,
 ) {
   const { username, nickname, email, phone, password, status, deptId } = data
-  const roleIds = normalizeIds(data.roleIds)
+  const roleIds = normalizeIds(data.roleIds) ?? []
+
+  // 角色授予属管理权操作：需管理员权限；授予管理权角色额外需平台级
+  if (roleIds.length > 0) {
+    await assertCanAssignRoles(-1, roleIds, reqUser)
+  }
+  // 受保护用户名不可被非平台级操作者占用
+  if (PROTECTED_USERNAMES.includes(username)) {
+    const authority = await resolveOperatorAuthority(reqUser)
+    if (!authority.isPlatformAdmin) {
+      throw new AppError(403, 'FORBIDDEN: 受保护账号仅平台管理员可创建')
+    }
+  }
 
   const existing = await User.findOne({ where: { username } })
   if (existing) throw new AppError(409, '用户名已存在')
@@ -160,7 +250,7 @@ export async function updateUser(
     deptId?: number
     roleIds?: number[] | number
   },
-  reqUser: { id: number; username: string; dataScope?: number; deptId?: number; deptIds?: number[] },
+  reqUser: UserOperator & { dataScope?: number; deptId?: number; deptIds?: number[] },
 ) {
   const user = await User.findByPk(userId)
   if (!user) throw new AppError(404, '用户不存在')
@@ -170,6 +260,17 @@ export async function updateUser(
 
   const { username, nickname, email, phone, avatar, status, deptId } = data
   const roleIds = normalizeIds(data.roleIds)
+
+  // 角色授予：需管理员权限；授予管理权角色额外需平台级；禁止自我提权
+  await assertCanAssignRoles(userId, roleIds === undefined ? undefined : roleIds, reqUser)
+  // 受保护账号（admin）的状态/用户名变更仅平台级可为
+  await assertCanMutateProtectedUser(user as unknown as { username: string }, reqUser)
+  if (username && PROTECTED_USERNAMES.includes(username)) {
+    const authority = await resolveOperatorAuthority(reqUser)
+    if (!authority.isPlatformAdmin) {
+      throw new AppError(403, 'FORBIDDEN: 受保护账号仅平台管理员可操作')
+    }
+  }
 
   const updateData = { username, nickname, email, phone, avatar, status, deptId }
   const trackFields = ['username', 'nickname', 'email', 'phone', 'status', 'deptId']
@@ -193,13 +294,30 @@ export async function updateUser(
 
 /**
  * 修改密码（管理员重置 / 用户自助改密）
+ *
+ * 安全整改：管理员重置分支此前无任何授权校验——任意登录用户可重置 admin 的密码
+ * （实测已复现，构成完整账号接管）。现要求：重置操作须为平台超管，
+ * 且目标账号在自己的数据范围内（isTargetInScope）。
  */
-export async function changePassword(userId: number, options: { reset: boolean; oldPassword?: string; password?: string }) {
+export async function changePassword(
+  userId: number,
+  options: { reset: boolean; oldPassword?: string; password?: string },
+  op?: UserOperator & { dataScope?: number; deptId?: number; deptIds?: number[] },
+) {
   const user = await User.findByPk(userId)
   if (!user) throw new AppError(404, '用户不存在')
 
   // 管理员重置密码
   if (options.reset) {
+    const authority = await resolveOperatorAuthority(op)
+    if (!authority.isManager) {
+      throw new AppError(403, 'FORBIDDEN: 重置密码仅管理员可操作')
+    }
+    if (!isTargetInScope((user as any).deptId, op)) {
+      throw new AppError(403, '无权重置该用户密码')
+    }
+    // 受保护账号（admin）的密码重置需平台级权限
+    await assertCanMutateProtectedUser(user as unknown as { username: string }, op)
     const newPassword = '123456'
     user.password = newPassword
     user.passwordResetRequired = 1
@@ -234,12 +352,14 @@ export async function changePassword(userId: number, options: { reset: boolean; 
 /**
  * 删除单个用户
  */
-export async function deleteUser(userId: number, reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
+export async function deleteUser(userId: number, reqUser?: UserOperator & { dataScope?: number; deptId?: number; deptIds?: number[] }) {
   const user = await User.findByPk(userId)
   if (!user) throw new AppError(404, '用户不存在')
   if (!isTargetInScope((user as any).deptId, reqUser)) {
     throw new AppError(403, '无权删除该用户')
   }
+  // 受保护账号（admin / 平台超管）不可被非平台级操作者删除
+  await assertCanMutateProtectedUser(user as unknown as { username: string }, reqUser)
 
   const username = user.username
   await UserRole.destroy({ where: { userId } })
@@ -252,7 +372,7 @@ export async function deleteUser(userId: number, reqUser?: { dataScope?: number;
 /**
  * 批量删除用户
  */
-export async function batchDeleteUsers(ids: number[], reqUser?: { dataScope?: number; deptId?: number; deptIds?: number[] }) {
+export async function batchDeleteUsers(ids: number[], reqUser?: UserOperator & { dataScope?: number; deptId?: number; deptIds?: number[] }) {
   const users = await User.findAll({ where: { id: { [Op.in]: ids } } })
   if (users.length === 0) {
     throw new AppError(404, '用户不存在')
@@ -260,6 +380,10 @@ export async function batchDeleteUsers(ids: number[], reqUser?: { dataScope?: nu
   const outOfScope = users.filter((u) => !isTargetInScope((u as any).deptId, reqUser))
   if (outOfScope.length > 0) {
     throw new AppError(403, '无权删除部分用户')
+  }
+  // 批量删除同样不得触及受保护账号
+  for (const u of users) {
+    await assertCanMutateProtectedUser(u as unknown as { username: string }, reqUser)
   }
 
   await UserRole.destroy({ where: { userId: { [Op.in]: ids } } })
@@ -336,7 +460,7 @@ export async function downloadTemplate(): Promise<ExcelJS.Buffer> {
  */
 export async function importUsers(
   filePath: string,
-  reqUser: { id: number; username: string },
+  reqUser: UserOperator,
 ): Promise<{ total: number; success: number; failed: { row: number; msg: string }[] }> {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.readFile(filePath)
@@ -389,6 +513,10 @@ export async function importUsers(
       }
 
       const tempPwd = crypto.randomBytes(4).toString('hex')
+      // 批量导入同样受角色授予规则约束（roleIds 列可携带管理权角色码）
+      if (roleIds.length > 0) {
+        await assertCanAssignRoles(-1, roleIds, reqUser)
+      }
       const user = await User.create({
         username,
         nickname,

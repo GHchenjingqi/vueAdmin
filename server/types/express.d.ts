@@ -15,6 +15,10 @@ declare namespace Express {
     tenantId?: number
     /** 有效数据范围：1=全部 2=本部门 3=本级及以下 */
     dataScope?: number
+    /** 是否为平台超管（持有 platform_admin 角色，跨租户） */
+    isPlatformAdmin?: boolean
+    /** 生效的角色码集合（后端授权守卫据此判定） */
+    roles?: string[]
     iat?: number
     exp?: number
   }

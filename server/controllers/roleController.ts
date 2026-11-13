@@ -46,7 +46,7 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
  */
 export const create = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await roleService.createRole(req.body)
+    const result = await roleService.createRole(req.body, req.user)
     logOperation(req, '创建角色', `ID: ${result.id} 名称: ${result.name}`)
     res.status(201).json({ code: 0, data: { id: result.id }, message: '创建成功' })
   } catch (err) {
@@ -60,7 +60,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
  */
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { changes, summary, name } = await roleService.updateRole(Number(req.params.id), req.body)
+    const { changes, summary, name } = await roleService.updateRole(Number(req.params.id), req.body, req.user)
     logOperation(req, '更新角色', `ID: ${req.params.id} 名称: ${name}`, JSON.stringify({ changes, summary }))
     res.json({ code: 0, message: '更新成功' })
   } catch (err) {
@@ -74,7 +74,7 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
  */
 export const remove = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id, name } = await roleService.deleteRole(Number(req.params.id))
+    const { id, name } = await roleService.deleteRole(Number(req.params.id), req.user)
     logOperation(req, '删除角色', `ID: ${id} 名称: ${name}`)
     res.json({ code: 0, message: '删除成功' })
   } catch (err) {

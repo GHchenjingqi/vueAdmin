@@ -209,6 +209,21 @@ describe('userService.ts', () => {
   describe('updateUser', () => {
     it('更新用户信息成功', async () => {
       const mockUser = {
+        id: 5,
+        username: 'normal_user',
+        nickname: '普通用户',
+        update: vi.fn(),
+      }
+
+      vi.mocked(User.findByPk).mockResolvedValueOnce(mockUser as any)
+
+      await updateUser(5, { nickname: '普通用户2' }, { id: 1, username: 'admin' })
+
+      expect(mockUser.update).toHaveBeenCalled()
+    })
+
+    it('非平台管理员修改受保护账号（admin）被拒', async () => {
+      const mockUser = {
         id: 1,
         username: 'admin',
         nickname: '管理员',
@@ -217,9 +232,10 @@ describe('userService.ts', () => {
 
       vi.mocked(User.findByPk).mockResolvedValueOnce(mockUser as any)
 
-      await updateUser(1, { nickname: '超级管理员' }, { id: 1, username: 'admin' })
-
-      expect(mockUser.update).toHaveBeenCalled()
+      await expect(
+        updateUser(1, { nickname: '被篡改' }, { id: 1, username: 'admin' }),
+      ).rejects.toThrow('受保护账号')
+      expect(mockUser.update).not.toHaveBeenCalled()
     })
 
     it('用户不存在抛出错误', async () => {

@@ -74,7 +74,7 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
  */
 export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.changePassword(Number(req.params.id), req.body)
+    const result = await userService.changePassword(Number(req.params.id), req.body, req.user)
     logOperation(req, '重置密码', `ID: ${req.params.id}`, JSON.stringify({ id: req.params.id }))
     res.json({ code: 0, data: result, message: result.password ? '密码已重置' : '密码修改成功' })
   } catch (err) {
