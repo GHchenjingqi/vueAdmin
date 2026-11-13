@@ -153,7 +153,26 @@ app.use(originValidator)
 
 // 静态文件：上传目录（头像、图片等）
 const uploadsDir = resolve(__dirname, 'uploads')
-app.use('/uploads', express.static(uploadsDir))
+/**
+ * 上传目录的静态资源单独施加 CSP: sandbox。
+ *
+ * 安全整改：上传白名单允许 .svg，而 SVG 是 XML 文本格式、可内联 <script>；
+ * 全局 CSP 的 script-src 含 'unsafe-inline'（Vite HMR 所需），无法阻止内联脚本，
+ * 且 express.static 以 image/svg+xml 提供、无 Content-Disposition。
+ * 实测（实测响应头）：上传的 SVG 被以 image/svg+xml 返回，script-src 含
+ * 'unsafe-inline' → 访问 /uploads/xxx.svg 会在站点源下执行脚本（存储型 XSS），
+ * 可窃取 localStorage 中的管理员令牌。
+ *
+ * 修复：对 /uploads 响应覆盖 CSP 为 `sandbox`（不含 allow-scripts）：
+ *   - 文档式渲染（直接访问 / 嵌入 <object>/<iframe>）时 SVG 进入不透明沙箱，
+ *     脚本无法执行；
+ *   - 图片式渲染（<img src="...">）不受 sandbox 影响，功能不受损；
+ *   - 同时对历史已上传的 SVG 文件立即生效，无需清理数据。
+ */
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data: blob:")
+  next()
+}, express.static(uploadsDir))
 
 // ---------- API 路由（优先匹配）----------
 app.use('/api/v1', apiRoutes)

@@ -5,7 +5,7 @@
  */
 
 import { existsSync, readdirSync, statSync } from 'fs'
-import { resolve, dirname, extname, relative } from 'path'
+import { resolve, dirname, extname, relative, isAbsolute } from 'path'
 import { fileURLToPath } from 'url'
 import { unlink } from 'fs/promises'
 import { AppError } from '../middleware/errorHandler.js'
@@ -85,7 +85,16 @@ export function listUploadedFiles() {
 export async function deleteUploadedFile(fileId: string) {
   const filePath = resolve(UPLOAD_DIR, fileId)
 
-  if (!filePath.startsWith(UPLOAD_DIR)) {
+  /**
+   * 目录边界校验：用 relative() 判定而非 startsWith()。
+   *
+   * 安全整改：原实现 `filePath.startsWith(UPLOAD_DIR)` 是**前缀匹配**——
+   * fileId 形如 `../uploads-backup/secret.txt` 解析后为 `.../uploads-backup/secret.txt`，
+   * 仍以 `.../uploads` 开头 → 校验通过，可删除 uploads 同级目录下的任意文件。
+   * 正确判定：解析后的路径相对 UPLOAD_DIR 不得以 `..` 开头（且不得为绝对路径）。
+   */
+  const rel = relative(UPLOAD_DIR, filePath)
+  if (!rel || rel.startsWith('..') || isAbsolute(rel)) {
     throw new AppError(403, '非法文件路径')
   }
 

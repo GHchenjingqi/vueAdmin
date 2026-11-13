@@ -101,6 +101,37 @@ const ALLOWED_EXTENSIONS = Object.values(ALLOWED)
   .join(', ')
 
 /**
+ * SVG 危险内容特征检测。
+ *
+ * 安全整改：SVG 是 XML 文本格式，可内联 <script> 与事件处理器；全局 CSP 的
+ * script-src 含 'unsafe-inline'（Vite HMR 所需），单靠 CSP 无法阻止内联脚本。
+ * 故上传时直接拒绝含脚本/事件处理器/外部文档嵌入的 SVG（纵深防御：静态层
+ * 另有 CSP sandbox 兜底）。
+ */
+const SVG_DANGEROUS_PATTERNS: Array<{ re: RegExp; hint: string }> = [
+  { re: /<\s*script[\s>]/i, hint: '<script> 标签' },
+  { re: /<\s*\/\s*script\s*>/i, hint: '</script> 标签' },
+  { re: /<\s*foreignObject[\s>]/i, hint: '<foreignObject> 标签' },
+  { re: /<\s*(iframe|embed|object)[\s>]/i, hint: '内嵌框架标签' },
+  { re: /<\s*set[\s>][^>]*\battributeName\s*=\s*["']?on/i, hint: 'set 事件注入' },
+  { re: /\son[a-z]+\s*=/i, hint: '事件处理器属性（on*=）' },
+  { re: /javascript\s*:/i, hint: 'javascript: 伪协议' },
+  { re: /<\s*handler[\s>]/i, hint: '<handler> 标签' },
+]
+
+/**
+ * 校验 SVG 内容是否含可执行脚本特征。
+ * @param content SVG 文本内容
+ * @throws AppError 含危险特征时抛出
+ */
+export function assertSvgSafe(content: string): void {
+  const hit = SVG_DANGEROUS_PATTERNS.find((p) => p.re.test(content))
+  if (hit) {
+    throw new AppError(400, `SVG 文件包含不允许的内容（${hit.hint}），请移除后再上传`)
+  }
+}
+
+/**
  * 校验单个已上传文件对象（来自 multer 的 req.file / req.files[i]）。
  * 校验失败抛出 AppError，不负责清理磁盘文件。
  */
@@ -122,6 +153,10 @@ export function validateUploadFile(file: { originalname: string; size: number; p
     const header = readFileHeader(file.path, 16)
     if (!checkImageMagicBytes(ext, header)) {
       throw new AppError(400, '文件内容与扩展名不匹配，可能不是合法的图片文件')
+    }
+    // SVG 为文本格式：魔数校验无法识别内联脚本，须另行检查危险特征
+    if (ext === '.svg') {
+      assertSvgSafe(readFileHeader(file.path, 64 * 1024).toString('utf8'))
     }
   }
 }
