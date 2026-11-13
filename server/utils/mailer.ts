@@ -54,3 +54,14 @@ export async function getSenderName(): Promise<string> {
     return 'Vue Admin'
   }
 }
+
+/** 系统发件人邮箱：优先环境变量 SMTP_USER，其次 settings 表的 smtp_user，兜底 no-reply。 */
+export async function getSenderEmail(): Promise<string> {
+  if (process.env.SMTP_USER) return process.env.SMTP_USER
+  try {
+    const setting = await Setting.findOne({ where: { optionKey: 'smtp_user' } })
+    return setting?.optionValue || 'no-reply@localhost'
+  } catch {
+    return 'no-reply@localhost'
+  }
+}

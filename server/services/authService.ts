@@ -545,12 +545,13 @@ export async function forgotPassword(email: string, baseUrl: string): Promise<vo
 
   // 尝试发送邮件（失败不阻塞）
   try {
-    const { getTransporter, getSenderName } = await import('../utils/mailer.js')
+    const { getTransporter, getSenderName, getSenderEmail } = await import('../utils/mailer.js')
     const transporter = await getTransporter()
     if (transporter) {
       const senderName = await getSenderName()
+      const senderEmail = await getSenderEmail()
       await transporter.sendMail({
-        from: `"${senderName}" <${email}>`,
+        from: `"${senderName}" <${senderEmail}>`,
         to: email,
         subject: '密码重置',
         html: `<p>请点击以下链接重置密码（15分钟内有效）：</p>

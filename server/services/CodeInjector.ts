@@ -66,9 +66,31 @@ function getAbsolutePath(relativePath: string): string {
 
 /**
  * 判断文件是否在允许的目录中（防止越权）
+ *
+ * 安全整改：原实现用 `relativePath.startsWith(dir)` 做前缀匹配，未对路径做归一化，
+ * 攻击者可构造 `server/controllers/../../etc/cron.d/evil` 这类含 `..` 的相对路径，
+ * 前缀 `server/controllers/` 命中白名单，但 path.resolve 解析后会跳出允许目录、
+ * 写到项目根之外（任意文件写入 / 潜在的 RCE）。
+ *
+ * 现改为：先 path.posix.normalize 消解 `.` 与 `..`，拒绝任何试图跳出项目根的路径，
+ * 再对归一化后的路径做严格前缀匹配；危险文件名始终拒绝（即便落在允许目录内）。
  */
-function isPathAllowed(relativePath: string): boolean {
-  // 允许写入的目录
+export function isPathAllowed(relativePath: string): boolean {
+  if (typeof relativePath !== 'string' || relativePath.length === 0) return false
+
+  // 统一分隔符为 `/` 后归一化（消解 . 与 ..）
+  const normalized = path.posix.normalize(relativePath.replace(/\\/g, '/'))
+
+  // 归一化后仍试图跳出项目根（以 .. 开头，或为绝对路径）→ 一律拒绝
+  if (normalized.startsWith('..') || path.isAbsolute(normalized)) return false
+
+  // 不允许写入危险文件（即便落在允许目录内）
+  const blockedPatterns = [/\.env/, /package\.json/, /package-lock\.json/, /tsconfig\.json/, /vite\.config/, /\.git/, /server\.js$/, /app\.ts$/, /index\.html$/]
+  for (const pattern of blockedPatterns) {
+    if (pattern.test(normalized)) return false
+  }
+
+  // 允许写入的目录（归一化后严格前缀匹配，杜绝穿越）
   const allowedDirs = [
     'server/controllers/',
     'server/services/',
@@ -83,15 +105,8 @@ function isPathAllowed(relativePath: string): boolean {
     'src/utils/',
     '.ai-knowledge/',
   ]
-
   for (const dir of allowedDirs) {
-    if (relativePath.startsWith(dir)) return true
-  }
-
-  // 不允许写入危险文件
-  const blockedPatterns = [/\.env/, /package\.json/, /package-lock\.json/, /tsconfig\.json/, /vite\.config/, /\.git/, /server\.js$/, /app\.ts$/, /index\.html$/]
-  for (const pattern of blockedPatterns) {
-    if (pattern.test(relativePath)) return false
+    if (normalized === dir.replace(/\/$/, '') || normalized.startsWith(dir)) return true
   }
 
   return false
