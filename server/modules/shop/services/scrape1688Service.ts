@@ -42,6 +42,34 @@ export interface ScrapedProduct {
   categoryPath: string[] | null
 }
 
+/**
+ * 归一化图片 URL：去掉 1688 CDN 转码后缀（xxx.jpg_.webp 是 xxx.jpg 的 webp 版本），
+ * 使 XHR 主图与 DOM 渲染图能按同一 URL 去重。
+ */
+export function normalizeImageUrl(url: string): string {
+  return url.replace(/\.(jpe?g|png|gif|bmp)_\.(webp|jpe?g|png)$/, '.$1')
+}
+
+/**
+ * 合并主图与详情图（纯函数，可单测）：
+ * - 主图在前，详情图追加在后
+ * - 按归一化 URL 去重（详情图常与主图重复出现，仅转码后缀不同）
+ * - 上限 maxImages，防止超大图集拖慢转存
+ */
+export function mergeMainAndDetail(mainImages: string[], detailImages: string[], maxImages = 30): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const img of [...mainImages, ...detailImages]) {
+    if (!img) continue
+    const norm = normalizeImageUrl(img)
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    out.push(norm)
+    if (out.length >= maxImages) break
+  }
+  return out
+}
+
 /** 从 document.title 清洗出商品标题（去掉「 - 阿里巴巴」尾巴） */
 export function parseTitle(rawTitle: string | null | undefined): string | null {
   if (!rawTitle) return null
@@ -217,19 +245,28 @@ export async function scrape1688(url: string, opts?: { timeoutMs?: number }): Pr
     // 主图 + 阶梯价：XHR 捕获
     const parsed = parseSkuSelector(skuSelectorPayload)
 
-    // 兜底：DOM 提取商品图（alicdn ibank 图，排除图标类 svg/tps 小图）
-    let images = parsed.images
-    if (!images.length) {
-      const domImgs = (await page.evaluate(`(() => {
-        const set = new Set();
-        document.querySelectorAll('img').forEach(i => {
-          const s = i.src || '';
-          if (/cbu01\\.alicdn\\.com\\/img\\/ibank/.test(s)) set.add(s.split('?')[0].replace(/\\.webp$/, ''));
-        });
-        return Array.from(set);
-      })()`).catch(() => [] as string[])) as string[]
-      images = domImgs
+    // 滚动到底触发详情区懒加载（详情图 800x800 在主 DOM 渲染，滚动后才加载）
+    for (let i = 0; i < 12; i++) {
+      await page.mouse.wheel(0, 1200).catch(() => {})
+      await page.waitForTimeout(250)
     }
+    await page.waitForTimeout(1500)
+
+    // DOM 提取 ibank 大图（naturalWidth>=600：主图 1440 / 详情图 800；
+    // 排除 SKU 缩略图 ~300x350、_sum.jpg 80x80、店铺头像等小图）
+    const domImgs = (await page.evaluate(`(() => {
+      var seen = new Set();
+      document.querySelectorAll('img').forEach(function(i) {
+        var s = i.src || '';
+        if (s.indexOf('cbu01.alicdn.com/img/ibank') < 0) return;
+        if ((i.naturalWidth || 0) < 600) return;
+        seen.add(s.split('?')[0]);
+      });
+      return Array.from(seen);
+    })()`).catch(() => [] as string[])) as string[]
+
+    // 主图在前 + 详情图追加（去重、上限 30）；主图缺失时 DOM 图即全部图（兜底）
+    const images = mergeMainAndDetail(parsed.images, domImgs)
 
     if (!title && !images.length) {
       throw new ScrapeError('抓取失败：未提取到标题或图片（可能被反爬拦截或页面结构变化）')

@@ -4,7 +4,7 @@ import * as auditLogService from '../services/auditLogService.js'
 import { scrape1688Batch } from '../services/scrape1688Service.js'
 import { transferImages } from '../services/imageTransferService.js'
 import { executeImport } from '../services/productImportService.js'
-import { makeSlug } from '../utils/scrape1688.js'
+import { extractOfferId, makeSlug } from '../utils/scrape1688.js'
 
 /**
  * 1688 采集控制器
