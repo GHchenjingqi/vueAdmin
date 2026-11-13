@@ -261,13 +261,13 @@ export const spuApi = {
   importTemplate() {
     return request.get<Blob>('/shop/spus/import-template', { responseType: 'blob' })
   },
-  /** 1688 采集预览（抓取 + 图片转存，不写库） */
+  /** 1688 采集预览（抓取 + 图片转存，不写库）。抓取串行且慢，单独放宽超时（10 分钟） */
   scrape1688Preview(urls: string[]) {
-    return request.post<Scrape1688PreviewResult>('/shop/spus/scrape-1688/preview', { urls })
+    return request.post<Scrape1688PreviewResult>('/shop/spus/scrape-1688/preview', { urls }, { timeout: 600_000 })
   },
   /** 1688 采集入库（写库为 draft） */
   scrape1688Commit(data: Scrape1688CommitPayload) {
-    return request.post<ImportCommitResult>('/shop/spus/scrape-1688/commit', data)
+    return request.post<ImportCommitResult>('/shop/spus/scrape-1688/commit', data, { timeout: 60_000 })
   },
 }
 

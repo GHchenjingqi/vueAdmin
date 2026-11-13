@@ -19,15 +19,23 @@ import { makeSlug } from '../utils/scrape1688.js'
  * 保证"采集完成即图片已本地化"，不依赖人工上传。
  */
 
+/** 仅接受 1688 商品详情页链接（防 SSRF：Playwright 不应打开任意 URL） */
+const offerUrlSchema = z
+  .string()
+  .url()
+  .refine((u) => /^https:\/\/(detail|m)\.1688\.com\/offer\/\d+\.html/.test(u), {
+    message: '仅支持 1688 商品详情页链接（detail.1688.com/offer/xxx.html）',
+  })
+
 const previewSchema = z.object({
-  urls: z.array(z.string().url()).min(1).max(20),
+  urls: z.array(offerUrlSchema).min(1).max(20),
 })
 
 const commitSchema = z.object({
   items: z
     .array(
       z.object({
-        url: z.string().url(),
+        url: offerUrlSchema,
         title: z.string().min(1),
         description: z.string().nullable().optional(),
         cover: z.string().nullable().optional(),
@@ -124,7 +132,7 @@ export const scrapeCommit = async (req: Request, res: Response, next: NextFuncti
       cover: it.cover ?? null,
       images: it.images,
       skus: it.skus.map((sku, i) => ({
-        skuCode: `C1688-${makeSlug(it.title, it.url)}-${i + 1}`.toUpperCase(),
+        skuCode: `C1688-${extractOfferId(it.url) ?? makeSlug(it.title, it.url).slice(0, 20)}-${i + 1}`.toUpperCase(),
         spec: Object.keys(sku.spec).length ? sku.spec : null,
         barcode: null,
         hsCode: null,

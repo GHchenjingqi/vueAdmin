@@ -90,18 +90,18 @@ export async function transferImages(
     idx++
   }
 
-  const results: TransferResult[] = []
+  // 结果按原始 URL 顺序输出（保证 cover = 首图），写入槽位而非 push
+  const results: TransferResult[] = new Array(tasks.length)
   let cursor = 0
 
   async function worker() {
     while (cursor < tasks.length) {
-      const task = tasks[cursor++]
+      const i = cursor++
+      const task = tasks[i]
       const r = await downloadOne(task.url, destDir, referer, task.filename)
-      if (r) {
-        results.push({ url: r.url, error: null })
-      } else {
-        results.push({ url: task.url, error: '下载失败' })
-      }
+      results[i] = r
+        ? { url: r.url, error: null }
+        : { url: task.url, error: '下载失败' }
     }
   }
 

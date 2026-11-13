@@ -77,18 +77,23 @@ export function parseSkuSelector(data: unknown): { images: string[]; skus: Scrap
     (tradeModel?.disPriceRanges as unknown[] | undefined) ??
     ((tradeModel?.offerPriceModel as Record<string, unknown> | undefined)?.currentPrices as unknown[] | undefined)
 
-  const prices: number[] = []
+  // 阶梯价语义：取起批价（beginAmount 最小档的单价），不是所有档的最低单价。
+  // 1688 阶梯价 beginAmount 越大单价越低；进货成本应按起批价核算。
+  let moqPrice: number | null = null
   if (Array.isArray(ranges)) {
+    let best: { beginAmount: number; price: number } | null = null
     for (const r of ranges) {
       const rec = r as Record<string, unknown>
+      const beginAmount = Number(rec.beginAmount ?? 1)
       const p = Number(rec.discountPrice ?? rec.price)
-      if (Number.isFinite(p) && p > 0) prices.push(p)
+      if (!Number.isFinite(p) || p <= 0) continue
+      if (!best || beginAmount < best.beginAmount) best = { beginAmount, price: p }
     }
+    if (best) moqPrice = best.price
   }
 
-  if (prices.length) {
-    const min = Math.min(...prices)
-    skus.push({ spec: {}, price: min })
+  if (moqPrice != null) {
+    skus.push({ spec: {}, price: moqPrice })
   }
 
   return { images, skus }

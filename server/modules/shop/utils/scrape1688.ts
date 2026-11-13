@@ -25,3 +25,9 @@ export function inferImageExt(url: string): string {
   const m = clean.match(/\.(jpe?g|png|webp|gif|bmp)$/i)
   return m ? `.${m[1].toLowerCase()}` : '.jpg'
 }
+
+/** 从 1688 商品 URL 提取 offerId（无则 null） */
+export function extractOfferId(url: string): string | null {
+  const m = url.match(/offer\/(\d+)/)
+  return m ? m[1] : null
+}
