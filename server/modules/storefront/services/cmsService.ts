@@ -1,4 +1,5 @@
 import { Op, Sequelize, UniqueConstraintError } from 'sequelize'
+import DOMPurify from 'isomorphic-dompurify'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopArticle } from '../../shop/models/index.js'
@@ -338,13 +339,23 @@ function toFaqItem(row: ShopArticle, withAnswer: boolean): FaqItem {
   return {
     id: row.id,
     question: row.title,
-    answer: withAnswer ? row.content : '',
+    answer: withAnswer ? sanitizeFaqAnswer(row.content) : '',
     shortAnswer: row.summary,
     category: faqCategoryOf(row.tags),
     slug: row.slug,
     sortOrder: row.sortOrder,
     updatedAt: row.updatedAt,
   }
+}
+
+/**
+ * 净化 FAQ 富文本答案：保留安全格式标签（p/br/strong/em/ul/ol/li/a/img 等），
+ * 剥离 script / 事件属性 / javascript: 协议，防止存储型 XSS 注入公开 FAQ 页面。
+ * FAQ 答案经 C 端 v-html 渲染给所有公开访客，必须由服务端在输出边界净化一次。
+ */
+function sanitizeFaqAnswer(html: string | null | undefined): string {
+  if (!html) return ''
+  return DOMPurify.sanitize(html)
 }
 
 export interface FaqListQuery {
