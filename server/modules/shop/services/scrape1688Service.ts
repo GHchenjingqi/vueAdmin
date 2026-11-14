@@ -1,4 +1,8 @@
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
+import { mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { logInfo } from '../../../utils/fileLogger.js'
 
 /**
  * 1688 商品抓取服务
@@ -40,6 +44,26 @@ export interface ScrapedProduct {
   skus: ScrapedSku[]
   /** 1688 一级/二级类目文本，用于后续映射到本地 categoryId */
   categoryPath: string[] | null
+}
+
+/**
+ * storageState 会话文件：跨抓取复用 cookie（1688 访问期间下发的
+ * 反爬/会话 cookie），降低重复访问的风控摩擦。
+ * 用户如需登录态（部分商品价格/SKU 需登录可见），可用
+ * `npx playwright open --save-storage=state.json` 导出后放到该路径。
+ */
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const SESSION_FILE = process.env.SCRAPE_1688_SESSION_PATH || resolve(__dirname, '../../../.cache/scrape1688-state.json')
+
+/** 校验会话文件可解析且形状合法（cookies 数组）；无效返回 undefined（全新会话） */
+function loadSessionState(path: string): string | undefined {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { cookies?: unknown }
+    if (!parsed || !Array.isArray(parsed.cookies)) return undefined
+    return path
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -211,11 +235,14 @@ export async function scrape1688(url: string, opts?: { timeoutMs?: number }): Pr
     // 未设置时用 Playwright 默认浏览器）
     const executablePath = process.env.SCRAPE_CHROMIUM_PATH || undefined
     browser = await chromium.launch({ headless: true, executablePath })
+    // 复用上次会话 cookie（文件可解析时加载；损坏/缺失则全新会话）
+    const sessionState = existsSync(SESSION_FILE) ? loadSessionState(SESSION_FILE) : undefined
     const context: BrowserContext = await browser.newContext({
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
       locale: 'zh-CN',
       viewport: { width: 1440, height: 900 },
+      storageState: sessionState,
     })
     const page = await context.newPage()
 
@@ -270,6 +297,14 @@ export async function scrape1688(url: string, opts?: { timeoutMs?: number }): Pr
 
     if (!title && !images.length) {
       throw new ScrapeError('抓取失败：未提取到标题或图片（可能被反爬拦截或页面结构变化）')
+    }
+
+    // 会话状态落盘（cookie 随访问更新；失败不影响抓取结果）
+    try {
+      mkdirSync(dirname(SESSION_FILE), { recursive: true })
+      await context.storageState({ path: SESSION_FILE })
+    } catch (err) {
+      logInfo(`1688 会话状态保存失败: ${err instanceof Error ? err.message : String(err)}`)
     }
 
     return {

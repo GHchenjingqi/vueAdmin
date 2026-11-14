@@ -66,8 +66,9 @@ describe('ProForm', () => {
       modelValue,
       showActions: false,
     })
-    expect(wrapper.vm.formData.name).toBe('test user')
-    expect(wrapper.vm.formData.email).toBe('test@example.com')
+    const vm = wrapper.vm as unknown as { formData: { name: string; email: string } }
+    expect(vm.formData.name).toBe('test user')
+    expect(vm.formData.email).toBe('test@example.com')
   })
 
   it('hidden 为 true 时隐藏表单项', () => {
@@ -125,7 +126,7 @@ describe('ProForm', () => {
       schema,
       showActions: false,
     })
-    expect(wrapper.vm.formData.name).toBe('default name')
+    expect((wrapper.vm as unknown as { formData: { name: string } }).formData.name).toBe('default name')
   })
 
   it('调用 update:modelValue 当表单数据变化', async () => {
@@ -136,7 +137,7 @@ describe('ProForm', () => {
     })
 
     // 直接修改 formData 应该触发 emit
-    wrapper.vm.formData.name = 'new name'
+    ;(wrapper.vm as unknown as { formData: { name: string } }).formData.name = 'new name'
     await wrapper.vm.$nextTick()
 
     const emitted = wrapper.emitted('update:modelValue')

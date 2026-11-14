@@ -46,3 +46,6 @@ shops/node_modules/
 
 # 运行时上传数据（用户上传文件/测试转存产物，不入库）
 server/uploads/
+
+# 1688 抓取会话状态（运行时 cookie，不入库）
+server/.cache/
