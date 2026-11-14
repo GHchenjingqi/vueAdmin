@@ -8,6 +8,7 @@ import { paypalGateway } from './gateways/paypal.js'
 import { wechatGateway } from './gateways/wechat.js'
 import { alipayGateway } from './gateways/alipay.js'
 import { unionpayGateway } from './gateways/unionpay.js'
+import { stripeGateway } from './gateways/stripe.js'
 
 /** mock / bnpl 沿用 HMAC-SHA256 签名与自定义 JSON 事件（保持既有沙箱链路与回归契约） */
 const mockGateway: PaymentGateway = {
@@ -20,7 +21,14 @@ const mockGateway: PaymentGateway = {
   },
   async verifyAndParse(ctx: GatewayNotifyContext): Promise<GatewayEvent> {
     const def = getProvider(ctx.config.providerId)
-    const secret = def?.webhookSecret ?? config.payment?.webhookSecret ?? 'storefront_mock_webhook_secret'
+    // 安全修复（CWE-798 / CWE-345）：mock/bnpl 回调必须以配置的独立 webhook 密钥验签，
+    // 严禁退回硬编码默认密钥。未配置（含仍为旧默认常量 'storefront_mock_webhook_secret'）
+    // 时 fail-closed 拒绝——否则任意匿名者可凭已知默认密钥伪造 payment.succeeded，
+    // 把任意订单标记为已支付/已收款，造成资损。
+    const secret = def?.webhookSecret ?? config.payment?.webhookSecret
+    if (!secret || secret === 'storefront_mock_webhook_secret') {
+      throw new AppError(401, 'mock/bnpl 回调未配置独立 webhook 密钥（禁止默认密钥），拒绝')
+    }
     const signature = ctx.config.signature ?? ''
     if (!signature) throw new AppError(401, '缺少签名')
     const expected = createHmac('sha256', secret).update(ctx.rawBody).digest('hex')
@@ -47,6 +55,7 @@ const mockGateway: PaymentGateway = {
 
 const REAL: Record<string, PaymentGateway> = {
   paypal: paypalGateway,
+  stripe: stripeGateway,
   wechat: wechatGateway,
   alipay: alipayGateway,
   unionpay: unionpayGateway,
