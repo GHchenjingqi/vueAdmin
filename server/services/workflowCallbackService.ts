@@ -6,6 +6,7 @@
 import WorkflowBinding from '../models/WorkflowBinding.js'
 import { logInfo } from '../utils/fileLogger.js'
 import { errMessage } from '../utils/errMessage.js'
+import { signWorkflowCallback } from './workflowCallbackAuth.js'
 
 export async function fireWorkflowCallback(
   instance: { bindingKey: string | null; bindingId: number | null; id: number; title: string | null; status: string; output?: string | null },
@@ -26,10 +27,15 @@ export async function fireWorkflowCallback(
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 5000)
+  const { signature, ts } = signWorkflowCallback(payload)
   try {
     const res = await fetch(binding.callbackUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-workflow-signature': signature,
+        'x-workflow-ts': String(ts),
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     })

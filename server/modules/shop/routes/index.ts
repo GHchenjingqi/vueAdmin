@@ -28,6 +28,7 @@ import {
   adjustInventorySchema,
   createOrderSchema,
   shipOrderSchema,
+  batchShipSchema,
   createPromotionSchema,
   updatePromotionSchema,
   createCouponSchema,
@@ -85,8 +86,10 @@ const router = Router()
 
 /**
  * POST /shop/workflow-callback
- * 工作流审批结束回调（由引擎 fireWorkflowCallback 触发）。内部接口免鉴权：
- * 仅依据 instanceId + status 更新 SPU 状态，并校验实例确属 shop-publish 业务。
+ * 工作流审批结束回调（由引擎 fireWorkflowCallback 触发）。
+ * 此前"内部接口免鉴权"假设被证实不成立（与公开 API 共用端口，可被匿名伪造），
+ * 现改为 HMAC-SHA256 验签 fail-closed：引擎签发、端点校验，缺签/错签/过期一律 401。
+ * 见 services/workflowCallbackAuth.ts。
  */
 router.post('/workflow-callback', spuController.workflowCallback)
 
@@ -186,6 +189,9 @@ router.post('/inventory/adjust', authMiddleware, validate(adjustInventorySchema)
 router.get('/orders', authMiddleware, validate(shopPaginationSchema, 'query'), orderController.list)
 router.get('/orders/:id', authMiddleware, validate(idParamSchema, 'params'), orderController.detail)
 router.post('/orders', authMiddleware, validate(createOrderSchema), orderController.create)
+// 批量发货（PLAN 4.1）：必须注册在 `/orders/:id/*` 之前，
+// 否则 Express 会把 "batch-ship" 当成 :id 从而命中 idParamSchema 报 400。
+router.post('/orders/batch-ship', authMiddleware, validate(batchShipSchema), orderController.batchShip)
 router.post('/orders/:id/pay', authMiddleware, validate(idParamSchema, 'params'), orderController.markPaid)
 router.post('/orders/:id/ship', authMiddleware, validate(idParamSchema, 'params'), validate(shipOrderSchema), orderController.ship)
 router.post('/orders/:id/cancel', authMiddleware, validate(idParamSchema, 'params'), orderController.cancel)
@@ -202,6 +208,9 @@ router.post('/order-mails/:id/retry', authMiddleware, validate(idParamSchema, 'p
 router.get('/rmas', authMiddleware, rmaAdminController.list)
 router.post('/rmas/:id/approve', authMiddleware, validate(idParamSchema, 'params'), rmaAdminController.approve)
 router.post('/rmas/:id/reject', authMiddleware, validate(idParamSchema, 'params'), validate(rmaRejectSchema, 'body'), rmaAdminController.reject)
+// PLAN 4.2：批准即退款（支持部分退）与转换货，补齐「批准 → 退款」之间的人工断层
+router.post('/rmas/:id/refund', authMiddleware, validate(idParamSchema, 'params'), rmaAdminController.approveWithRefund)
+router.post('/rmas/:id/exchange', authMiddleware, validate(idParamSchema, 'params'), rmaAdminController.approveAsExchange)
 
 // ==================== 商品评价 / 问答后台审核（补齐 pending → 公开的断点） ====================
 router.get('/reviews', authMiddleware, reviewAdminController.listReviews)

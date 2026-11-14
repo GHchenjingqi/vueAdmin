@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction } from 'express'
+import { AppError } from '../../../middleware/errorHandler.js'
 import * as auditLogService from '../services/auditLogService.js'
 import * as spuService from '../services/spuService.js'
+import { verifyWorkflowCallback } from '../../../services/workflowCallbackAuth.js'
 
 export const list = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -69,10 +71,18 @@ export const submitForPublish = async (req: Request, res: Response, next: NextFu
   }
 }
 
-/** 工作流审批结果回调（由引擎 fireWorkflowCallback POST 触发，内部接口免鉴权） */
+/** 工作流审批结果回调（由引擎 fireWorkflowCallback POST 触发，HMAC 验签 fail-closed） */
 export const workflowCallback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { instanceId, status } = req.body as { instanceId: number; status: string }
+    const body = (req.body ?? {}) as { instanceId?: number; status?: string }
+    const signature = req.headers['x-workflow-signature'] as string | undefined
+    const ts = req.headers['x-workflow-ts'] as string | undefined
+    // fail-closed：缺签名 / 签名不符 / 时间戳过期 一律拒绝，杜绝匿名伪造审批回调
+    if (!verifyWorkflowCallback(body.instanceId, body.status, signature, ts)) {
+      next(new AppError(401, '回调签名校验失败'))
+      return
+    }
+    const { instanceId, status } = body
     if (status !== 'approved' && status !== 'rejected') {
       res.json({ code: 0, data: null })
       return

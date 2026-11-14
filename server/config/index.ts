@@ -71,6 +71,12 @@ const config = {
     // Webhook 验签密钥（mock 用 HMAC-SHA256 对原始 body 签名）
     webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET || 'storefront_mock_webhook_secret',
   },
+  workflow: {
+    // 工作流审批回调（引擎 → /api/v1/shop/workflow-callback）HMAC 验签密钥；
+    // 未配置时回退 config.jwt.secret（生产已被启动守卫强制设置）。
+    // 见 services/workflowCallbackAuth.ts。
+    callbackSecret: process.env.WORKFLOW_CALLBACK_SECRET || '',
+  },
   checkout: {
     // 运费 / 税费为占位规则，待 P3-T05 / P3-T06 接入真实 Provider 后替换；
     // 金额一律「分」，税率传 0..1 小数（如 0.08 = 8%）。
