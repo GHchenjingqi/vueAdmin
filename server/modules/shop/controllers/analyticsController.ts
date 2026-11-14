@@ -5,7 +5,8 @@ import { queryInt, queryStr } from '../utils/query.js'
 
 function parseQuery(req: Request): AnalyticsQuery {
   const dim = queryStr(req.query.dimension)
-  const dimension = dim && ['day', 'month', 'channel', 'category'].includes(dim) ? (dim as AnalyticsQuery['dimension']) : 'day'
+  const allowed = ['day', 'month', 'channel', 'category', 'country', 'utm'] as const
+  const dimension = dim && (allowed as readonly string[]).includes(dim) ? (dim as AnalyticsQuery['dimension']) : 'day'
   return {
     startAt: queryStr(req.query.startAt),
     endAt: queryStr(req.query.endAt),

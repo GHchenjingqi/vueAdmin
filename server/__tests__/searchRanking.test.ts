@@ -43,6 +43,10 @@ vi.mock('../modules/shop/models/index.js', () => ({
   ShopSku: { findAll: vi.fn(async () => hoist.skus) },
   ShopProductPrice: { findAll: vi.fn(async () => hoist.prices) },
   ShopInventory: { findAll: vi.fn(async () => hoist.inventories) },
+  // PLAN 2.4：列表查询新增评分聚合（按 spuId 分组），mock 返回空集合即可
+  ShopReview: { findAll: vi.fn(async () => []) },
+  // PLAN 2.5：列表补类目摘要（name/slug），mock 返回空集合
+  ShopCategory: { findAll: vi.fn(async () => []) },
 }))
 
 beforeEach(() => {

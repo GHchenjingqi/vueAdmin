@@ -53,6 +53,21 @@ export const PROVIDER_CREDENTIALS: Record<string, ProviderCredentialDef> = {
       { key: 'GATEWAY', label: '网关地址', secret: false },
     ],
   },
+  /**
+   * Stripe（PLAN 6.1）：Secret Key 用于服务端建 Checkout Session / 退款；
+   * Webhook Secret 用于验签（Stripe 用 t + v1 的 HMAC-SHA256 方案）。
+   * Publishable Key 不进服务端逻辑，放这里只是为了后台一处录入。
+   */
+  stripe: {
+    prefix: 'STRIPE',
+    fields: [
+      { key: 'SECRET_KEY', label: 'Secret Key (sk_...)', secret: true },
+      { key: 'PUBLISHABLE_KEY', label: 'Publishable Key (pk_...)', secret: false },
+      { key: 'WEBHOOK_SECRET', label: 'Webhook Secret (whsec_...)', secret: true },
+      { key: 'SUCCESS_URL', label: '支付成功回跳地址', secret: false, placeholder: 'https://shop.example.com/checkout/result' },
+      { key: 'CANCEL_URL', label: '用户取消回跳地址', secret: false, placeholder: 'https://shop.example.com/cart' },
+    ],
+  },
   unionpay: {
     prefix: 'UNIONPAY',
     fields: [

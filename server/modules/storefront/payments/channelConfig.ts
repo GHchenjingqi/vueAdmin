@@ -15,7 +15,7 @@ export const PAYMENT_CHANNELS_KEY = 'shop.payment.channels'
 const TTL_MS = 60_000
 
 /** 合法通道 id（与 providerRegistry.PROVIDERS 对齐，避免存入未知值） */
-export const CHANNEL_IDS = ['paypal', 'wechat', 'alipay', 'unionpay', 'mock', 'bnpl'] as const
+export const CHANNEL_IDS = ['paypal', 'stripe', 'wechat', 'alipay', 'unionpay', 'mock', 'bnpl'] as const
 export type ChannelId = (typeof CHANNEL_IDS)[number]
 
 /** legacy 兼容模式下默认暴露的通道（真实网关必须显式勾选才启用） */

@@ -6,7 +6,7 @@
  *       白名单内的地址按 settings.shop.shipping 分区运费服务端重算；
  *       未提供地址时不改变历史行为（兼容既有链路）。
  */
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterEach } from 'vitest'
 import { runInTenant } from '../modules/tenant/context.js'
 import * as categoryService from '../modules/shop/services/categoryService.js'
 import * as brandService from '../modules/shop/services/brandService.js'
@@ -21,6 +21,7 @@ import * as quoteService from '../modules/storefront/services/quoteService.js'
 import * as checkoutService from '../modules/storefront/services/checkoutService.js'
 import * as paymentService from '../modules/storefront/services/paymentService.js'
 import type { StorefrontSite } from '../modules/storefront/middleware/siteContext.js'
+import { setPromotionEvaluator } from '../modules/storefront/services/promotionService.js'
 
 const TID = 1
 const uniq = (): string => `sh${Date.now()}${Math.floor(Math.random() * 1e6)}`
@@ -38,6 +39,9 @@ const zoneCents = (country: string): number => {
 }
 
 beforeAll(async () => {
+  // 隔离：共享测试库里可能存在其它用例/并行会话建的促销活动（8 折），
+  // 会让本文件的金额断言随环境漂移。这里显式关闭促销求值。
+  setPromotionEvaluator(async () => null)
   shippingService.clearShippingCache()
   cfg = await inTenant(() => shippingService.getActiveShipping())
   await inTenant(async () => {
@@ -136,6 +140,63 @@ describe('T-08 配送范围与分区运费', () => {
       const q = await quoteService.createQuote(site, { items: [{ skuId, qty: 1 }] })
       expect(Number.isInteger(q.shippingCents)).toBe(true)
       expect(q.amountCents).toBe(q.subtotalCents + q.shippingCents + q.taxCents - q.discountCents)
+    })
+  })
+})
+
+describe('T-08 档位加价端到端（PLAN 1.3 补完）', () => {
+  // 共享库的 settings.shop.shipping 是全局单行且无 options，直接改会与并行测试竞态；
+  // 通过注入缝给一个带档位的配置，确定性验证「分区基础运费 + 档位加价」链路。
+  const OPTIONS_CFG: shippingService.ShippingConfig = {
+    mode: 'whitelist',
+    allowedCountries: ['US', 'GB'],
+    zones: [{ countries: ['US'], shippingCents: 800 }],
+    defaultShippingCents: 1500,
+    options: [
+      { id: 'std', name: 'Standard', surchargeCents: 0, etaDays: '7-12' },
+      { id: 'exp', name: 'Express', surchargeCents: 1200, etaDays: '3-5' },
+    ],
+  }
+
+  afterEach(() => shippingService.setShippingConfigProvider(null))
+
+  it('选定档位：运费 = 分区基础 + 该档加价，出参档位清单逐档 = 基础 + 各档加价', async () => {
+    shippingService.setShippingConfigProvider(async () => OPTIONS_CFG)
+    await inTenant(async () => {
+      const q = await quoteService.createQuote(site, {
+        items: [{ skuId, qty: 1 }],
+        shippingAddress: addr('US'),
+        shippingRateId: 'exp',
+      })
+      // 分区基础 800 + 特快加价 1200
+      expect(q.shippingCents).toBe(2000)
+      expect(q.shippingOptionId).toBe('exp')
+      const amounts = Object.fromEntries(q.shippingOptions.map((o) => [o.id, o.amountCents]))
+      expect(amounts['std']).toBe(800)
+      expect(amounts['exp']).toBe(2000)
+      // 总价勾稽：税费不含运费，金额一致
+      expect(q.amountCents).toBe(q.subtotalCents + q.shippingCents + q.taxCents - q.discountCents)
+    })
+  })
+
+  it('档位不存在或未指定 → 回退标准档（加价 0），不报错', async () => {
+    shippingService.setShippingConfigProvider(async () => OPTIONS_CFG)
+    await inTenant(async () => {
+      const q = await quoteService.createQuote(site, {
+        items: [{ skuId, qty: 1 }],
+        shippingAddress: addr('US'),
+        shippingRateId: 'nope',
+      })
+      expect(q.shippingOptionId).toBe('std')
+      expect(q.shippingCents).toBe(800)
+    })
+  })
+
+  it('注入缝关闭后回到真实库配置（无 options → 单一标准档）', async () => {
+    await inTenant(async () => {
+      const q = await quoteService.createQuote(site, { items: [{ skuId, qty: 1 }], shippingAddress: addr('US') })
+      expect(q.shippingOptions).toHaveLength(1)
+      expect(q.shippingOptions[0].id).toBe('std')
     })
   })
 })

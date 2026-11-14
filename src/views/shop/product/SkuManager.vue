@@ -73,6 +73,27 @@
         </el-form-item>
         <el-form-item :label="t('shop.sku.declaredValue')">
           <el-input-number v-model="form.declaredValue" :min="0" :precision="2" :controls="false" style="width: 160px" />
+          <div class="form-tip">{{ t('shop.sku.declaredValueTip') }}</div>
+        </el-form-item>
+        <!-- 采购成本：利润报表用；与报关申报价值分离，避免用报关价冒充成本 -->
+        <el-form-item :label="t('shop.sku.costAmount')">
+          <el-input-number v-model="form.costAmount" :min="0" :precision="2" :controls="false" style="width: 160px" />
+          <div class="form-tip">{{ t('shop.sku.costAmountTip') }}</div>
+        </el-form-item>
+        <!-- 物流属性：运费按重/体积重计费与货代对账的前提 -->
+        <el-form-item :label="t('shop.sku.weightGram')">
+          <el-input-number v-model="form.weightGram" :min="0" :precision="0" :controls="false" style="width: 160px" />
+          <span class="unit">g</span>
+        </el-form-item>
+        <el-form-item :label="t('shop.sku.dimensions')">
+          <div class="dimension-row">
+            <el-input-number v-model="form.lengthMm" :min="0" :precision="0" :controls="false" :placeholder="t('shop.sku.length')" style="width: 110px" />
+            <span class="unit">×</span>
+            <el-input-number v-model="form.widthMm" :min="0" :precision="0" :controls="false" :placeholder="t('shop.sku.width')" style="width: 110px" />
+            <span class="unit">×</span>
+            <el-input-number v-model="form.heightMm" :min="0" :precision="0" :controls="false" :placeholder="t('shop.sku.height')" style="width: 110px" />
+            <span class="unit">mm</span>
+          </div>
         </el-form-item>
         <el-form-item :label="t('shop.sku.compliance')">
           <div class="compliance-list">
@@ -210,6 +231,11 @@ const form = reactive({
   originCountry: '',
   hsCode: '',
   declaredValue: null as number | null,
+  costAmount: null as number | null,
+  weightGram: null as number | null,
+  lengthMm: null as number | null,
+  widthMm: null as number | null,
+  heightMm: null as number | null,
 })
 
 const complianceItems = ref<Array<{ key: string; value: string }>>([])
@@ -227,6 +253,11 @@ const openDialog = (row?: Record<string, unknown>): void => {
     form.originCountry = (row.originCountry as string) || ''
     form.hsCode = (row.hsCode as string) || ''
     form.declaredValue = (row.declaredValue as number) ?? null
+    form.costAmount = (row.costAmount as number) ?? null
+    form.weightGram = (row.weightGram as number) ?? null
+    form.lengthMm = (row.lengthMm as number) ?? null
+    form.widthMm = (row.widthMm as number) ?? null
+    form.heightMm = (row.heightMm as number) ?? null
     const compliance = (row.compliance as Record<string, string>) || {}
     complianceItems.value = Object.entries(compliance).map(([key, value]) => ({ key, value }))
   } else {
@@ -237,6 +268,11 @@ const openDialog = (row?: Record<string, unknown>): void => {
     form.originCountry = ''
     form.hsCode = ''
     form.declaredValue = null
+    form.costAmount = null
+    form.weightGram = null
+    form.lengthMm = null
+    form.widthMm = null
+    form.heightMm = null
     complianceItems.value = []
   }
   dialogVisible.value = true
@@ -260,6 +296,11 @@ const handleSubmit = async (): Promise<void> => {
         originCountry: form.originCountry || null,
         hsCode: form.hsCode || null,
         declaredValue: form.declaredValue,
+        costAmount: form.costAmount,
+        weightGram: form.weightGram,
+        lengthMm: form.lengthMm,
+        widthMm: form.widthMm,
+        heightMm: form.heightMm,
         compliance,
       })
       ElMessage.success(t('common.updateSuccess'))
@@ -271,6 +312,11 @@ const handleSubmit = async (): Promise<void> => {
         originCountry: form.originCountry || null,
         hsCode: form.hsCode || null,
         declaredValue: form.declaredValue,
+        costAmount: form.costAmount,
+        weightGram: form.weightGram,
+        lengthMm: form.lengthMm,
+        widthMm: form.widthMm,
+        heightMm: form.heightMm,
         compliance,
       })
       ElMessage.success(t('common.createSuccess'))
@@ -396,6 +442,24 @@ onMounted(fetchSkus)
       gap: 6px;
       margin-bottom: 6px;
     }
+  }
+
+  .form-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 2px;
+  }
+
+  .dimension-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .unit {
+    font-size: 12px;
+    color: #909399;
   }
 
   .price-add-form {

@@ -22,6 +22,8 @@ interface RawCategory {
   name: string
   level: number
   sort: number
+  /** 后端下发的语义 slug；历史行可能缺失，回退 c-<id> 保持链接可用 */
+  slug?: string
   children?: RawCategory[]
 }
 
@@ -35,6 +37,13 @@ interface RawListItem {
   categoryId: number
   price: { currency: string; min: number; max: number } | null
   inStock: boolean
+  /** 已审核评价聚合（后端 catalogService 提供）；缺失按无评价处理 */
+  ratingAvg?: number | null
+  reviewCount?: number | null
+  /** 类目摘要（含语义 slug） */
+  category?: { id: number; name: string; slug: string } | null
+  /** 商品最后更新时间（sitemap lastmod 用） */
+  updatedAt?: string
 }
 
 interface RawDetail {
@@ -51,13 +60,24 @@ interface RawDetail {
   variants: { id: number; code: string; spec: Record<string, string> | null; price: number | null; inStock: boolean }[] | null
   /** 后台 per-product SEO（title/description）；缺失或形状不符按 null 透传 */
   seo?: { title?: unknown; description?: unknown } | null
+  /** 已审核评价聚合（后端 catalogService 提供） */
+  ratingAvg?: number | null
+  reviewCount?: number | null
 }
 
 const toCents = (v: number): number => Math.round(v * 100)
 
 function adaptCategories(raw: RawCategory[]): CatalogCategory[] {
   const map = (rows: RawCategory[]): CatalogCategory[] =>
-    rows.map((r) => ({ id: r.id, slug: `c-${r.id}`, name: r.name, level: r.level, kind: 'other', children: map(r.children ?? []) }))
+    rows.map((r) => ({
+      id: r.id,
+      // 优先用后端语义 slug（/c/lace-wigs）；缺失时回退 c-<id>，旧链接仍可访问
+      slug: r.slug && r.slug.trim() ? r.slug.trim() : `c-${r.id}`,
+      name: r.name,
+      level: r.level,
+      kind: 'other',
+      children: map(r.children ?? []),
+    }))
   return map(raw)
 }
 
@@ -70,9 +90,16 @@ function adaptList(raw: { list: RawListItem[]; total: number; page: number; page
     cover: p.cover,
     images: p.images ?? [],
     videos: p.videos ?? [],
-    category: p.categoryId ? { id: p.categoryId, name: '', slug: `c-${p.categoryId}` } : null,
+    category: p.category
+      ? { id: p.category.id, name: p.category.name, slug: p.category.slug }
+      : p.categoryId
+        ? { id: p.categoryId, name: '', slug: `c-${p.categoryId}` }
+        : null,
     price: p.price ? { amount: toCents(p.price.min), currency: p.price.currency } : null,
     inStock: !!p.inStock,
+    ratingAvg: typeof p.ratingAvg === 'number' && p.ratingAvg > 0 ? p.ratingAvg : null,
+    reviewCount: typeof p.reviewCount === 'number' && p.reviewCount > 0 ? p.reviewCount : 0,
+    updatedAt: typeof p.updatedAt === 'string' ? p.updatedAt : undefined,
     variants: [],
   }))
   return { list, total: raw.total ?? list.length, page: raw.page ?? 1, pageSize: raw.pageSize ?? 24 }
@@ -102,6 +129,8 @@ function adaptDetail(raw: RawDetail): CatalogProduct {
       raw.seo && typeof raw.seo.title === 'string' && typeof raw.seo.description === 'string'
         ? { title: raw.seo.title, description: raw.seo.description }
         : null,
+    ratingAvg: typeof raw.ratingAvg === 'number' && raw.ratingAvg > 0 ? raw.ratingAvg : null,
+    reviewCount: typeof raw.reviewCount === 'number' && raw.reviewCount > 0 ? raw.reviewCount : 0,
   }
 }
 
@@ -134,11 +163,9 @@ export default defineEventHandler(async (event) => {
   const qs = new URLSearchParams()
   for (const [k, v] of Object.entries(query)) {
     if (v === undefined || v === '') continue
-    if (k === 'category') continue // slug 由下方映射或回退处理
+    // category 直接透传语义 slug（后端支持 slug 解析，并兼容旧 c-<id>）
     qs.set(k, String(v))
   }
-  const catMatch = /^c-(\d+)$/.exec(String(query.category ?? ''))
-  if (catMatch) qs.set('categoryId', catMatch[1])
 
   setResponseHeaders(event, { 'cache-control': 'public, max-age=30, stale-while-revalidate=30' })
 
@@ -146,6 +173,7 @@ export default defineEventHandler(async (event) => {
   // commerceSource=mock 时直接服务 mock fixtures，避免「目录=真实库测试商品、购物车=mockStore」导致
   // SKU 不一致（variant not found / CART_EMPTY），保证 mock 独立开发模式自洽、前端主链路可端到端验证。
   if (getCommerceSource() === 'mock') {
+    setResponseHeader(event, 'x-data-source', 'mock')
     const mock = mockCatalog(path, query)
     if (mock === null) {
       setResponseStatus(event, 404)
@@ -208,6 +236,7 @@ export default defineEventHandler(async (event) => {
     // 网络级失败 → mock 回退（前端独立开发模式）
   }
 
+  setResponseHeader(event, 'x-data-source', 'mock')
   const mock = mockCatalog(path, query)
   if (mock === null) {
     setResponseStatus(event, 404)

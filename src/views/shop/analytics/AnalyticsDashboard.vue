@@ -45,11 +45,15 @@
             <el-option :label="t('shop.analytics.dimMonth')" value="month" />
             <el-option :label="t('shop.analytics.dimChannel')" value="channel" />
             <el-option :label="t('shop.analytics.dimCategory')" value="category" />
+            <!-- PLAN 3.2：按广告来源/活动看投放 ROI（无 utm 的订单归入 direct） -->
+            <el-option :label="t('shop.analytics.dimUtm')" value="utm" />
           </el-select>
         </div>
       </template>
       <el-table v-loading="loading" :data="salesRows" border stripe max-height="360">
-        <el-table-column prop="key" :label="t('shop.analytics.dimension')" min-width="140" />
+        <el-table-column :label="t('shop.analytics.dimension')" min-width="180">
+          <template #default="{ row }">{{ formatDimensionKey(row.key) }}</template>
+        </el-table-column>
         <el-table-column prop="usdTotal" :label="t('shop.analytics.usdTotal')" min-width="130">
           <template #default="{ row }">$ {{ Number(row.usdTotal).toFixed(2) }}</template>
         </el-table-column>
@@ -69,7 +73,9 @@
         <span class="card-title">{{ t('shop.analytics.profit') }}</span>
       </template>
       <el-table v-loading="loading" :data="profitSeries" border stripe max-height="360">
-        <el-table-column prop="key" :label="t('shop.analytics.dimension')" min-width="140" />
+        <el-table-column :label="t('shop.analytics.dimension')" min-width="180">
+          <template #default="{ row }">{{ formatDimensionKey(row.key) }}</template>
+        </el-table-column>
         <el-table-column prop="revenueUSD" :label="t('shop.analytics.revenueUSD')" min-width="140">
           <template #default="{ row }">$ {{ Number(row.revenueUSD).toFixed(2) }}</template>
         </el-table-column>
@@ -168,6 +174,25 @@ const metrics = computed(() => [
   },
   { label: t('shop.analytics.costUSD'), value: `$${(profitSummary.value?.costUSD ?? 0).toFixed(2)}`, cls: 'is-down' },
 ])
+
+/**
+ * 分组键的可读化（PLAN 3.2）。
+ *
+ * 后端返回的键形如 `utm:google::spring`、`channel:3`、`category:12`、`day:2026-11-13`。
+ * 直接展示原始键对运营不友好，这里做展示层映射；未知前缀原样返回，避免吞掉信息。
+ */
+function formatDimensionKey(key: string): string {
+  if (!key) return '-'
+  if (key.startsWith('utm:')) {
+    const rest = key.slice(4)
+    const [source, campaign] = rest.split('::')
+    const src = !source || source === 'direct' ? t('shop.analytics.utmDirect') : source
+    if (!campaign || campaign === '(none)') return src
+    return `${src} / ${campaign}`
+  }
+  const [, value] = key.split(':')
+  return value ?? key
+}
 
 const loadSales = async (): Promise<void> => {
   try {

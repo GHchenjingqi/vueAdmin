@@ -137,6 +137,13 @@ export const createSkuSchema = z.object({
   originCountry: z.string().length(2).nullable().optional(),
   hsCode: z.string().max(20).nullable().optional(),
   declaredValue: z.number().min(0).max(9999999999.99).nullable().optional(),
+  // 采购成本（利润报表用，与报关申报价值分离）
+  costAmount: z.number().min(0).max(9999999999.99).nullable().optional(),
+  // 物流属性：运费按重/体积重计费与货代对账
+  weightGram: z.number().int().min(0).max(100000000).nullable().optional(),
+  lengthMm: z.number().int().min(0).max(100000).nullable().optional(),
+  widthMm: z.number().int().min(0).max(100000).nullable().optional(),
+  heightMm: z.number().int().min(0).max(100000).nullable().optional(),
   compliance: z.record(z.string().min(1).max(50), z.string().max(500)).nullable().optional(),
 })
 export type CreateSkuInput = z.infer<typeof createSkuSchema>
@@ -272,6 +279,29 @@ export const shipOrderSchema = z.object({
 })
 export type ShipOrderInput = z.infer<typeof shipOrderSchema>
 
+/**
+ * 批量发货（PLAN 4.1）
+ *
+ * 允许每行指定自己的承运商与运单号（跨境常用「同一承运商、多个运单号」）。
+ * 上限 100 条：单次提交过大时事务与外部运单生成会长时间占用连接，
+ * 且部分失败后的返工成本高于拆批。
+ */
+export const batchShipSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        orderId: z.number().int().positive(),
+        carrier: z.string().min(1).max(100).optional(),
+        trackingNo: z.string().min(1).max(100).optional(),
+      }),
+    )
+    .min(1)
+    .max(100),
+  /** 未在行内指定承运商时的默认值 */
+  defaultCarrier: z.string().min(1).max(100).optional(),
+})
+export type BatchShipInput = z.infer<typeof batchShipSchema>
+
 // ============================================================================
 // 阶段 4：营销中心 / 数据参谋
 // ============================================================================
@@ -349,7 +379,7 @@ export const analyticsQuerySchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  dimension: z.enum(['channel', 'country', 'category', 'day']).default('day'),
+  dimension: z.enum(['channel', 'country', 'category', 'day', 'utm']).default('day'),
   channelId: z.number().int().min(1).optional(),
 })
 export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>

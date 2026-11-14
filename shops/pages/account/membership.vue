@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { getToken, getStoredCustomer, type CustomerPublic } from '@shared/customer/auth'
+import { getStoredCustomer, type CustomerPublic, isAuthenticated } from '@shared/customer/auth'
 import { useI18n } from '~/composables/useI18n'
 
 /**
@@ -10,7 +10,7 @@ import { useI18n } from '~/composables/useI18n'
  */
 const { t, ti } = useI18n()
 const customer = ref<CustomerPublic | null>(getStoredCustomer())
-const loggedIn = computed(() => !!customer.value && !!getToken())
+const loggedIn = computed(() => !!customer.value && isAuthenticated())
 
 interface MembershipView {
   tier: { id: number; name: string; level: number; discountPct: number } | null

@@ -108,6 +108,8 @@ export function useCheckout() {
     const { getToken } = await import('@shared/customer/auth')
     const token = getToken()
     const res = await fetch(`/api/checkout/orders?page=${page}&pageSize=${pageSize}`, {
+      // PLAN 5.2：Cookie 模式下 token 为 null，必须带 credentials 才能携带 httpOnly 会话
+      credentials: 'same-origin',
       headers: token ? { authorization: `Bearer ${token}` } : {},
     })
     const data = (await res.json()) as { items?: OrderDraft[]; total?: number; page?: number; pageSize?: number } & { message?: string }

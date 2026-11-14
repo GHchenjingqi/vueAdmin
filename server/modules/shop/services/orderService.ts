@@ -203,3 +203,86 @@ export async function cancel(id: number): Promise<ShopOrder> {
   }
   return order
 }
+
+/**
+ * 批量发货（PLAN 4.1）
+ *
+ * 设计要点（尊重既有事务边界，不做「大事务包所有单」）：
+ * - 逐单调用 `ship(id, input)`，每单仍是自己的事务：一单失败不会回滚已成功的单，
+ *   也不会把多单的库存扣减绑在同一个长事务里（跨境订单常有部分单地址异常）。
+ * - 单条失败只记录原因并继续，最后返回逐单结果；`failed` 明细供运营直接定位重试。
+ * - 未在行内给承运商的，用 `defaultCarrier`；两者都缺则该行失败（不猜承运商）。
+ * - 已发货/已取消的订单由 `ship` 自身状态机拒绝，这里不预先过滤，
+ *   避免「预检查通过但执行时被并发改状态」造成误判。
+ */
+export interface BatchShipItemInput {
+  orderId: number
+  carrier?: string
+  trackingNo?: string
+}
+
+export interface BatchShipRowResult {
+  orderId: number
+  ok: boolean
+  status?: string
+  trackingNo?: string | null
+  carrier?: string | null
+  error?: string
+}
+
+export interface BatchShipResult {
+  total: number
+  succeeded: number
+  failed: number
+  rows: BatchShipRowResult[]
+}
+
+export async function batchShip(
+  items: Array<{ orderId?: number; carrier?: string; trackingNo?: string }>,
+  defaultCarrier?: string,
+): Promise<BatchShipResult> {
+  if (!Array.isArray(items) || items.length === 0) throw new AppError(400, '请至少提供一条发货记录')
+  if (items.length > 100) throw new AppError(400, '单次最多 100 条发货记录')
+
+  // 同一单在一次请求里出现多次会产生「已发货」伪失败，先去重并保留首个
+  const seen = new Set<number>()
+  const unique: BatchShipItemInput[] = []
+  for (const it of items) {
+    if (typeof it.orderId !== 'number' || !Number.isInteger(it.orderId) || it.orderId <= 0) {
+      throw new AppError(400, '发货记录缺少有效的 orderId')
+    }
+    if (seen.has(it.orderId)) continue
+    seen.add(it.orderId)
+    unique.push({ orderId: it.orderId, carrier: it.carrier, trackingNo: it.trackingNo })
+  }
+
+  const rows: BatchShipRowResult[] = []
+  for (const it of unique) {
+    const carrier = it.carrier || defaultCarrier
+    if (!carrier) {
+      // 承运商是运单必填项；缺失时明确失败，不静默用店铺名兜底（会导致轨迹查不到）
+      rows.push({ orderId: it.orderId, ok: false, error: '缺少承运商（行内与默认值均为空）' })
+      continue
+    }
+    try {
+      const order = await ship(it.orderId, { carrier, trackingNo: it.trackingNo })
+      // ship 内部已建运单并置 shipped；回读最近一条运单拿实际运单号（未传时由适配层生成）
+      const shipment = await ShopOrderShipment.findOne({
+        where: { orderId: it.orderId, tenantId: tid() },
+        order: [['id', 'DESC']],
+      })
+      rows.push({
+        orderId: it.orderId,
+        ok: true,
+        status: order.status,
+        trackingNo: shipment?.trackingNo ?? null,
+        carrier: shipment?.carrier ?? carrier,
+      })
+    } catch (err) {
+      rows.push({ orderId: it.orderId, ok: false, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  const succeeded = rows.filter((r) => r.ok).length
+  return { total: rows.length, succeeded, failed: rows.length - succeeded, rows }
+}

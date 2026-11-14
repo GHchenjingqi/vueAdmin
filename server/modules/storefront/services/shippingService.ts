@@ -19,16 +19,41 @@ export interface ShippingZone {
   shippingCents: number
 }
 
+/** 可选配送档位：在分区基础运费之上叠加固定加价（如特快件）。缺省时只有标准档。 */
+export interface ShippingOption {
+  id: string
+  name: string
+  surchargeCents: number
+  etaDays: string
+}
+
 export interface ShippingConfig {
   mode: 'whitelist'
   allowedCountries: string[]
   zones: ShippingZone[]
   defaultShippingCents: number
+  /** 后台可配的配送档位；未配置时回退为单一标准档（向后兼容旧配置） */
+  options?: ShippingOption[]
 }
 
 const SETTING_KEY = 'shop.shipping'
 const TTL_MS = 60_000
 const cache: { value: ShippingConfig | null; expiresAt: number } = { value: null, expiresAt: 0 }
+
+/**
+ * 配置注入点（与 taxService.setTaxProvider / promotionService.setPromotionEvaluator 同款惯例）。
+ *
+ * 用于单测隔离：共享库的 `settings.shop.shipping` 是全局单行（非租户维度），
+ * 直接改它会与并行测试竞态；注入后档位加价链路可确定性测试。
+ * 生产不设置时走默认实现（DB 读取 + 缓存），行为不变。
+ */
+type ShippingConfigProvider = () => Promise<ShippingConfig>
+let shippingConfigProvider: ShippingConfigProvider | null = null
+
+export function setShippingConfigProvider(provider: ShippingConfigProvider | null): void {
+  shippingConfigProvider = provider
+  clearShippingCache()
+}
 
 /** 后台改配置后主动失效（对齐 currencyConfig 的缓存治理） */
 export function clearShippingCache(): void {
@@ -37,6 +62,29 @@ export function clearShippingCache(): void {
 }
 
 const iso2 = (v: unknown): boolean => typeof v === 'string' && /^[A-Z]{2}$/.test(v.trim().toUpperCase())
+
+/** 默认档位：旧配置（无 options）时唯一可选，id 与前端历史写死的 'std' 保持一致 */
+export const DEFAULT_SHIPPING_OPTION: ShippingOption = { id: 'std', name: 'Standard', surchargeCents: 0, etaDays: '7-12' }
+
+/** 校验档位数组：id 唯一非空、加价非负整数、etaDays 为可读字符串 */
+function validateShippingOptions(raw: unknown): ShippingOption[] | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (!Array.isArray(raw) || raw.length === 0) throw new AppError(503, 'SHOP_SHIPPING_CONFIG_INVALID')
+  const seen = new Set<string>()
+  const out: ShippingOption[] = []
+  for (const item of raw) {
+    const o = item as ShippingOption | null
+    if (!o || typeof o !== 'object') throw new AppError(503, 'SHOP_SHIPPING_CONFIG_INVALID')
+    const id = typeof o.id === 'string' ? o.id.trim() : ''
+    if (!/^[a-z0-9_-]{1,20}$/i.test(id) || seen.has(id)) throw new AppError(503, 'SHOP_SHIPPING_CONFIG_INVALID')
+    if (!Number.isInteger(o.surchargeCents) || o.surchargeCents < 0) throw new AppError(503, 'SHOP_SHIPPING_CONFIG_INVALID')
+    if (typeof o.name !== 'string' || !o.name.trim()) throw new AppError(503, 'SHOP_SHIPPING_CONFIG_INVALID')
+    if (typeof o.etaDays !== 'string' || !/^[\d\s-]{1,20}$/.test(o.etaDays)) throw new AppError(503, 'SHOP_SHIPPING_CONFIG_INVALID')
+    seen.add(id)
+    out.push({ id, name: o.name.trim(), surchargeCents: o.surchargeCents, etaDays: o.etaDays.trim() })
+  }
+  return out
+}
 
 export function validateShippingConfig(raw: unknown): ShippingConfig {
   const cfg = raw as ShippingConfig | null
@@ -59,10 +107,13 @@ export function validateShippingConfig(raw: unknown): ShippingConfig {
     allowedCountries: [...new Set(cfg.allowedCountries.map((c) => c.trim().toUpperCase()))],
     zones: zones.map((z) => ({ countries: z.countries.map((c) => c.trim().toUpperCase()), shippingCents: z.shippingCents })),
     defaultShippingCents: fallback,
+    options: validateShippingOptions((cfg as { options?: unknown }).options),
   }
 }
 
 export async function getActiveShipping(): Promise<ShippingConfig> {
+  // 测试注入路径：不走缓存，避免 provider 在多次调用间被 60s 缓存掩盖
+  if (shippingConfigProvider) return shippingConfigProvider()
   const now = Date.now()
   if (cache.value && now < cache.expiresAt) return cache.value
   const row = await Setting.findOne({ where: { optionKey: SETTING_KEY } })
@@ -95,15 +146,43 @@ export async function assertShippableCountry(country: string): Promise<void> {
   }
 }
 
+/** 读取可用配送档位（旧配置无 options 时回退为单一标准档） */
+export async function listShippingOptions(): Promise<ShippingOption[]> {
+  const cfg = await getActiveShipping()
+  return cfg.options && cfg.options.length > 0 ? cfg.options : [DEFAULT_SHIPPING_OPTION]
+}
+
+/** 可配送国家白名单（供 C 端国家下拉与后台配置同源，避免前端写死） */
+export async function listShippableCountries(): Promise<string[]> {
+  const cfg = await getActiveShipping()
+  return [...cfg.allowedCountries]
+}
+
 /**
  * 解析收货地址 → 国家 + 分区运费。
  * 未提供地址时返回旧行为（config.checkout.shippingCents），不触发配置读取。
+ *
+ * shippingRateId 指定档位时，在分区基础运费上叠加该档位 surchargeCents；
+ * 未指定或档位不存在时回退标准档（加价 0），保证既有调用方行为不变。
  */
 export async function resolveShipping(
   address?: Record<string, unknown> | null,
-): Promise<{ country: string | null; shippingCents: number }> {
+  shippingRateId?: string,
+): Promise<{
+  country: string | null
+  shippingCents: number
+  shippingOption: ShippingOption
+  shippingOptions: ShippingOption[]
+}> {
+  const options = await listShippingOptions().catch(() => [DEFAULT_SHIPPING_OPTION])
+  const selected =
+    options.find((o) => o.id === shippingRateId) ??
+    options.find((o) => o.id === DEFAULT_SHIPPING_OPTION.id) ??
+    options[0]
+
   if (!address || typeof address !== 'object' || Object.keys(address).length === 0) {
-    return { country: null, shippingCents: Math.round(Number(config.checkout?.shippingCents ?? 0)) }
+    const base = Math.round(Number(config.checkout?.shippingCents ?? 0))
+    return { country: null, shippingCents: base + selected.surchargeCents, shippingOption: selected, shippingOptions: options }
   }
   const country = extractCountry(address)
   if (!country) throw new AppError(400, 'ADDRESS_COUNTRY_REQUIRED: 收货地址缺少有效的两位国家码')
@@ -113,5 +192,6 @@ export async function resolveShipping(
     throw new AppError(400, `ADDRESS_NOT_SHIPPABLE: 国家 ${country} 不在配送范围`)
   }
   const zone = cfg.zones.find((z) => z.countries.includes(country))
-  return { country, shippingCents: zone ? zone.shippingCents : cfg.defaultShippingCents }
+  const base = zone ? zone.shippingCents : cfg.defaultShippingCents
+  return { country, shippingCents: base + selected.surchargeCents, shippingOption: selected, shippingOptions: options }
 }

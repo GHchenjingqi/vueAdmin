@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { getToken, getStoredCustomer } from '@shared/customer/auth'
+import { getToken, getStoredCustomer, isAuthenticated } from '@shared/customer/auth'
 import { useI18n } from '~/composables/useI18n'
 
 /**
@@ -23,7 +23,7 @@ interface AddressItem {
 }
 
 const customer = getStoredCustomer()
-if (!getToken()) await navigateTo('/account', { replace: true })
+if (!isAuthenticated()) await navigateTo('/account', { replace: true })
 
 const list = ref<AddressItem[]>([])
 const loading = ref(true)
@@ -33,7 +33,7 @@ const form = ref({ fullName: '', phone: '', country: 'US', province: '', city: '
 const error = ref('')
 
 function authHeaders(): Record<string, string> {
-  return { 'content-type': 'application/json', authorization: `Bearer ${getToken() ?? ''}` }
+  return { 'content-type': 'application/json', ...(getToken() ? { authorization: `Bearer ${getToken()}` } : {}) }
 }
 
 async function load(): Promise<void> {

@@ -1217,7 +1217,15 @@
       "complianceValue": "Cert no. / URL",
       "addCompliance": "Add Certificate",
       "fetchFailed": "Failed to load SKUs",
-      "deleteConfirm": "Delete SKU"
+      "deleteConfirm": "Delete SKU",
+      "declaredValueTip": "Customs declared value, not the purchase cost",
+      "costAmount": "Purchase Cost",
+      "costAmountTip": "Used by the profit report. If empty, cost is counted as 0 (profit will be overstated)",
+      "weightGram": "Unit Weight",
+      "dimensions": "Package Size",
+      "length": "L",
+      "width": "W",
+      "height": "H"
     },
     "price": {
       "title": "Multi-currency Pricing",
@@ -1396,7 +1404,17 @@
       "itemQty": "Qty",
       "itemPrice": "Unit Price",
       "searchPlaceholder": "Search order no.",
-      "fetchFailed": "Failed to load orders"
+      "fetchFailed": "Failed to load orders",
+      "batchShip": "Bulk Ship",
+      "batchCarrierPlaceholder": "Default carrier, e.g. YunExpress / 4PX",
+      "batchRows": "Shipment Rows",
+      "batchRowsPlaceholder": "One per line: orderId trackingNo\nExample:\n1001 YT250100001\n1002 YT250100002",
+      "batchRowsTip": "Separate with space, comma or tab. Leave tracking no. empty to auto-generate. Max 100 rows.",
+      "batchSummary": "Done: {ok} succeeded, {fail} failed",
+      "batchOk": "Shipped",
+      "batchEmpty": "Please enter at least one shipment row",
+      "batchInvalidRows": "Invalid rows (must start with orderId): {rows}",
+      "orderId": "Order ID"
     },
     "rma": {
       "title": "Returns",
@@ -1423,7 +1441,15 @@
       "approve": "Approve",
       "reject": "Reject",
       "rejectTitle": "Reject Return Request",
-      "fetchFailed": "Failed to fetch return requests"
+      "fetchFailed": "Failed to fetch return requests",
+      "refundAction": "Approve & Refund",
+      "refundTitle": "Approve and Refund",
+      "refundAmount": "Refund Amount",
+      "refundAmountTip": "Defaults to the approved RMA amount. Partial refunds allowed; the cap is enforced by the server.",
+      "refundReason": "Refund Note",
+      "refundAmountRequired": "Refund amount must be greater than 0",
+      "exchange": "Convert to Exchange",
+      "statusExchange": "Exchanging"
     },
     "reviews": {
       "title": "Product Reviews",
@@ -1645,7 +1671,9 @@
       "funnelAdd": "Added to cart",
       "funnelPurchase": "Purchased",
       "funnelNote": "Funnel joins behaviors after a search within the same session (sessionId); ",
-      "funnelLoadFailed": "Failed to load search funnel"
+      "funnelLoadFailed": "Failed to load search funnel",
+      "dimUtm": "By Traffic Source",
+      "utmDirect": "Direct"
     },
     "publish": {
       "title": "Publish to Channel",

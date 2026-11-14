@@ -43,3 +43,34 @@ export const reject = async (req: Request, res: Response, next: NextFunction) =>
     next(err)
   }
 }
+
+/** POST /shop/rmas/:id/refund —— 批准并退款（PLAN 4.2，支持部分退款） */
+export const approveWithRefund = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = (req.body ?? {}) as { amountCents?: number; reason?: string }
+    const result = await rmaAdminService.approveRmaWithRefund(Number(req.params.id), {
+      amountCents: typeof body.amountCents === 'number' ? body.amountCents : undefined,
+      reason: body.reason,
+    })
+    await recordAdminAction(req, 'rma.refunded', 'refund', Number(req.params.id) || null, {
+      status: 'refunded',
+      refundNo: result.refund.refundNo,
+      amountCents: result.refund.amountCents,
+    })
+    res.json({ code: 0, data: result })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** POST /shop/rmas/:id/exchange —— 转为换货（PLAN 4.2，不触发退款） */
+export const approveAsExchange = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = (req.body ?? {}) as { note?: string }
+    const row = await rmaAdminService.approveRmaAsExchange(Number(req.params.id), body.note)
+    await recordAdminAction(req, 'rma.exchange', 'refund', Number(req.params.id) || null, { status: 'exchange' })
+    res.json({ code: 0, data: row })
+  } catch (err) {
+    next(err)
+  }
+}

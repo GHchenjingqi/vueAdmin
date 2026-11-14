@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 import { ShopWishlist, ShopMailOutbox, ShopSpu } from '../../shop/models/index.js'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { getTenantContext } from '../../tenant/context.js'
+import { productUrl, resolveUnsubscribeToken, withCallToAction } from './mailFooterService.js'
 
 /**
  * 收藏夹 Wishlist 服务（C 端顾客）
@@ -167,17 +168,21 @@ export async function notifyPriceDrop(
       toEmail: c.email,
       customerId: c.id,
       subject: `Price drop: ${opts.productName} -${discountPct}%`,
-      bodyText: [
-        `Hi,`,
-        ``,
-        `Good news! The price of "${opts.productName}" you saved has dropped:`,
-        `  Old: ${fmtPrice(opts.oldPrice)}`,
-        `  New: ${fmtPrice(opts.newPrice)} (-${discountPct}%)`,
-        ``,
-        `Grab it before it sells out!`,
-        ``,
-        `— Aurora Hair Studio`,
-      ].join('\n'),
+      // PLAN 4.4：补商品深链与退订入口。详情接口支持纯 id 解析，因此无需额外查 slug。
+      bodyText: withCallToAction(
+        [
+          `Good news! The price of "${opts.productName}" you saved has dropped:`,
+          `  Old: ${fmtPrice(opts.oldPrice)}`,
+          `  New: ${fmtPrice(opts.newPrice)} (-${discountPct}%)`,
+          ``,
+          `Grab it before it sells out!`,
+        ].join('\n'),
+        {
+          cta: { label: 'View the item', url: productUrl(productId) },
+          unsubscribeToken: await resolveUnsubscribeToken(c.email),
+          siteName: 'Aurora Hair Studio',
+        },
+      ),
       dedupeKey,
       status: 'pending',
     } as never)

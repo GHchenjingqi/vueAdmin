@@ -95,6 +95,12 @@ export async function salesReport(query: AnalyticsQuery) {
       case 'category':
         key = `category:${skuToCategory.get(it.skuId) ?? 0}`
         break
+      // PLAN 3.2：按广告来源归因分组。utm 已随建单固化进订单快照，
+      // 但报表此前只有 day/channel/country/category，导致投放 ROI 无法从站内数据算出。
+      // 无 utm 的订单归到 direct（直接访问/自然流量），避免被静默丢弃。
+      case 'utm':
+        key = `utm:${order.utmSource ?? 'direct'}::${order.utmCampaign ?? '(none)'}`
+        break
       default:
         key = `day:${(order.createdAt as Date).toISOString().slice(0, 10)}`
     }
@@ -126,11 +132,23 @@ export async function profitReport(query: AnalyticsQuery) {
   const items = await ShopOrderItem.findAll({ where: { tenantId: tid(), orderId: { [Op.in]: orders.map((o) => o.id) } } })
   const rateSnaps = await loadRateSnapshots()
 
-  // SKU 申报价值（COGS 代理）映射
+  // 成本映射（PLAN 3.3）：优先用采购成本 costAmount；
+  // declaredValue 是报关申报价值，不能当成本（历史上曾直接用它，导致毛利口径失真）。
+  // 两者都缺失时记 0 并统计缺失 SKU 数，在出参里显式标注，避免"看起来毛利很高"的误判。
   const skuIds = Array.from(new Set(items.map((i) => i.skuId)))
   const skus = await ShopSku.findAll({ where: { id: { [Op.in]: skuIds }, tenantId: tid() } })
   const skuCost = new Map<number, number>()
-  skus.forEach((s) => skuCost.set(s.id, Number(s.declaredValue ?? 0)))
+  const missingCostSkuIds = new Set<number>()
+  for (const s of skus) {
+    const cost = s.costAmount != null ? Number(s.costAmount) : null
+    if (cost != null && Number.isFinite(cost) && cost >= 0) {
+      skuCost.set(s.id, cost)
+    } else {
+      // 不用 declaredValue 兜底：报关价值 ≠ 采购成本，混用会让成本失真
+      skuCost.set(s.id, 0)
+      missingCostSkuIds.add(s.id)
+    }
+  }
 
   let totalRevenueUSD = 0
   let totalCostUSD = 0
@@ -147,8 +165,8 @@ export async function profitReport(query: AnalyticsQuery) {
     const orderItems = items.filter((i) => i.orderId === order.id)
     let cost = 0
     for (const it of orderItems) {
-      const declared = skuCost.get(it.skuId) ?? 0
-      cost += toUSDAmount(declared * it.qty, order.currency, day, rateSnaps)
+      const unitCost = skuCost.get(it.skuId) ?? 0
+      cost += toUSDAmount(unitCost * it.qty, order.currency, day, rateSnaps)
     }
 
     totalRevenueUSD += revenueUSD
@@ -173,6 +191,16 @@ export async function profitReport(query: AnalyticsQuery) {
       costUSD: round(totalCostUSD),
       grossProfitUSD: round(totalRevenueUSD - totalCostUSD),
       fxGainLossUSD: round(totalFxGainLoss),
+    },
+    /**
+     * 成本口径提示（PLAN 3.3）：`missingCostSkuCount > 0` 表示这些 SKU 未维护采购成本，
+     * 其成本按 0 计入，毛利被高估。前端据此提示运营补数据。
+     */
+    costBasis: {
+      field: 'costAmount',
+      missingCostSkuCount: missingCostSkuIds.size,
+      /** 缺失成本的 SKU 明细（最多 20 个，便于定位） */
+      missingCostSkuIds: [...missingCostSkuIds].slice(0, 20),
     },
     series: series.map((s) => ({ ...s, revenueUSD: round(s.revenueUSD), costUSD: round(s.costUSD), profitUSD: round(s.profitUSD), fxGainLoss: round(s.fxGainLoss) })),
   }

@@ -50,6 +50,8 @@ export interface CreateOrderParams {
   attribution?: OrderAttribution
   /** 要抵扣的积分数（服务端在报价中钳制到余额与应付；captured 时扣减） */
   pointsToRedeem?: number
+  /** 配送档位 id；与报价阶段保持一致，避免金额漂移 */
+  shippingRateId?: string
 }
 
 export interface OrderItemView {
@@ -137,6 +139,7 @@ export async function createOrder(site: StorefrontSite, params: CreateOrderParam
     couponCode: params.couponCode,
     customerId: params.customerId,
     pointsToRedeem: params.pointsToRedeem,
+    shippingRateId: params.shippingRateId,
   })
 
   // 3) T-07 优惠券占用（幂等键 = orderNo，失败可精确回退）

@@ -1217,7 +1217,15 @@
       "complianceValue": "证书编号/URL",
       "addCompliance": "添加资质",
       "fetchFailed": "SKU 加载失败",
-      "deleteConfirm": "确认删除 SKU"
+      "deleteConfirm": "确认删除 SKU",
+      "declaredValueTip": "报关用申报价值，不等同采购成本",
+      "costAmount": "采购成本",
+      "costAmountTip": "利润报表按此计算毛利；不填则成本按 0 计入（毛利会被高估）",
+      "weightGram": "单件实重",
+      "dimensions": "包装尺寸",
+      "length": "长",
+      "width": "宽",
+      "height": "高"
     },
     "price": {
       "title": "多币种价格",
@@ -1396,7 +1404,17 @@
       "itemQty": "数量",
       "itemPrice": "单价",
       "searchPlaceholder": "搜索订单号",
-      "fetchFailed": "订单加载失败"
+      "fetchFailed": "订单加载失败",
+      "batchShip": "批量发货",
+      "batchCarrierPlaceholder": "默认承运商，如 YunExpress / 4PX",
+      "batchRows": "发货明细",
+      "batchRowsPlaceholder": "每行一条：订单ID 运单号\n示例：\n1001 YT250100001\n1002 YT250100002",
+      "batchRowsTip": "用空格、逗号或制表符分隔；运单号留空则由系统生成。单次最多 100 条。",
+      "batchSummary": "发货完成：成功 {ok} 条，失败 {fail} 条",
+      "batchOk": "已发货",
+      "batchEmpty": "请输入至少一条发货明细",
+      "batchInvalidRows": "以下行格式不正确（需以订单ID开头）：{rows}",
+      "orderId": "订单ID"
     },
     "rma": {
       "title": "退货审核",
@@ -1423,7 +1441,15 @@
       "approve": "审核通过",
       "reject": "驳回",
       "rejectTitle": "驳回退货申请",
-      "fetchFailed": "退货申请加载失败"
+      "fetchFailed": "退货申请加载失败",
+      "refundAction": "批准退款",
+      "refundTitle": "批准并退款",
+      "refundAmount": "退款金额",
+      "refundAmountTip": "默认按售后审批额度；可改为部分退款，上限由后端按订单实付校验",
+      "refundReason": "退款说明",
+      "refundAmountRequired": "退款金额必须大于 0",
+      "exchange": "转为换货",
+      "statusExchange": "换货中"
     },
     "reviews": {
       "title": "商品评价审核",
@@ -1645,7 +1671,9 @@
       "funnelAdd": "加入购物车",
       "funnelPurchase": "下单支付",
       "funnelNote": "以下漏斗按同一会话（sessionId）内「搜索之后」的行为串联；",
-      "funnelLoadFailed": "搜索漏斗数据加载失败"
+      "funnelLoadFailed": "搜索漏斗数据加载失败",
+      "dimUtm": "按广告来源",
+      "utmDirect": "直接访问"
     },
     "publish": {
       "title": "发布到渠道",

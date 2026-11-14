@@ -6,6 +6,8 @@ class ShopCategory extends Model<InferAttributes<ShopCategory>, InferCreationAtt
   declare id: CreationOptional<number>
   declare parentId: number
   declare name: Record<string, string>
+  /** 语义化 slug（/c/:slug 与类目 TDK）；迁移回填，历史行可能为 null */
+  declare slug: string | null
   declare level: number
   declare sort: number
   declare tenantId: number
@@ -31,6 +33,11 @@ ShopCategory.init(
       type: DataTypes.JSON,
       allowNull: false,
       comment: '类目名称（多语言 JSON）',
+    },
+    slug: {
+      type: DataTypes.STRING(80),
+      allowNull: true,
+      comment: '类目语义化 slug（用于 /c/:slug 与类目 TDK）',
     },
     level: {
       type: DataTypes.INTEGER,

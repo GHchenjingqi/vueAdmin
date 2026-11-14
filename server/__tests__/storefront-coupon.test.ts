@@ -20,6 +20,7 @@ import * as couponService from '../modules/storefront/services/couponService.js'
 import * as quoteService from '../modules/storefront/services/quoteService.js'
 import * as checkoutService from '../modules/storefront/services/checkoutService.js'
 import type { StorefrontSite } from '../modules/storefront/middleware/siteContext.js'
+import { setPromotionEvaluator } from '../modules/storefront/services/promotionService.js'
 
 const TID = 1
 const uniq = (): string => `cp${Date.now()}${Math.floor(Math.random() * 1e6)}`
@@ -60,6 +61,9 @@ async function createCoupon(overrides: CouponOverrides = {}): Promise<ShopCoupon
 }
 
 beforeAll(async () => {
+  // 隔离：共享测试库里可能存在其它用例/并行会话建的促销活动（8 折），
+  // 会让本文件的金额断言随环境漂移。这里显式关闭促销求值。
+  setPromotionEvaluator(async () => null)
   await inTenant(async () => {
     const category = await categoryService.createCategory({ parentId: 0, name: { 'en-US': 'CP Cat ' + uniq() }, level: 1, sort: 0 })
     const brand = await brandService.createBrand({ name: 'CP Brand ' + uniq() })

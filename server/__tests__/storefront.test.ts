@@ -17,6 +17,7 @@ import * as rateService from '../modules/shop/services/rateService.js'
 import * as warehouseService from '../modules/shop/services/warehouseService.js'
 import * as inventoryService from '../modules/shop/services/inventoryService.js'
 import * as catalogService from '../modules/storefront/services/catalogService.js'
+import { setPromotionEvaluator } from '../modules/storefront/services/promotionService.js'
 
 const TID = 1
 
@@ -32,6 +33,9 @@ let publishedKeyword = ''
 let draftKeyword = ''
 
 beforeAll(async () => {
+  // 隔离：共享测试库里可能存在其它用例/并行会话建的促销活动（8 折），
+  // 会让本文件的金额断言随环境漂移。这里显式关闭促销求值。
+  setPromotionEvaluator(async () => null)
   await runInTenant({ tenantId: TID }, async () => {
     const category = await categoryService.createCategory({
       parentId: 0,
@@ -118,7 +122,23 @@ describe('阶段5：Storefront 商品列表', () => {
       const { list } = await catalogService.listProducts({ keyword: publishedKeyword })
       const item = list[0]
       expect(Object.keys(item).sort()).toEqual(
-        ['brandId', 'categoryId', 'cover', 'id', 'images', 'inStock', 'price', 'slug', 'title', 'videos'].sort(),
+        // PLAN 2.4 / 2.5 / 2.6 新增的公开字段：评分聚合、类目摘要、更新时间（sitemap lastmod）
+        [
+          'brandId',
+          'category',
+          'categoryId',
+          'cover',
+          'id',
+          'images',
+          'inStock',
+          'price',
+          'ratingAvg',
+          'reviewCount',
+          'slug',
+          'title',
+          'updatedAt',
+          'videos',
+        ].sort(),
       )
       expect(item.price).toEqual({ currency: 'USD', min: 129.9, max: 129.9 })
       expect(item.inStock).toBe(true)

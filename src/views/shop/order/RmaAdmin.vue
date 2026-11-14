@@ -34,6 +34,19 @@
           <el-button v-if="(row as RmaItem).status === 'pending'" type="danger" link size="small" @click="openReject(row as RmaItem)">
             {{ t('shop.rma.reject') }}
           </el-button>
+          <!-- PLAN 4.2：批准即退款（支持部分退）与转换货，避免客服在两个界面各操作一次 -->
+          <el-button
+            v-if="(row as RmaItem).status === 'pending' || (row as RmaItem).status === 'approved' || (row as RmaItem).status === 'returned'"
+            type="primary"
+            link
+            size="small"
+            @click="openRefund(row as RmaItem)"
+          >
+            {{ t('shop.rma.refundAction') }}
+          </el-button>
+          <el-button v-if="(row as RmaItem).status === 'pending'" type="warning" link size="small" @click="handleExchange(row as RmaItem)">
+            {{ t('shop.rma.exchange') }}
+          </el-button>
         </div>
       </template>
     </ProTable>
@@ -92,6 +105,23 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 批准并退款（PLAN 4.2）：金额默认取 RMA 审批额度，可改为部分退 -->
+    <el-dialog v-model="refundVisible" :title="t('shop.rma.refundTitle')" width="460px" :close-on-click-modal="false" destroy-on-close>
+      <el-form label-width="110px">
+        <el-form-item :label="t('shop.rma.refundAmount')">
+          <el-input-number v-model="refundForm.amount" :min="0" :precision="2" :controls="false" style="width: 180px" />
+          <div class="form-tip">{{ t('shop.rma.refundAmountTip') }}</div>
+        </el-form-item>
+        <el-form-item :label="t('shop.rma.refundReason')">
+          <el-input v-model="refundForm.reason" type="textarea" :rows="2" maxlength="200" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="refundVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="handleRefund">{{ t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -111,6 +141,7 @@ const statusLabel = (status: RmaStatus): string => {
     rejected: t('shop.rma.statusRejected'),
     returned: t('shop.rma.statusReturned'),
     refunded: t('shop.rma.statusRefunded'),
+    exchange: t('shop.rma.statusExchange'),
     cancelled: t('shop.rma.statusCancelled'),
   }
   return map[status] ?? status
@@ -123,6 +154,7 @@ const statusTag = (status: RmaStatus): 'success' | 'warning' | 'info' | 'danger'
     rejected: 'danger',
     returned: 'success',
     refunded: 'success',
+    exchange: 'warning',
     cancelled: 'info',
   }
   return map[status] ?? 'info'
@@ -226,6 +258,55 @@ const handleReject = async (): Promise<void> => {
     ElMessage.success(t('common.operationSuccess'))
     rejectVisible.value = false
     detailVisible.value = false
+    fetchList()
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err))
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+// ==================== 批准退款 / 换货（PLAN 4.2） ====================
+const refundVisible = ref(false)
+const refundForm = reactive({ amount: 0, reason: '' })
+
+const openRefund = (row: RmaItem): void => {
+  targetId.value = row.id
+  // 默认带出 RMA 上的审批额度（分 → 元展示），客服可改成部分退
+  refundForm.amount = row.refundAmountCents ? Number(row.refundAmountCents) / 100 : 0
+  refundForm.reason = ''
+  refundVisible.value = true
+}
+
+const handleRefund = async (): Promise<void> => {
+  if (targetId.value == null) return
+  // 前端只做"必须大于 0"的提示；上限与已退额度由后端 refundService 校验
+  if (!(refundForm.amount > 0)) {
+    ElMessage.warning(t('shop.rma.refundAmountRequired'))
+    return
+  }
+  submitLoading.value = true
+  try {
+    await shopRmaApi.approveWithRefund(targetId.value, {
+      amountCents: Math.round(refundForm.amount * 100),
+      reason: refundForm.reason.trim() || undefined,
+    })
+    ElMessage.success(t('common.operationSuccess'))
+    refundVisible.value = false
+    detailVisible.value = false
+    fetchList()
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err))
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+const handleExchange = async (row: RmaItem): Promise<void> => {
+  submitLoading.value = true
+  try {
+    await shopRmaApi.approveAsExchange(row.id)
+    ElMessage.success(t('common.operationSuccess'))
     fetchList()
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))

@@ -4,8 +4,9 @@ import { ShopSku, ShopSpu, ShopProductPrice, ShopCustomer, ShopMembershipTier } 
 import * as inventoryService from '../../shop/services/inventoryService.js'
 import { getDeliveryCommitment, type DeliveryCommitment } from '../../shop/services/warehouseRoutingService.js'
 import { evaluateBundle, allocateBundleDiscount } from './bundleService.js'
-import { resolveShipping } from './shippingService.js'
+import { listShippableCountries, resolveShipping } from './shippingService.js'
 import { evaluateCoupon } from './couponService.js'
+import { evaluatePromotion } from './promotionService.js'
 import { resolveTax } from './taxService.js'
 import { extractCountry } from './shippingService.js'
 import type { StorefrontSite } from '../middleware/siteContext.js'
@@ -68,6 +69,16 @@ export interface QuoteResult {
   pointsDiscountCents: number
   /** 服务端校验后实际采用的抵扣积分（≤ 请求值与余额） */
   pointsToRedeem: number
+  /** 当前地址可用的配送档位（含 id/name/etaDays/该档位实际运费） */
+  shippingOptions: Array<{ id: string; name: string; etaDays: string; amountCents: number }>
+  /** 本次报价实际采用的配送档位 id */
+  shippingOptionId: string
+  /** 可配送国家白名单（前端国家下拉与后台配置同源，避免写死） */
+  shippableCountries: string[]
+  /** 命中的促销活动（未命中为 null）；金额已从小计扣除 */
+  promotion: { id: number; name: Record<string, string>; rate: number } | null
+  /** 促销折扣金额（分，未命中为 0） */
+  promotionDiscountCents: number
   amountCents: number
   version: number
   expiresAt: string
@@ -121,6 +132,8 @@ export async function createQuote(
     customerId?: number
     /** 要抵扣的积分数（服务端钳制到余额与应付） */
     pointsToRedeem?: number
+    /** 选中的配送档位 id（对应 settings.shop.shipping.options）；缺省为标准档 */
+    shippingRateId?: string
   },
 ): Promise<QuoteResult> {
   const { currency, lines } = await resolveQuoteLines(site, input)
@@ -188,8 +201,16 @@ export async function createQuote(
     subtotalCents = quoteLines.reduce((s, l) => s + l.lineTotalCents, 0)
   }
 
-  // 运费：地址驱动的白名单校验 + 分区计费（服务端重算，忽略前端传入运费）
-  const { shippingCents } = await resolveShipping(input.shippingAddress)
+  // 运费：地址驱动的白名单校验 + 分区计费 + 档位加价（服务端重算，忽略前端传入运费）
+  const shipping = await resolveShipping(input.shippingAddress, input.shippingRateId)
+  const shippingCents = shipping.shippingCents
+  // 档位清单按「该地址的基础运费 + 各档位加价」逐档计算，供前端渲染可选配送方式
+  const shippingOptions = shipping.shippingOptions.map((opt) => ({
+    id: opt.id,
+    name: opt.name,
+    etaDays: opt.etaDays,
+    amountCents: shippingCents - (shipping.shippingOption.surchargeCents ?? 0) + opt.surchargeCents,
+  }))
   // 税费：仅当提供目的国时计算；目的国无配置税率时 Provider 会阻断报价（fail-closed，不静默按 0）
   let taxCents = 0
   let taxRate = 0
@@ -206,6 +227,14 @@ export async function createQuote(
   // T-07：券码由服务端校验并重算折扣，前端传入的任何折扣金额一律忽略
   const coupon = await evaluateCoupon(input.couponCode, { currency, subtotalCents })
   const couponDiscountCents = coupon?.discountCents ?? 0
+
+  // 促销活动（PLAN 3.1）：作用于商品小计，先于券/会员/积分计算。
+  // 历史缺陷：后台可建活动但报价完全不读 promotions，运营建的活动不进入订单金额。
+  const promotion = await evaluatePromotion({ currency, subtotalCents }).catch(() => null)
+  const promotionDiscountCents = promotion?.discountCents ?? 0
+  // 促销折后小计作为券/会员/积分的计算基数，避免对已让利金额重复打折
+  const subtotalAfterPromotion = Math.max(0, subtotalCents - promotionDiscountCents)
+
   // P5-T05 修复：bundle 优惠已在 L165-171 折入行单价并重算 subtotalCents，
   // 因此 discountCents 只表示「从折后小计额外扣减的券折」。
   // 原实现把 bundleDiscountCents 再次计入 discountCents，导致同一笔优惠被扣两次
@@ -227,9 +256,9 @@ export async function createQuote(
         // 例：商品 100 元 + 100 元券 + 95 折会员 + 运费 20 元
         //   修复前应付 = 100 + 20 - 100 - 5 = 15 元（运费被吃 5 元）
         //   修复后应付 = 100 + 20 - 100 - 0  = 20 元（券抵满商品，运费照收）
-        const tierDiscountRoom = Math.max(0, subtotalCents - couponDiscountCents)
+        const tierDiscountRoom = Math.max(0, subtotalAfterPromotion - couponDiscountCents)
         tierDiscountCents = Math.min(
-          Math.round((subtotalCents * (100 - tier.discountPct)) / 100),
+          Math.round((subtotalAfterPromotion * (100 - tier.discountPct)) / 100),
           tierDiscountRoom,
         )
         tierName = tier.name
@@ -246,8 +275,8 @@ export async function createQuote(
     pointsToRedeem = Math.min(Math.floor(input.pointsToRedeem), balance)
     if (pointsToRedeem > 0) {
       pointsDiscountCents = pointsToRedeem * 100
-      // 抵扣不得使应付为负：钳制到折后应付（含券折/会员折/运费/税费后）
-      const payable = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents - tierDiscountCents)
+      // 抵扣不得使应付为负：钳制到折后应付（含促销折/券折/会员折/运费/税费后）
+      const payable = Math.max(0, subtotalAfterPromotion + shippingCents + taxCents - discountCents - tierDiscountCents)
       if (pointsDiscountCents > payable) {
         pointsDiscountCents = payable
         pointsToRedeem = Math.ceil(pointsDiscountCents / 100)
@@ -255,7 +284,10 @@ export async function createQuote(
     }
   }
 
-  const amountCents = Math.max(0, subtotalCents + shippingCents + taxCents - discountCents - tierDiscountCents - pointsDiscountCents)
+  const amountCents = Math.max(
+    0,
+    subtotalAfterPromotion + shippingCents + taxCents - discountCents - tierDiscountCents - pointsDiscountCents,
+  )
 
   // P5-T04：订单级配送承诺 = 各 SKU 主仓承诺的最大值（取最不利/最长），无库存记录为 null
   const commitments = quoteLines
@@ -283,6 +315,11 @@ export async function createQuote(
     tierName,
     pointsDiscountCents,
     pointsToRedeem,
+    shippingOptions,
+    shippingOptionId: shipping.shippingOption.id,
+    shippableCountries: await listShippableCountries(),
+    promotion: promotion ? { id: promotion.promotionId, name: promotion.name, rate: promotion.rate } : null,
+    promotionDiscountCents,
     amountCents,
     version: Date.now(),
     expiresAt: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),

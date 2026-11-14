@@ -37,7 +37,7 @@ async function seed() {
     rates: { EUR: 1.1, GBP: 1.3 },
   } as never)
 
-  // 3 个 SKU（profitReport 成本用 declaredValue）
+  // 3 个 SKU（PLAN 3.3：profitReport 成本改读 costAmount，不再用报关申报价值 declaredValue）
   const skus = []
   for (let i = 0; i < 3; i++) {
     skus.push(
@@ -46,6 +46,7 @@ async function seed() {
         spuId: 1,
         code: `${PREFIX}SKU${i}`,
         declaredValue: 20,
+        costAmount: 20,
       } as never),
     )
   }
@@ -99,7 +100,7 @@ describe('报表汇率快照 N+1', () => {
 
       // 数量正确：40 单 × 100 EUR × 1.1 = 4400 USD
       expect(report.summary.revenueUSD).toBeCloseTo(4400, 0)
-      // 成本：每单 2 行 × declaredValue20 × qty1 = 40/单 × 40 单 = 1600 EUR × 1.1 = 1760 USD
+      // 成本：每单 2 行 × costAmount 20 × qty1 = 40/单 × 40 单 = 1600 EUR × 1.1 = 1760 USD
       expect(report.summary.costUSD).toBeCloseTo(1760, 0)
       expect(report.series.length).toBeGreaterThanOrEqual(1)
     })

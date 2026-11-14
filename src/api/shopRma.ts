@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 
 /** 退货申请（RMA）状态 */
-export type RmaStatus = 'pending' | 'approved' | 'rejected' | 'returned' | 'refunded' | 'cancelled'
+export type RmaStatus = 'pending' | 'approved' | 'rejected' | 'returned' | 'refunded' | 'exchange' | 'cancelled'
 
 /** 退货明细项 */
 export interface RmaItemLine {
@@ -45,5 +45,13 @@ export const shopRmaApi = {
   },
   reject(id: number, rejectReason: string) {
     return request.post<RmaItem>(`/shop/rmas/${id}/reject`, { rejectReason })
+  },
+  /** 批准并退款（PLAN 4.2）：amountCents 省略则按 RMA 审批额度退，支持部分退 */
+  approveWithRefund(id: number, data?: { amountCents?: number; reason?: string }) {
+    return request.post<{ rma: RmaItem; refund: { refundNo: string; amountCents: number; currency: string } }>(`/shop/rmas/${id}/refund`, data ?? {})
+  },
+  /** 转为换货（不触发退款） */
+  approveAsExchange(id: number, note?: string) {
+    return request.post<RmaItem>(`/shop/rmas/${id}/exchange`, { note })
   },
 }

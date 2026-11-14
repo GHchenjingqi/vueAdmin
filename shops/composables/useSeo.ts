@@ -1,5 +1,9 @@
 import { computed } from 'vue'
 import { useLocale } from './useLocale'
+import { useStoreConfig } from './useStoreConfig'
+
+/** 后端未下发 siteName 时的兜底站点名（与 store-config 控制器的回退保持一致） */
+const FALLBACK_SITE_NAME = 'Aurora Hair Studio'
 
 /**
  * SEO 组合式（P2-T09 / P5-T01b 单语 / SEO-TDK）。
@@ -52,7 +56,10 @@ export function useSeo(input: SeoInput) {
     return img.startsWith('http') ? img : `${siteUrl}${img.startsWith('/') ? img : `/${img}`}`
   })
 
-  const siteName = 'Aurora Hair Studio'
+  // PLAN 5.4：站点名由 store config 下发（后台 site_title），不再硬编码。
+  // 取不到时回退内置名，避免标题模板拼出 "xxx · " 的残缺结果。
+  const cfg = useStoreConfig()
+  const siteName = computed(() => cfg.config.value.siteName || FALLBACK_SITE_NAME)
   const ogType = input.ogType ?? 'website'
   const robots = input.noindex ? 'noindex, nofollow' : 'index, follow'
 
@@ -66,7 +73,7 @@ export function useSeo(input: SeoInput) {
       { property: 'og:description', content: description.value },
       { property: 'og:type', content: ogType },
       { property: 'og:url', content: canonical.value },
-      { property: 'og:site_name', content: siteName },
+      { property: 'og:site_name', content: siteName.value },
       ...(ogImage.value ? [{ property: 'og:image', content: ogImage.value }] : []),
       { name: 'twitter:card', content: ogImage.value ? 'summary_large_image' : 'summary' },
       { name: 'twitter:title', content: title.value },

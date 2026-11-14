@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 import { getTenantContext } from '../../tenant/context.js'
 import { ShopCart, ShopCartItem, ShopCustomer, ShopMailOutbox, ShopNewsletter, ShopOrder } from '../../shop/models/index.js'
 import { ISO_META } from './currencyConfig.js'
+import { cartUrl, resolveUnsubscribeToken, withCallToAction } from './mailFooterService.js'
 
 /**
  * 弃购召回邮件（abandoned cart recovery）
@@ -189,6 +190,14 @@ export async function scanAndNotify(
     }
 
     const { subject, bodyText } = renderEmail(cand)
+    // PLAN 4.4：补商品深链与退订入口 —— 原正文只有商品名和金额，
+    // 顾客想回来得自己搜，且没有退订方式（CAN-SPAM / GDPR 要求）。
+    const unsubToken = await resolveUnsubscribeToken(customer.email, cart.locale ?? undefined)
+    const bodyWithCta = withCallToAction(bodyText, {
+      cta: { label: 'Resume your cart', url: cartUrl() },
+      unsubscribeToken: unsubToken,
+      siteName: 'Aurora Hair Studio',
+    })
     const dedupeKey = `abandoned_cart:${cand.tier}:${cart.id}:${cart.version}`
     const existing = await ShopMailOutbox.findOne({
       where: { tenantId: tId, type: 'abandoned_cart', dedupeKey },
@@ -201,7 +210,7 @@ export async function scanAndNotify(
       toEmail: customer.email,
       customerId,
       subject,
-      bodyText,
+      bodyText: bodyWithCta,
       dedupeKey,
       status: 'pending',
     } as never)

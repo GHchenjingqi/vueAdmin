@@ -32,7 +32,11 @@ export const storefrontProductQuerySchema = z
     page: optionalQueryInt(),
     pageSize: optionalQueryInt(60),
     keyword: optionalQueryStr(100),
+    /** 排序白名单：newest（默认）/ price-asc / price-desc；非法值由 service 回退 newest（不返回 400） */
+    sort: optionalQueryStr(20),
     categoryId: optionalQueryInt(),
+    /** 类目语义 slug（BFF 从 /c/:slug 透传）；与 categoryId 二选一，slug 优先解析 */
+    category: optionalQueryStr(80),
     /** 按 SPU id 列表精确取（收藏夹/最近看过复用商品卡渲染）；逗号分隔数字串 */
     ids: optionalQueryStr(2000),
     currency: z.preprocess((v) => {
@@ -132,6 +136,8 @@ export const quoteSchema = z
     couponCode: z.string().min(1).max(50).optional(),
     // 会员积分抵扣（服务端钳制到余额与应付；登录态顾客身份取自 JWT）
     pointsToRedeem: z.number().int().min(0).max(1_000_000).optional(),
+    // 配送档位 id（settings.shop.shipping.options）；缺省为标准档
+    shippingRateId: z.string().min(1).max(20).optional(),
   })
   .passthrough()
 
@@ -165,6 +171,8 @@ export const createOrderSchema = z
     couponCode: z.string().min(1).max(50).optional(),
     pointsToRedeem: z.number().int().min(0).max(1_000_000).optional(),
     attribution: orderAttributionSchema.optional(),
+    // 配送档位与报价保持一致，避免「报价含特快加价、下单按标准档」的金额漂移
+    shippingRateId: z.string().min(1).max(20).optional(),
   })
   .passthrough()
 
@@ -273,6 +281,8 @@ export const cmsListQuerySchema = z
     pageSize: optionalQueryInt(60),
     tag: optionalQueryStr(40),
     keyword: optionalQueryStr(100),
+    /** 排序白名单：newest（默认）/ price-asc / price-desc；非法值由 service 回退 newest（不返回 400） */
+    sort: optionalQueryStr(20),
   })
   .passthrough()
 
@@ -299,6 +309,8 @@ export const faqListQuerySchema = z
   .object({
     category: optionalQueryStr(40),
     keyword: optionalQueryStr(100),
+    /** 排序白名单：newest（默认）/ price-asc / price-desc；非法值由 service 回退 newest（不返回 400） */
+    sort: optionalQueryStr(20),
   })
   .passthrough()
 export type FaqListQueryInput = z.infer<typeof faqListQuerySchema>

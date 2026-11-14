@@ -10,11 +10,37 @@ import { buildCollectionPaginationLinks } from '~/shared/seo/pagination'
  */
 const { t, ti } = useI18n()
 const route = useRoute()
-const { listProducts } = useCatalog()
+const { listProducts, loadCategories } = useCatalog()
 
 const page = computed(() => Number(route.query.page ?? 1) || 1)
 const sort = computed(() => String(route.query.sort ?? 'newest'))
 const category = computed(() => String(route.params.slug ?? ''))
+
+// 类目树：用于「旧 c-<id> 链接 → 语义 slug」的 301 与 H1 名称
+const { data: categories } = await useAsyncData('collection-categories', () => loadCategories())
+const flatCategories = computed(() => {
+  const out: { id: number; slug: string; name: string }[] = []
+  const walk = (nodes: { id: number; slug: string; name: string; children?: unknown[] }[]): void => {
+    for (const n of nodes) {
+      out.push({ id: n.id, slug: n.slug, name: n.name })
+      if (Array.isArray(n.children) && n.children.length) walk(n.children as typeof nodes)
+    }
+  }
+  walk((categories.value ?? []) as never)
+  return out
+})
+
+/**
+ * 旧链接兼容（SEO_SPEC §7）：/c/c-11 → /c/lace-wigs，301 保住历史外链与收录。
+ * 只在能解析出语义 slug 时跳转，避免 slug 缺失时空跳。
+ */
+const matchedCategory = computed(() => flatCategories.value.find((c) => c.slug === category.value) ?? null)
+if (/^c-\d+$/.test(category.value)) {
+  const canonicalSlug = matchedCategory.value?.slug
+  if (canonicalSlug && canonicalSlug !== category.value) {
+    await navigateTo({ path: `/c/${canonicalSlug}`, query: route.query }, { redirectCode: 301, replace: true })
+  }
+}
 
 const { data, pending, error } = await useAsyncData(
   `collection-${category.value}-${sort.value}-${page.value}`,
@@ -58,12 +84,14 @@ const CATEGORY_SEO: Record<string, { name: string; desc: string; keywords: strin
   },
 }
 const humanize = (s: string) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+/** 展示名：优先后台类目名，其次语义 slug 的人化形式，最后回退 category 参数 */
+const categoryLabel = computed(() => matchedCategory.value?.name || humanize(category.value))
 
 useSeo({
-  title: () => CATEGORY_SEO[category.value]?.name ?? humanize(category.value),
+  title: () => CATEGORY_SEO[category.value]?.name ?? categoryLabel.value,
   description: () =>
     CATEGORY_SEO[category.value]?.desc ??
-    `Shop ${humanize(category.value)} at Aurora Hair Studio. Free standard shipping over $99, 30-day returns.`,
+    `Shop ${categoryLabel.value} at Aurora Hair Studio. Free standard shipping over $99, 30-day returns.`,
   keywords: () => CATEGORY_SEO[category.value]?.keywords ?? category.value.replace(/-/g, ', '),
   path: `/c/${category.value}`,
   // SEO_SPEC §2（P0-T16）：分页 canonical 自指 + rel=prev/next；第 1 页 canonical 去参数
@@ -77,7 +105,7 @@ useSeo({
 
 <template>
   <div>
-    <h1 class="mb-6 text-2xl font-semibold capitalize">{{ category.replace(/-/g, ' ') }}</h1>
+    <h1 class="mb-6 text-2xl font-semibold capitalize">{{ categoryLabel }}</h1>
 
     <div class="mb-6 flex flex-wrap items-center gap-2 text-sm">
       <span class="text-stone-500">{{ t('category.sort') }}</span>

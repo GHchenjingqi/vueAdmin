@@ -10,7 +10,8 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'en' },
-      titleTemplate: '%s · Aurora Hair Studio',
+      // PLAN 5.4：titleTemplate 不再硬编码站点名。
+      // 由 useSeo / layout 用后端下发的 siteName 动态设置（见 plugins/site-head.ts）。
       meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
     },
   },

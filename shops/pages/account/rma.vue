@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { getToken, submitRma, listMyRmas } from '@shared/customer/auth'
+import { submitRma, listMyRmas, isAuthenticated } from '@shared/customer/auth'
 import { useI18n } from '~/composables/useI18n'
 
 /**
@@ -18,7 +18,7 @@ const message = ref('')
 const error = ref('')
 const rmas = ref<unknown[] | null>(null)
 
-if (!getToken()) {
+if (!isAuthenticated()) {
   await navigateTo('/account', { replace: true })
 }
 

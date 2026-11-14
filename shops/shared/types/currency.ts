@@ -16,6 +16,8 @@ export interface CurrencyConfig {
 export interface StoreConfig {
   currency: CurrencyConfig
   market: { country: string; language: string }
+  /** 站点名（后台 site_title 下发；用于标题模板、og:site_name、Organization） */
+  siteName?: string
   version: string
 }
 

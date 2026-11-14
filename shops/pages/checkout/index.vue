@@ -30,11 +30,22 @@ const address = reactive({
   postcode: '',
 })
 const couponCode = ref('')
-const shippingRateId = ref('std')
+// 档位由服务端下发（见 quote.shippingRates）；初始为空，拿到首个报价后落到服务端返回的默认档
+const shippingRateId = ref('')
 const email = ref('')
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
 const fieldErrors = reactive<Record<string, string>>({})
+
+/**
+ * 可配送国家：优先用报价响应里的 shippableCountries（与后台 settings.shop.shipping 同源），
+ * 取不到时回退内置列表。国家是运费分区与税率的唯一依据，不能让用户自由输入。
+ */
+const FALLBACK_COUNTRIES = ['US', 'CA', 'GB', 'DE', 'FR', 'AU', 'JP', 'SG']
+const shippingCountries = computed(() => {
+  const fromServer = quote.value?.shippableCountries ?? []
+  return fromServer.length > 0 ? fromServer : FALLBACK_COUNTRIES
+})
 
 interface QuoteResponse {
   quoteId: string
@@ -52,6 +63,7 @@ interface QuoteResponse {
   shippingRates: { id: string; name: string; amount: { amount: number; currency: string }; etaDays: string }[]
   appliedCoupon: { code: string; discount: { amount: number; currency: string } } | null
   deliveryCommitment?: { warehouseId: number; warehouseName: string; warehouseType: string; deliveryEstimateDays: number } | null
+  shippableCountries?: string[]
 }
 
 const { data: quote, refresh: refreshQuoteBase } = await useAsyncData(
@@ -59,10 +71,23 @@ const { data: quote, refresh: refreshQuoteBase } = await useAsyncData(
   () =>
     $fetch<QuoteResponse>('/api/checkout/quote', {
       method: 'POST',
-      body: { shippingRateId: shippingRateId.value, couponCode: couponCode.value || undefined },
+      // 地址是运费与税费的前提：不传地址时服务端只能给出不含税总价（这曾导致税恒为 0）
+      body: {
+        shippingAddress: address,
+        shippingRateId: shippingRateId.value || undefined,
+        couponCode: couponCode.value || undefined,
+      },
     }),
   { server: true },
 )
+
+// 服务端下发档位后，首次进入时选中它返回的默认档，避免前端写死 'std'
+watch([quote, shippingRateId], () => {
+  const rates = quote.value?.shippingRates ?? []
+  if (!shippingRateId.value && rates.length > 0) {
+    shippingRateId.value = rates[0].id
+  }
+})
 
 async function refreshQuote(): Promise<void> {
   await refreshQuoteBase()
@@ -83,6 +108,18 @@ function validateAddress(): boolean {
   fieldErrors.email = email.value.includes('@') ? '' : t('checkout.err.email')
   return Object.values(fieldErrors).every((v) => !v)
 }
+
+/**
+ * 国家变化即重算报价：运费按分区、税费按目的国，两者都依赖 country。
+ * 只在国家有效时才重算，避免用户清空字段时把报价打成 400。
+ */
+watch(
+  () => address.country,
+  async (country) => {
+    if (!country || country.trim().length !== 2) return
+    await refreshQuote()
+  },
+)
 
 async function submit(): Promise<void> {
   submitError.value = null
@@ -117,7 +154,17 @@ useSeo({ title: () => t('checkout.title'), description: () => t('checkout.descri
         <div class="space-y-3">
           <div v-for="key in Object.keys(address) as (keyof typeof address)[]" :key="key" class="space-y-1">
             <label class="block text-xs font-medium text-stone-600" :for="key">{{ t('field.' + key) }}</label>
+            <!-- 国家决定运费分区与税率，用下拉限定为可配送国家，避免自由输入导致 400 -->
+            <select
+              v-if="key === 'country'"
+              :id="key"
+              v-model="address[key]"
+              class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
+            >
+              <option v-for="c in shippingCountries" :key="c" :value="c">{{ c }}</option>
+            </select>
             <input
+              v-else
               :id="key"
               v-model="address[key]"
               class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"

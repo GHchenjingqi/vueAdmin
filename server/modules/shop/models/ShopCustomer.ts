@@ -2,7 +2,7 @@ import { DataTypes, Model, CreationOptional, InferAttributes, InferCreationAttri
 import sequelize from '../../../config/database.js'
 
 /** C 端顾客状态 */
-export type CustomerStatus = 'active' | 'blocked'
+export type CustomerStatus = 'active' | 'blocked' | 'deleted'
 
 /** C 端顾客（与后台 admin users 完全隔离，独立 JWT） */
 class ShopCustomer extends Model<InferAttributes<ShopCustomer>, InferCreationAttributes<ShopCustomer>> {
@@ -54,7 +54,7 @@ ShopCustomer.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'active',
-      comment: 'active/blocked',
+      comment: 'active/blocked/deleted（注销=匿名化停用）',
     },
     referralCode: {
       type: DataTypes.STRING(64),

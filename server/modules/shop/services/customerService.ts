@@ -137,3 +137,15 @@ export function verifyCustomerToken(token: string): CustomerJwtPayload {
     type: 'customer',
   }
 }
+
+/**
+ * 仅校验密码是否正确（PLAN 5.3：注销二次确认用）。
+ *
+ * 与 authenticateCustomer 分开：后者会写登录计数/限流/会员维度，注销场景不应触发这些副作用。
+ * 已注销账号一律返回 false（状态为 deleted 时不可再核验，防止变相探测）。
+ */
+export async function verifyCustomerPassword(tenantId: number, customerId: number, password: string): Promise<boolean> {
+  const customer = await ShopCustomer.findOne({ where: { tenantId, id: customerId } })
+  if (!customer || customer.status === 'deleted') return false
+  return bcrypt.compare(password, customer.passwordHash)
+}

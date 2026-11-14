@@ -24,10 +24,30 @@ import type { Money } from '@shared/types/currency'
 
 export type CommerceSource = 'mock' | 'real' | 'auto'
 
+/**
+ * 数据源解析。
+ *
+ * 生产环境（NODE_ENV=production）强制 real：mock/auto 都会在网络抖动时把演示商品
+ * 卖给真实顾客，且监控看不到异常（页面 200、订单落到 mock store）。
+ * 开发/预发保留 auto 与 mock 以便独立联调。
+ */
 export function getCommerceSource(): CommerceSource {
+  if (process.env.NODE_ENV === 'production') {
+    const raw = useRuntimeConfig().commerceSource as string | undefined
+    if (raw === 'mock' || raw === 'auto') {
+      // 只告警一次，避免每次请求刷日志
+      if (!productionSourceWarned) {
+        productionSourceWarned = true
+        console.warn(`[commerce] 生产环境忽略 NUXT_COMMERCE_SOURCE=${raw}，已强制使用 real 数据源`)
+      }
+    }
+    return 'real'
+  }
   const raw = useRuntimeConfig().commerceSource as string | undefined
   return raw === 'real' || raw === 'mock' ? raw : 'auto'
 }
+
+let productionSourceWarned = false
 
 import { request as httpsRequest } from 'node:https'
 import { request as httpRequest } from 'node:http'
@@ -127,6 +147,18 @@ export function adaptQuote(real: Record<string, unknown>, extraWarnings: string[
     tax: money(num(real.taxCents), currency),
     total: money(num(real.amountCents), currency),
   }
+  // 配送档位由服务端按目的地下发（含每档实际运费），前端不再写死 'std'
+  const rawOptions = Array.isArray(real.shippingOptions) ? (real.shippingOptions as Record<string, unknown>[]) : []
+  const shippingRates = rawOptions.map((o) => ({
+    id: str(o.id, 'std'),
+    name: str(o.name, 'Standard'),
+    amount: money(num(o.amountCents), currency),
+    etaDays: str(o.etaDays, ''),
+  }))
+  // 可配送国家白名单同源下发，前端下拉不再硬编码
+  const shippableCountries = Array.isArray(real.shippableCountries)
+    ? (real.shippableCountries as unknown[]).filter((c): c is string => typeof c === 'string' && /^[A-Z]{2}$/.test(c))
+    : []
   return {
     quoteId: `real-${num(real.version, 0)}`,
     version: num(real.version, 1),
@@ -140,7 +172,7 @@ export function adaptQuote(real: Record<string, unknown>, extraWarnings: string[
       lineTotal: money(num(i.lineTotalCents), currency),
     })),
     totals,
-    shippingRates: [],
+    shippingRates,
     appliedCoupon: null,
     warnings: extraWarnings,
     // P5-T04：按仓配送承诺透传
@@ -152,6 +184,7 @@ export function adaptQuote(real: Record<string, unknown>, extraWarnings: string[
           deliveryEstimateDays: num((real.deliveryCommitment as Record<string, unknown>).deliveryEstimateDays),
         }
       : null,
+    shippableCountries,
   }
 }
 
@@ -252,4 +285,64 @@ function rawRequest(
     if (init.body) req.write(init.body)
     req.end()
   })
+}
+
+// ===================== BFF 转发体契约（唯一构造点，供单测锁定） =====================
+
+/**
+ * 报价转发体。
+ *
+ * 后端 quoteService 依赖 shippingAddress 计运费/税费，依赖 couponCode / pointsToRedeem
+ * 计折扣。BFF 曾只转发 cartToken，导致税率、分区运费、优惠券在 C 端全部失效
+ * （storefront-ops-audit dim01）。此函数是唯一构造点，字段集合由契约单测锁定。
+ */
+export interface QuoteForwardInput {
+  cartToken?: string
+  shippingAddress?: unknown
+  shippingRateId?: string
+  couponCode?: string
+  customerId?: number
+  pointsToRedeem?: number
+}
+
+export function buildQuoteForwardBody(body: Record<string, unknown>, cartToken?: string): QuoteForwardInput {
+  return {
+    cartToken,
+    shippingAddress: body.shippingAddress,
+    shippingRateId: body.shippingRateId as string | undefined,
+    couponCode: body.couponCode as string | undefined,
+    customerId: body.customerId as number | undefined,
+    pointsToRedeem: body.pointsToRedeem as number | undefined,
+  }
+}
+
+/** 下单转发体：券与积分必须随单下发，否则下单金额与报价不一致 */
+export interface OrderForwardInput {
+  idempotencyKey: string
+  email?: string
+  shippingAddress?: unknown
+  note?: string
+  cartToken?: string
+  couponCode?: string
+  pointsToRedeem?: number
+  shippingRateId?: string
+  attribution?: unknown
+}
+
+export function buildOrderForwardBody(
+  body: Record<string, unknown>,
+  cartToken: string | undefined,
+  fallbackKey: string,
+): OrderForwardInput {
+  return {
+    idempotencyKey: (body.idempotencyKey as string | undefined) ?? fallbackKey,
+    email: body.email as string | undefined,
+    shippingAddress: body.address,
+    note: body.note as string | undefined,
+    cartToken,
+    couponCode: body.couponCode as string | undefined,
+    pointsToRedeem: body.pointsToRedeem as number | undefined,
+    shippingRateId: body.shippingRateId as string | undefined,
+    attribution: body.attribution,
+  }
 }

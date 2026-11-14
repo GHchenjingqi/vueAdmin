@@ -36,6 +36,10 @@ export interface CatalogProduct {
   inStock: boolean
   variants: CatalogVariant[]
   categoryKind?: 'wig' | 'apparel'
+  /** 已审核评价均分（保留 2 位）；无评价为 null */
+  ratingAvg?: number | null
+  /** 已审核评价数量 */
+  reviewCount?: number
   /** 后台 per-product SEO 字段（真实后端契约提供；mock fixtures 可缺省） */
   seo?: { title: string; description: string } | null
 }

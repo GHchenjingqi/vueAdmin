@@ -4,7 +4,7 @@ import { useWishlist, type WishlistItemView } from '~/composables/useWishlist'
 import { useCatalog } from '~/composables/useCatalog'
 import { useI18n } from '~/composables/useI18n'
 import ProductCard from '~/components/commerce/ProductCard.vue'
-import { getToken, getStoredCustomer, type CustomerPublic } from '@shared/customer/auth'
+import { getStoredCustomer, type CustomerPublic, isAuthenticated } from '@shared/customer/auth'
 import type { CatalogProduct } from '@shared/types/api'
 
 /**
@@ -16,7 +16,7 @@ const wishlist = useWishlist()
 const catalog = useCatalog()
 
 const customer = ref<CustomerPublic | null>(getStoredCustomer())
-const loggedIn = computed(() => !!customer.value && !!getToken())
+const loggedIn = computed(() => !!customer.value && isAuthenticated())
 const items = ref<WishlistItemView[]>([])
 const loading = ref(false)
 const error = ref('')

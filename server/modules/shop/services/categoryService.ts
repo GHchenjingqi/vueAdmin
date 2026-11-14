@@ -3,6 +3,7 @@ import { AppError } from '../../../middleware/errorHandler.js'
 import { ShopCategory } from '../models/index.js'
 import type { CreateCategoryInput, UpdateCategoryInput } from '../../../shared/schemas/shop.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
+import { generateUniqueCategorySlug } from './categorySlugService.js'
 
 /** 当前租户 ID（读取全局租户上下文，平台超管兜底为 1） */
 const tid = (): number => getTenantContext()?.tenantId ?? 1
@@ -55,7 +56,10 @@ export async function createCategory(input: CreateCategoryInput): Promise<ShopCa
     // 子类目层级 = 父层级 + 1，最大 5 级
     input.level = Math.min(parent.level + 1, 5)
   }
-  return ShopCategory.create({ ...input, tenantId: getTenantContext()?.tenantId ?? 1 } as never)
+  const tenantId = getTenantContext()?.tenantId ?? 1
+  // slug 是 /c/:slug 与类目 TDK 的唯一依据，必须与类目同时创建（历史缺陷：只在迁移里回填过）
+  const slug = await generateUniqueCategorySlug(tenantId, input.name, null)
+  return ShopCategory.create({ ...input, slug, tenantId } as never)
 }
 
 export async function updateCategory(id: number, input: UpdateCategoryInput): Promise<ShopCategory> {
@@ -76,7 +80,13 @@ export async function updateCategory(id: number, input: UpdateCategoryInput): Pr
       if (descendants.includes(input.parentId)) throw new AppError(400, '父类目不能是自身的子孙类目')
     }
   }
-  await row.update(input as never)
+  // slug 一经生成即保持稳定（URL 是外链与收录的一部分，不能随改名漂移）；
+  // 只有历史空值需要补，避免旧数据永久缺失语义 URL。
+  const patch: Record<string, unknown> = { ...input }
+  if (!row.slug) {
+    patch.slug = await generateUniqueCategorySlug(tid(), input.name ?? row.name, row.id, row.id)
+  }
+  await row.update(patch as never)
   return row
 }
 

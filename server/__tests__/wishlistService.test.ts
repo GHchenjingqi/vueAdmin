@@ -11,8 +11,9 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 const hoist = vi.hoisted(() => {
   const rows: Record<string, unknown>[] = []
   const outbox: Record<string, unknown>[] = []
+  const newsletter: { email: string; token: string }[] = []
   let idSeq = 1
-  return { rows, outbox, idSeq }
+  return { rows, outbox, newsletter, idSeq }
 })
 
 function makeRow(over: Record<string, unknown> = {}) {
@@ -105,6 +106,15 @@ vi.mock('../modules/shop/models/index.js', () => ({
   ShopSku: { findAll: vi.fn(async () => []) },
   ShopProductPrice: { findAll: vi.fn(async () => []) },
   ShopInventory: { findAll: vi.fn(async () => []) },
+  // PLAN 4.4：退订 token 解析需要 newsletter 模型（未订阅时补建并返回 token）
+  ShopNewsletter: {
+    findOne: vi.fn(async (args: { where: { email?: string } }) =>
+      hoist.newsletter.find((n) => n.email === args.where.email) ?? null),
+    create: vi.fn(async (rec: Record<string, unknown>) => {
+      hoist.newsletter.push(rec as { email: string; token: string })
+      return rec
+    }),
+  },
 }))
 
 const wishlistService = await import('../modules/storefront/services/wishlistService.js')
@@ -112,6 +122,7 @@ const wishlistService = await import('../modules/storefront/services/wishlistSer
 beforeEach(async () => {
   hoist.rows.length = 0
   hoist.outbox.length = 0
+  hoist.newsletter.length = 0
   vi.clearAllMocks()
   // 复位 ShopSpu.findOne（防止 "商品不存在抛 404" 测试污染后续用例）
   const { ShopSpu } = (await import('../modules/shop/models/index.js')) as { ShopSpu: { findOne: unknown } }

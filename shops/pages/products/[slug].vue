@@ -53,6 +53,14 @@ const inStock = computed(() => variant.value?.inStock ?? false)
 const stockNote = computed(() => variant.value?.stockNote)
 const added = ref(false)
 
+// 图片画廊：cover 优先，其后拼接 images（去重、过滤空值）
+const gallery = computed<string[]>(() => {
+  const list = [product.value?.cover, ...(product.value?.images ?? [])].filter((v): v is string => typeof v === 'string' && v.length > 0)
+  return [...new Set(list)]
+})
+const activeIndex = ref(0)
+const activeImage = computed(() => gallery.value[activeIndex.value] ?? null)
+
 async function addToCart(): Promise<void> {
   if (!variant.value || !inStock.value || !variant.value.price) return
   await cart.add(variant.value.id, 1)
@@ -114,6 +122,30 @@ onMounted(async () => {
   }
 })
 
+// ==================== 到货通知（PLAN 4.3） ====================
+const restockEmail = ref('')
+const restockBusy = ref(false)
+const restockDone = ref(false)
+const restockError = ref<string | null>(null)
+
+async function subscribeRestock(): Promise<void> {
+  if (!variant.value || restockBusy.value) return
+  restockBusy.value = true
+  restockError.value = null
+  try {
+    await $fetch('/api/restock/subscribe', {
+      method: 'POST',
+      body: { email: restockEmail.value.trim(), skuId: variant.value.id },
+    })
+    restockDone.value = true
+  } catch (err) {
+    // 失败要可见：缺货页是流失点，静默失败会让顾客以为已订阅
+    restockError.value = err instanceof Error ? err.message : t('restock.failed')
+  } finally {
+    restockBusy.value = false
+  }
+}
+
 // 收藏（详情页心形）：游客本地 / 登录云端，进入页面初始化收藏 id 集合
 const wishlist = useWishlist()
 const wishBusy = ref(false)
@@ -158,8 +190,30 @@ async function toggleWishlist(): Promise<void> {
     <div v-else class="grid gap-8 lg:grid-cols-2">
       <div>
         <div class="aspect-square w-full overflow-hidden rounded-2xl bg-stone-100">
-          <img v-if="product.cover" :src="product.cover" :alt="product.title" width="1200" height="1200" class="h-full w-full object-cover" />
+          <img
+            v-if="activeImage"
+            :src="activeImage"
+            :alt="product.title"
+            width="1200"
+            height="1200"
+            class="h-full w-full object-cover"
+          />
           <div v-else class="flex h-full w-full items-center justify-center text-6xl text-stone-300" aria-hidden="true">✦</div>
+        </div>
+        <!-- 多图切换：spus.images 后端已返回，此前 PDP 只渲染 cover，顾客看不到发际线/发缝细节 -->
+        <div v-if="gallery.length > 1" class="mt-3 flex gap-2 overflow-x-auto">
+          <button
+            v-for="(img, idx) in gallery"
+            :key="img + idx"
+            type="button"
+            class="h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition"
+            :class="activeIndex === idx ? 'border-stone-900' : 'border-transparent hover:border-stone-300'"
+            :aria-label="`查看第 ${idx + 1} 张图片`"
+            :aria-pressed="activeIndex === idx"
+            @click="activeIndex = idx"
+          >
+            <img :src="img" :alt="`${product.title} ${idx + 1}`" width="120" height="120" class="h-full w-full object-cover" loading="lazy" />
+          </button>
         </div>
         <!-- A-视频（本地存储）：spus.videos 透传；有视频时在主图下方播放（首个视频，原生 controls） -->
         <div v-if="product.videos?.length" class="mt-4 space-y-2">
@@ -177,6 +231,12 @@ async function toggleWishlist(): Promise<void> {
       <div class="space-y-6">
         <div>
           <h1 class="text-2xl font-semibold">{{ product.title }}</h1>
+          <!-- 评分：有已审核评价时才展示（0 条评价显示空星反而劝退） -->
+          <div v-if="product.ratingAvg && product.reviewCount" class="mt-1 flex items-center gap-2 text-sm text-stone-500">
+            <span class="text-amber-500" aria-hidden="true">{{ '★'.repeat(Math.floor(product.ratingAvg)) }}{{ '☆'.repeat(5 - Math.floor(product.ratingAvg)) }}</span>
+            <span class="tabular-nums">{{ product.ratingAvg.toFixed(1) }}</span>
+            <span>({{ product.reviewCount }})</span>
+          </div>
           <div class="mt-2 flex items-center gap-3">
             <span class="text-2xl font-semibold tabular-nums">{{ priceText }}</span>
             <span class="rounded-full px-2.5 py-0.5 text-xs font-medium" :class="inStock ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-500'">
@@ -219,6 +279,31 @@ async function toggleWishlist(): Promise<void> {
           </button>
           <p v-if="!inStock" class="text-xs text-stone-500">{{ stockNote ?? t('product.unavailable') }}</p>
         </div>
+
+        <!-- 到货通知（PLAN 4.3）：缺货时留邮箱，补货后由后端 notifyRestock 发出 -->
+        <div v-if="!inStock" class="rounded-xl border border-stone-200 bg-stone-50 p-4">
+          <p class="text-sm font-medium text-stone-900">{{ t('restock.title') }}</p>
+          <p class="mt-1 text-xs text-stone-500">{{ t('restock.hint') }}</p>
+          <div v-if="restockDone" class="mt-3 text-sm text-emerald-700">{{ t('restock.success') }}</div>
+          <form v-else class="mt-3 flex gap-2" @submit.prevent="subscribeRestock">
+            <input
+              v-model="restockEmail"
+              type="email"
+              required
+              :placeholder="t('restock.placeholder')"
+              class="min-w-0 flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
+            />
+            <button
+              type="submit"
+              class="shrink-0 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:opacity-50"
+              :disabled="restockBusy"
+            >
+              {{ restockBusy ? t('restock.submitting') : t('restock.submit') }}
+            </button>
+          </form>
+          <p v-if="restockError" class="mt-2 text-xs text-red-600">{{ restockError }}</p>
+        </div>
+
         <p v-if="!wishlist.isLoggedIn()" class="text-xs text-stone-500">{{ t('wishlist.loginToSync') }}</p>
       </div>
 

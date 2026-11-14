@@ -8,6 +8,7 @@ export type RmaStatus =
   | 'rejected' // 审核驳回
   | 'returned' // 顾客已回寄（提供物流单号）
   | 'refunded' // 已退款
+  | 'exchange' // 换货：已批准、等待重发（PLAN 4.2，不触发退款）
   | 'cancelled' // 顾客取消
 
 /** 退货明细项（冗余标题以便列表展示，金额以订单快照为准） */
@@ -50,7 +51,7 @@ ShopRmaRequest.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'pending',
-      comment: 'pending/approved/rejected/returned/refunded/cancelled',
+      comment: 'pending/approved/rejected/returned/refunded/exchange/cancelled',
     },
     reason: { type: DataTypes.TEXT, allowNull: true, comment: '退货原因' },
     items: { type: DataTypes.JSON, allowNull: true, comment: '退货明细 JSON 数组' },

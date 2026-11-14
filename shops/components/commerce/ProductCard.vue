@@ -11,12 +11,17 @@ const props = defineProps<{
     price: { amount: number; currency: string } | null
     inStock: boolean
     category?: { name: string } | null
+    ratingAvg?: number | null
+    reviewCount?: number
   }
 }>()
 const { t } = useI18n()
 const cfg = useStoreConfig()
 const link = computed(() => `/products/${props.product.slug}`)
 const priceText = computed(() => (props.product.price ? cfg.format(props.product.price.amount) : '—'))
+// 仅在真有评价时展示星级：0 条评价显示空星是负面信号
+const hasRating = computed(() => !!props.product.ratingAvg && (props.product.reviewCount ?? 0) > 0)
+const fullStars = computed(() => Math.floor(props.product.ratingAvg ?? 0))
 </script>
 
 <template>
@@ -35,6 +40,11 @@ const priceText = computed(() => (props.product.price ? cfg.format(props.product
       </div>
     </div>
     <h3 class="mt-3 line-clamp-2 text-sm font-medium text-stone-900 group-hover:underline">{{ product.title }}</h3>
+    <div v-if="hasRating" class="mt-1 flex items-center gap-1 text-xs text-stone-500">
+      <span class="text-amber-500" aria-hidden="true">{{ '★'.repeat(fullStars) }}{{ '☆'.repeat(5 - fullStars) }}</span>
+      <span class="tabular-nums">{{ product.ratingAvg?.toFixed(1) }}</span>
+      <span>({{ product.reviewCount }})</span>
+    </div>
     <div class="mt-1 flex items-center gap-2">
       <span class="text-sm tabular-nums">{{ priceText }}</span>
       <span v-if="!product.inStock" class="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-500">{{ t('card.outOfStock') }}</span>

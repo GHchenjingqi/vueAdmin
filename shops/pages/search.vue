@@ -16,19 +16,19 @@ const catalog = useCatalog()
 const q = computed(() => String(route.query.q ?? '').slice(0, 100))
 const page = computed(() => Number(route.query.page ?? 1) || 1)
 
-// ---- 主搜索结果（复用 catalog.listProducts keyword） ----
+// ---- 主搜索结果：后端 keyword 检索（SQL 过滤 + 同义词展开）+ 服务端分页 ----
+// 历史实现只取最新 24 条再在客户端过滤，第 25 条以后的匹配商品永远搜不到（audit dim02）。
 const { data, pending } = await useAsyncData(
   `search-${q.value}-${page.value}`,
-  () => catalog.listProducts({ page: page.value, pageSize: 24 }),
+  () =>
+    q.value.trim()
+      ? catalog.listProducts({ keyword: q.value, page: page.value, pageSize: 24 })
+      : Promise.resolve({ list: [], total: 0, page: page.value, pageSize: 24 }),
   { watch: [q, page] },
 )
-const results = computed(() => {
-  const list = data.value?.list ?? []
-  const term = q.value.toLowerCase().trim()
-  if (!term) return []
-  // 客户端轻过滤：与后端 keyword filter 叠加，防止 sort 参数污染
-  return list.filter((p) => p.title.toLowerCase().includes(term) || p.slug.toLowerCase().includes(term))
-})
+const results = computed<CatalogProduct[]>(() => data.value?.list ?? [])
+const total = computed(() => data.value?.total ?? 0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / (data.value?.pageSize ?? 24))))
 
 // ---- 纠错建议（有结果但用户拼写可疑时展示） ----
 const suggestions = ref<string[]>([])
@@ -80,7 +80,7 @@ useSeo({
   <div>
     <h1 class="mb-2 text-2xl font-semibold">{{ t('search.title') }}</h1>
     <p class="mb-6 text-sm text-stone-500">
-      <template v-if="q">{{ ti('search.results', { q, n: String(results.length) }) }}</template>
+      <template v-if="q">{{ ti('search.results', { q, n: String(total) }) }}</template>
       <template v-else>{{ t('search.hint') }}</template>
     </p>
 
@@ -125,8 +125,23 @@ useSeo({
       </div>
     </div>
 
-    <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      <ProductCard v-for="p in results" :key="p.id" :product="p" />
-    </div>
+    <template v-else>
+      <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <ProductCard v-for="p in results" :key="p.id" :product="p" />
+      </div>
+
+      <!-- 服务端分页：搜索结果总数可能远超单页，必须能翻页 -->
+      <nav v-if="totalPages > 1" class="mt-8 flex justify-center gap-2" aria-label="Pagination">
+        <NuxtLink
+          v-for="pg in totalPages"
+          :key="pg"
+          :to="{ path: '/search', query: { ...route.query, page: pg } }"
+          class="rounded-lg border px-3 py-1.5 text-sm"
+          :class="pg === page ? 'border-stone-900 bg-stone-900 text-white' : 'border-stone-300 hover:border-stone-500'"
+        >
+          {{ pg }}
+        </NuxtLink>
+      </nav>
+    </template>
   </div>
 </template>

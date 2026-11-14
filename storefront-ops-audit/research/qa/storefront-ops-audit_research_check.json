@@ -1,0 +1,775 @@
+{
+  "ok": true,
+  "quality_ok": true,
+  "delivery_allowed": true,
+  "handoff_status": "full",
+  "validator": "research-synthesis",
+  "route": "C",
+  "topic": "storefront-ops-audit",
+  "research_dir": "D:\\codes\\web\\storefront-ops-audit\\research",
+  "min_dimensions": 6,
+  "dimension_count": 6,
+  "wide_count": 0,
+  "coverage": {
+    "actual_dimensions": 6,
+    "recommended_dimensions": 6,
+    "dimension_ratio": 1.0,
+    "wide_required": false,
+    "wide_present": false
+  },
+  "files_checked": [
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_cross_verification.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_dim01.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_dim02.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_dim03.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_dim04.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_dim05.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_dim06.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_evidence.json",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_file_analysis.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_final.md",
+    "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_insight.md"
+  ],
+  "issues": [],
+  "warnings": [],
+  "presentation_handoff": {
+    "schema_version": 1,
+    "delivery_mode": "full",
+    "verified_facts": [
+      {
+        "id": "fact_0f3d23e0455928a9",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/pages/checkout/index.vue sends shippingRateId and couponCode in the quote request body.",
+        "source_type": "user_input",
+        "source_url": "file:shops/pages/checkout/index.vue",
+        "canonical": "vue-admin monorepo | shops/pages/checkout/index.vue sends shippingRateId and couponCode in the quote request body. | user_input | file:shops/pages/checkout/index.vue",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_03a9a290cc2898d0",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/server/api/[...mock].ts calls readBody then forwards only cartToken, not the address or coupon, to checkout/quote.",
+        "source_type": "user_input",
+        "source_url": "file:shops/server/api/[...mock].ts",
+        "canonical": "vue-admin monorepo | shops/server/api/[...mock].ts calls readBody then forwards only cartToken, not the address or coupon, to checkout/quote. | user_input | file:shops/server/api/[...mock].ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_208a66ac33f5b605",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/server/api/[...mock].ts forwards email, shippingAddress, note, cartToken and attribution on checkout/orders, without couponCode.",
+        "source_type": "user_input",
+        "source_url": "file:shops/server/api/[...mock].ts",
+        "canonical": "vue-admin monorepo | shops/server/api/[...mock].ts forwards email, shippingAddress, note, cartToken and attribution on checkout/orders, without couponCode. | user_input | file:shops/server/api/[...mock].ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_7cb6382790e025e6",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/storefront/services/quoteService.ts keeps taxCents at 0 unless input.shippingAddress and input.shippingAddress.country exist.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/storefront/services/quoteService.ts",
+        "canonical": "vue-admin monorepo | server/modules/storefront/services/quoteService.ts keeps taxCents at 0 unless input.shippingAddress and input.shippingAddress.country exist. | user_input | file:server/modules/storefront/services/quoteService.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_1fe6e1f51f8b24fd",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/server/utils/commerce.ts adaptQuote returns shippingRates as an empty array literal.",
+        "source_type": "user_input",
+        "source_url": "file:shops/server/utils/commerce.ts",
+        "canonical": "vue-admin monorepo | shops/server/utils/commerce.ts adaptQuote returns shippingRates as an empty array literal. | user_input | file:shops/server/utils/commerce.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_d2c333196cb4c4c8",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/config/index.ts defines shippingCents as Number(process.env.STORE_SHIPPING_CENTS ?? 0), so the fallback is 0.",
+        "source_type": "user_input",
+        "source_url": "file:server/config/index.ts",
+        "canonical": "vue-admin monorepo | server/config/index.ts defines shippingCents as Number(process.env.STORE_SHIPPING_CENTS ?? 0), so the fallback is 0. | user_input | file:server/config/index.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_f27bc4b182ce59bd",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/composables/useCatalog.ts listProducts params list category, sort, page, pageSize, ids and attr but no keyword.",
+        "source_type": "user_input",
+        "source_url": "file:shops/composables/useCatalog.ts",
+        "canonical": "vue-admin monorepo | shops/composables/useCatalog.ts listProducts params list category, sort, page, pageSize, ids and attr but no keyword. | user_input | file:shops/composables/useCatalog.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_80e50950ecd91662",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/pages/search.vue filters the returned list on the client by title and slug includes term.",
+        "source_type": "user_input",
+        "source_url": "file:shops/pages/search.vue",
+        "canonical": "vue-admin monorepo | shops/pages/search.vue filters the returned list on the client by title and slug includes term. | user_input | file:shops/pages/search.vue",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_5e9e68ab40265522",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/storefront/services/catalogService.ts reads params.keyword and calls expandTerm(keyword) to expand synonym variants.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/storefront/services/catalogService.ts",
+        "canonical": "vue-admin monorepo | server/modules/storefront/services/catalogService.ts reads params.keyword and calls expandTerm(keyword) to expand synonym variants. | user_input | file:server/modules/storefront/services/catalogService.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_03850d16b5f4bb5d",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/server/api/catalog/[...path].ts builds the category slug as `c-${r.id}` from the category id.",
+        "source_type": "user_input",
+        "source_url": "file:shops/server/api/catalog/[...path].ts",
+        "canonical": "vue-admin monorepo | shops/server/api/catalog/[...path].ts builds the category slug as `c-${r.id}` from the category id. | user_input | file:shops/server/api/catalog/[...path].ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_86340cb942130cdc",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/pages/c/[slug].vue keys the CATEGORY_SEO record on slugs such as lace-wigs.",
+        "source_type": "user_input",
+        "source_url": "file:shops/pages/c/[slug].vue",
+        "canonical": "vue-admin monorepo | shops/pages/c/[slug].vue keys the CATEGORY_SEO record on slugs such as lace-wigs. | user_input | file:shops/pages/c/[slug].vue",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_8b8302312e2905c2",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "shops/pages/products/[slug].vue renders an img with v-if product.cover and never iterates the images array.",
+        "source_type": "user_input",
+        "source_url": "file:shops/pages/products/[slug].vue",
+        "canonical": "vue-admin monorepo | shops/pages/products/[slug].vue renders an img with v-if product.cover and never iterates the images array. | user_input | file:shops/pages/products/[slug].vue",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_d51bc43136c462dc",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/shop/services/marketingService.ts exports activePromotions returning a ShopPromotion array.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/shop/services/marketingService.ts",
+        "canonical": "vue-admin monorepo | server/modules/shop/services/marketingService.ts exports activePromotions returning a ShopPromotion array. | user_input | file:server/modules/shop/services/marketingService.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_af0fd51ca4cbd7e1",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/storefront/services/quoteService.ts calls evaluateBundle and evaluateCoupon, and never reads a promotion record.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/storefront/services/quoteService.ts",
+        "canonical": "vue-admin monorepo | server/modules/storefront/services/quoteService.ts calls evaluateBundle and evaluateCoupon, and never reads a promotion record. | user_input | file:server/modules/storefront/services/quoteService.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_4f0e0fc4eecfd238",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/shop/models/ShopOrder.ts declares utmSource and utmMedium columns on the order model.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/shop/models/ShopOrder.ts",
+        "canonical": "vue-admin monorepo | server/modules/shop/models/ShopOrder.ts declares utmSource and utmMedium columns on the order model. | user_input | file:server/modules/shop/models/ShopOrder.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_a72e0b0a2801e286",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/shop/services/analyticsService.ts groups salesReport rows by channel and country, with no utm case.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/shop/services/analyticsService.ts",
+        "canonical": "vue-admin monorepo | server/modules/shop/services/analyticsService.ts groups salesReport rows by channel and country, with no utm case. | user_input | file:server/modules/shop/services/analyticsService.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_671ead645900de6d",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/shop/services/analyticsService.ts profitReport sets skuCost from declaredValue via Number(s.declaredValue ?? 0).",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/shop/services/analyticsService.ts",
+        "canonical": "vue-admin monorepo | server/modules/shop/services/analyticsService.ts profitReport sets skuCost from declaredValue via Number(s.declaredValue ?? 0). | user_input | file:server/modules/shop/services/analyticsService.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_7719dda1c5cf5575",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/shop/services/orderService.ts ship takes a single id and a single ShipOrderInput, so there is no batch entry.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/shop/services/orderService.ts",
+        "canonical": "vue-admin monorepo | server/modules/shop/services/orderService.ts ship takes a single id and a single ShipOrderInput, so there is no batch entry. | user_input | file:server/modules/shop/services/orderService.ts",
+        "evidence_basis": "user_input"
+      },
+      {
+        "id": "fact_3a9d4a1a7e0cbfd9",
+        "entity": "vue-admin monorepo",
+        "aliases": [
+          "vue-admin monorepo",
+          "shops",
+          "server",
+          "src",
+          "docs",
+          "storefront"
+        ],
+        "claim": "server/modules/shop/services/rmaAdminService.ts approveRma updates ShopRmaRequest status from pending to approved.",
+        "source_type": "user_input",
+        "source_url": "file:server/modules/shop/services/rmaAdminService.ts",
+        "canonical": "vue-admin monorepo | server/modules/shop/services/rmaAdminService.ts approveRma updates ShopRmaRequest status from pending to approved. | user_input | file:server/modules/shop/services/rmaAdminService.ts",
+        "evidence_basis": "user_input"
+      }
+    ],
+    "gaps": [],
+    "quality_summary": {
+      "quality_ok": true,
+      "issue_count": 0,
+      "warning_count": 0,
+      "actual_dimensions": 6,
+      "recommended_dimensions": 6
+    },
+    "context_files": [
+      "storefront-ops-audit_cross_verification.md",
+      "storefront-ops-audit_dim01.md",
+      "storefront-ops-audit_dim02.md",
+      "storefront-ops-audit_dim03.md",
+      "storefront-ops-audit_dim04.md",
+      "storefront-ops-audit_dim05.md",
+      "storefront-ops-audit_dim06.md",
+      "storefront-ops-audit_evidence.json",
+      "storefront-ops-audit_file_analysis.md",
+      "storefront-ops-audit_final.md",
+      "storefront-ops-audit_insight.md"
+    ]
+  },
+  "evidence_schema_version": 1,
+  "evidence_file": "D:\\codes\\web\\storefront-ops-audit\\research\\storefront-ops-audit_evidence.json",
+  "target_entity_count": 1,
+  "evidence_count": 19,
+  "verified_evidence_count": 19,
+  "conflicting_evidence_count": 0,
+  "unverified_evidence_count": 0,
+  "first_party_entity_count": 0,
+  "verified_evidence": [
+    {
+      "id": "fact_0f3d23e0455928a9",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/pages/checkout/index.vue sends shippingRateId and couponCode in the quote request body.",
+      "source_url": "file:shops/pages/checkout/index.vue",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/pages/checkout/index.vue | body: { shippingRateId: shippingRateId.value, couponCode: couponCode.value || undefined },",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/pages/checkout/index.vue sends shippingRateId and couponCode in the quote request body. | user_input | file:shops/pages/checkout/index.vue",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_03a9a290cc2898d0",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/server/api/[...mock].ts calls readBody then forwards only cartToken, not the address or coupon, to checkout/quote.",
+      "source_url": "file:shops/server/api/[...mock].ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/server/api/[...mock].ts | await readBody(event) // consume body, the real contract only needs cartToken\nconst cartToken = cartTokenFrom(cookie)\nbody: { cartToken }",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/server/api/[...mock].ts calls readBody then forwards only cartToken, not the address or coupon, to checkout/quote. | user_input | file:shops/server/api/[...mock].ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_208a66ac33f5b605",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/server/api/[...mock].ts forwards email, shippingAddress, note, cartToken and attribution on checkout/orders, without couponCode.",
+      "source_url": "file:shops/server/api/[...mock].ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/server/api/[...mock].ts | email: body.email,\nshippingAddress: body.address,\nnote: body.note,\ncartToken,\nattribution: body.attribution,",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/server/api/[...mock].ts forwards email, shippingAddress, note, cartToken and attribution on checkout/orders, without couponCode. | user_input | file:shops/server/api/[...mock].ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_7cb6382790e025e6",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/storefront/services/quoteService.ts keeps taxCents at 0 unless input.shippingAddress and input.shippingAddress.country exist.",
+      "source_url": "file:server/modules/storefront/services/quoteService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/storefront/services/quoteService.ts | let taxCents = 0\nlet taxRate = 0\nif (input.shippingAddress && input.shippingAddress.country) {",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/storefront/services/quoteService.ts keeps taxCents at 0 unless input.shippingAddress and input.shippingAddress.country exist. | user_input | file:server/modules/storefront/services/quoteService.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_1fe6e1f51f8b24fd",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/server/utils/commerce.ts adaptQuote returns shippingRates as an empty array literal.",
+      "source_url": "file:shops/server/utils/commerce.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/server/utils/commerce.ts | shippingRates: [],",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/server/utils/commerce.ts adaptQuote returns shippingRates as an empty array literal. | user_input | file:shops/server/utils/commerce.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_d2c333196cb4c4c8",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/config/index.ts defines shippingCents as Number(process.env.STORE_SHIPPING_CENTS ?? 0), so the fallback is 0.",
+      "source_url": "file:server/config/index.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/config/index.ts | shippingCents: Number(process.env.STORE_SHIPPING_CENTS ?? 0),",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/config/index.ts defines shippingCents as Number(process.env.STORE_SHIPPING_CENTS ?? 0), so the fallback is 0. | user_input | file:server/config/index.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_f27bc4b182ce59bd",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/composables/useCatalog.ts listProducts params list category, sort, page, pageSize, ids and attr but no keyword.",
+      "source_url": "file:shops/composables/useCatalog.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/composables/useCatalog.ts | params: { category?: string; sort?: string; page?: number; pageSize?: number; ids?: number[]; attr?: Record<string, string> } = {},",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/composables/useCatalog.ts listProducts params list category, sort, page, pageSize, ids and attr but no keyword. | user_input | file:shops/composables/useCatalog.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_80e50950ecd91662",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/pages/search.vue filters the returned list on the client by title and slug includes term.",
+      "source_url": "file:shops/pages/search.vue",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/pages/search.vue | return list.filter((p) => p.title.toLowerCase().includes(term) || p.slug.toLowerCase().includes(term))",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/pages/search.vue filters the returned list on the client by title and slug includes term. | user_input | file:shops/pages/search.vue",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_5e9e68ab40265522",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/storefront/services/catalogService.ts reads params.keyword and calls expandTerm(keyword) to expand synonym variants.",
+      "source_url": "file:server/modules/storefront/services/catalogService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/storefront/services/catalogService.ts | const keyword = typeof params.keyword === 'string' ? params.keyword.trim() : ''\nif (keyword) {\nconst variants = expandTerm(keyword)",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/storefront/services/catalogService.ts reads params.keyword and calls expandTerm(keyword) to expand synonym variants. | user_input | file:server/modules/storefront/services/catalogService.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_03850d16b5f4bb5d",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/server/api/catalog/[...path].ts builds the category slug as `c-${r.id}` from the category id.",
+      "source_url": "file:shops/server/api/catalog/[...path].ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/server/api/catalog/[...path].ts | slug: `c-${r.id}`, name: r.name, level: r.level, kind: 'other'",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/server/api/catalog/[...path].ts builds the category slug as `c-${r.id}` from the category id. | user_input | file:shops/server/api/catalog/[...path].ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_86340cb942130cdc",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/pages/c/[slug].vue keys the CATEGORY_SEO record on slugs such as lace-wigs.",
+      "source_url": "file:shops/pages/c/[slug].vue",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/pages/c/[slug].vue | const CATEGORY_SEO: Record<string, { name: string; desc: string; keywords: string }> = {\n'lace-wigs': {",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/pages/c/[slug].vue keys the CATEGORY_SEO record on slugs such as lace-wigs. | user_input | file:shops/pages/c/[slug].vue",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_8b8302312e2905c2",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "shops/pages/products/[slug].vue renders an img with v-if product.cover and never iterates the images array.",
+      "source_url": "file:shops/pages/products/[slug].vue",
+      "source_type": "user_input",
+      "evidence_excerpt": "shops/pages/products/[slug].vue | <img v-if=\"product.cover\" :src=\"product.cover\" :alt=\"product.title\" width=\"1200\" height=\"1200\"",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | shops/pages/products/[slug].vue renders an img with v-if product.cover and never iterates the images array. | user_input | file:shops/pages/products/[slug].vue",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_d51bc43136c462dc",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/shop/services/marketingService.ts exports activePromotions returning a ShopPromotion array.",
+      "source_url": "file:server/modules/shop/services/marketingService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/shop/services/marketingService.ts | export async function activePromotions(): Promise<ShopPromotion[]> {",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/shop/services/marketingService.ts exports activePromotions returning a ShopPromotion array. | user_input | file:server/modules/shop/services/marketingService.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_af0fd51ca4cbd7e1",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/storefront/services/quoteService.ts calls evaluateBundle and evaluateCoupon, and never reads a promotion record.",
+      "source_url": "file:server/modules/storefront/services/quoteService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/storefront/services/quoteService.ts | const bundleEval = await evaluateBundle(lines, currency)\nconst coupon = await evaluateCoupon(input.couponCode, { currency, subtotalCents })",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/storefront/services/quoteService.ts calls evaluateBundle and evaluateCoupon, and never reads a promotion record. | user_input | file:server/modules/storefront/services/quoteService.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_4f0e0fc4eecfd238",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/shop/models/ShopOrder.ts declares utmSource and utmMedium columns on the order model.",
+      "source_url": "file:server/modules/shop/models/ShopOrder.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/shop/models/ShopOrder.ts | declare utmSource: string | null\ndeclare utmMedium: string | null",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/shop/models/ShopOrder.ts declares utmSource and utmMedium columns on the order model. | user_input | file:server/modules/shop/models/ShopOrder.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_a72e0b0a2801e286",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/shop/services/analyticsService.ts groups salesReport rows by channel and country, with no utm case.",
+      "source_url": "file:server/modules/shop/services/analyticsService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/shop/services/analyticsService.ts | case 'channel':\nkey = `channel:${order.channelId}`\ncase 'country':\nkey = `country:${(order.buyer as Record<string, unknown>)?.country ?? 'unknown'}`",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/shop/services/analyticsService.ts groups salesReport rows by channel and country, with no utm case. | user_input | file:server/modules/shop/services/analyticsService.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_671ead645900de6d",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/shop/services/analyticsService.ts profitReport sets skuCost from declaredValue via Number(s.declaredValue ?? 0).",
+      "source_url": "file:server/modules/shop/services/analyticsService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/shop/services/analyticsService.ts | skus.forEach((s) => skuCost.set(s.id, Number(s.declaredValue ?? 0)))",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/shop/services/analyticsService.ts profitReport sets skuCost from declaredValue via Number(s.declaredValue ?? 0). | user_input | file:server/modules/shop/services/analyticsService.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_7719dda1c5cf5575",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/shop/services/orderService.ts ship takes a single id and a single ShipOrderInput, so there is no batch entry.",
+      "source_url": "file:server/modules/shop/services/orderService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/shop/services/orderService.ts | export async function ship(id: number, input: ShipOrderInput): Promise<ShopOrder> {",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/shop/services/orderService.ts ship takes a single id and a single ShipOrderInput, so there is no batch entry. | user_input | file:server/modules/shop/services/orderService.ts",
+      "evidence_basis": "user_input"
+    },
+    {
+      "id": "fact_3a9d4a1a7e0cbfd9",
+      "entity": "vue-admin monorepo",
+      "aliases": [
+        "vue-admin monorepo",
+        "shops",
+        "server",
+        "src",
+        "docs",
+        "storefront"
+      ],
+      "claim": "server/modules/shop/services/rmaAdminService.ts approveRma updates ShopRmaRequest status from pending to approved.",
+      "source_url": "file:server/modules/shop/services/rmaAdminService.ts",
+      "source_type": "user_input",
+      "evidence_excerpt": "server/modules/shop/services/rmaAdminService.ts | const [affected] = await ShopRmaRequest.update({ status: 'approved' } as never, {\nwhere: { tenantId: tId, id, status: 'pending' },",
+      "confidence": "high",
+      "status": "verified",
+      "canonical": "vue-admin monorepo | server/modules/shop/services/rmaAdminService.ts approveRma updates ShopRmaRequest status from pending to approved. | user_input | file:server/modules/shop/services/rmaAdminService.ts",
+      "evidence_basis": "user_input"
+    }
+  ]
+}

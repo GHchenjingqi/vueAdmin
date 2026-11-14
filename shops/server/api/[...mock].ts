@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { mockStore } from '@shared/mock/store'
 import { MOCK_BLOG_POSTS, MOCK_REVIEWS, MOCK_BANNERS, MOCK_PRODUCTS, MOCK_FAQS } from '@shared/mock/fixtures'
-import { adaptCartView, adaptOrderView, adaptQuote, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
+import { adaptCartView, adaptOrderView, adaptQuote, buildOrderForwardBody, buildQuoteForwardBody, commerceRealFetch, getCommerceSource, simulateMockProviderWebhook, unwrapEnvelope } from '../utils/commerce'
 
 /**
  * BFF 商务路由（cart / checkout / orders）：前端接线层。
@@ -59,10 +59,15 @@ export default defineEventHandler(async (event) => {
     console.log(`[ext] ${method} ${url} -> status=${res.status} networkError=${res.networkError} body=${JSON.stringify(res.body)?.slice(0, 140)}`)
     // P4-T07：reviews 在 auto 网络级失败时回退 mock（与 cart 一致），保证本地演示可见评论/验证购买标记
     if (url.startsWith('reviews') && res.networkError && source === 'auto') {
-      return mockHandle(url, method, event, locale)
+      return mockFallback(url, method, event, locale)
     }
     // P2-8：网络级失败（status=0）一律 502，不伪装成 200 假成功；4xx 业务错误仍原样透传
     if (res.networkError) return upstreamFail(event, res)
+    // PLAN 5.2：auth 登录/注册下发 httpOnly Cookie，必须透传给浏览器，
+    // 否则 Cookie 只到 BFF 就断了，前端仍得把 token 存 localStorage。
+    if (res.setCookie) {
+      for (const c of res.setCookie) appendHeader(event, 'set-cookie', c)
+    }
     setResponseStatus(event, res.status)
     return res.ok ? unwrapEnvelope(res.body) : (res.body ?? { code: 'UPSTREAM_ERROR', message: 'ext upstream error' })
   }
@@ -82,8 +87,19 @@ export default defineEventHandler(async (event) => {
     // auto + 网络级失败 → 落入 mock；real + 失败已在 handleReal 返回错误
   }
 
-  return mockHandle(url, method, event, locale)
+  return mockFallback(url, method, event, locale)
 })
+
+/**
+ * mock 回退唯一出口：打 X-Data-Source: mock 响应头。
+ *
+ * 演示数据被真实顾客看到时，至少要让调用方、CDN 日志与监控能识别出来；
+ * 否则「页面 200 + 假商品 + 订单进 mock store」完全静默。
+ */
+async function mockFallback(url: string, method: string, event: Parameters<Parameters<typeof defineEventHandler>[0]>[0], locale?: string): Promise<unknown> {
+  setResponseHeader(event, 'x-data-source', 'mock')
+  return mockHandle(url, method, event, locale)
+}
 
 /** 真实后台处理；返回 null 表示「网络级失败且允许回退 mock」 */
 async function handleReal(
@@ -153,9 +169,18 @@ async function handleReal(
 
   // ---- POST /api/checkout/quote ----
   if (url === 'checkout/quote' && method === 'POST') {
-    await readBody(event) // 消费 body（真实契约仅需 cartToken；地址/运费/优惠由后台规则表承接）
+    // 报价要素必须全量转发：后端 quoteService 依赖 shippingAddress 计算运费/税费，
+    // 依赖 couponCode / pointsToRedeem 计算折扣。此前只转发 cartToken，导致
+    // 税率、分区运费、优惠券在 C 端全部失效（见 storefront-ops-audit dim01）。
+    const body = (await readBody(event)) ?? {}
     const cartToken = cartTokenFrom(cookie)
-    const res = await commerceRealFetch('checkout/quote', { method: 'POST', body: { cartToken }, cookie, authorization, requestId })
+    const res = await commerceRealFetch('checkout/quote', {
+      method: 'POST',
+      body: buildQuoteForwardBody(body as Record<string, unknown>, cartToken),
+      cookie,
+      authorization,
+      requestId,
+    })
     if (res.networkError) return source === 'auto' ? null : upstreamFail(event, res)
     if (!res.ok) return upstreamFail(event, res)
     return adaptQuote(unwrapEnvelope(res.body) as Record<string, unknown>)
@@ -181,23 +206,14 @@ async function handleReal(
   if (url === 'checkout/orders' && method === 'POST') {
     const body = await readBody(event)
     const cartToken = cartTokenFrom(cookie)
+    // P2-5：客户端未传幂等键时，用下单要素的内容哈希兜底（同请求重试内容一致→同一键→后端去重），
+    // 避免此前 randomUUID 兜底导致重试生成新键、可能重复下单/占库存占券
+    const fallbackKey = createHash('sha256')
+      .update(JSON.stringify({ cartToken, email: body.email, address: body.address, note: body.note, attribution: body.attribution }))
+      .digest('hex')
     const res = await commerceRealFetch('checkout/orders', {
       method: 'POST',
-      body: {
-        // P2-5：客户端未传幂等键时，用下单要素的内容哈希兜底（同请求重试内容一致→同一键→后端去重），
-        // 避免此前 randomUUID 兜底导致重试生成新键、可能重复下单/占库存占券
-        idempotencyKey:
-          body.idempotencyKey ??
-          createHash('sha256')
-            .update(JSON.stringify({ cartToken, email: body.email, address: body.address, note: body.note, attribution: body.attribution }))
-            .digest('hex'),
-        email: body.email,
-        shippingAddress: body.address,
-        note: body.note,
-        cartToken,
-        // 步骤 6：订单来源归因（site / utm），后端 createOrderSchema 精确剥离并固化进快照
-        attribution: body.attribution,
-      },
+      body: buildOrderForwardBody(body as Record<string, unknown>, cartToken, fallbackKey),
       cookie,
       authorization,
       requestId,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { getToken, getStoredCustomer, type CustomerPublic } from '@shared/customer/auth'
+import { getToken, getStoredCustomer, type CustomerPublic, isAuthenticated } from '@shared/customer/auth'
 import { useI18n } from '~/composables/useI18n'
 
 /**
@@ -25,7 +25,7 @@ interface AvailableCoupon {
 
 const { t, ti } = useI18n()
 const customer = ref<CustomerPublic | null>(getStoredCustomer())
-const loggedIn = computed(() => !!customer.value && !!getToken())
+const loggedIn = computed(() => !!customer.value && isAuthenticated())
 const coupons = ref<AvailableCoupon[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -41,7 +41,7 @@ async function reload(): Promise<void> {
   error.value = ''
   try {
     const raw = await $fetch<AvailableCoupon[] | { data?: AvailableCoupon[] }>('/api/coupons/available', {
-      headers: { authorization: `Bearer ${getToken() ?? ''}` },
+      headers: { ...(getToken() ? { authorization: `Bearer ${getToken()}` } : {}) },
     })
     // BFF 正常已解包为数组；兼容后端信封直出
     const list = Array.isArray(raw) ? raw : (raw?.data ?? [])

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { getToken } from '@shared/customer/auth'
+import { isAuthenticated } from '@shared/customer/auth'
 import { useCheckout } from '~/composables/useCheckout'
 import { useI18n } from '~/composables/useI18n'
 import Price from '~/components/commerce/Price.vue'
@@ -23,7 +23,7 @@ interface OrderRow {
   totals: { total: { amount: number; currency: string } }
 }
 
-if (!getToken()) await navigateTo('/account', { replace: true })
+if (!isAuthenticated()) await navigateTo('/account', { replace: true })
 
 const { listOrders } = useCheckout()
 const orders = ref<OrderRow[]>([])

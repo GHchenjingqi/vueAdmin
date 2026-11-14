@@ -50,6 +50,8 @@ export interface Quote {
   warnings: string[]
   /** P5-T04：按仓配送承诺（路由后的主仓，天） */
   deliveryCommitment?: { warehouseId: number; warehouseName: string; warehouseType: string; deliveryEstimateDays: number } | null
+  /** 可配送国家白名单（与后台 settings.shop.shipping 同源；空数组表示未取到，前端回退内置列表） */
+  shippableCountries?: string[]
 }
 
 export interface OrderDraft {

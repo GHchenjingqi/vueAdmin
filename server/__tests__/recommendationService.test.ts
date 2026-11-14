@@ -120,6 +120,10 @@ vi.mock('../modules/shop/models/index.js', () => ({
   },
   ShopProductPrice: { findAll: vi.fn(async () => []) },
   ShopInventory: { findAll: vi.fn(async () => []) },
+  // PLAN 2.4：listProducts 需要评分聚合模型
+  ShopReview: { findAll: vi.fn(async () => []) },
+  // PLAN 2.5：listProducts 需要类目摘要
+  ShopCategory: { findAll: vi.fn(async () => []) },
 }))
 
 // catalogService.listProducts 真实依赖 ShopSpu/ShopSku/ShopProductPrice/ShopInventory；

@@ -28,6 +28,8 @@ export interface PaymentProviderDef {
 
 export const PROVIDERS: PaymentProviderDef[] = [
   { id: 'paypal', label: 'PayPal', kind: 'card', supportedCurrencies: ['USD', 'EUR', 'GBP', 'CAD', 'AUD'], real: true },
+  // PLAN 6.1：Stripe 覆盖 card / Apple Pay / Google Pay（由 Checkout 自动展示可用方式）
+  { id: 'stripe', label: 'Card (Stripe)', kind: 'card', supportedCurrencies: ['USD', 'EUR', 'GBP', 'CAD', 'AUD'], real: true },
   { id: 'wechat', label: '微信支付', kind: 'wallet', supportedCurrencies: ['CNY'], real: true },
   { id: 'alipay', label: '支付宝', kind: 'wallet', supportedCurrencies: ['CNY'], real: true },
   // 业务口径：银联全国通用，任何币种都展示；外币按订单快照原样送网关，不做换汇

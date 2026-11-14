@@ -138,7 +138,8 @@ describe('按后台币种自动切换支付通道', () => {
   })
 
   it('非法通道 id 写入被拒绝', () => {
-    expect(() => validateEnabled(['paypal', 'stripe'])).toThrow(/未知支付通道/)
+    // PLAN 6.1 起 stripe 是合法通道，这里改用确实不存在的 id 验证白名单
+    expect(() => validateEnabled(['paypal', 'not_a_real_channel'])).toThrow(/未知支付通道/)
   })
 })
 

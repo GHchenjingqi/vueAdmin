@@ -17,6 +17,8 @@ export const quote = async (req: Request, res: Response, next: NextFunction) => 
       // 会员折扣/积分抵扣：登录态顾客身份 + 抵扣请求（服务端钳制）
       customerId: req.customer?.customerId,
       pointsToRedeem: body.pointsToRedeem,
+      // 配送档位：决定在分区基础运费上叠加哪一档加价
+      shippingRateId: body.shippingRateId,
     })
     res.json({ code: 0, data })
   } catch (err) {
@@ -52,6 +54,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       couponCode: body.couponCode,
       attribution: body.attribution,
       pointsToRedeem: body.pointsToRedeem,
+      shippingRateId: body.shippingRateId,
     })
     res.json({ code: 0, data })
   } catch (err) {

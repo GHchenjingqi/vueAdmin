@@ -70,7 +70,8 @@ describe('凭据接口 controller 限流', () => {
       const payload = (res.json as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0] as {
         data: { providers: { id: string }[] }
       }
-      expect(payload.data.providers.map((p) => p.id)).toEqual(['paypal', 'wechat', 'alipay', 'unionpay'])
+      // PLAN 6.1：新增 stripe 通道，顺序与 PROVIDER_CREDENTIALS 定义一致
+      expect(payload.data.providers.map((p) => p.id)).toEqual(['paypal', 'wechat', 'alipay', 'stripe', 'unionpay'])
     })
   })
 })

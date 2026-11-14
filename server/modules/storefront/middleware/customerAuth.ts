@@ -20,6 +20,24 @@ declare global {
 }
 
 /**
+ * 顾客会话 Cookie 名（PLAN 5.2）
+ *
+ * 历史实现把 JWT 存 localStorage（XSS 可直接读取）。现在登录同时下发 httpOnly Cookie，
+ * 中间件优先读 Cookie、其次读 Bearer —— 两者并存的好处是：
+ * 旧前端（仍发 Bearer）不需要同步改造，新前端可以直接不再存 token。
+ */
+export const CUSTOMER_COOKIE = 'customer_token'
+
+/** 从请求中取顾客 JWT：优先 httpOnly Cookie，其次 Authorization: Bearer */
+function extractToken(req: Request): string | null {
+  const cookieToken = (req.cookies as Record<string, string> | undefined)?.[CUSTOMER_COOKIE]
+  if (typeof cookieToken === 'string' && cookieToken) return cookieToken
+  const auth = req.headers.authorization
+  if (auth && auth.startsWith('Bearer ')) return auth.slice(7)
+  return null
+}
+
+/**
  * 校验顾客账号当前状态（封禁即时生效）。
  *
  * 安全整改：顾客 JWT 有效期 30 天且无撤销机制，若只在登录时校验 status，
@@ -33,6 +51,8 @@ async function assertCustomerActive(customerId: number, tenantId: number): Promi
   })
   if (!row) throw new AppError(401, '账号不存在')
   if (row.status === 'blocked') throw new AppError(403, '账号已被禁用')
+  // PLAN 5.3：注销后身份立即失效，不能再用旧令牌访问任何顾客接口
+  if (row.status === 'deleted') throw new AppError(401, '账号已注销')
 }
 
 /**
@@ -43,14 +63,14 @@ async function assertCustomerActive(customerId: number, tenantId: number): Promi
  * 失败时以 AppError(401) 交给全局错误处理器统一返回。
  */
 export async function customerAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  const auth = req.headers.authorization
-  if (!auth || !auth.startsWith('Bearer ')) {
+  const token = extractToken(req)
+  if (!token) {
     next(new AppError(401, '未提供认证令牌'))
     return
   }
 
   try {
-    const payload = verifyCustomerToken(auth.split(' ')[1])
+    const payload = verifyCustomerToken(token)
     await assertCustomerActive(payload.sub, payload.tenantId)
     req.customer = {
       customerId: payload.sub,
@@ -70,13 +90,13 @@ export async function customerAuth(req: Request, _res: Response, next: NextFunct
  * 账号已封禁时按游客处理（不注入 customer），避免被封禁账号继续享受会员折扣与积分抵扣。
  */
 export async function optionalCustomerAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  const auth = req.headers.authorization
-  if (!auth || !auth.startsWith('Bearer ')) {
+  const token = extractToken(req)
+  if (!token) {
     next()
     return
   }
   try {
-    const payload = verifyCustomerToken(auth.split(' ')[1])
+    const payload = verifyCustomerToken(token)
     await assertCustomerActive(payload.sub, payload.tenantId)
     req.customer = {
       customerId: payload.sub,

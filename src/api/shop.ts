@@ -282,6 +282,11 @@ export interface Sku {
   originCountry: string | null
   hsCode: string | null
   declaredValue: number | null
+  costAmount: number | null
+  weightGram: number | null
+  lengthMm: number | null
+  widthMm: number | null
+  heightMm: number | null
   compliance: Record<string, string> | null
   status: ShopStatus
 }
@@ -301,6 +306,11 @@ export const skuApi = {
     originCountry?: string | null
     hsCode?: string | null
     declaredValue?: number | null
+    costAmount?: number | null
+    weightGram?: number | null
+    lengthMm?: number | null
+    widthMm?: number | null
+    heightMm?: number | null
     compliance?: Record<string, string> | null
   }) {
     return request.post<Sku>('/shop/skus', data)
@@ -314,6 +324,11 @@ export const skuApi = {
       originCountry: string | null
       hsCode: string | null
       declaredValue: number | null
+      costAmount: number | null
+      weightGram: number | null
+      lengthMm: number | null
+      widthMm: number | null
+      heightMm: number | null
       compliance: Record<string, string> | null
     }>,
   ) {
@@ -565,6 +580,23 @@ export const inventoryApi = {
 
 export type OrderStatus = 'created' | 'paid' | 'fulfilled' | 'shipped' | 'done' | 'cancelled'
 
+/** 批量发货逐单结果（PLAN 4.1） */
+export interface BatchShipRowResult {
+  orderId: number
+  ok: boolean
+  status?: string
+  trackingNo?: string | null
+  carrier?: string | null
+  error?: string
+}
+
+export interface BatchShipResult {
+  total: number
+  succeeded: number
+  failed: number
+  rows: BatchShipRowResult[]
+}
+
 export interface OrderBuyer {
   name?: string
   country?: string
@@ -627,6 +659,13 @@ export const orderApi = {
   },
   ship(id: number, data?: { carrier?: string; trackingNo?: string }) {
     return request.post<Order>(`/shop/orders/${id}/ship`, data ?? {})
+  },
+  /**
+   * 批量发货（PLAN 4.1）：单条失败不阻断其余，返回逐单结果。
+   * `defaultCarrier` 用于「同一承运商、多个运单号」的常见场景。
+   */
+  batchShip(data: { items: { orderId: number; carrier?: string; trackingNo?: string }[]; defaultCarrier?: string }) {
+    return request.post<BatchShipResult>('/shop/orders/batch-ship', data)
   },
   cancel(id: number) {
     return request.post<Order>(`/shop/orders/${id}/cancel`)
@@ -697,7 +736,8 @@ export const marketingApi = {
 
 // ==================== 阶段 4：数据参谋 ====================
 
-export type AnalyticsDimension = 'day' | 'month' | 'channel' | 'category'
+// PLAN 3.2：utm 用于广告渠道 ROI（键形如 `utm:google::spring`）
+export type AnalyticsDimension = 'day' | 'month' | 'channel' | 'category' | 'utm'
 
 export interface AnalyticsQuery {
   dimension?: AnalyticsDimension

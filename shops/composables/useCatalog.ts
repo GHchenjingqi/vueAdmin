@@ -25,10 +25,20 @@ export function useCatalog() {
   }
 
   async function listProducts(
-    params: { category?: string; sort?: string; page?: number; pageSize?: number; ids?: number[]; attr?: Record<string, string> } = {},
+    params: {
+      category?: string
+      /** 关键词：由后端做 SQL 过滤 + 同义词展开，前端不再本地过滤 */
+      keyword?: string
+      sort?: string
+      page?: number
+      pageSize?: number
+      ids?: number[]
+      attr?: Record<string, string>
+    } = {},
   ): Promise<ProductListResult> {
     const qs = new URLSearchParams()
     if (params.category) qs.set('category', params.category)
+    if (params.keyword?.trim()) qs.set('keyword', params.keyword.trim())
     if (params.sort) qs.set('sort', params.sort)
     if (params.ids?.length) qs.set('ids', params.ids.join(','))
     qs.set('page', String(params.page ?? 1))

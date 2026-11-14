@@ -15,6 +15,8 @@ export const currencyConfigSchema = z.object({
 export const storeConfigSchema = z.object({
   currency: currencyConfigSchema,
   market: z.object({ country: z.string().length(2), language: z.string().min(2) }),
+  // 可选：旧后端未下发 siteName 时前端回退内置站点名（不阻塞渲染）
+  siteName: z.string().min(1).max(100).optional(),
   version: z.string().min(1),
 })
 

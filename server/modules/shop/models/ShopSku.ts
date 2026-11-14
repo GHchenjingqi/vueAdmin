@@ -13,6 +13,14 @@ class ShopSku extends Model<InferAttributes<ShopSku>, InferCreationAttributes<Sh
   declare originCountry: string | null
   declare hsCode: string | null
   declare declaredValue: number | null
+  /** 采购成本（与报关申报价值分离；利润报表使用该字段） */
+  declare costAmount: number | null
+  /** 单件实重（克）；为空表示未维护，运费按分区固定价 */
+  declare weightGram: number | null
+  /** 包装三边（毫米），体积重计费与货代对账用 */
+  declare lengthMm: number | null
+  declare widthMm: number | null
+  declare heightMm: number | null
   declare compliance: Record<string, string> | null
   declare status: CreationOptional<SkuStatus>
   declare tenantId: number
@@ -63,6 +71,19 @@ ShopSku.init(
       allowNull: true,
       comment: '单件申报价值（USD）',
     },
+    costAmount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      comment: '采购成本（与报关申报价值分离，用于利润报表）',
+    },
+    weightGram: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      comment: '单件实重（克），运费按重计费',
+    },
+    lengthMm: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, comment: '包装长（毫米）' },
+    widthMm: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, comment: '包装宽（毫米）' },
+    heightMm: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, comment: '包装高（毫米）' },
     compliance: {
       type: DataTypes.JSON,
       allowNull: true,

@@ -9,6 +9,7 @@ import {
   ShopInventory,
   ShopProductPrice,
   ShopRateSnapshot,
+  ShopReview,
   ShopSpu,
   ShopSku,
 } from '../../shop/models/index.js'
@@ -34,6 +35,8 @@ export interface StorefrontCategory {
   level: number
   sort: number
   children: StorefrontCategory[]
+  /** 语义化 slug（/c/:slug）；历史行 slug 为空时回退 c-<id> 保持链接可用 */
+  slug: string
 }
 
 export interface StorefrontProductListItem {
@@ -45,8 +48,16 @@ export interface StorefrontProductListItem {
   videos: string[]
   categoryId: number
   brandId: number | null
+  /** 类目摘要（含语义 slug，便于列表页拼 /c/:slug 与面包屑） */
+  category: { id: number; name: string; slug: string } | null
   price: { currency: string; min: number; max: number } | null
   inStock: boolean
+  /** 已审核评价的均分（保留 2 位）；无评价为 null */
+  ratingAvg: number | null
+  /** 已审核评价数量 */
+  reviewCount: number
+  /** 商品最后更新时间（ISO），sitemap 的 lastmod 用 */
+  updatedAt: string
 }
 
 export interface StorefrontVariant {
@@ -66,12 +77,15 @@ export interface StorefrontProductDetail {
   cover: string | null
   images: string[]
   videos: string[]
-  category: { id: number; name: string } | null
+  category: { id: number; name: string; slug: string } | null
   brand: { id: number; name: string } | null
   currency: string
   price: { min: number; max: number } | null
   variants: StorefrontVariant[]
   seo: { title: string; description: string }
+  /** 已审核评价聚合：用于 PDP 星级与 JSON-LD aggregateRating */
+  ratingAvg: number | null
+  reviewCount: number
 }
 
 /** service 层自身做参数规范化，不依赖 validate 中间件（BFF / 内部调用可能绕过 schema） */
@@ -146,6 +160,7 @@ export async function listCategories(lang = 'en-US'): Promise<StorefrontCategory
       name: localized(row.name, lang),
       level: row.level,
       sort: row.sort,
+      slug: row.slug || `c-${row.id}`,
       children: [],
     })
   }
@@ -156,6 +171,15 @@ export async function listCategories(lang = 'en-US'): Promise<StorefrontCategory
     else roots.push(node)
   }
   return roots
+}
+
+/**
+ * 排序白名单：非法值一律回退 newest（不把用户输入拼进 SQL，也不做模糊匹配）
+ */
+type CatalogSort = 'newest' | 'price-asc' | 'price-desc'
+
+function normalizeSort(value: unknown): CatalogSort {
+  return value === 'price-asc' || value === 'price-desc' ? value : 'newest'
 }
 
 /**
@@ -182,8 +206,19 @@ export async function listProducts(
 
   const base = publicWhere()
   const categoryId = positiveInt(params.categoryId, 0)
-  const where: Record<string | symbol, unknown> = categoryId > 0 ? { ...base, categoryId } : { ...base }
-
+  // 支持按语义 slug 过滤（BFF 传来的 category 是 slug）；解析失败回退为不按类目过滤
+  const categorySlug = typeof params.category === 'string' ? params.category.trim() : ''
+  let resolvedCategoryId = categoryId
+  if (resolvedCategoryId <= 0 && categorySlug) {
+    const bySlug = await ShopCategory.findOne({
+      where: { tenantId: tid(), slug: categorySlug },
+      attributes: ['id'],
+    })
+    // 兼容旧 c-<id> 链接
+    const legacyId = /^c-(\d+)$/.exec(categorySlug)
+    resolvedCategoryId = bySlug ? bySlug.id : legacyId ? Number(legacyId[1]) : 0
+  }
+  const where: Record<string | symbol, unknown> = resolvedCategoryId > 0 ? { ...base, categoryId: resolvedCategoryId } : { ...base }
   // 按 SPU id 列表精确取（收藏夹/最近看过）：显式带 tenantId + publicWhere，保持传入顺序
   const idsParam = typeof params.ids === 'string' ? params.ids : ''
   const idFilter = idsParam
@@ -212,6 +247,37 @@ export async function listProducts(
   if (idFilter.length) {
     const orderMap = new Map(idFilter.map((id, idx) => [id, idx]))
     rows.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0))
+  }
+
+  // 排序必须在分页前完成，否则只能对当前页重排，跨页顺序错乱。
+  // newest 由 SQL 的 id DESC 保证；price-* 需要先取全量最低价才能正确排序。
+  const sort = normalizeSort(params.sort)
+  if (!idFilter.length && sort !== 'newest') {
+    const allSpuIds = rows.map((r) => r.id)
+    const allSkus = allSpuIds.length ? await ShopSku.findAll({ where: { tenantId: tid(), spuId: { [Op.in]: allSpuIds } } }) : []
+    const allSkuIds = allSkus.map((s) => s.id)
+    const allPrices = allSkuIds.length
+      ? await ShopProductPrice.findAll({ where: { tenantId: tid(), skuId: { [Op.in]: allSkuIds }, currency } })
+      : []
+    const skuToSpuAll = new Map<number, number>()
+    for (const s of allSkus) skuToSpuAll.set(s.id, s.spuId)
+    const minPriceBySpu = new Map<number, number>()
+    for (const p of allPrices) {
+      const spuId = skuToSpuAll.get(p.skuId)
+      if (spuId === undefined) continue
+      const amount = Number(p.amount)
+      const prev = minPriceBySpu.get(spuId)
+      if (prev === undefined || amount < prev) minPriceBySpu.set(spuId, amount)
+    }
+    // 无价格的 SPU 排到最后：价格排序时买家最不想看到"暂无报价"
+    rows.sort((a, b) => {
+      const pa = minPriceBySpu.get(a.id)
+      const pb = minPriceBySpu.get(b.id)
+      if (pa === undefined && pb === undefined) return b.id - a.id
+      if (pa === undefined) return 1
+      if (pb === undefined) return -1
+      return sort === 'price-asc' ? pa - pb : pb - pa
+    })
   }
 
   const total = rows.length
@@ -245,9 +311,33 @@ export async function listProducts(
     availableBySpu.set(spuId, (availableBySpu.get(spuId) ?? 0) + available)
   }
 
+  // 评分聚合：只统计已审核评价，按 spuId 分组一次查完（避免 N+1）
+  const ratingBySpu = new Map<number, { avg: number; count: number }>()
+  if (spuIds.length) {
+    const rowsRating = (await ShopReview.findAll({
+      where: { tenantId: tid(), spuId: { [Op.in]: spuIds }, status: 'approved' },
+      attributes: ['spuId', [Sequelize.fn('AVG', Sequelize.col('rating')), 'avg'], [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']],
+      group: ['spuId'],
+      raw: true,
+    })) as unknown as Array<{ spuId: number; avg: string | number; count: string | number }>
+    for (const r of rowsRating) {
+      const count = Number(r.count) || 0
+      if (count <= 0) continue
+      ratingBySpu.set(Number(r.spuId), { avg: Math.round(Number(r.avg) * 100) / 100, count })
+    }
+  }
+
+  // 类目摘要映射（列表页需要类目名与语义 slug，供商品卡面包屑与 /c/:slug 链接）
+  const categoryIds = [...new Set(pageRows.map((r) => r.categoryId).filter((id) => id > 0))]
+  const categoryRows = categoryIds.length ? await ShopCategory.findAll({ where: { tenantId: tid(), id: { [Op.in]: categoryIds } } }) : []
+  const categoryById = new Map<number, { id: number; name: string; slug: string }>()
+  for (const c of categoryRows) {
+    categoryById.set(c.id, { id: c.id, name: localized(c.name, lang), slug: c.slug || `c-${c.id}` })
+  }
+
   const list: StorefrontProductListItem[] = pageRows.map((spu) => {
-    const title = localized(spu.name, lang)
     const values = priceBySpu.get(spu.id) ?? []
+    const title = localized(spu.name, lang)
     return {
       id: spu.id,
       slug: displaySlug(spu, lang),
@@ -257,6 +347,10 @@ export async function listProducts(
       videos: spu.videos ?? [],
       categoryId: spu.categoryId,
       brandId: spu.brandId,
+      category: categoryById.get(spu.categoryId) ?? null,
+      ratingAvg: ratingBySpu.get(spu.id)?.avg ?? null,
+      reviewCount: ratingBySpu.get(spu.id)?.count ?? 0,
+      updatedAt: spu.updatedAt ? new Date(spu.updatedAt as Date).toISOString() : new Date(0).toISOString(),
       price: values.length ? { currency, min: Math.min(...values), max: Math.max(...values) } : null,
       inStock: (availableBySpu.get(spu.id) ?? 0) > 0,
     }
@@ -341,6 +435,18 @@ export async function getProductBySlug(
   })
   const priceValues = variants.map((variant) => variant.price).filter((value): value is number => value !== null)
 
+  // 详情页评分聚合（单 SPU，直接聚合一次）
+  const ratingAgg = (await ShopReview.findOne({
+    where: { tenantId: tid(), spuId: spu.id, status: 'approved' },
+    attributes: [[Sequelize.fn('AVG', Sequelize.col('rating')), 'avg'], [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']],
+    raw: true,
+  })) as unknown as { avg: string | number | null; count: string | number } | null
+  const reviewCount = Number(ratingAgg?.count ?? 0) || 0
+  const detailRating = {
+    avg: reviewCount > 0 ? Math.round(Number(ratingAgg?.avg ?? 0) * 100) / 100 : null,
+    count: reviewCount,
+  }
+
   const title = localized(spu.name, lang)
   const description = localized(spu.description, lang)
   return {
@@ -351,12 +457,16 @@ export async function getProductBySlug(
     cover: spu.cover,
     images: spu.images ?? [],
     videos: spu.videos ?? [],
-    category: category ? { id: category.id, name: localized(category.name, lang) } : null,
+    category: category
+      ? { id: category.id, name: localized(category.name, lang), slug: category.slug || `c-${category.id}` }
+      : null,
     brand: brand ? { id: brand.id, name: brand.name } : null,
     currency: effectiveCurrency,
     price: priceValues.length ? { min: Math.min(...priceValues), max: Math.max(...priceValues) } : null,
     variants,
     seo: { title, description: description.slice(0, 160) },
+    ratingAvg: detailRating.avg,
+    reviewCount: detailRating.count,
   }
 }
 

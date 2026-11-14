@@ -8,6 +8,9 @@ import type { CatalogProduct } from '@shared/types/api'
 const { t } = useI18n()
 const catalog = useCatalog()
 const siteUrl = useRuntimeConfig().public.siteUrl as string
+// 站点名由 store config 下发；回退内置名保证结构化数据不为空
+const storeCfg = useStoreConfig()
+const siteName = computed(() => storeCfg.config.value.siteName || 'Aurora Hair Studio')
 const { data: categories } = await useAsyncData('home-categories', () => catalog.loadCategories())
 const { data: featured } = await useAsyncData('home-featured', () => catalog.listProducts({ pageSize: 8 }))
 
@@ -85,14 +88,15 @@ useHead({
   script: [
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'Aurora Hair Studio', url: siteUrl }),
+      // PLAN 5.4：Organization 名称跟随后台 site_title（不再硬编码）
+      innerHTML: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: siteName.value, url: siteUrl }),
     },
     {
       type: 'application/ld+json',
       innerHTML: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebSite',
-        name: 'Aurora Hair Studio',
+        name: siteName.value,
         url: siteUrl,
         potentialAction: {
           '@type': 'SearchAction',
