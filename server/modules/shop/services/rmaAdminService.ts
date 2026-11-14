@@ -8,6 +8,7 @@
 import { ShopRmaRequest } from '../models/index.js'
 import { getTenantContext } from '../../../modules/tenant/context.js'
 import { AppError } from '../../../middleware/errorHandler.js'
+import * as inventoryService from './inventoryService.js'
 
 /** 当前租户 ID（租户上下文，平台超管兜底为 1） */
 const tid = (): number => getTenantContext()?.tenantId ?? 1
@@ -141,5 +142,17 @@ export async function approveRmaAsExchange(id: number, note?: string) {
     if (!row) throw new AppError(404, '退货申请不存在')
     throw new AppError(400, '仅 pending 状态的申请可转为换货')
   }
-  return ShopRmaRequest.findOne({ where: { tenantId: tId, id } })
+  // 换货：旧物退回，回补其库存（与退货退款同理；重发由后台新建发货流程 deduct，避免每笔换货净少一件）。
+  // 这里在审批落库后独立回补：回补失败不阻断换货审批（捕获后告警，凭 RMA id 可人工/重试补偿）。
+  const rmaRow = await ShopRmaRequest.findOne({ where: { tenantId: tId, id } })
+  if (rmaRow?.items?.length) {
+    for (const it of rmaRow.items as { skuId: number; qty: number }[]) {
+      try {
+        await inventoryService.restockReturn(Number(it.skuId), Number(it.qty), `rma-exchange:${id}`)
+      } catch (err) {
+        console.warn(`[rma] 换货 ${id} 回补库存失败（不阻断换货审批）：`, err instanceof Error ? err.message : err)
+      }
+    }
+  }
+  return rmaRow
 }

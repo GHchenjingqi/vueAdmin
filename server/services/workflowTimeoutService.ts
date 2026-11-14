@@ -28,7 +28,7 @@ interface EscalateTo {
  *   - escalateTo 配置：自动升级转交（上级或指定人），并通知新处理人。
  *   - 默认：发送超时催办提醒。
  *
- * 由 app.ts 中 env 门控的 node-cron 周期性调用，默认关闭（WORKFLOW_TIMEOUT_CRON=1 启用）。
+ * 由 app.ts 在启动时无条件注册扫描器、周期调用（始终启用，见 app.ts 对应启动段）。
  */
 export async function scanWorkflowTimeouts(): Promise<{ reminded: number; autoApproved: number; escalated: number }> {
   const now = new Date()

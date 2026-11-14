@@ -44,29 +44,34 @@ async function findOrCreateRow(skuId: number, warehouseId: number, t?: Transacti
   return row
 }
 
-/** 调整在库量（入库/出库），并记流水 */
-export async function adjust(skuId: number, warehouseId: number, delta: number): Promise<ShopInventory> {
+/** 调整在库量（入库/出库），并记流水。可传入外部事务（与调用方同事务原子提交），否则独立事务 + 死锁重试 */
+export async function adjust(
+  skuId: number,
+  warehouseId: number,
+  delta: number,
+  ref: string | null = null,
+  transaction?: Transaction,
+): Promise<ShopInventory> {
   if (delta === 0) throw new AppError(400, '调整量不能为 0')
   const tId = tenantId()
-  const row = await withDeadlockRetry(() =>
-    sequelize.transaction(async (t) => {
-      const row = await findOrCreateRow(skuId, warehouseId, t)
-      const next = row.quantity + delta
-      if (next < 0) throw new AppError(400, `库存不足，调整后将为负数（当前 ${row.quantity}，调整 ${delta}）`)
-      await row.update({ quantity: next }, { transaction: t })
-      await ShopInventoryLog.create({
-        skuId,
-        warehouseId,
-        delta,
-        type: delta > 0 ? 'in' : 'out',
-        ref: null,
-        tenantId: tId,
-      } as never, { transaction: t })
-      return row
-    }),
-  )
-  // 入库完成（提交后）触发到货提醒通知；通知失败不应影响入库本身
-  if (delta > 0 && restockHook) {
+  const run = async (t: Transaction) => {
+    const row = await findOrCreateRow(skuId, warehouseId, t)
+    const next = row.quantity + delta
+    if (next < 0) throw new AppError(400, `库存不足，调整后将为负数（当前 ${row.quantity}，调整 ${delta}）`)
+    await row.update({ quantity: next }, { transaction: t })
+    await ShopInventoryLog.create({
+      skuId,
+      warehouseId,
+      delta,
+      type: delta > 0 ? 'in' : 'out',
+      ref,
+      tenantId: tId,
+    } as never, { transaction: t })
+    return row
+  }
+  const row = transaction ? await run(transaction) : await withDeadlockRetry(() => sequelize.transaction(run))
+  // 入库完成（提交后）触发到货提醒通知；通知失败不应影响入库本身（外部事务内不触发，交给调用方）
+  if (delta > 0 && restockHook && !transaction) {
     try {
       await restockHook(skuId, tId)
     } catch (e) {
@@ -74,6 +79,26 @@ export async function adjust(skuId: number, warehouseId: number, delta: number):
     }
   }
   return row
+}
+
+/** 默认回补仓库（无该 SKU 库存行时回退，避免找不到仓库导致回补失败） */
+const DEFAULT_RESTOCK_WAREHOUSE = 1
+
+/**
+ * 售后退货 / 换货回补库存：把退回实物加回可用库存。
+ * 优先回补到该 SKU 现有库存最多的仓库（最可能是原发货仓），无库存行时回退默认仓 1。
+ * 可传入外部事务（与退款 / 换货审批同事务原子提交），否则独立事务 + 死锁重试。
+ */
+export async function restockReturn(skuId: number, qty: number, ref: string, transaction?: Transaction): Promise<void> {
+  if (qty <= 0) return
+  const tId = tenantId()
+  const rows = await ShopInventory.findAll({
+    where: { skuId, tenantId: tId },
+    order: [['quantity', 'DESC']],
+    transaction,
+  } as any)
+  const warehouseId = rows[0]?.warehouseId ?? DEFAULT_RESTOCK_WAREHOUSE
+  await adjust(skuId, warehouseId, qty, ref, transaction)
 }
 
 /** 占用库存（下单时锁定），available = quantity - locked */

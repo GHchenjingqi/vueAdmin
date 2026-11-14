@@ -7,6 +7,7 @@ import { ShopOrderRefund, ShopRmaRequest } from '../models/index.js'
 import { tryEnqueue } from './orderMailService.js'
 import * as auditLogService from './auditLogService.js'
 import * as membershipService from './membershipService.js'
+import * as inventoryService from './inventoryService.js'
 import { ShopCustomer } from '../models/index.js'
 import { withDeadlockRetry } from './deadlockRetry.js'
 
@@ -128,8 +129,12 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
   const existing = await ShopOrderRefund.findOne({ where: { idempotencyKey, tenantId: tId } })
   if (existing) return notifyRefund(toView(existing))
 
+  // 全额退款标记：事务提交后据此恢复优惠券用量（与取消订单对称）
+  let fullyRefunded = false
+  let refundOrderNo: string | null = null
+
   try {
-    return await notifyRefund(
+    const view = await notifyRefund(
       await withDeadlockRetry(() =>
         sequelize.transaction(async (tx) => {
           const [orderRows] = await sequelize.query(
@@ -159,12 +164,16 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
           // 杜绝管理员对仅审批退半单的 RMA 签发整单金额退款，亦防止用失效/伪造 rmaId 放大退款。
           // rmaId 不属本单时（含越权/状态不符）不加载，保持原「退款照常、RMA 不驱动」行为。
           let rmaRefundCents: number | null = null
+          let rma: { items?: { skuId: number; qty: number }[] } | null = null
           if (params.rmaId != null) {
-            const rma = await ShopRmaRequest.findOne({
+            const row = await ShopRmaRequest.findOne({
               where: { id: params.rmaId, tenantId: tId, orderId: params.orderId, status: { [Op.in]: ['approved', 'returned'] } } as never,
               transaction: tx,
             })
-            if (rma) rmaRefundCents = Number(rma.refundAmountCents)
+            if (row) {
+              rma = row as unknown as { items?: { skuId: number; qty: number }[] }
+              rmaRefundCents = Number(row.refundAmountCents)
+            }
           }
 
           let amountCents = params.amountCents ?? remaining
@@ -213,7 +222,7 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
           // 同单校验（rma.orderId 须等于退款单）防越权改写其它订单的 RMA；
           // 已是 refunded 时 0 行影响 → 幂等 no-op。与退款落库同事务，保证原子。
           if (params.rmaId != null) {
-            await ShopRmaRequest.update({ status: 'refunded' } as never, {
+            const [affected] = await ShopRmaRequest.update({ status: 'refunded' } as never, {
               where: {
                 id: params.rmaId,
                 tenantId: tId,
@@ -222,6 +231,13 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
               } as never,
               transaction: tx,
             })
+            // 退货退款回补库存：仅当本事务真正把 RMA 由 approved/returned 驱动为 refunded 时才回补，
+            // 保证恰好一次（并发重放 / 幂等重放命中 0 行 → 不重复回补，避免账实二次偏差）。
+            if (affected > 0 && rma?.items?.length) {
+              for (const it of rma.items as { skuId: number; qty: number }[]) {
+                await inventoryService.restockReturn(Number(it.skuId), Number(it.qty), `rma:${params.rmaId}`, tx)
+              }
+            }
           }
 
           // X-T03：审计退款创建（system 事件，写入同事务；失败被服务吞掉，不阻断主流程）
@@ -237,11 +253,15 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
           )
 
           const total = alreadyRefunded + amountCents
+          const isFullyRefunded = total >= paidCents
           // 部分退款 → refunding；全额 → refunded（订单状态保持 paid，历史履约事实不改写）
           await sequelize.query('UPDATE orders SET paymentStatus = ?, updatedAt = NOW() WHERE id = ? AND tenantId = ?', {
-            replacements: [total >= paidCents ? 'refunded' : 'refunding', params.orderId, tId],
+            replacements: [isFullyRefunded ? 'refunded' : 'refunding', params.orderId, tId],
             transaction: tx,
           })
+          // 记录全额退款标记，事务提交后恢复优惠券用量（与订单取消对称）
+          fullyRefunded = isFullyRefunded
+          refundOrderNo = order.orderNo
 
           // 会员积分回补（防薅羊毛）：按退款比例回扣发分/回补抵扣；reason 带 refundNo 幂等。
           // 异常隔离：回补失败不得让退款失败（捕获后吞掉，凭 refundNo 可人工/重试补偿）。
@@ -262,6 +282,17 @@ export async function createRefund(params: CreateRefundParams): Promise<RefundVi
         }),
       ),
     )
+    // 全额退款恢复优惠券用量（与取消订单对称：整单退回则券可再次使用）。
+    // 失败隔离：恢复失败不得让退款失败（捕获后告警，凭 orderNo 可人工/重试补偿）。
+    if (fullyRefunded && refundOrderNo) {
+      try {
+        const { releaseCoupon } = await import('../../storefront/services/couponService.js')
+        await releaseCoupon(refundOrderNo)
+      } catch (err) {
+        console.warn(`[refund] 全额退款 ${refundOrderNo} 恢复优惠券用量失败（不阻断退款）：`, err instanceof Error ? err.message : err)
+      }
+    }
+    return view
   } catch (err) {
     // 并发下同一幂等键已被处理：返回首笔结果，不二次退款
     if (err instanceof UniqueConstraintError) {
