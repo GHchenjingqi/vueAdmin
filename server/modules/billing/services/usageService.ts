@@ -63,7 +63,17 @@ export async function getUsage(tenantId: number, metric: string): Promise<number
 }
 
 export async function getLimit(tenantId: number, metric: string): Promise<number> {
-  const sub = await Subscription.findOne({ where: { tenantId, status: { [Op.ne]: 'cancelled' } }, order: [['id', 'DESC']] })
+  // 仅对「当前有效」的订阅授予配额：状态为 active 且账期未结束。
+  // 否则订阅到期后（全库无续费/状态翻转定时任务，status 会永久停在 active）
+  // 仍会被无限期免费授予配额，造成计费失效 / 限额绕过。
+  const sub = await Subscription.findOne({
+    where: {
+      tenantId,
+      status: 'active',
+      currentPeriodEnd: { [Op.gte]: new Date() },
+    },
+    order: [['id', 'DESC']],
+  })
   if (!sub) return 0
   const plan = await Plan.findByPk(sub.planId)
   if (!plan) return 0
