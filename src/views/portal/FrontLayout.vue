@@ -68,7 +68,7 @@
         </nav>
 
         <div class="side-bottom">
-          <router-link to="/" class="side-admin-link">
+          <router-link v-if="isAdmin" to="/" class="side-admin-link">
             <el-icon><Setting /></el-icon>
             <span>{{ t('portal.navAdmin') }}</span>
           </router-link>
@@ -101,6 +101,8 @@ const userStore = useUserStore()
 
 const searchInput = ref('')
 const isLoggedIn = computed(() => userStore.isLoggedIn)
+// 「后台管理」入口仅对管理员可见，与全局权限判定保持一致
+const isAdmin = computed(() => userStore.roles.some((role) => role === 'admin' || role === 'super_admin'))
 const username = computed(() => userStore.username || t('portal.login'))
 const userInitial = computed(() => username.value.charAt(0).toUpperCase())
 

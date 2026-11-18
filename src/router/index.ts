@@ -137,6 +137,10 @@ router.beforeEach((to, _from, next) => {
   const userStore = useUserStore(pinia)
   const isLoggedIn = userStore.isLoggedIn
   const passwordResetRequired = userStore.passwordResetRequired
+  // 管理员判定口径与 v-permission / 前台「后台管理」入口保持一致
+  const isAdmin = userStore.roles.some((role) => role === 'admin' || role === 'super_admin')
+  // 后台页面均为名为 Layout 的父路由的子路由（含动态菜单注册）；前台在 /portal 下，不受此限
+  const isBackendRoute = to.matched.some((record) => record.name === 'Layout')
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     next({ path: '/login' })
@@ -149,6 +153,9 @@ router.beforeEach((to, _from, next) => {
     } else {
       next({ path: '/' })
     }
+  } else if (isBackendRoute && isLoggedIn && !isAdmin) {
+    // 非管理员禁止进入后台（手动输入后台路径同样拦截），统一回到前台广场
+    next({ path: '/portal/prompts' })
   } else if (to.meta.requiresAuth && passwordResetRequired && !to.meta.requiresPasswordChange) {
     next({ path: '/force-password-change' })
   } else {
