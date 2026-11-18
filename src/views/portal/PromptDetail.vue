@@ -1,98 +1,116 @@
 <template>
   <div v-loading="loading" class="detail-page">
-    <el-breadcrumb separator="/" class="detail-breadcrumb">
-      <el-breadcrumb-item :to="{ path: '/portal/prompts' }">{{ t('portal.navSquare') }}</el-breadcrumb-item>
-      <el-breadcrumb-item>{{ detail?.title || t('portal.detail') }}</el-breadcrumb-item>
-    </el-breadcrumb>
+    <div class="detail-container">
+      <el-breadcrumb separator="/" class="detail-breadcrumb">
+        <el-breadcrumb-item :to="{ path: '/portal/prompts' }">{{ t('portal.navSquare') }}</el-breadcrumb-item>
+        <el-breadcrumb-item>{{ detail?.title || t('portal.detail') }}</el-breadcrumb-item>
+      </el-breadcrumb>
 
-    <template v-if="detail">
-      <div class="detail-layout">
-        <section class="detail-gallery">
-          <div v-if="platformGroups.length > 1" class="gallery-platforms">
-            <button
-              v-for="(group, index) in platformGroups"
-              :key="group.platformId"
-              type="button"
-              class="platform-tab"
-              :class="{ active: index === activePlatformIndex }"
-              @click="selectPlatform(index)"
-            >
-              {{ group.platformName }}
-              <span class="tab-count">{{ group.images.length }}</span>
-            </button>
-          </div>
-          <div v-else-if="platformGroups.length === 1" class="gallery-single-platform">{{ platformGroups[0].platformName }}</div>
-          <div class="gallery-card">
-            <el-image
-              v-if="gallery.length"
-              :src="activeImage"
-              fit="contain"
-              class="detail-main-image"
-              :preview-src-list="gallery"
-              :initial-index="activeIndex"
-            />
-            <div v-else class="detail-main-placeholder">
-              <el-icon :size="40"><Picture /></el-icon>
+      <template v-if="detail">
+        <!-- 标题区：作为整页视觉焦点，聚合标题 / 作者 / 标签 / 统计 -->
+        <header class="detail-header">
+          <div class="detail-header-top">
+            <h1 class="detail-title">{{ detail.title }}</h1>
+            <div class="detail-tag-row">
+              <span v-if="detail.modelName" class="detail-tag detail-tag-model">{{ detail.modelName }}</span>
+              <span v-if="detail.categoryName" class="detail-tag">{{ detail.categoryName }}</span>
             </div>
           </div>
-          <div v-if="gallery.length > 1" class="detail-thumbs">
-            <button
-              v-for="(url, index) in gallery"
-              :key="url"
-              type="button"
-              class="detail-thumb"
-              :class="{ active: index === activeIndex }"
-              @click="activeIndex = index"
-            >
-              <img :src="url" :alt="`${detail.title} ${index + 1}`" />
-            </button>
-          </div>
-        </section>
-
-        <section class="detail-info">
-          <h1>{{ detail.title }}</h1>
-          <div class="detail-meta">
-            <el-tag effect="plain" type="primary">{{ detail.modelName }}</el-tag>
-            <el-tag effect="plain">{{ detail.categoryName }}</el-tag>
-            <span class="detail-author">{{ t('portal.author') }}：{{ detail.authorName || '-' }}</span>
-          </div>
-          <div class="detail-stats">
-            <span>
-              <el-icon><View /></el-icon>
-              {{ detail.viewCount ?? 0 }} {{ t('portal.views') }}
+          <div class="detail-header-meta">
+            <span class="detail-author">
+              <span class="author-avatar">{{ (detail.authorName || '?').charAt(0) }}</span>
+              {{ detail.authorName || '-' }}
             </span>
-            <span>
-              <el-icon><Star /></el-icon>
-              {{ detail.favoriteCount ?? 0 }} {{ t('portal.favorites') }}
+            <span class="detail-stats">
+              <span>
+                <el-icon><View /></el-icon>
+                {{ detail.viewCount ?? 0 }} {{ t('portal.views') }}
+              </span>
+              <span>
+                <el-icon><Star /></el-icon>
+                {{ detail.favoriteCount ?? 0 }} {{ t('portal.favorites') }}
+              </span>
             </span>
           </div>
+        </header>
 
-          <div class="detail-content-head">
-            <h3>{{ t('portal.content') }}</h3>
-            <el-button type="primary" size="small" :icon="DocumentCopy" @click="copyContent">
-              {{ t('portal.copy') }}
-            </el-button>
-          </div>
-          <pre class="detail-content">{{ detail.content }}</pre>
+        <div class="detail-layout">
+          <!-- 左：作品图集 -->
+          <section class="detail-gallery">
+            <div v-if="platformGroups.length > 1" class="gallery-platforms">
+              <button
+                v-for="(group, index) in platformGroups"
+                :key="group.platformId"
+                type="button"
+                class="platform-tab"
+                :class="{ active: index === activePlatformIndex }"
+                @click="selectPlatform(index)"
+              >
+                {{ group.platformName }}
+                <span class="tab-count">{{ group.images.length }}</span>
+              </button>
+            </div>
+            <div v-else-if="platformGroups.length === 1" class="gallery-single-platform">{{ platformGroups[0].platformName }}</div>
 
-          <div class="detail-actions">
-            <el-button :type="favorited ? 'primary' : 'default'" :icon="favorited ? StarFilled : Star" @click="toggleFavorite">
-              {{ favorited ? t('portal.favoriteRemove') : t('portal.favoriteAdd') }}
-            </el-button>
-            <el-button :icon="Back" @click="goBack">{{ t('portal.backToSquare') }}</el-button>
-          </div>
-        </section>
-      </div>
+            <div class="gallery-frame">
+              <el-image
+                v-if="gallery.length"
+                :src="activeImage"
+                fit="contain"
+                class="detail-main-image"
+                :preview-src-list="gallery"
+                :initial-index="activeIndex"
+              />
+              <div v-else class="detail-main-placeholder">
+                <el-icon :size="40"><Picture /></el-icon>
+              </div>
+            </div>
 
-      <section v-if="related.length" class="detail-related">
-        <h2 class="related-title">{{ t('portal.related') }}</h2>
-        <div class="detail-related-grid">
-          <PromptCard v-for="item in related" :key="item.id" :prompt="item" />
+            <div v-if="gallery.length > 1" class="detail-thumbs">
+              <button
+                v-for="(url, index) in gallery"
+                :key="url"
+                type="button"
+                class="detail-thumb"
+                :class="{ active: index === activeIndex }"
+                @click="activeIndex = index"
+              >
+                <img :src="url" :alt="`${detail.title} ${index + 1}`" />
+              </button>
+            </div>
+          </section>
+
+          <!-- 右：提示词面板（Header / Content / Footer 三段式） -->
+          <section class="prompt-panel">
+            <div class="prompt-panel-head">
+              <span class="prompt-panel-title">
+                <el-icon><Document /></el-icon>
+                {{ t('portal.content') }}
+              </span>
+              <el-button size="small" text :icon="DocumentCopy" @click="copyContent">{{ t('portal.copy') }}</el-button>
+            </div>
+            <div class="prompt-panel-body">
+              <pre class="detail-content">{{ detail.content }}</pre>
+            </div>
+            <div class="prompt-panel-foot">
+              <el-button :type="favorited ? 'primary' : 'default'" :icon="favorited ? StarFilled : Star" @click="toggleFavorite">
+                {{ favorited ? t('portal.favoriteRemove') : t('portal.favoriteAdd') }}
+              </el-button>
+              <el-button :icon="Back" @click="goBack">{{ t('portal.backToSquare') }}</el-button>
+            </div>
+          </section>
         </div>
-      </section>
-    </template>
 
-    <el-empty v-else-if="!loading" :description="t('portal.detailNotFound')" />
+        <section v-if="related.length" class="detail-related">
+          <h2 class="related-title">{{ t('portal.related') }}</h2>
+          <div class="detail-related-grid">
+            <PromptCard v-for="item in related" :key="item.id" :prompt="item" />
+          </div>
+        </section>
+      </template>
+
+      <el-empty v-else-if="!loading" :description="t('portal.detailNotFound')" />
+    </div>
   </div>
 </template>
 
@@ -100,7 +118,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Picture, View, Star, StarFilled, DocumentCopy, Back } from '@element-plus/icons-vue'
+import { Picture, View, Star, StarFilled, DocumentCopy, Document, Back } from '@element-plus/icons-vue'
 import { portalApi, type PortalPrompt } from '@/api'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
@@ -199,58 +217,165 @@ onMounted(() => void load())
 </script>
 
 <style scoped>
-.detail-breadcrumb {
-  margin-bottom: 18px;
+/* 语义 token 本地别名：全部继承 portal.css 的设计变量，不写死色值 */
+.detail-page {
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 20px;
+  --gap-6: 24px;
+  --gap-8: 32px;
+  /* 详情页卡片圆角：8px 为本页局部值，不改动全局 --radius，避免影响其他页面 */
+  --detail-radius: 8px;
 }
 
+/* 内容容器：最大宽度约束，避免宽屏上图片被拉满 */
+.detail-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.detail-breadcrumb {
+  margin-bottom: var(--gap-3);
+  font-size: var(--gap-3);
+}
+
+/* ---- 标题卡片 ---- */
+.detail-header {
+  padding: var(--gap-5) var(--gap-6);
+  margin-bottom: var(--gap-3);
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--detail-radius);
+}
+
+.detail-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gap-4);
+  flex-wrap: wrap;
+}
+
+.detail-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.detail-tag-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  flex-wrap: wrap;
+}
+
+.detail-tag {
+  padding: var(--gap-1) var(--gap-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--page-bg);
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.detail-tag-model {
+  border-color: transparent;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.detail-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-6);
+  margin-top: var(--gap-5);
+  padding-top: var(--gap-4);
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.detail-author {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-2);
+}
+
+.author-avatar {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.detail-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-4);
+}
+
+.detail-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-1);
+}
+
+/* ---- 主体两栏 ---- */
 .detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--gap-3);
   align-items: start;
 }
 
-.gallery-card {
+/* 图片卡片：白底 + 1px 边框 + 8px 圆角，无投影 */
+.detail-gallery {
+  min-width: 0;
+  padding: var(--gap-4);
   background: var(--card-bg);
-  border-radius: var(--radius);
-  padding: 12px;
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--detail-radius);
 }
 
-.detail-main-image {
-  width: 100%;
-  min-height: 340px;
-  max-height: 560px;
-  border-radius: var(--radius-sm);
-  background: var(--page-bg);
-}
-
-.detail-main-placeholder {
-  height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-3);
-  background: var(--page-bg);
-  border-radius: var(--radius-sm);
-}
-
+/* 平台切换：segmented 控件，浅底容器 + 选中态 */
 .gallery-platforms {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
-  gap: 0;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--line-strong);
+  gap: var(--gap-1);
+  padding: var(--gap-1);
+  margin-bottom: var(--gap-3);
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
 .platform-tab {
-  padding: 8px 16px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-1);
+  padding: var(--gap-2) var(--gap-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--ink-2);
   font-size: 13px;
+  font-family: var(--sans);
+  line-height: 1.4;
   cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .platform-tab:hover {
@@ -258,14 +383,14 @@ onMounted(() => void load())
 }
 
 .platform-tab.active {
+  background: var(--card-bg);
+  border-color: var(--line);
   color: var(--brand);
-  border-bottom-color: var(--brand);
   font-weight: 600;
 }
 
 .tab-count {
-  margin-left: 6px;
-  padding: 1px 6px;
+  padding: 0 var(--gap-1);
   border-radius: var(--radius-sm);
   background: var(--brand-soft);
   color: var(--brand);
@@ -273,27 +398,53 @@ onMounted(() => void load())
 }
 
 .gallery-single-platform {
-  margin-bottom: 10px;
+  margin-bottom: var(--gap-3);
   font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* 固定矮画框：图片高度受控，不再随栏宽被拉高；中性灰底 contain */
+.gallery-frame {
+  height: 280px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--page-bg);
+  border-radius: var(--radius-sm);
+}
+
+.detail-main-image {
+  width: 100%;
+  height: 100%;
+}
+
+.detail-main-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--ink-3);
 }
 
 .detail-thumbs {
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--gap-2);
+  margin-top: var(--gap-3);
   overflow-x: auto;
 }
 
 .detail-thumb {
-  width: 66px;
-  height: 66px;
+  width: 56px;
+  height: 56px;
   padding: 0;
-  border: 2px solid transparent;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
-  background: none;
+  background: var(--page-bg);
   flex-shrink: 0;
 }
 
@@ -307,112 +458,106 @@ onMounted(() => void load())
   object-fit: cover;
 }
 
-.detail-info {
+/* ---- 提示词面板：Header / Content / Footer ---- */
+.prompt-panel {
+  display: flex;
+  flex-direction: column;
   background: var(--card-bg);
-  border-radius: var(--radius);
-  padding: 24px;
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--detail-radius);
+  overflow: hidden;
 }
 
-.detail-info h1 {
-  margin: 0 0 16px;
-  font-size: 26px;
-  line-height: 1.4;
-}
-
-.detail-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.detail-author {
-  font-size: 13px;
-  color: var(--ink-3);
-}
-
-.detail-stats {
-  display: flex;
-  gap: 20px;
-  margin: 16px 0 22px;
-  font-size: 13px;
-  color: var(--ink-3);
-}
-
-.detail-stats span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.detail-content-head {
+.prompt-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  padding: var(--gap-3) var(--gap-4);
+  border-bottom: 1px solid var(--line);
 }
 
-.detail-content-head h3 {
-  margin: 0;
-  font-size: 15px;
+.prompt-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prompt-panel-body {
+  flex: 1;
+  padding: var(--gap-4);
+  background: var(--page-bg);
 }
 
 .detail-content {
   margin: 0;
-  padding: 16px;
-  border-radius: var(--radius-sm);
-  background: var(--page-bg);
-  border: 1px solid var(--line);
-  font-family: var(--sans);
+  font-family: var(--font-mono, 'SF Mono', Consolas, 'Liberation Mono', monospace);
   font-size: 13px;
   line-height: 1.8;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 340px;
-  overflow-y: auto;
   color: var(--ink-2);
+  max-height: 360px;
+  overflow-y: auto;
 }
 
-.detail-actions {
+.prompt-panel-foot {
   display: flex;
-  gap: 10px;
-  margin-top: 22px;
+  gap: var(--gap-2);
+  padding: var(--gap-3) var(--gap-4);
+  border-top: 1px solid var(--line);
 }
 
+/* ---- 相关推荐 ---- */
 .detail-related {
-  margin-top: 32px;
+  margin-top: var(--gap-3);
 }
 
 .related-title {
   font-size: 18px;
-  margin: 0 0 16px;
-  padding-left: 11px;
+  margin: 0 0 var(--gap-4);
+  padding-left: var(--gap-3);
   border-left: 3px solid var(--brand);
 }
 
 .detail-related-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 16px;
+  gap: var(--gap-3);
+}
+
+/* 相关推荐是整齐网格，封面统一裁切高度，避免竖图把某一行撑得过高 */
+.detail-related-grid :deep(.prompt-card) {
+  border-radius: var(--detail-radius);
+}
+
+.detail-related-grid :deep(.cover-image) {
+  height: 160px;
+  object-fit: cover;
+}
+
+.detail-related-grid :deep(.cover-placeholder) {
+  height: 160px;
 }
 
 @media (max-width: 900px) {
+  .detail-title {
+    font-size: 22px;
+  }
+
+  .detail-header-top {
+    flex-direction: column;
+  }
+
   .detail-layout {
     grid-template-columns: 1fr;
-    gap: 18px;
+    gap: var(--gap-3);
   }
 
-  .detail-main-image,
-  .detail-main-placeholder {
-    min-height: 240px;
-    height: 300px;
-  }
-
-  .detail-info h1 {
-    font-size: 22px;
+  .gallery-frame {
+    height: 220px;
   }
 }
 </style>
