@@ -1,0 +1,59 @@
+import * as portalService from '../services/portalService.js'
+import * as platformService from '../services/platformService.js'
+import * as registerService from '../services/registerService.js'
+import { portalUserId } from '../middleware/portalAuth.js'
+
+export async function categories(_req: any, res: any, next: any) {
+  try {
+    res.json({ code: 0, data: await portalService.listPublishedCategories() })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function platforms(_req: any, res: any, next: any) {
+  try {
+    res.json({ code: 0, data: await platformService.listPlatformOptions() })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function list(req: any, res: any, next: any) {
+  try {
+    res.json({ code: 0, data: await portalService.listPublishedPrompts(req.query, portalUserId(req) || undefined) })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function detail(req: any, res: any, next: any) {
+  try {
+    res.json({
+      code: 0,
+      data: await portalService.getPublishedPrompt(Number(req.params.id), portalUserId(req) || undefined),
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function related(req: any, res: any, next: any) {
+  try {
+    res.json({
+      code: 0,
+      data: await portalService.listRelated(Number(req.params.id), portalUserId(req) || undefined),
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** 前台注册：写入框架 users 表，随后由前端调用 /auth/login 登录 */
+export async function register(req: any, res: any, next: any) {
+  try {
+    res.status(201).json({ code: 0, data: await registerService.register(req.body) })
+  } catch (err) {
+    next(err)
+  }
+}

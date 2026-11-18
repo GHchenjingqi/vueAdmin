@@ -42,6 +42,62 @@ const routes = [
       },
     ],
   },
+  // 提示词平台前台：独立 Layout，与后台共用同一套登录态和数据源
+  {
+    path: '/portal',
+    component: () => import('@/views/portal/FrontLayout.vue'),
+    children: [
+      { path: '', redirect: '/portal/prompts' },
+      {
+        path: 'prompts',
+        name: 'PortalPrompts',
+        component: () => import('@/views/portal/PromptSquare.vue'),
+        meta: { title: '提示词广场' },
+      },
+      {
+        path: 'prompts/:id',
+        name: 'PortalPromptDetail',
+        component: () => import('@/views/portal/PromptDetail.vue'),
+        meta: { title: '提示词详情' },
+      },
+      {
+        path: 'publish',
+        name: 'PortalPublish',
+        component: () => import('@/views/portal/PublishPrompt.vue'),
+        meta: { title: '发布提示词' },
+      },
+      {
+        path: 'publish/:id',
+        name: 'PortalEdit',
+        component: () => import('@/views/portal/PublishPrompt.vue'),
+        meta: { title: '编辑投稿' },
+      },
+      {
+        path: 'mine',
+        name: 'PortalMine',
+        component: () => import('@/views/portal/MyPrompts.vue'),
+        meta: { title: '我的投稿' },
+      },
+      {
+        path: 'favorites',
+        name: 'PortalFavorites',
+        component: () => import('@/views/portal/MyFavorites.vue'),
+        meta: { title: '我的收藏' },
+      },
+      {
+        path: 'login',
+        name: 'PortalLogin',
+        component: () => import('@/views/portal/FrontLogin.vue'),
+        meta: { title: '登录' },
+      },
+      {
+        path: 'register',
+        name: 'PortalRegister',
+        component: () => import('@/views/portal/FrontRegister.vue'),
+        meta: { title: '注册' },
+      },
+    ],
+  },
   {
     path: '/login',
     name: 'Login',

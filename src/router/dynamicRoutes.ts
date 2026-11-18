@@ -61,15 +61,21 @@ export function addDynamicRoutes(menus: Menu[]): void {
  * 则回退到第一个可用菜单路径，避免停留在空白首页或命中 404。
  */
 export async function tryRestorePath(): Promise<boolean> {
-  if (savedPath !== '/' && savedPath !== '/login') {
-    const resolved = router.resolve(savedPath)
-    if (resolved.matched.length > 0 && resolved.name !== 'NotFound') {
-      await router.replace(savedPath)
-      return true
-    }
-    // savedPath 是无效路径（命中 catch-all 404）—— 不恢复，让 404 页面自然显示
-    return false
+  if (savedPath === '/' || savedPath === '/login') return false
+
+  // 仅在刷新后仍停留在 catch-all 404（动态路由尚未注册时的暂态）才恢复。
+  // 初始化是异步的：若此时用户已点击链接离开初始路径（例如从前台点「后台管理」），
+  // 无条件 replace 会覆盖用户导航，把人拉回前台，表现为「点击无反应」；
+  // 同时 savedPath 只含 pathname，replace 还会丢掉 sharecode 等 query 参数。
+  const current = router.currentRoute.value
+  if (current.name !== 'NotFound') return false
+
+  const resolved = router.resolve(savedPath)
+  if (resolved.matched.length > 0 && resolved.name !== 'NotFound') {
+    await router.replace(savedPath)
+    return true
   }
+  // savedPath 是无效路径（命中 catch-all 404）—— 不恢复，让 404 页面自然显示
   return false
 }
 

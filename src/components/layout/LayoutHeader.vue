@@ -70,6 +70,8 @@
 
     <!-- 右侧：通知 + 主题切换 + 语言 + 用户 -->
     <div class="header-right">
+      <!-- 提示词平台前台入口（独立 Layout） -->
+      <router-link to="/portal/prompts" class="portal-entry">{{ t('sidebar.promptPortal') }}</router-link>
       <NotificationCenter @unread-change="handleUnreadChange" />
 
       <!-- 深色主题切换 -->
@@ -241,6 +243,25 @@ function previewUrl(url: string): string {
 </script>
 
 <style lang="scss" scoped>
+.portal-entry {
+  flex-shrink: 0;
+  margin-right: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--el-color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--el-color-primary-light-9);
+  }
+
+  @media (max-width: 767px) {
+    display: none;
+  }
+}
+
 .layout-header-inner {
   display: flex;
   align-items: center;

@@ -29,3 +29,17 @@ bundle-report/
 
 # Playwright 联调截图产物
 e2e-artifacts/
+
+# ===== AI 提示词分享平台 =====
+# 云端 client/ 是前端 Vite 构建产物（等同 dist），不入库
+prompt-cloud/client/
+# 云端运行时数据；uploads 仅保留内置示例图，用户上传不入库
+prompt-cloud/data/
+prompt-cloud/uploads/*
+!prompt-cloud/uploads/demo-*.jpg
+# 初版独立实现（已废弃，主线为 prompt 模块 + prompt-cloud），仅本地保留
+prompt-platform/
+# WorkBuddy 会话产物、调试截图与测试输出转储
+*.genie
+/image-*.webp
+*_test_out.txt

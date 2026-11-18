@@ -123,6 +123,15 @@
           </el-form-item>
         </el-form>
 
+        <!-- 提示词平台前台入口：游客无需登录即可浏览 -->
+        <div class="portal-entry-box">
+          <span class="portal-entry-hint">{{ t('login.portalHint') }}</span>
+          <router-link to="/portal/prompts" class="portal-entry-link">
+            {{ t('sidebar.promptPortal') }}
+            <el-icon :size="14"><ArrowRight /></el-icon>
+          </router-link>
+        </div>
+
         <!-- 底部版权 -->
         <div class="login-copyright">
           <p>{{ t('login.copyright', { year: new Date().getFullYear() }) }}</p>
@@ -150,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { Odometer, User, Lock, Key, ArrowDown, Check } from '@element-plus/icons-vue'
+import { Odometer, User, Lock, Key, ArrowDown, ArrowRight, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { authApi, siteApi } from '@/api'
 import { sanitizeSvg } from '@/utils/sanitize'
@@ -595,6 +604,39 @@ onMounted(() => {
   font-size: 16px;
   border-radius: 8px;
   letter-spacing: 1px;
+}
+
+/* 提示词平台前台入口 */
+.portal-entry-box {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 8px;
+  background: var(--content-bg, #f5f6fa);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.portal-entry-hint {
+  font-size: 13px;
+  color: var(--text-secondary, #909399);
+}
+
+.portal-entry-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--mainColor, #409eff);
+  text-decoration: none;
+}
+
+.portal-entry-link:hover {
+  text-decoration: underline;
 }
 
 .login-copyright {

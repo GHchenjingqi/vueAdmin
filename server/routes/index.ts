@@ -26,6 +26,8 @@ import * as serverController from '../controllers/serverController.js'
 import config from '../config/index.js'
 import aiRoutes from './ai.routes.js'
 import knowledgeRoutes from '../modules/knowledge/routes/index.js'
+import promptRoutes from '../modules/prompt/routes/index.js'
+import portalRoutes from '../modules/prompt/routes/portal.js'
 // ==================== 工作流管理 ====================
 import workflowRoutes from './workflowRoutes.js'
 
@@ -1961,6 +1963,8 @@ if (config.app.aiAssistantEnabled !== false) {
 }
 router.use(workflowRoutes)
 router.use('/knowledge', knowledgeRoutes)
+router.use('/prompt', promptRoutes)
+router.use('/portal', portalRoutes)
 
 // ==================== 计费与配额 ====================
 import billingRoutes from '../modules/billing/routes/billingRoutes.js'

@@ -31,10 +31,16 @@ export default tseslint.config(
   {
     // 全局忽略
     ignores: [
-      'dist/**',
+      '**/dist/**',
       'server/**',
-      'node_modules/**',
+      '**/node_modules/**',
+      '**/coverage/**',
       'e2e-report/**',
+      // AI 提示词平台：云端构建产物/运行时数据 + 已废弃的初版独立实现
+      'prompt-cloud/client/**',
+      'prompt-cloud/data/**',
+      'prompt-cloud/uploads/**',
+      'prompt-platform/**',
       '.ai-knowledge/**',
       '.kilo/**',
       '**/*.d.ts',
@@ -95,6 +101,18 @@ export default tseslint.config(
     files: ['src/**/__tests__/**/*.ts', 'src/**/__tests__/**/*.vue', '**/*.test.ts', '**/*.spec.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    // 云端轻量后端为独立 CommonJS Node 脚本
+    files: ['prompt-cloud/server.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 )
