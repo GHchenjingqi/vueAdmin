@@ -1,10 +1,10 @@
 <template>
   <div class="image-uploader">
     <div class="image-uploader-bar">
-      <el-upload :show-file-list="false" accept="image/*" multiple :http-request="handleUpload" :before-upload="beforeUpload">
+      <el-upload :show-file-list="false" accept="image/*" :multiple="max > 1" :http-request="handleUpload" :before-upload="beforeUpload">
         <el-button :icon="UploadFilled">{{ t('portal.uploadImage') }}</el-button>
       </el-upload>
-      <span class="image-uploader-tip">{{ t('portal.imageTip') }} · {{ modelValue.length }}/20</span>
+      <span class="image-uploader-tip">{{ t('portal.imageTip') }} · {{ modelValue.length }}/{{ max }}</span>
     </div>
 
     <div v-if="modelValue.length" class="image-uploader-list">
@@ -30,15 +30,15 @@ import type { PromptImageItem } from '@/api/prompt'
 import { useI18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/error'
 
-const props = defineProps<{ modelValue: PromptImageItem[] }>()
+const props = withDefaults(defineProps<{ modelValue: PromptImageItem[]; max?: number }>(), { max: 20 })
 const emit = defineEmits<{ (e: 'update:modelValue', value: PromptImageItem[]): void }>()
 
 const { t } = useI18n()
 const imageUrls = computed(() => props.modelValue.map((image) => image.url))
 
 const beforeUpload = (file: File): boolean => {
-  if (props.modelValue.length >= 20) {
-    ElMessage.error(t('portal.imageGroupLimit'))
+  if (props.modelValue.length >= props.max) {
+    ElMessage.error(props.max === 1 ? t('portal.stepImageLimit') : t('portal.imageGroupLimit'))
     return false
   }
   if (!file.type.startsWith('image/')) {
@@ -53,8 +53,8 @@ const beforeUpload = (file: File): boolean => {
 }
 
 const handleUpload = async (options: UploadRequestOptions): Promise<void> => {
-  if (props.modelValue.length >= 20) {
-    ElMessage.error(t('portal.imageGroupLimit'))
+  if (props.modelValue.length >= props.max) {
+    ElMessage.error(props.max === 1 ? t('portal.stepImageLimit') : t('portal.imageGroupLimit'))
     return
   }
   try {

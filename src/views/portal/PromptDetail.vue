@@ -34,7 +34,10 @@
           </div>
         </header>
 
-        <div class="detail-layout">
+        <!-- 套组：有序步骤时间轴 -->
+        <SequenceTimeline v-if="isSequence && detail" :detail="detail" />
+
+        <div v-else class="detail-layout">
           <!-- 左：作品图集 -->
           <section class="detail-gallery">
             <div v-if="platformGroups.length > 1" class="gallery-platforms">
@@ -124,6 +127,7 @@ import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/error'
 import PromptCard from './components/PromptCard.vue'
+import SequenceTimeline from './components/SequenceTimeline.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -136,6 +140,8 @@ const loading = ref(false)
 const favorited = ref(false)
 const activeIndex = ref(0)
 const activePlatformIndex = ref(0)
+
+const isSequence = computed(() => detail.value?.type === 'sequence')
 
 const platformGroups = computed(() => {
   if (detail.value?.platformGroups?.length) return detail.value.platformGroups

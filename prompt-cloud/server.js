@@ -19,6 +19,8 @@ const COOKIE_NAME = 'ppt_token'
 const CATEGORY_NAMES = ['人物', '服装', '环境', '建筑', '产品', '美食', '动物', '插画艺术', '摄影', '其他']
 const DB_SCHEMA = 'prompt-cloud-v1'
 const IMAGES_PER_GROUP = 20
+const IMAGES_PER_STEP_GROUP = 1
+const MAX_STEPS = 100
 const DEFAULT_PLATFORM_ID = 1
 const DEFAULT_PLATFORM_NAMES = ['通用', '即梦', '可灵', 'GPT', 'Midjourney', 'Stable Diffusion', '通义万相']
 
@@ -49,6 +51,22 @@ const DEMO_PROMPTS = [
   { title: '梦幻独角兽 · 童话插画', categoryId: 8, modelName: 'Flux.1 Pro', authorId: 4, views: 1338, favs: 98, seed: 'unicorn', ratio: [720, 940], content: 'A majestic unicorn in an enchanted forest, sparkling particles, dreamy pastel colors, children book illustration, soft glowing light' },
   { title: '晨光瑜伽 · 生活美学', categoryId: 1, modelName: 'Midjourney v6', authorId: 5, views: 712, favs: 35, seed: 'morning-yoga', ratio: [720, 960], content: 'A woman practicing yoga by the window in morning sunlight, serene atmosphere, lifestyle photography, warm tones, soft shadows --ar 3:4' },
 ]
+
+// 有序步骤套组示例：一套太极三式，每步一个动作、每平台一张代表图
+const SEQUENCE_DEMO = {
+  title: '太极三式 · 起势到收势',
+  categoryId: 1,
+  modelName: '即梦 / 可灵',
+  authorId: 2,
+  views: 1860,
+  favs: 142,
+  characterAnchor: '同一名白衣武者，身形清瘦，晨雾中的古朴庭院，写实电影质感，全身构图，统一柔和光线',
+  steps: [
+    { name: '起势', actionPrompt: '双脚并拢站立，双手自然垂于身体两侧，缓缓吸气，目光平视前方', camera: '正面全身平视', seconds: 5, transition: '重心左移，进入左搂膝拗步', images: [{ seed: 'morning-yoga', platformId: 2 }] },
+    { name: '左搂膝拗步', actionPrompt: '左腿前弓成弓步，左手搂膝向左下划弧，右手立掌向前推出，目视右手', camera: '侧面全身', seconds: 8, transition: '重心后移，收脚换势进入单鞭', images: [{ seed: 'red-dress', platformId: 2 }, { seed: 'street-fashion', platformId: 3 }] },
+    { name: '单鞭收势', actionPrompt: '身体右转，右手勾手，左手立掌向左缓缓推出，随后双手回收归于腹前', camera: '正面全身平视', seconds: 8, transition: '套路结束，气息归元', images: [{ seed: 'morning-yoga', platformId: 3 }] },
+  ],
+}
 
 function buildDemoData(t) {
   const users = DEMO_USERS.map((u) => ({
@@ -99,10 +117,65 @@ function buildDemoData(t) {
     promptId,
     createdAt: t,
   }))
+
+  // 追加套组示例：先建 prompt，再建 steps，最后给每步挂对应平台的单张效果图
+  const sequencePromptId = prompts.length + 1
+  prompts.push({
+    id: sequencePromptId,
+    title: SEQUENCE_DEMO.title,
+    content: SEQUENCE_DEMO.steps.map((s, i) => `${i + 1}. ${s.name}：${s.actionPrompt}`).join('\n'),
+    categoryId: SEQUENCE_DEMO.categoryId,
+    modelName: SEQUENCE_DEMO.modelName,
+    type: 'sequence',
+    characterAnchor: SEQUENCE_DEMO.characterAnchor,
+    status: 'published',
+    source: 'demo',
+    authorId: SEQUENCE_DEMO.authorId,
+    rejectReason: null,
+    reviewedBy: 1,
+    reviewedAt: t,
+    viewCount: SEQUENCE_DEMO.views,
+    isDeleted: 0,
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    updatedAt: t,
+  })
+  let stepId = 0
+  const steps = []
+  SEQUENCE_DEMO.steps.forEach((step, stepIndex) => {
+    stepId += 1
+    const currentStepId = stepId
+    steps.push({
+      id: currentStepId,
+      promptId: sequencePromptId,
+      stepOrder: stepIndex + 1,
+      name: step.name,
+      actionPrompt: step.actionPrompt,
+      camera: step.camera,
+      seconds: step.seconds,
+      transition: step.transition,
+      createdAt: t,
+      updatedAt: t,
+    })
+    for (const imageRef of step.images) {
+      imageId += 1
+      images.push({
+        id: imageId,
+        promptId: sequencePromptId,
+        platformId: imageRef.platformId,
+        stepId: currentStepId,
+        url: `/uploads/demo-${imageRef.seed}.jpg`,
+        filePath: null,
+        sort: 0,
+        isCover: 1,
+      })
+    }
+  })
+
   return {
     users,
     prompts,
     images,
+    steps,
     favorites,
     seq: {
       user: 5,
@@ -110,6 +183,7 @@ function buildDemoData(t) {
       platform: DEFAULT_PLATFORM_NAMES.length,
       prompt: prompts.length,
       image: imageId,
+      step: stepId,
       favorite: favorites.length,
       upload: 0,
     },
@@ -155,6 +229,7 @@ function seedDb() {
     })),
     prompts: demo.prompts,
     images: demo.images,
+    steps: demo.steps,
     favorites: demo.favorites,
     uploads: [],
     demoSeeded: true,
@@ -180,6 +255,7 @@ function ensureDemo(db) {
   db.users.push(...demo.users)
   db.prompts.push(...demo.prompts)
   db.images.push(...demo.images)
+  db.steps = [...(db.steps || []), ...demo.steps]
   db.favorites.push(...demo.favorites)
   db.seq = {
     user: Math.max(db.seq?.user || 0, demo.seq.user),
@@ -187,6 +263,7 @@ function ensureDemo(db) {
     platform: Math.max(db.seq?.platform || 0, demo.seq.platform),
     prompt: demo.seq.prompt,
     image: demo.seq.image,
+    step: demo.seq.step,
     favorite: demo.seq.favorite,
     upload: db.seq?.upload || 0,
   }
@@ -227,6 +304,36 @@ function ensurePlatforms(db) {
   return migrated
 }
 
+// 老库升级：补齐 steps 集合、prompt 的 type/characterAnchor、图片的 stepId
+function ensureSequence(db) {
+  let migrated = false
+  if (!Array.isArray(db.steps)) {
+    db.steps = []
+    migrated = true
+  }
+  for (const prompt of db.prompts || []) {
+    if (!prompt.type) {
+      prompt.type = 'single'
+      migrated = true
+    }
+    if (prompt.characterAnchor === undefined) {
+      prompt.characterAnchor = null
+      migrated = true
+    }
+  }
+  for (const img of db.images || []) {
+    if (img.stepId === undefined) {
+      img.stepId = null
+      migrated = true
+    }
+  }
+  db.seq = db.seq || {}
+  if (!db.seq.step) {
+    db.seq.step = db.steps.reduce((max, step) => Math.max(max, Number(step.id) || 0), 0)
+  }
+  return migrated
+}
+
 function loadDb() {
   let loaded = null
   try {
@@ -247,12 +354,14 @@ function loadDb() {
   }
   const db = loaded || seedDb()
   const platformMigrated = ensurePlatforms(db)
+  const sequenceMigrated = ensureSequence(db)
   const demoMigrated = ensureDemo(db)
-  if (demoMigrated || platformMigrated || !loaded) {
+  if (demoMigrated || platformMigrated || sequenceMigrated || !loaded) {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8')
     if (demoMigrated && platformMigrated) console.log('seeded demo prompts and upgraded platform groups')
     else if (demoMigrated) console.log('seeded demo prompts into empty database')
     else if (platformMigrated) console.log('upgraded legacy images into default platform group')
+    if (sequenceMigrated && !demoMigrated) console.log('upgraded database for prompt sequences')
   }
   return db
 }
@@ -355,13 +464,14 @@ function livePrompts() {
   return db.prompts.filter((p) => !p.isDeleted)
 }
 
-function imagesOf(promptId) {
+function imagesOf(promptId, stepId) {
   return db.images
-    .filter((img) => img.promptId === promptId)
+    .filter((img) => img.promptId === promptId && (stepId === undefined || (img.stepId ?? null) === (stepId ?? null)))
     .sort((a, b) => (a.sort - b.sort) || (a.id - b.id))
     .map((img) => ({
       id: img.id,
       platformId: img.platformId || DEFAULT_PLATFORM_ID,
+      stepId: img.stepId ?? null,
       url: img.url,
       filePath: img.filePath,
       sort: img.sort,
@@ -369,10 +479,10 @@ function imagesOf(promptId) {
     }))
 }
 
-function platformGroupsOf(promptId) {
+function groupImagesByPlatform(images) {
   const groups = []
   const byId = new Map()
-  for (const img of imagesOf(promptId)) {
+  for (const img of images) {
     const platformId = img.platformId || DEFAULT_PLATFORM_ID
     if (!byId.has(platformId)) {
       const platform = db.platforms.find((p) => p.id === platformId)
@@ -389,10 +499,38 @@ function platformGroupsOf(promptId) {
   return groups
 }
 
+function platformGroupsOf(promptId) {
+  return groupImagesByPlatform(imagesOf(promptId))
+}
+
+function stepsOf(promptId) {
+  return (db.steps || [])
+    .filter((step) => step.promptId === promptId)
+    .sort((a, b) => (a.stepOrder - b.stepOrder) || (a.id - b.id))
+    .map((step) => {
+      const stepImages = imagesOf(promptId, step.id)
+      const platformGroups = groupImagesByPlatform(stepImages)
+      return {
+        id: step.id,
+        stepOrder: step.stepOrder,
+        name: step.name,
+        actionPrompt: step.actionPrompt,
+        camera: step.camera ?? null,
+        seconds: step.seconds ?? null,
+        transition: step.transition ?? null,
+        platformGroups,
+        coverImage: platformGroups[0]?.coverImage || stepImages[0]?.url || '',
+      }
+    })
+}
+
 function decorate(prompt) {
   const category = db.categories.find((c) => c.id === prompt.categoryId)
   const images = imagesOf(prompt.id)
-  const cover = images.find((img) => img.isCover === 1) || images[0]
+  const isSequence = prompt.type === 'sequence'
+  const steps = isSequence ? stepsOf(prompt.id) : []
+  const coverPool = isSequence && steps.length && steps[0].platformGroups.length ? steps[0].platformGroups[0].images : images
+  const cover = coverPool.find((img) => img.isCover === 1) || coverPool[0]
   return {
     id: prompt.id,
     title: prompt.title,
@@ -400,6 +538,9 @@ function decorate(prompt) {
     categoryId: prompt.categoryId,
     categoryName: category ? category.name : '',
     modelName: prompt.modelName,
+    type: prompt.type || 'single',
+    characterAnchor: prompt.characterAnchor ?? null,
+    steps,
     status: prompt.status,
     source: prompt.source,
     authorId: prompt.authorId,
@@ -433,6 +574,12 @@ function inputGroups(data) {
 }
 
 function countInputImages(data) {
+  if (data.type === 'sequence') {
+    return (Array.isArray(data.steps) ? data.steps : []).reduce(
+      (sum, step) => sum + (Array.isArray(step.platformGroups) ? step.platformGroups.reduce((s, g) => s + (Array.isArray(g.images) ? g.images.length : 0), 0) : 0),
+      0,
+    )
+  }
   return inputGroups(data).reduce((sum, group) => sum + (Array.isArray(group.images) ? group.images.length : 0), 0)
 }
 
@@ -448,6 +595,7 @@ function replaceImages(promptId, data) {
         id: nextId('image'),
         promptId,
         platformId,
+        stepId: null,
         url: String(img.url || ''),
         filePath: img.filePath ?? null,
         sort: Number.isFinite(Number(img.sort)) ? Number(img.sort) : index,
@@ -457,11 +605,64 @@ function replaceImages(promptId, data) {
   }
 }
 
+function replaceSteps(promptId, data) {
+  db.images = db.images.filter((img) => img.promptId !== promptId)
+  db.steps = (db.steps || []).filter((step) => step.promptId !== promptId)
+  const steps = Array.isArray(data.steps) ? data.steps : []
+  steps.forEach((step, index) => {
+    const stepId = nextId('step')
+    const t = nowIso()
+    db.steps.push({
+      id: stepId,
+      promptId,
+      stepOrder: Number.isFinite(Number(step.stepOrder)) && Number(step.stepOrder) > 0 ? Number(step.stepOrder) : index + 1,
+      name: String(step.name || '').trim(),
+      actionPrompt: String(step.actionPrompt || '').trim(),
+      camera: step.camera ? String(step.camera).trim() : null,
+      seconds: Number.isFinite(Number(step.seconds)) ? Number(step.seconds) : null,
+      transition: step.transition ? String(step.transition).trim() : null,
+      createdAt: t,
+      updatedAt: t,
+    })
+    for (const group of Array.isArray(step.platformGroups) ? step.platformGroups : []) {
+      const platformId = Number(group.platformId) || DEFAULT_PLATFORM_ID
+      const images = Array.isArray(group.images) ? group.images.slice(0, IMAGES_PER_STEP_GROUP) : []
+      images.forEach((img, imageIndex) => {
+        db.images.push({
+          id: nextId('image'),
+          promptId,
+          platformId,
+          stepId,
+          url: String(img.url || ''),
+          filePath: img.filePath ?? null,
+          sort: imageIndex,
+          isCover: imageIndex === 0 ? 1 : 0,
+        })
+      })
+    }
+  })
+}
+
 function validationError(data, requireImage) {
   if (!data.title || !String(data.title).trim()) return '标题不能为空'
   if (!data.content || !String(data.content).trim()) return '提示词正文不能为空'
   if (!data.modelName || !String(data.modelName).trim()) return '模型名称不能为空'
   if (!data.categoryId) return '请选择分类'
+  if (data.type === 'sequence') {
+    const steps = Array.isArray(data.steps) ? data.steps : []
+    if (steps.length === 0) return '套组至少需要 1 个步骤'
+    if (steps.length > MAX_STEPS) return `套组最多 ${MAX_STEPS} 个步骤`
+    for (const [index, step] of steps.entries()) {
+      if (!step.name || !String(step.name).trim()) return `第 ${index + 1} 步缺少动作名`
+      if (!step.actionPrompt || !String(step.actionPrompt).trim()) return `第 ${index + 1} 步缺少动作提示词`
+      for (const group of Array.isArray(step.platformGroups) ? step.platformGroups : []) {
+        if (Array.isArray(group.images) && group.images.length > IMAGES_PER_STEP_GROUP) return `每步每个平台最多上传 ${IMAGES_PER_STEP_GROUP} 张效果图`
+        if (!db.platforms.some((p) => p.id === Number(group.platformId) && p.status === 1)) return '所选平台不存在或已停用'
+      }
+    }
+    if (requireImage && countInputImages(data) === 0) return '正式发布的套组必须上传至少一张效果图'
+    return null
+  }
   const groups = inputGroups(data)
   if (requireImage && countInputImages(data) === 0) return '正式发布的提示词必须上传至少一张效果图'
   if (groups.some((group) => Array.isArray(group.images) && group.images.length > IMAGES_PER_GROUP)) return `每个平台最多上传 ${IMAGES_PER_GROUP} 张效果图`
@@ -491,6 +692,8 @@ function trimData(data) {
     content: String(data.content || '').trim(),
     categoryId: Number(data.categoryId),
     modelName: String(data.modelName || '').trim(),
+    type: data.type === 'sequence' ? 'sequence' : 'single',
+    characterAnchor: data.type === 'sequence' && data.characterAnchor ? String(data.characterAnchor).trim() : null,
   }
 }
 
@@ -824,7 +1027,8 @@ portal.post('/mine', (req, res) => {
     updatedAt: nowIso(),
   }
   db.prompts.push(prompt)
-  if (data.platformGroups !== undefined || Array.isArray(data.images)) replaceImages(prompt.id, data)
+  if (data.type === 'sequence') replaceSteps(prompt.id, data)
+  else if (data.platformGroups !== undefined || Array.isArray(data.images)) replaceImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt), 201)
 })
@@ -836,7 +1040,8 @@ portal.put('/mine/:id', (req, res) => {
   const data = req.body || {}
   const submitting = data.submit === true
   const existing = imagesOf(prompt.id).length
-  const willHaveImages = data.platformGroups !== undefined || data.images !== undefined ? countInputImages(data) > 0 : existing > 0
+  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined
+  const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : existing > 0
   if (submitting && !willHaveImages) return fail(res, '提交审核必须上传至少一张效果图', 400)
   const err = validationError(data, false) || categoryError(data.categoryId)
   if (err) return fail(res, err, 400)
@@ -847,7 +1052,8 @@ portal.put('/mine/:id', (req, res) => {
     reviewedAt: submitting ? null : prompt.reviewedAt,
     updatedAt: nowIso(),
   })
-  if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(prompt.id, data)
+  if (data.type === 'sequence') replaceSteps(prompt.id, data)
+  else if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt))
 })
@@ -1086,7 +1292,8 @@ admin.post('/prompts', (req, res) => {
     updatedAt: nowIso(),
   }
   db.prompts.push(prompt)
-  if (data.platformGroups !== undefined || Array.isArray(data.images)) replaceImages(prompt.id, data)
+  if (data.type === 'sequence') replaceSteps(prompt.id, data)
+  else if (data.platformGroups !== undefined || Array.isArray(data.images)) replaceImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt), 201)
 })
@@ -1096,7 +1303,8 @@ admin.put('/prompts/:id', (req, res) => {
   if (!prompt) return fail(res, '提示词不存在', 404)
   const data = req.body || {}
   const publishing = data.action === 'publish'
-  const willHaveImages = data.platformGroups !== undefined || data.images !== undefined ? countInputImages(data) > 0 : imagesOf(prompt.id).length > 0
+  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined
+  const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : imagesOf(prompt.id).length > 0
   if (publishing && !willHaveImages) return fail(res, '正式发布的提示词必须上传至少一张效果图', 400)
   const err = validationError(data, false) || categoryError(data.categoryId)
   if (err) return fail(res, err, 400)
@@ -1105,7 +1313,8 @@ admin.put('/prompts/:id', (req, res) => {
     rejectReason: publishing ? null : prompt.rejectReason,
     updatedAt: nowIso(),
   })
-  if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(prompt.id, data)
+  if (data.type === 'sequence') replaceSteps(prompt.id, data)
+  else if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt))
 })

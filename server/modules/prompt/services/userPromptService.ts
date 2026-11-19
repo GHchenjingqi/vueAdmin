@@ -10,7 +10,7 @@ import Prompt from '../models/Prompt.js'
 import PromptImage from '../models/PromptImage.js'
 import { AppError } from '../../../middleware/errorHandler.js'
 import { assertCategoryUsable } from './categoryService.js'
-import { countInputImages, decorate, getPromptById, normalizePage, replaceImages, validateInput, type PromptInput, type PromptQuery } from './promptService.js'
+import { countInputImages, decorate, getPromptById, normalizePage, replaceImages, replaceSteps, validateInput, type PromptInput, type PromptQuery } from './promptService.js'
 
 export interface PortalPromptInput extends PromptInput {
   /** true=提交审核；false/undefined=存草稿 */
@@ -42,13 +42,16 @@ export async function createUserPrompt(data: PortalPromptInput, userId: number) 
         content: data.content!.trim(),
         categoryId: Number(data.categoryId),
         modelName: data.modelName!.trim(),
+        type: data.type === 'sequence' ? 'sequence' : 'single',
+        characterAnchor: data.type === 'sequence' ? data.characterAnchor?.trim() || null : null,
         status: submitting ? 'pending' : 'draft',
         source: 'user',
         authorId: userId,
       },
       { transaction },
     )
-    if (countInputImages(data) > 0) await replaceImages(prompt.id, data, transaction)
+    if (data.type === 'sequence') await replaceSteps(prompt.id, data, transaction)
+    else if (countInputImages(data) > 0) await replaceImages(prompt.id, data, transaction)
     return prompt.id
   })
   return getPromptById(promptId)
@@ -82,7 +85,8 @@ export async function updateUserPrompt(id: number, userId: number, data: PortalP
   assertEditable(prompt)
 
   const existingImageCount = await PromptImage.count({ where: { promptId: id } })
-  const willHaveImages = data.platformGroups !== undefined || data.images !== undefined ? countInputImages(data) > 0 : existingImageCount > 0
+  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined
+  const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : existingImageCount > 0
   const submitting = data.submit === true
   if (submitting && !willHaveImages) throw new AppError(400, '提交审核必须上传至少一张效果图')
   await validateInput(data, false)
@@ -95,11 +99,14 @@ export async function updateUserPrompt(id: number, userId: number, data: PortalP
         content: data.content!.trim(),
         categoryId: Number(data.categoryId),
         modelName: data.modelName!.trim(),
+        type: data.type === 'sequence' ? 'sequence' : 'single',
+        characterAnchor: data.type === 'sequence' ? data.characterAnchor?.trim() || null : null,
         ...(submitting ? { status: 'pending', rejectReason: null, reviewedBy: null, reviewedAt: null } : {}),
       },
       { transaction },
     )
-    if (data.platformGroups !== undefined || data.images !== undefined) await replaceImages(id, data, transaction)
+    if (data.type === 'sequence') await replaceSteps(id, data, transaction)
+    else if (data.platformGroups !== undefined || data.images !== undefined) await replaceImages(id, data, transaction)
   })
   return getPromptById(id)
 }

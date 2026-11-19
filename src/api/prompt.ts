@@ -5,6 +5,7 @@ import request from '@/utils/request'
 import type { PaginatedData, ListQueryParams } from '@/types/response'
 
 export type PromptStatus = 'draft' | 'pending' | 'published' | 'rejected' | 'offline'
+export type PromptType = 'single' | 'sequence'
 
 export interface PromptCategory {
   id: number
@@ -51,6 +52,25 @@ export interface PromptImageGroup {
   coverImage: string
 }
 
+/** 套组中的一步 */
+export interface PromptStepInput {
+  id?: number
+  stepOrder?: number
+  name: string
+  actionPrompt: string
+  camera?: string | null
+  seconds?: number | null
+  transition?: string | null
+  platformGroups: PromptImageGroupInput[]
+}
+
+export interface PromptStep extends PromptStepInput {
+  id: number
+  stepOrder: number
+  platformGroups: PromptImageGroup[]
+  coverImage: string
+}
+
 export interface PromptItem {
   id: number
   title: string
@@ -58,6 +78,9 @@ export interface PromptItem {
   categoryId: number
   categoryName?: string
   modelName: string
+  type?: PromptType
+  characterAnchor?: string | null
+  steps?: PromptStep[]
   status: PromptStatus
   source: 'admin' | 'user'
   authorId: number
@@ -89,6 +112,9 @@ export interface PromptPayload {
   content: string
   categoryId: number
   modelName: string
+  type?: PromptType
+  characterAnchor?: string | null
+  steps?: PromptStepInput[]
   action?: 'publish' | 'draft'
   images?: PromptImageItem[]
   platformGroups?: PromptImageGroupInput[]

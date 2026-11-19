@@ -13,7 +13,7 @@
         </el-select>
         <el-button link type="danger" size="small" @click="removeGroup(index)">{{ t('portal.removePlatformGroup') }}</el-button>
       </div>
-      <ImageUploader :model-value="group.images" @update:model-value="updateImages(index, $event)" />
+      <ImageUploader :model-value="group.images" :max="max" @update:model-value="updateImages(index, $event)" />
     </div>
 
     <el-button class="add-group" :disabled="!hasAvailable" @click="addGroup">+ {{ t('portal.addPlatformGroup') }}</el-button>
@@ -27,7 +27,7 @@ import type { PromptImageGroupInput, PromptImageItem, PromptPlatform } from '@/a
 import ImageUploader from './ImageUploader.vue'
 import { useI18n } from '@/i18n'
 
-const props = defineProps<{ modelValue: PromptImageGroupInput[]; platforms: PromptPlatform[] }>()
+const props = withDefaults(defineProps<{ modelValue: PromptImageGroupInput[]; platforms: PromptPlatform[]; max?: number }>(), { max: 20 })
 const emit = defineEmits<{ (e: 'update:modelValue', value: PromptImageGroupInput[]): void }>()
 const { t } = useI18n()
 

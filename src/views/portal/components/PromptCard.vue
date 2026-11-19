@@ -24,6 +24,7 @@
         </button>
       </div>
       <span v-if="prompt.categoryName" class="cover-category">{{ prompt.categoryName }}</span>
+      <span v-if="isSequence" class="cover-sequence">{{ t('portal.sequenceBadge') }} · {{ stepCount }}</span>
     </div>
 
     <div class="card-body">
@@ -64,6 +65,8 @@ const userStore = useUserStore()
 
 const favorited = ref(Boolean(props.prompt.isFavorited))
 const favoriteCount = computed(() => (props.prompt.favoriteCount ?? 0) + (favorited.value === Boolean(props.prompt.isFavorited) ? 0 : favorited.value ? 1 : -1))
+const isSequence = computed(() => props.prompt.type === 'sequence')
+const stepCount = computed(() => t('portal.stepCount').replace('{n}', String(props.prompt.steps?.length ?? 0)))
 
 watch(
   () => props.prompt.isFavorited,
@@ -139,6 +142,17 @@ const toggleFavorite = async (): Promise<void> => {
   padding: 3px 9px;
   border-radius: var(--radius-pill);
   backdrop-filter: blur(4px);
+}
+
+.cover-sequence {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
 }
 
 .cover-shade {

@@ -6,7 +6,7 @@
  */
 import request from '@/utils/request'
 import type { PaginatedData, ListQueryParams } from '@/types/response'
-import type { PromptCategory, PromptImageGroupInput, PromptItem, PromptPlatform, PromptStatus } from './prompt'
+import type { PromptCategory, PromptImageGroupInput, PromptItem, PromptPlatform, PromptStatus, PromptStepInput, PromptType } from './prompt'
 
 export interface PortalCategory extends PromptCategory {
   promptCount: number
@@ -32,6 +32,12 @@ export interface PortalPayload {
   content: string
   categoryId: number
   modelName: string
+  /** 内容形态：single=单条，sequence=有序步骤套组 */
+  type?: PromptType
+  /** 角色锚定提示词，仅套组使用 */
+  characterAnchor?: string | null
+  /** 套组步骤，仅套组使用 */
+  steps?: PromptStepInput[]
   /** true=提交审核，false=存草稿 */
   submit?: boolean
   /** 按平台分组的效果图；每组最多 20 张 */

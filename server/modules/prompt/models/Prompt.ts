@@ -2,6 +2,7 @@ import { DataTypes, Model, CreationOptional, InferAttributes, InferCreationAttri
 import sequelize from '../../../config/database.js'
 
 export type PromptStatus = 'draft' | 'pending' | 'published' | 'rejected' | 'offline'
+export type PromptType = 'single' | 'sequence'
 
 class Prompt extends Model<InferAttributes<Prompt>, InferCreationAttributes<Prompt>> {
   declare id: CreationOptional<number>
@@ -9,6 +10,8 @@ class Prompt extends Model<InferAttributes<Prompt>, InferCreationAttributes<Prom
   declare content: string
   declare categoryId: number
   declare modelName: string
+  declare type: CreationOptional<PromptType>
+  declare characterAnchor: CreationOptional<string | null>
   declare status: CreationOptional<PromptStatus>
   declare source: CreationOptional<'admin' | 'user'>
   declare authorId: number
@@ -29,6 +32,8 @@ Prompt.init(
     content: { type: DataTypes.TEXT, allowNull: false, comment: '提示词正文' },
     categoryId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, comment: '分类 ID' },
     modelName: { type: DataTypes.STRING(100), allowNull: false, comment: '模型名称' },
+    type: { type: DataTypes.ENUM('single', 'sequence'), allowNull: false, defaultValue: 'single', comment: '内容形态' },
+    characterAnchor: { type: DataTypes.TEXT, allowNull: true, comment: '角色锚定提示词' },
     status: { type: DataTypes.ENUM('draft', 'pending', 'published', 'rejected', 'offline'), allowNull: false, defaultValue: 'draft' },
     source: { type: DataTypes.ENUM('admin', 'user'), allowNull: false, defaultValue: 'admin' },
     authorId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, comment: '作者用户 ID' },
