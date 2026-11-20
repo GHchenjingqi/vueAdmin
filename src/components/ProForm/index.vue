@@ -148,6 +148,20 @@ const replaceFormData = (value: Record<string, unknown>): void => {
   Object.assign(formData, value)
 }
 
+/**
+ * 把 formData 当前值原地写回父组件的 modelValue。
+ * v-model 会用 emit 出的对象替换父组件绑定：若 emit 深克隆，父组件失去响应式引用，
+ * 后续对 model 的直接修改（如图片数组 push/splice）将不再触发视图更新。
+ * 原地写回 + emit 同一引用可保持父组件对象响应式身份不变。
+ */
+const writeThroughToModel = (): void => {
+  const target = props.modelValue
+  if (!target || typeof target !== 'object') return
+  for (const key of Object.keys(formData)) {
+    target[key] = cloneValue(formData[key])
+  }
+}
+
 const resolveSchemaValue = (value: unknown, item: FormSchemaItem, currentModel: Record<string, unknown>): unknown => {
   if (typeof value === 'function') {
     return value(currentModel, item)
@@ -198,9 +212,11 @@ watch(
   formData,
   (value: Record<string, unknown>) => {
     if (syncingFromProps.value) return
-    const nextModel = cloneValue(value)
-    lastEmittedModel.value = serializeModel(nextModel)
-    emit('update:modelValue', nextModel)
+    writeThroughToModel()
+    // emit 父组件对象本身（引用一致），避免 v-model 赋值后父组件与内部数据源脱钩
+    const emitted = props.modelValue && typeof props.modelValue === 'object' ? props.modelValue : cloneValue(value)
+    lastEmittedModel.value = serializeModel(cloneValue(value))
+    emit('update:modelValue', emitted)
   },
   { deep: true },
 )
@@ -257,10 +273,11 @@ const handleReset = async (): Promise<void> => {
   const elForm = formRef.value as InstanceType<typeof import('element-plus').ElForm> | null
   elForm?.clearValidate()
 
-  const nextModel = cloneValue(formData)
-  lastEmittedModel.value = serializeModel(nextModel)
-  emit('update:modelValue', nextModel)
-  emit('reset', nextModel)
+  lastEmittedModel.value = serializeModel(cloneValue(formData))
+  writeThroughToModel()
+  const emitted = props.modelValue && typeof props.modelValue === 'object' ? props.modelValue : cloneValue(formData)
+  emit('update:modelValue', emitted)
+  emit('reset', cloneValue(formData))
 }
 
 const validate = async (): Promise<boolean> => {

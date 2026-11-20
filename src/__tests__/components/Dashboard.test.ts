@@ -111,13 +111,24 @@ describe('Dashboard.vue', () => {
     expect(wrapper.find('.info-card').exists()).toBe(true)
   })
 
-  it('数据加载成功后显示统计卡片', async () => {
+  it('数据加载成功后显示统计卡片（提示词 4 + 用户 4）', async () => {
     const wrapper = createWrapper()
     await nextTick()
     await nextTick()
     await nextTick()
 
-    expect(wrapper.findAll('.stat-card').length).toBe(4)
+    expect(wrapper.findAll('.stat-card').length).toBe(8)
+  })
+
+  it('统计区包含提示词统计与用户统计两个分组标题', async () => {
+    const wrapper = createWrapper()
+    await nextTick()
+    await nextTick()
+    await nextTick()
+
+    const text = wrapper.find('.stats-groups').text()
+    expect(text).toContain('提示词统计')
+    expect(text).toContain('用户统计')
   })
 
   it('挂载时调用 getStats API', () => {
