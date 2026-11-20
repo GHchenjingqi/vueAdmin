@@ -4,12 +4,14 @@
 import request from '@/utils/request'
 
 export interface DashboardStats {
-  totalUsers: number
-  todayNewUsers: number
-  activeUsers: number
-  totalNotices: number
-  loginCount?: number
-  operationCount?: number
+  promptTotal: number
+  promptPublished: number
+  promptPending: number
+  promptSequence: number
+  userTotal: number
+  userTodayNew: number
+  userActive: number
+  userContributors: number
   [key: string]: unknown
 }
 

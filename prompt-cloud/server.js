@@ -971,16 +971,22 @@ api.get('/site/info', (_req, res) =>
 api.get('/settings', (_req, res) => ok(res, {}))
 api.get('/settings/:key', (_req, res) => ok(res, null))
 api.put('/settings', (_req, res) => ok(res, null))
-api.get('/dashboard/stats', (_req, res) =>
+api.get('/dashboard/stats', (_req, res) => {
+  const prompts = livePrompts()
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const contributorIds = new Set(prompts.filter((p) => p.source === 'user').map((p) => p.authorId))
   ok(res, {
-    totalUsers: db.users.length,
-    todayNewUsers: 0,
-    activeUsers: db.users.length,
-    totalNotices: 0,
-    loginCount: 0,
-    operationCount: livePrompts().length,
-  }),
-)
+    promptTotal: prompts.length,
+    promptPublished: prompts.filter((p) => p.status === 'published').length,
+    promptPending: prompts.filter((p) => p.status === 'pending').length,
+    promptSequence: prompts.filter((p) => p.type === 'sequence').length,
+    userTotal: db.users.length,
+    userTodayNew: db.users.filter((u) => u.createdAt && new Date(u.createdAt) >= todayStart).length,
+    userActive: db.users.filter((u) => u.status === 1).length,
+    userContributors: contributorIds.size,
+  })
+})
 api.get('/notices/sse', (_req, res) => res.status(204).end())
 api.get('/notices/unread/count', (_req, res) => ok(res, { count: 0, total: 0 }))
 api.get('/notices', (_req, res) => ok(res, { rows: [], total: 0, items: [], unread: 0, count: 0 }))
@@ -1494,6 +1500,31 @@ admin.get('/stats', (_req, res) =>
     favorites: db.favorites.length,
   }),
 )
+
+// 数据备份：发布前把线上真实数据导出，避免本地构建产物覆盖线上维护内容
+admin.get('/data/export', (_req, res) => {
+  persist()
+  ok(res, JSON.parse(JSON.stringify(db)))
+})
+
+// 数据恢复：仅管理员可调用，严格校验结构后原子写盘
+admin.post('/data/import', (req, res) => {
+  const incoming = req.body && typeof req.body === 'object' ? req.body.data || req.body : null
+  const arrays = ['users', 'prompts', 'images', 'steps', 'categories', 'platforms', 'favorites', 'uploads']
+  if (!incoming || incoming.schema !== DB_SCHEMA || arrays.some((key) => !Array.isArray(incoming[key]))) {
+    return fail(res, '备份数据结构不合法', 400)
+  }
+  const backupFile = `${DB_FILE}.before-import-${Date.now()}.bak`
+  try {
+    fs.copyFileSync(DB_FILE, backupFile)
+    db = incoming
+    db.seq = db.seq || {}
+    persist()
+    ok(res, { imported: true, prompts: db.prompts.length })
+  } catch (err) {
+    return fail(res, '数据恢复失败：' + err.message, 500)
+  }
+})
 
 api.use('/prompt', admin)
 api.use((_req, res) => fail(res, '接口不存在', 404))

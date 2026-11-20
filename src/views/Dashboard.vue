@@ -24,43 +24,44 @@
     </section>
 
     <!-- 数据卡片 - 骨架屏 -->
-    <el-row v-if="loading" :gutter="16">
-      <el-col v-for="i in 4" :key="i" :xs="24" :sm="12" :md="6">
-        <el-card shadow="hover" class="stat-card">
-          <el-skeleton :rows="2" animated />
-        </el-card>
-      </el-col>
-    </el-row>
+    <div v-if="loading" class="stats-groups">
+      <div v-for="group in statGroups" :key="group.key" class="stat-group">
+        <div class="stat-group-title">{{ group.title }}</div>
+        <el-row :gutter="16">
+          <el-col v-for="i in 4" :key="i" :xs="24" :sm="12" :md="6">
+            <el-card shadow="hover" class="stat-card">
+              <el-skeleton :rows="2" animated />
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
+    </div>
 
     <!-- 数据卡片 - 实际内容 -->
-    <section v-else :aria-label="t('accessibility.statsOverview')">
-      <el-row :gutter="16">
-        <el-col v-for="item in statsCards as unknown as any[]" :key="item.title" :xs="24" :sm="12" :md="6">
-          <el-card shadow="hover" class="stat-card" :aria-label="item.title + ': ' + item.value">
-            <div class="stat-content">
-              <div class="stat-info">
-                <div class="stat-title">
-                  {{ item.title }}
+    <div v-else class="stats-groups" :aria-label="t('accessibility.statsOverview')">
+      <div v-for="group in statGroups" :key="group.key" class="stat-group">
+        <div class="stat-group-title">{{ group.title }}</div>
+        <el-row :gutter="16">
+          <el-col v-for="item in group.cards" :key="item.key" :xs="24" :sm="12" :md="6">
+            <el-card shadow="hover" class="stat-card" :aria-label="item.title + ': ' + item.value">
+              <div class="stat-content">
+                <div class="stat-info">
+                  <div class="stat-title">
+                    {{ item.title }}
+                  </div>
+                  <div class="stat-value">
+                    {{ item.value }}
+                  </div>
                 </div>
-                <div class="stat-value">
-                  {{ item.value }}
-                </div>
-                <div v-if="item.trendText" class="stat-trend">
-                  <el-icon :size="12" :class="item.trendUp ? 'trend-up' : 'trend-down'">
-                    <CaretTop v-if="item.trendUp" />
-                    <CaretBottom v-else />
-                  </el-icon>
-                  <span>{{ item.trendText }}</span>
+                <div class="stat-icon" :style="{ background: item.iconBg }">
+                  <MenuIcon :name="item.icon" :size="24" :color="item.iconColor" />
                 </div>
               </div>
-              <div class="stat-icon" :style="{ background: item.iconBg }">
-                <MenuIcon :name="item.icon" :size="24" :color="item.iconColor" />
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </section>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
+    </div>
 
     <!-- 快速入?提示 - 骨架屏 -->
     <el-card v-if="loading" shadow="hover" class="info-card">
@@ -84,7 +85,6 @@
 
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import { dashboardApi } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 import { useUserStore } from '@/stores'
@@ -96,52 +96,43 @@ const username = computed(() => userStore.username || t('common.default'))
 
 const loading = ref(true)
 
+type StatKey = 'promptTotal' | 'promptPublished' | 'promptPending' | 'promptSequence' | 'userTotal' | 'userTodayNew' | 'userActive' | 'userContributors'
+
 interface StatsCard {
+  key: StatKey
   title: string
   value: number
   icon: string
   iconColor: string
   iconBg: string
-  trendText: string
-  trendUp: boolean
 }
 
-const statsCards = ref<StatsCard[]>([
+interface StatGroup {
+  key: 'prompt' | 'user'
+  title: string
+  cards: StatsCard[]
+}
+
+const statGroups = ref<StatGroup[]>([
   {
-    title: t('dashboard.totalUsers'),
-    value: 0,
-    icon: 'User',
-    iconColor: '#1890ff',
-    iconBg: '#e6f4ff',
-    trendText: t('dashboard.comparedToYesterday') + '12%',
-    trendUp: true,
+    key: 'prompt',
+    title: t('dashboard.promptStats'),
+    cards: [
+      { key: 'promptTotal', title: t('dashboard.promptTotal'), value: 0, icon: 'Document', iconColor: '#1890ff', iconBg: '#e6f4ff' },
+      { key: 'promptPublished', title: t('dashboard.promptPublished'), value: 0, icon: 'CircleCheck', iconColor: '#52c41a', iconBg: '#f6ffed' },
+      { key: 'promptPending', title: t('dashboard.promptPending'), value: 0, icon: 'Clock', iconColor: '#faad14', iconBg: '#fffbe6' },
+      { key: 'promptSequence', title: t('dashboard.promptSequence'), value: 0, icon: 'List', iconColor: '#722ed1', iconBg: '#f9f0ff' },
+    ],
   },
   {
-    title: t('dashboard.todayNew'),
-    value: 0,
-    icon: 'TrendCharts',
-    iconColor: '#52c41a',
-    iconBg: '#f6ffed',
-    trendText: t('dashboard.comparedToYesterday') + '8%',
-    trendUp: true,
-  },
-  {
-    title: t('dashboard.activeUsers'),
-    value: 0,
-    icon: 'Refresh',
-    iconColor: '#faad14',
-    iconBg: '#fffbe6',
-    trendText: t('dashboard.comparedToYesterday') + '3%',
-    trendUp: false,
-  },
-  {
-    title: t('dashboard.systemMessages'),
-    value: 0,
-    icon: 'Message',
-    iconColor: '#f5222d',
-    iconBg: '#fff1f0',
-    trendText: t('dashboard.comparedToYesterday') + '5%',
-    trendUp: true,
+    key: 'user',
+    title: t('dashboard.userStats'),
+    cards: [
+      { key: 'userTotal', title: t('dashboard.totalUsers'), value: 0, icon: 'User', iconColor: '#1890ff', iconBg: '#e6f4ff' },
+      { key: 'userTodayNew', title: t('dashboard.todayNew'), value: 0, icon: 'TrendCharts', iconColor: '#52c41a', iconBg: '#f6ffed' },
+      { key: 'userActive', title: t('dashboard.activeUsers'), value: 0, icon: 'Refresh', iconColor: '#faad14', iconBg: '#fffbe6' },
+      { key: 'userContributors', title: t('dashboard.userContributors'), value: 0, icon: 'UserFilled', iconColor: '#f5222d', iconBg: '#fff1f0' },
+    ],
   },
 ])
 
@@ -168,10 +159,13 @@ const currentDateText = computed(() => {
 onMounted(async () => {
   try {
     const res = await dashboardApi.getStats()
-    const statsData: Array<{ value: number }> = res.data as unknown as Array<{ value: number }>
-    statsCards.value = statsCards.value.map((card, index) => ({
-      ...card,
-      value: statsData[index]?.value ?? card.value,
+    const stats = (res.data ?? {}) as Record<string, unknown>
+    statGroups.value = statGroups.value.map((group) => ({
+      ...group,
+      cards: group.cards.map((card) => ({
+        ...card,
+        value: Number(stats[card.key] ?? 0),
+      })),
     }))
   } catch (err: unknown) {
     ElMessage.error(t('dashboard.fetchFailed') + ' ' + getErrorMessage(err))
@@ -249,6 +243,22 @@ onMounted(async () => {
   box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.3);
 }
 
+/* 数据卡片分组 */
+.stats-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-group-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 8px 0 4px;
+  padding-left: 8px;
+  border-left: 3px solid var(--mainColor);
+}
+
 /* 数据卡片 */
 .stat-card {
   margin-bottom: 16px;
@@ -277,22 +287,6 @@ onMounted(async () => {
   color: var(--text-primary);
   letter-spacing: 0.5px;
   margin-bottom: 4px;
-}
-
-.stat-trend {
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.trend-up {
-  color: #52c41a;
-}
-
-.trend-down {
-  color: #f5222d;
 }
 
 .stat-icon {

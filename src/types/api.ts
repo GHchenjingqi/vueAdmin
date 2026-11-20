@@ -85,10 +85,13 @@ export interface SystemSetting {
 
 /** 仪表盘统计数据 */
 export interface DashboardStats {
-  userCount?: number
-  todayNewUsers?: number
-  logCount?: number
-  noticeCount?: number
-  activeUsers?: number
+  promptTotal?: number
+  promptPublished?: number
+  promptPending?: number
+  promptSequence?: number
+  userTotal?: number
+  userTodayNew?: number
+  userActive?: number
+  userContributors?: number
   [key: string]: unknown
 }
