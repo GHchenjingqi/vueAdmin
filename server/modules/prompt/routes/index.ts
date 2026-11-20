@@ -28,6 +28,9 @@ router.put('/platforms/:id', platformController.update)
 router.delete('/platforms/:id', platformController.remove)
 
 router.get('/prompts', promptController.list)
+// 注意：静态路径必须放在 /prompts/:id 之前，否则会被动态段吞掉
+router.get('/prompts/model-options', promptController.modelOptions)
+router.get('/prompts/parent-options', promptController.parentOptions)
 router.get('/prompts/:id', promptController.getById)
 router.post('/prompts', promptController.create)
 router.put('/prompts/:id', promptController.update)

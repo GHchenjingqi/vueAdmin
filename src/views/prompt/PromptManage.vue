@@ -33,6 +33,10 @@
         <span v-else>-</span>
       </template>
 
+      <template #column-categoryName="{ row }">
+        {{ row.categoryNames?.length ? row.categoryNames.join('、') : row.categoryName || '-' }}
+      </template>
+
       <template #column-status="{ row }">
         <el-tag :type="statusType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
       </template>
@@ -65,9 +69,26 @@
       destroy-on-close
     >
       <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="90px" />
+      <div class="prompt-parent">
+        <div class="prompt-parent-title">{{ t('prompt.parentPrompt') }}</div>
+        <el-select
+          v-model="form.parentId"
+          filterable
+          remote
+          clearable
+          :remote-method="searchParentOptions"
+          :loading="parentLoading"
+          :placeholder="t('prompt.parentPlaceholder')"
+          style="width: 100%"
+          @focus="searchParentOptions()"
+        >
+          <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
+        </el-select>
+        <div class="prompt-parent-tip">{{ t('prompt.parentTip') }}</div>
+      </div>
       <div class="prompt-images">
         <div class="prompt-images-title">{{ t('prompt.images') }}</div>
-        <el-upload :show-file-list="false" accept="image/*" :http-request="handleUpload" :before-upload="beforeUpload">
+        <el-upload :show-file-list="false" multiple accept="image/*" :http-request="handleUpload" :before-upload="beforeUpload">
           <el-button :icon="UploadFilled">{{ t('prompt.uploadImage') }}</el-button>
         </el-upload>
         <div class="prompt-image-list">
@@ -91,7 +112,10 @@
     <el-dialog v-model="detailVisible" :title="t('prompt.viewDetail')" width="720px" top="6vh" destroy-on-close>
       <template v-if="detail">
         <h3 class="prompt-detail-title">{{ detail.title }}</h3>
-        <p class="prompt-detail-meta">{{ detail.categoryName }} · {{ detail.modelName }} · {{ statusLabel(detail.status) }}</p>
+        <p class="prompt-detail-meta">
+          {{ detail.categoryNames?.length ? detail.categoryNames.join('、') : detail.categoryName }} · {{ detail.modelName }} ·
+          {{ statusLabel(detail.status) }}
+        </p>
         <div class="prompt-detail-images">
           <el-image
             v-for="image in detail.images || []"
@@ -141,7 +165,7 @@ const columns = computed(() => [
   { prop: 'id', label: 'ID', width: 70 },
   { prop: 'coverImage', label: t('prompt.cover'), width: 90 },
   { prop: 'title', label: t('prompt.title'), minWidth: 180, showOverflowTooltip: true },
-  { prop: 'categoryName', label: t('prompt.category'), width: 120 },
+  { prop: 'categoryName', label: t('prompt.category'), width: 150 },
   { prop: 'modelName', label: t('prompt.model'), width: 120 },
   { prop: 'status', label: t('common.status'), width: 100, align: 'center' },
   { prop: 'source', label: t('prompt.source'), width: 100, align: 'center' },
@@ -166,6 +190,8 @@ interface PromptForm {
   title: string
   content: string
   categoryId: number | string
+  categoryIds: Array<number | string>
+  parentId: number | string | null
   modelName: string
   images: PromptImageItem[]
 }
@@ -175,6 +201,9 @@ const loading = ref(false)
 const pagination = reactive({ pageNum: 1, pageSize: 10, total: 0 })
 const searchParams = reactive<Record<string, unknown>>({ keyword: '', status: '', categoryId: '' })
 const categoryOptions = ref<PromptCategory[]>([])
+const modelOptions = ref<string[]>([])
+const parentOptions = ref<Array<{ id: number; title: string }>>([])
+const parentLoading = ref(false)
 const stats = ref<PromptStats>({ total: 0, published: 0, pending: 0, offline: 0, categories: 0, favorites: 0 })
 const dialogVisible = ref(false)
 const detailVisible = ref(false)
@@ -183,7 +212,7 @@ const submitting = ref(false)
 const currentId = ref<number | null>(null)
 const detail = ref<PromptItem | null>(null)
 const formRef = ref<InstanceType<typeof ProForm> | null>(null)
-const form = reactive<PromptForm>({ title: '', content: '', categoryId: '', modelName: '', images: [] })
+const form = reactive<PromptForm>({ title: '', content: '', categoryId: '', categoryIds: [], parentId: null, modelName: '', images: [] })
 
 const formImageUrls = computed(() => form.images.map((image) => image.url))
 const detailImageUrls = computed(() => (detail.value?.images ?? []).map((image) => image.url))
@@ -198,13 +227,24 @@ const statCards = computed(() => [
 const formSchema = computed(() => [
   { prop: 'title', label: t('prompt.title'), type: 'input', required: true },
   {
-    prop: 'categoryId',
+    prop: 'categoryIds',
     label: t('prompt.category'),
     type: 'select',
     required: true,
+    multiple: true,
     options: () => categoryOptions.value.map((item) => ({ label: item.name, value: item.id })),
+    props: { 'multiple-limit': 10 },
   },
-  { prop: 'modelName', label: t('prompt.model'), type: 'input', required: true },
+  {
+    prop: 'modelName',
+    label: t('prompt.model'),
+    type: 'select',
+    required: true,
+    filterable: true,
+    placeholder: t('prompt.modelPlaceholder'),
+    options: () => modelOptions.value.map((name) => ({ label: name, value: name })),
+    props: { 'allow-create': true, 'default-first-option': true },
+  },
   { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, props: { rows: 5 } },
 ])
 
@@ -228,11 +268,28 @@ const fetchRows = async (): Promise<void> => {
 }
 
 const fetchOptions = async (): Promise<void> => {
+  const [categories, models] = await Promise.allSettled([promptApi.getCategoryOptions(), promptApi.getModelOptions()])
+  if (categories.status === 'fulfilled') {
+    categoryOptions.value = categories.value.data
+  } else {
+    ElMessage.error(getErrorMessage(categories.reason))
+  }
+  // 模型选项只是便利功能，接口异常时仍可手动录入，不阻断分类加载
+  if (models.status === 'fulfilled') modelOptions.value = models.value.data ?? []
+}
+
+const searchParentOptions = async (keyword = ''): Promise<void> => {
+  parentLoading.value = true
   try {
-    const res = await promptApi.getCategoryOptions()
-    categoryOptions.value = res.data
+    const res = await promptApi.getParentOptions({
+      keyword: keyword.trim(),
+      excludeId: isEdit.value && currentId.value !== null ? currentId.value : undefined,
+    })
+    parentOptions.value = res.data
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))
+  } finally {
+    parentLoading.value = false
   }
 }
 
@@ -255,6 +312,8 @@ const resetForm = (): void => {
   form.title = ''
   form.content = ''
   form.categoryId = ''
+  form.categoryIds = []
+  form.parentId = null
   form.modelName = ''
   form.images = []
 }
@@ -262,6 +321,7 @@ const resetForm = (): void => {
 const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
   if (!categoryOptions.value.length) await fetchOptions()
   resetForm()
+  let parentTitle = ''
   if (row) {
     const item = row as unknown as PromptItem
     isEdit.value = true
@@ -271,7 +331,10 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
       const loaded = res.data
       form.title = loaded.title
       form.content = loaded.content
-      form.categoryId = loaded.categoryId
+      form.categoryIds = loaded.categoryIds?.length ? loaded.categoryIds : [loaded.categoryId]
+      form.categoryId = form.categoryIds[0]
+      form.parentId = loaded.parentId ?? null
+      parentTitle = loaded.parentTitle ?? ''
       form.modelName = loaded.modelName
       form.images = (loaded.images ?? []).map((image) => ({
         url: image.url,
@@ -287,8 +350,18 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
     isEdit.value = false
     currentId.value = null
   }
+  await searchParentOptions()
+  // 编辑时若当前关联项不在默认列表里（如标题变化），补上以保证回显可读
+  if (form.parentId && parentTitle && !parentOptions.value.some((item) => item.id === Number(form.parentId))) {
+    parentOptions.value.unshift({ id: Number(form.parentId), title: parentTitle })
+  }
   dialogVisible.value = true
 }
+
+/** 与后端 IMAGES_PER_GROUP 保持一致，避免批量上传后提交被服务端拒绝 */
+const MAX_IMAGES = 20
+/** 正在上传中的文件数：批量选择时 form.images 尚未 push，需要计入上限 */
+const pendingUploads = ref(0)
 
 const beforeUpload = (file: File): boolean => {
   if (!file.type.startsWith('image/')) {
@@ -299,6 +372,11 @@ const beforeUpload = (file: File): boolean => {
     ElMessage.error(t('prompt.imageSizeExceeded'))
     return false
   }
+  if (form.images.length + pendingUploads.value >= MAX_IMAGES) {
+    ElMessage.warning(t('prompt.imageLimitReached', { count: MAX_IMAGES }))
+    return false
+  }
+  pendingUploads.value += 1
   return true
 }
 
@@ -308,6 +386,8 @@ const handleUpload = async (options: UploadRequestOptions): Promise<void> => {
     form.images.push({ url: res.data.url, filePath: res.data.id, sort: form.images.length, isCover: form.images.length === 0 })
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))
+  } finally {
+    pendingUploads.value = Math.max(0, pendingUploads.value - 1)
   }
 }
 
@@ -328,10 +408,13 @@ const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
     0,
     form.images.findIndex((image) => Boolean(image.isCover)),
   )
+  const categoryIds = form.categoryIds.map(Number)
   return {
     title: form.title,
     content: form.content,
-    categoryId: Number(form.categoryId),
+    categoryId: categoryIds[0] ?? Number(form.categoryId),
+    categoryIds,
+    parentId: form.parentId === null || form.parentId === '' ? null : Number(form.parentId),
     modelName: form.modelName,
     action,
     images: form.images.map((image, index) => ({ url: image.url, filePath: image.filePath ?? null, sort: index, isCover: index === coverIndex })),
@@ -442,6 +525,20 @@ onMounted(() => {
   width: 54px;
   height: 40px;
   border-radius: 4px;
+}
+.prompt-parent {
+  margin-top: 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 12px;
+}
+.prompt-parent-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.prompt-parent-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .prompt-images {
   margin-top: 16px;

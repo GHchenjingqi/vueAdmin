@@ -8,6 +8,24 @@ export async function list(req: any, res: any, next: any) {
   }
 }
 
+export async function modelOptions(_req: any, res: any, next: any) {
+  try {
+    res.json({ code: 0, data: await promptService.listModelOptions() })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function parentOptions(req: any, res: any, next: any) {
+  try {
+    const keyword = req.query.keyword ? String(req.query.keyword) : undefined
+    const excludeId = req.query.excludeId ? Number(req.query.excludeId) : undefined
+    res.json({ code: 0, data: await promptService.listParentOptions(keyword, excludeId) })
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function getById(req: any, res: any, next: any) {
   try {
     res.json({ code: 0, data: await promptService.getPromptById(Number(req.params.id)) })

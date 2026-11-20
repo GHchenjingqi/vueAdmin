@@ -9,6 +9,8 @@ class Prompt extends Model<InferAttributes<Prompt>, InferCreationAttributes<Prom
   declare title: string
   declare content: string
   declare categoryId: number
+  declare categoryIds: CreationOptional<number[] | null>
+  declare parentId: CreationOptional<number | null>
   declare modelName: string
   declare type: CreationOptional<PromptType>
   declare characterAnchor: CreationOptional<string | null>
@@ -30,7 +32,9 @@ Prompt.init(
     id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
     title: { type: DataTypes.STRING(200), allowNull: false, comment: '标题' },
     content: { type: DataTypes.TEXT, allowNull: false, comment: '提示词正文' },
-    categoryId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, comment: '分类 ID' },
+    categoryId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, comment: '主分类 ID（categoryIds 首项）' },
+    categoryIds: { type: DataTypes.JSON, allowNull: true, comment: '所属分类 ID 列表' },
+    parentId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, comment: '派生自的提示词 ID' },
     modelName: { type: DataTypes.STRING(100), allowNull: false, comment: '模型名称' },
     type: { type: DataTypes.ENUM('single', 'sequence'), allowNull: false, defaultValue: 'single', comment: '内容形态' },
     characterAnchor: { type: DataTypes.TEXT, allowNull: true, comment: '角色锚定提示词' },

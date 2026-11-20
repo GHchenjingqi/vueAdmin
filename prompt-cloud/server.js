@@ -21,6 +21,8 @@ const DB_SCHEMA = 'prompt-cloud-v1'
 const IMAGES_PER_GROUP = 20
 const IMAGES_PER_STEP_GROUP = 1
 const MAX_STEPS = 100
+const MAX_CATEGORIES = 10
+const MAX_CHAIN_DEPTH = 20
 const DEFAULT_PLATFORM_ID = 1
 const DEFAULT_PLATFORM_NAMES = ['通用', '即梦', '可灵', 'GPT', 'Midjourney', 'Stable Diffusion', '通义万相']
 
@@ -524,9 +526,77 @@ function stepsOf(promptId) {
     })
 }
 
+/** 分类多选：优先 categoryIds，未传时回退 categoryId，兼容投稿等旧调用方 */
+function resolveCategoryIds(data) {
+  const raw = Array.isArray(data.categoryIds) && data.categoryIds.length ? data.categoryIds : [data.categoryId]
+  return Array.from(new Set(raw.map(Number).filter((id) => Number.isFinite(id) && id > 0)))
+}
+
+/** 回溯祖先链：返回直接父标题、层级深度和根 → 当前的正文链 */
+function resolveParentChain(prompt) {
+  const seen = new Set([prompt.id])
+  const chain = []
+  let cursor = prompt
+  let depth = 0
+  const directParent = prompt.parentId ? livePrompts().find((p) => p.id === Number(prompt.parentId)) : null
+  const parentTitle = directParent ? directParent.title : ''
+  for (let i = 0; cursor.parentId && i < MAX_CHAIN_DEPTH; i += 1) {
+    const parent = livePrompts().find((p) => p.id === Number(cursor.parentId))
+    if (!parent || seen.has(parent.id)) break
+    seen.add(parent.id)
+    depth += 1
+    chain.unshift({ id: parent.id, title: parent.title, content: parent.content })
+    cursor = parent
+  }
+  chain.push({ id: prompt.id, title: prompt.title, content: prompt.content })
+  return { parentTitle, depth, chain }
+}
+
+function childrenOf(promptId) {
+  return db.prompts
+    .filter((p) => !p.isDeleted && Number(p.parentId) === Number(promptId))
+    .sort((a, b) => a.id - b.id)
+    .map((p) => {
+      const first = imagesOf(p.id)[0]
+      return { id: p.id, title: p.title, status: p.status, coverImage: first ? first.url : '' }
+    })
+}
+
+function parentError(data, currentId) {
+  if (!data.parentId) return null
+  const id = Number(data.parentId)
+  if (!Number.isFinite(id) || id <= 0) return '关联的提示词无效'
+  if (currentId && id === Number(currentId)) return '不能关联自己'
+  const parent = findPrompt(id)
+  if (!parent) return '关联的提示词不存在'
+  if (parent.status !== 'published') return '只能关联已发布的提示词'
+  let cursor = parent
+  const seen = new Set([id])
+  for (let depth = 0; cursor.parentId && depth < MAX_CHAIN_DEPTH; depth += 1) {
+    const ancestorId = Number(cursor.parentId)
+    if (currentId && ancestorId === Number(currentId)) return '不能关联自己的下游提示词'
+    if (seen.has(ancestorId)) break
+    seen.add(ancestorId)
+    const ancestor = findPrompt(ancestorId)
+    if (!ancestor) break
+    cursor = ancestor
+  }
+  return null
+}
+
+function hasCategory(prompt, categoryId) {
+  return resolveCategoryIds(prompt).includes(Number(categoryId))
+}
+
 function decorate(prompt) {
   const category = db.categories.find((c) => c.id === prompt.categoryId)
+  const categoryIds = resolveCategoryIds(prompt)
+  const categoryNames = categoryIds.map((id) => {
+    const item = db.categories.find((c) => c.id === id)
+    return item ? item.name : ''
+  })
   const images = imagesOf(prompt.id)
+  const parentMeta = resolveParentChain(prompt)
   const isSequence = prompt.type === 'sequence'
   const steps = isSequence ? stepsOf(prompt.id) : []
   const coverPool = isSequence && steps.length && steps[0].platformGroups.length ? steps[0].platformGroups[0].images : images
@@ -536,7 +606,14 @@ function decorate(prompt) {
     title: prompt.title,
     content: prompt.content,
     categoryId: prompt.categoryId,
+    categoryIds,
+    categoryNames,
     categoryName: category ? category.name : '',
+    parentId: prompt.parentId ?? null,
+    parentTitle: parentMeta.parentTitle,
+    depth: parentMeta.depth,
+    chain: parentMeta.chain,
+    children: childrenOf(prompt.id),
     modelName: prompt.modelName,
     type: prompt.type || 'single',
     characterAnchor: prompt.characterAnchor ?? null,
@@ -647,7 +724,9 @@ function validationError(data, requireImage) {
   if (!data.title || !String(data.title).trim()) return '标题不能为空'
   if (!data.content || !String(data.content).trim()) return '提示词正文不能为空'
   if (!data.modelName || !String(data.modelName).trim()) return '模型名称不能为空'
-  if (!data.categoryId) return '请选择分类'
+  const categoryIds = resolveCategoryIds(data)
+  if (!categoryIds.length) return '请选择分类'
+  if (categoryIds.length > MAX_CATEGORIES) return `最多选择 ${MAX_CATEGORIES} 个分类`
   if (data.type === 'sequence') {
     const steps = Array.isArray(data.steps) ? data.steps : []
     if (steps.length === 0) return '套组至少需要 1 个步骤'
@@ -671,10 +750,12 @@ function validationError(data, requireImage) {
   return null
 }
 
-function categoryError(categoryId) {
-  const category = db.categories.find((c) => c.id === Number(categoryId))
-  if (!category) return '分类不存在'
-  if (category.status !== 1) return '分类已停用，请选择其他分类'
+function categoryError(data) {
+  for (const id of resolveCategoryIds(data)) {
+    const category = db.categories.find((c) => c.id === id)
+    if (!category) return '分类不存在'
+    if (category.status !== 1) return '分类已停用，请选择其他分类'
+  }
   return null
 }
 
@@ -690,7 +771,9 @@ function trimData(data) {
   return {
     title: String(data.title || '').trim(),
     content: String(data.content || '').trim(),
-    categoryId: Number(data.categoryId),
+    categoryId: resolveCategoryIds(data)[0],
+    categoryIds: resolveCategoryIds(data),
+    parentId: data.parentId ? Number(data.parentId) : null,
     modelName: String(data.modelName || '').trim(),
     type: data.type === 'sequence' ? 'sequence' : 'single',
     characterAnchor: data.type === 'sequence' && data.characterAnchor ? String(data.characterAnchor).trim() : null,
@@ -916,7 +999,7 @@ portal.get('/categories', (_req, res) => {
   const rows = db.categories
     .filter((c) => c.status === 1)
     .sort((a, b) => a.sort - b.sort || a.id - b.id)
-    .map((c) => ({ ...c, promptCount: livePrompts().filter((p) => p.categoryId === c.id && p.status === 'published').length }))
+    .map((c) => ({ ...c, promptCount: livePrompts().filter((p) => hasCategory(p, c.id) && p.status === 'published').length }))
   ok(res, rows)
 })
 
@@ -932,7 +1015,7 @@ portal.get('/prompts', (req, res) => {
     const k = String(q.keyword).toLowerCase()
     rows = rows.filter((p) => [p.title, p.content, p.modelName].some((v) => String(v).toLowerCase().includes(k)))
   }
-  if (q.categoryId !== undefined && q.categoryId !== '') rows = rows.filter((p) => p.categoryId === Number(q.categoryId))
+  if (q.categoryId !== undefined && q.categoryId !== '') rows = rows.filter((p) => hasCategory(p, q.categoryId))
   if (q.sort === 'popular') rows.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0) || b.id - a.id)
   else rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.id - a.id)
   const uid = currentUser(req) ? currentUser(req).id : undefined
@@ -943,7 +1026,7 @@ portal.get('/prompts/:id/related', (req, res) => {
   const current = livePrompts().find((p) => p.id === Number(req.params.id) && p.status === 'published')
   if (!current) return ok(res, [])
   const rows = livePrompts()
-    .filter((p) => p.categoryId === current.categoryId && p.status === 'published' && p.id !== current.id)
+    .filter((p) => hasCategory(p, current.categoryId) && p.status === 'published' && p.id !== current.id)
     .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0) || b.id - a.id)
     .slice(0, 4)
   const uid = currentUser(req) ? currentUser(req).id : undefined
@@ -1009,7 +1092,7 @@ portal.get('/mine/:id', (req, res) => {
 portal.post('/mine', (req, res) => {
   const data = req.body || {}
   const submitting = data.submit === true
-  const err = validationError(data, submitting) || categoryError(data.categoryId)
+  const err = validationError(data, submitting) || categoryError(data) || parentError(data)
   if (err) return fail(res, err, 400)
   const fields = trimData(data)
   const prompt = {
@@ -1043,7 +1126,7 @@ portal.put('/mine/:id', (req, res) => {
   const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined
   const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : existing > 0
   if (submitting && !willHaveImages) return fail(res, '提交审核必须上传至少一张效果图', 400)
-  const err = validationError(data, false) || categoryError(data.categoryId)
+  const err = validationError(data, false) || categoryError(data) || parentError(data, prompt.id)
   if (err) return fail(res, err, 400)
   Object.assign(prompt, trimData(data), {
     status: submitting ? 'pending' : prompt.status,
@@ -1128,7 +1211,7 @@ admin.get('/categories', (req, res) => {
   }
   if (req.query.status !== undefined && req.query.status !== '') rows = rows.filter((c) => c.status === Number(req.query.status))
   rows.sort((a, b) => a.sort - b.sort || a.id - b.id)
-  const decorated = rows.map((c) => ({ ...c, promptCount: livePrompts().filter((p) => p.categoryId === c.id).length }))
+  const decorated = rows.map((c) => ({ ...c, promptCount: livePrompts().filter((p) => hasCategory(p, c.id)).length }))
   ok(res, paged(decorated, page, pageSize))
 })
 
@@ -1166,14 +1249,14 @@ admin.put('/categories/:id', (req, res) => {
   if (data.status !== undefined) category.status = Number(data.status)
   category.updatedAt = nowIso()
   persist()
-  ok(res, { ...category, promptCount: livePrompts().filter((p) => p.categoryId === category.id).length })
+  ok(res, { ...category, promptCount: livePrompts().filter((p) => hasCategory(p, category.id)).length })
 })
 
 admin.delete('/categories/:id', (req, res) => {
   const id = Number(req.params.id)
   const category = db.categories.find((c) => c.id === id)
   if (!category) return fail(res, '分类不存在', 404)
-  const referenced = livePrompts().filter((p) => p.categoryId === id).length
+  const referenced = livePrompts().filter((p) => hasCategory(p, id)).length
   if (referenced > 0) return fail(res, `该分类下还有 ${referenced} 条提示词，请先迁移或停用该分类`, 409)
   db.categories = db.categories.filter((c) => c.id !== id)
   persist()
@@ -1259,11 +1342,25 @@ admin.get('/prompts', (req, res) => {
     const k = String(req.query.keyword).toLowerCase()
     rows = rows.filter((p) => String(p.title).toLowerCase().includes(k))
   }
-  if (req.query.categoryId !== undefined && req.query.categoryId !== '') rows = rows.filter((p) => p.categoryId === Number(req.query.categoryId))
+  if (req.query.categoryId !== undefined && req.query.categoryId !== '') rows = rows.filter((p) => hasCategory(p, req.query.categoryId))
   if (req.query.status) rows = rows.filter((p) => p.status === req.query.status)
   if (req.query.source) rows = rows.filter((p) => p.source === req.query.source)
   rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.id - a.id)
   ok(res, paged(rows.map(decorate), page, pageSize))
+})
+
+admin.get('/prompts/model-options', (_req, res) => {
+  const names = Array.from(new Set(livePrompts().map((p) => String(p.modelName || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+  ok(res, names)
+})
+
+admin.get('/prompts/parent-options', (req, res) => {
+  const keyword = String(req.query.keyword || '').trim().toLowerCase()
+  const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null
+  let rows = livePrompts().filter((p) => p.status === 'published' && (!excludeId || p.id !== excludeId))
+  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows.sort((a, b) => b.id - a.id)
+  ok(res, rows.slice(0, 20).map((p) => ({ id: p.id, title: p.title })))
 })
 
 admin.get('/prompts/:id', (req, res) => {
@@ -1275,7 +1372,7 @@ admin.get('/prompts/:id', (req, res) => {
 admin.post('/prompts', (req, res) => {
   const data = req.body || {}
   const publishing = data.action === 'publish'
-  const err = validationError(data, publishing) || categoryError(data.categoryId)
+  const err = validationError(data, publishing) || categoryError(data) || parentError(data)
   if (err) return fail(res, err, 400)
   const prompt = {
     id: nextId('prompt'),
@@ -1306,7 +1403,7 @@ admin.put('/prompts/:id', (req, res) => {
   const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined
   const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : imagesOf(prompt.id).length > 0
   if (publishing && !willHaveImages) return fail(res, '正式发布的提示词必须上传至少一张效果图', 400)
-  const err = validationError(data, false) || categoryError(data.categoryId)
+  const err = validationError(data, false) || categoryError(data) || parentError(data, prompt.id)
   if (err) return fail(res, err, 400)
   Object.assign(prompt, trimData(data), {
     status: publishing ? 'published' : prompt.status,

@@ -71,12 +71,37 @@ export interface PromptStep extends PromptStepInput {
   coverImage: string
 }
 
+/** 关联链中的一个节点，按根 → 当前顺序排列 */
+export interface PromptChainNode {
+  id: number
+  title: string
+  content: string
+}
+
+export interface PromptChild {
+  id: number
+  title: string
+  status: PromptStatus
+  coverImage: string
+}
+
 export interface PromptItem {
   id: number
   title: string
   content: string
   categoryId: number
+  categoryIds?: number[]
   categoryName?: string
+  categoryNames?: string[]
+  /** 派生自的提示词 ID；顶层为 null */
+  parentId?: number | null
+  parentTitle?: string | null
+  /** 祖先层级数，顶层为 0 */
+  depth?: number
+  /** 根 → 当前的正文链，详情页用于展示完整上下文 */
+  chain?: PromptChainNode[]
+  /** 直接追问衍生的提示词摘要 */
+  children?: PromptChild[]
   modelName: string
   type?: PromptType
   characterAnchor?: string | null
@@ -111,6 +136,8 @@ export interface PromptPayload {
   title: string
   content: string
   categoryId: number
+  categoryIds?: number[]
+  parentId?: number | null
   modelName: string
   type?: PromptType
   characterAnchor?: string | null
@@ -181,6 +208,16 @@ export const promptApi = {
   },
 
   /** ==================== 提示词 ==================== */
+  /** 库里已有的模型名（去重），后台表单可下拉选择或手动录入新值 */
+  getModelOptions() {
+    return request.get<string[]>('/prompt/prompts/model-options')
+  },
+
+  /** 关联原提示词：搜索可关联的已发布提示词 */
+  getParentOptions(params: { keyword?: string; excludeId?: number } = {}) {
+    return request.get<Array<{ id: number; title: string }>>('/prompt/prompts/parent-options', { params })
+  },
+
   getPrompts(params: PromptListQuery) {
     return request.get<PaginatedData<PromptItem>>('/prompt/prompts', { params })
   },

@@ -17,6 +17,10 @@
             </div>
           </div>
           <div class="detail-header-meta">
+            <router-link v-if="detail.parentId && detail.parentTitle" :to="`/portal/prompts/${detail.parentId}`" class="detail-parent-link">
+              <el-icon><Link /></el-icon>
+              {{ t('portal.derivedFrom') }}：{{ detail.parentTitle }}
+            </router-link>
             <span class="detail-author">
               <span class="author-avatar">{{ (detail.authorName || '?').charAt(0) }}</span>
               {{ detail.authorName || '-' }}
@@ -90,10 +94,25 @@
                 <el-icon><Document /></el-icon>
                 {{ t('portal.content') }}
               </span>
-              <el-button size="small" text :icon="DocumentCopy" @click="copyContent">{{ t('portal.copy') }}</el-button>
+              <span class="prompt-panel-actions">
+                <el-button v-if="chain.length > 1" size="small" text :icon="DocumentCopy" @click="copyChain">
+                  {{ t('portal.copyFullChain') }}
+                </el-button>
+                <el-button size="small" text :icon="DocumentCopy" @click="copyContent">{{ t('portal.copy') }}</el-button>
+              </span>
             </div>
             <div class="prompt-panel-body">
-              <pre class="detail-content">{{ detail.content }}</pre>
+              <template v-if="chain.length > 1">
+                <div v-for="(node, index) in chain" :key="node.id" class="chain-node" :class="{ 'chain-node-current': node.id === detail.id }">
+                  <div class="chain-node-head">
+                    <span class="chain-node-index">{{ index + 1 }}</span>
+                    <span class="chain-node-title">{{ node.title }}</span>
+                    <span v-if="node.id === detail.id" class="chain-node-current-tag">{{ t('portal.currentStep') }}</span>
+                  </div>
+                  <pre class="detail-content chain-content">{{ node.content }}</pre>
+                </div>
+              </template>
+              <pre v-else class="detail-content">{{ detail.content }}</pre>
             </div>
             <div class="prompt-panel-foot">
               <el-button :type="favorited ? 'primary' : 'default'" :icon="favorited ? StarFilled : Star" @click="toggleFavorite">
@@ -103,6 +122,17 @@
             </div>
           </section>
         </div>
+
+        <section v-if="followUps.length" class="detail-related">
+          <h2 class="related-title">{{ t('portal.followUps') }}</h2>
+          <div class="followup-list">
+            <router-link v-for="child in followUps" :key="child.id" :to="`/portal/prompts/${child.id}`" class="followup-item">
+              <img v-if="child.coverImage" :src="child.coverImage" :alt="child.title" class="followup-cover" />
+              <span class="followup-title">{{ child.title }}</span>
+              <el-icon><ArrowRight /></el-icon>
+            </router-link>
+          </div>
+        </section>
 
         <section v-if="related.length" class="detail-related">
           <h2 class="related-title">{{ t('portal.related') }}</h2>
@@ -121,11 +151,12 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Picture, View, Star, StarFilled, DocumentCopy, Document, Back } from '@element-plus/icons-vue'
+import { Picture, View, Star, StarFilled, DocumentCopy, Document, Back, Link, ArrowRight } from '@element-plus/icons-vue'
 import { portalApi, type PortalPrompt } from '@/api'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/error'
+import { copyText } from '@/utils/clipboard'
 import PromptCard from './components/PromptCard.vue'
 import SequenceTimeline from './components/SequenceTimeline.vue'
 
@@ -142,6 +173,9 @@ const activeIndex = ref(0)
 const activePlatformIndex = ref(0)
 
 const isSequence = computed(() => detail.value?.type === 'sequence')
+const chain = computed(() => detail.value?.chain ?? [])
+const followUps = computed(() => (detail.value?.children ?? []).filter((child) => child.status === 'published'))
+const fullChainText = computed(() => chain.value.map((node, index) => `${index + 1}. ${node.title}\n${node.content}`).join('\n\n'))
 
 const platformGroups = computed(() => {
   if (detail.value?.platformGroups?.length) return detail.value.platformGroups
@@ -194,6 +228,15 @@ const copyContent = async (): Promise<void> => {
     document.body.removeChild(textarea)
     if (ok) ElMessage.success(t('portal.copySuccess'))
     else ElMessage.error(t('portal.copyFailed'))
+  }
+}
+
+const copyChain = async (): Promise<void> => {
+  try {
+    await copyText(fullChainText.value)
+    ElMessage.success(t('portal.copySuccess'))
+  } catch {
+    ElMessage.error(t('portal.copyFailed'))
   }
 }
 
@@ -304,6 +347,18 @@ onMounted(() => void load())
   border-top: 1px solid var(--line);
   font-size: 13px;
   color: var(--ink-3);
+}
+
+.detail-parent-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-1);
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.detail-parent-link:hover {
+  text-decoration: underline;
 }
 
 .detail-author {
@@ -491,10 +546,66 @@ onMounted(() => void load())
   color: var(--ink);
 }
 
+.prompt-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-1);
+}
+
 .prompt-panel-body {
   flex: 1;
   padding: var(--gap-4);
   background: var(--page-bg);
+}
+
+.chain-node {
+  padding: var(--gap-3);
+  border: 1px solid var(--line);
+  border-radius: var(--detail-radius);
+  background: var(--card-bg);
+}
+
+.chain-node + .chain-node {
+  margin-top: var(--gap-3);
+}
+
+.chain-node-current {
+  border-color: var(--brand);
+}
+
+.chain-node-head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  margin-bottom: var(--gap-2);
+  font-size: 13px;
+}
+
+.chain-node-index {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 11px;
+}
+
+.chain-node-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chain-node-current-tag {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--brand);
+}
+
+.chain-content {
+  max-height: 220px;
 }
 
 .detail-content {
@@ -514,6 +625,47 @@ onMounted(() => void load())
   gap: var(--gap-2);
   padding: var(--gap-3) var(--gap-4);
   border-top: 1px solid var(--line);
+}
+
+/* ---- 追问衍生 ---- */
+.followup-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--gap-3);
+}
+
+.followup-item {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-3);
+  padding: var(--gap-3);
+  border: 1px solid var(--line);
+  border-radius: var(--detail-radius);
+  background: var(--card-bg);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.followup-item:hover {
+  border-color: var(--brand);
+}
+
+.followup-cover {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.followup-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
 }
 
 /* ---- 相关推荐 ---- */

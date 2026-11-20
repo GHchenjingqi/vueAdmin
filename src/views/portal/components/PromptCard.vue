@@ -31,6 +31,7 @@
       <h3 class="card-title" :title="prompt.title">{{ prompt.title }}</h3>
       <div class="card-tags">
         <span class="card-model">{{ prompt.modelName }}</span>
+        <span v-if="prompt.parentId" class="card-followup">{{ t('portal.followUpBadge') }}</span>
       </div>
       <div class="card-author">
         <span class="author-avatar">{{ (prompt.authorName || '?').charAt(0) }}</span>
@@ -226,6 +227,16 @@ const toggleFavorite = async (): Promise<void> => {
   color: var(--brand);
   background: var(--brand-soft);
   padding: 3px 9px;
+  border-radius: var(--radius-pill);
+}
+
+.card-followup {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  padding: 3px 7px;
   border-radius: var(--radius-pill);
 }
 

@@ -1,4 +1,4 @@
-import { Op, fn, col } from 'sequelize'
+import { Op } from 'sequelize'
 import PromptCategory from '../models/PromptCategory.js'
 import Prompt from '../models/Prompt.js'
 import { AppError } from '../../../middleware/errorHandler.js'
@@ -40,15 +40,19 @@ export async function listCategories(params: CategoryQuery) {
     limit: pageSize,
   })
 
-  const counters = await Prompt.findAll({
-    attributes: ['categoryId', [fn('COUNT', col('id')), 'promptCount']],
+  // 一条提示词可归属多个分类，需按 categoryIds 逐项统计；老数据回退到主分类
+  const promptCategories = await Prompt.findAll({
+    attributes: ['id', 'categoryId', 'categoryIds'],
     where: { isDeleted: 0 },
-    group: ['categoryId'],
     raw: true,
   })
   const countMap = new Map<number, number>()
-  for (const item of counters as any[]) {
-    countMap.set(Number(item.categoryId), Number(item.promptCount))
+  for (const item of promptCategories as any[]) {
+    const ids = Array.isArray(item.categoryIds) && item.categoryIds.length ? item.categoryIds : [item.categoryId]
+    for (const raw of ids) {
+      const id = Number(raw)
+      if (Number.isFinite(id)) countMap.set(id, (countMap.get(id) ?? 0) + 1)
+    }
   }
 
   return { rows: rows.map((row) => ({ ...row.toJSON(), promptCount: countMap.get(row.id) ?? 0 })), total: count, page, pageSize }
@@ -96,7 +100,12 @@ export async function updateCategory(id: number, data: CategoryInput) {
 export async function deleteCategory(id: number) {
   const category = await PromptCategory.findByPk(id)
   if (!category) throw new AppError(404, '分类不存在')
-  const referenced = await Prompt.count({ where: { categoryId: id, isDeleted: 0 } })
+  const referenced = await Prompt.count({
+    where: {
+      isDeleted: 0,
+      [Op.or]: [{ categoryId: id }, { categoryIds: { [Op.contains]: [id] } }],
+    },
+  })
   if (referenced > 0) {
     throw new AppError(409, `该分类下还有 ${referenced} 条提示词，请先迁移或停用该分类`)
   }
