@@ -170,6 +170,25 @@ describe('requestCache', () => {
       expect(getCache(key)).toBe('settings')
     })
 
+    it('带动态段动作的写 URL 失效资源列表缓存（如 /reviews/14/approve → GET /reviews）', () => {
+      const listKey = buildGetCacheKey('/prompt/reviews', { page: 1, pageSize: 10 })
+      setCache(listKey, 'pending-list')
+
+      invalidateByUrl('/prompt/reviews/14/approve')
+      expect(getCache(listKey)).toBeNull()
+    })
+
+    it('带动态段 ID 的写 URL 失效资源列表缓存（如 DELETE /prompts/14 → GET /prompts）', () => {
+      const listKey = buildGetCacheKey('/prompt/prompts', { page: 1 })
+      const otherKey = buildGetCacheKey('/prompt/categories')
+      setCache(listKey, 'prompts-list')
+      setCache(otherKey, 'categories')
+
+      invalidateByUrl('/prompt/prompts/14')
+      expect(getCache(listKey)).toBeNull()
+      expect(getCache(otherKey)).toBe('categories')
+    })
+
     it('清除 localStorage 中匹配的持久化缓存', () => {
       const key = buildGetCacheKey('/api/orgs')
       setCache(key, 'org-data', 60000, true)

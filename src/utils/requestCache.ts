@@ -101,9 +101,7 @@ export function setCache(key: string, data: unknown, ttl: number = DEFAULT_TTL, 
  */
 export function invalidateByUrl(url: string): void {
   const segments = url.split('/').filter(Boolean)
-  // 取最后一个有意义的路径段作为匹配 key
-  const key = segments[segments.length - 1] || segments[0]
-  if (!key) {
+  if (!segments.length) {
     // 兜底：清空所有缓存
     clearAll()
     return
@@ -111,24 +109,17 @@ export function invalidateByUrl(url: string): void {
 
   const toDelete = new Set<string>()
 
-  // 同时匹配末段（如 ID）和父段（如资源名 providers）
-  const matchKeys = [key]
-  if (segments.length >= 2) {
-    const parentKey = segments[segments.length - 2]
-    if (parentKey && parentKey !== key) {
-      matchKeys.push(parentKey)
-    }
-  }
-
-  for (const mk of matchKeys) {
-    if (urlIndex.has(mk)) {
-      for (const cacheKey of urlIndex.get(mk)!) {
-        if (toDelete.has(cacheKey)) continue
-        // 从缓存 key 中提取 URL 部分，精确匹配前缀
-        const keyUrl = cacheKey.split(':')[1] || ''
-        if (url.startsWith(keyUrl)) {
-          toDelete.add(cacheKey)
-        }
+  // 必须匹配 URL 的所有路径段：带动态段的写操作（如 POST /reviews/14/approve）
+  // 末两段是 '14'/'approve'，若不回溯到资源段 'reviews'，列表缓存将无法失效
+  for (const seg of segments) {
+    const keys = urlIndex.get(seg)
+    if (!keys) continue
+    for (const cacheKey of keys) {
+      if (toDelete.has(cacheKey)) continue
+      // 从缓存 key 中提取 URL 部分，精确匹配前缀
+      const keyUrl = cacheKey.split(':')[1] || ''
+      if (keyUrl && url.startsWith(keyUrl)) {
+        toDelete.add(cacheKey)
       }
     }
   }
