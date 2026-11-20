@@ -75,6 +75,16 @@ export async function remove(req: any, res: any, next: any) {
   }
 }
 
+export async function batchRemove(req: any, res: any, next: any) {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : []
+    const result = await promptService.deletePrompts(ids)
+    res.json({ code: 0, message: '删除成功', data: result })
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function stats(req: any, res: any, next: any) {
   try {
     res.json({ code: 0, data: await promptService.stats() })

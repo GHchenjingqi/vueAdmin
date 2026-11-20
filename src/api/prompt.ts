@@ -246,6 +246,10 @@ export const promptApi = {
     return request.delete<null>(`/prompt/prompts/${id}`)
   },
 
+  batchDeletePrompts(ids: number[]) {
+    return request.post<{ deleted: number }>('/prompt/prompts/batch-delete', { ids })
+  },
+
   /** ==================== 投稿审核 ==================== */
   getReviews(params: PromptListQuery) {
     return request.get<PaginatedData<PromptItem>>('/prompt/reviews', { params })

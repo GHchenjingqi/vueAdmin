@@ -10,6 +10,7 @@
     </el-row>
 
     <ProTable
+      ref="tableRef"
       :key="locale"
       :title="t('prompt.manageTitle')"
       :columns="columns"
@@ -20,9 +21,16 @@
       :search-params="searchParams"
       :search-fields="searchFields"
       column-settings-key="prompt_manage_list"
+      show-selection
+      reserve-selection
+      row-key="id"
       @query="onQuery"
+      @selection-change="onSelectionChange"
     >
       <template #header-buttons>
+        <el-button type="danger" plain :icon="Delete" :disabled="!selectedRows.length" @click="handleBatchDelete">
+          {{ t('prompt.batchDelete') }}{{ selectedRows.length ? ` (${selectedRows.length})` : '' }}
+        </el-button>
         <el-button type="primary" :icon="Plus" @click="openDialog()">
           {{ t('prompt.addPrompt') }}
         </el-button>
@@ -212,7 +220,9 @@ const submitting = ref(false)
 const currentId = ref<number | null>(null)
 const detail = ref<PromptItem | null>(null)
 const formRef = ref<InstanceType<typeof ProForm> | null>(null)
+const tableRef = ref<InstanceType<typeof ProTable> | null>(null)
 const form = reactive<PromptForm>({ title: '', content: '', categoryId: '', categoryIds: [], parentId: null, modelName: '', images: [] })
+const selectedRows = ref<PromptItem[]>([])
 
 const formImageUrls = computed(() => form.images.map((image) => image.url))
 const detailImageUrls = computed(() => (detail.value?.images ?? []).map((image) => image.url))
@@ -479,6 +489,36 @@ const handleOffline = async (row: Record<string, unknown>): Promise<void> => {
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))
   }
+}
+
+const onSelectionChange = (selection: unknown[]): void => {
+  selectedRows.value = selection as PromptItem[]
+}
+
+const handleBatchDelete = (): void => {
+  const ids = selectedRows.value.map((row) => row.id)
+  if (!ids.length) {
+    ElMessage.warning(t('prompt.selectFirst'))
+    return
+  }
+  ElMessageBox.confirm(t('prompt.batchDeleteConfirm', { count: ids.length }), t('common.confirm'), {
+    type: 'warning',
+    confirmButtonText: t('common.delete'),
+    cancelButtonText: t('common.cancel'),
+  })
+    .then(async () => {
+      try {
+        const res = await promptApi.batchDeletePrompts(ids)
+        ElMessage.success(t('prompt.batchDeleteSuccess', { count: res.data?.deleted ?? ids.length }))
+        selectedRows.value = []
+        tableRef.value?.clearSelection()
+        fetchRows()
+        fetchStats()
+      } catch (err: unknown) {
+        ElMessage.error(getErrorMessage(err))
+      }
+    })
+    .catch(() => undefined)
 }
 
 const handleDelete = (row: Record<string, unknown>): void => {

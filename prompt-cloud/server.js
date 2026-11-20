@@ -1500,6 +1500,23 @@ admin.delete('/prompts/:id', (req, res) => {
   ok(res, null)
 })
 
+// 批量删除：与单条删除同为软删除，跳过不存在或已删除的条目
+admin.post('/prompts/batch-delete', (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))] : []
+  if (!ids.length) return fail(res, '请提供要删除的提示词 ID', 400)
+  let deleted = 0
+  for (const prompt of db.prompts) {
+    if (ids.includes(prompt.id) && !prompt.isDeleted) {
+      prompt.isDeleted = 1
+      prompt.status = 'offline'
+      prompt.updatedAt = nowIso()
+      deleted += 1
+    }
+  }
+  if (deleted) persist()
+  ok(res, { deleted })
+})
+
 admin.get('/reviews', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   const rows = livePrompts()

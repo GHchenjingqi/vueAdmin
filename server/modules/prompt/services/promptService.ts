@@ -526,6 +526,14 @@ export async function deletePrompt(id: number) {
   await prompt.update({ isDeleted: 1, status: 'offline' })
 }
 
+/** 批量软删除：跳过不存在或已删除的条目，返回实际删除数 */
+export async function deletePrompts(ids: number[]) {
+  const uniqueIds = [...new Set(ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))]
+  if (!uniqueIds.length) throw new AppError(400, '请提供要删除的提示词 ID')
+  const [affected] = await Prompt.update({ isDeleted: 1, status: 'offline' }, { where: { id: { [Op.in]: uniqueIds }, isDeleted: 0 } })
+  return { deleted: affected }
+}
+
 export async function stats() {
   const base = { isDeleted: 0 }
   const [total, published, pending, categories, favorites, offline] = await Promise.all([
