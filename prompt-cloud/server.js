@@ -14,6 +14,9 @@ const CLIENT_DIR = path.join(ROOT, 'client')
 const UPLOAD_DIR = path.join(ROOT, 'uploads')
 const DATA_DIR = path.join(ROOT, 'data')
 const DB_FILE = path.join(DATA_DIR, 'db.json')
+const BACKUP_DIR = path.join(DATA_DIR, 'backups')
+const MAX_BACKUPS = 10
+const BACKUP_MIN_INTERVAL_MS = 60 * 1000
 const JWT_SECRET = process.env.JWT_SECRET || 'prompt-cloud-jwt-secret-20261116'
 const COOKIE_NAME = 'ppt_token'
 const CATEGORY_NAMES = ['人物', '服装', '环境', '建筑', '产品', '美食', '动物', '插画艺术', '摄影', '其他']
@@ -370,7 +373,55 @@ function loadDb() {
 
 let db = loadDb()
 
+let lastBackupAt = 0
+
+// 滚动备份：每次持久化前把当前库拷贝到 data/backups，同一分钟限一份，保留最近 MAX_BACKUPS 份
+function backupDb() {
+  try {
+    if (!fs.existsSync(DB_FILE)) return
+    const now = Date.now()
+    if (now - lastBackupAt < BACKUP_MIN_INTERVAL_MS) return
+    lastBackupAt = now
+    fs.mkdirSync(BACKUP_DIR, { recursive: true })
+    const stamp = new Date(now).toISOString().replace(/[:.]/g, '-')
+    fs.copyFileSync(DB_FILE, path.join(BACKUP_DIR, `db-${stamp}.json`))
+    const files = fs
+      .readdirSync(BACKUP_DIR)
+      .filter((f) => f.startsWith('db-') && f.endsWith('.json'))
+      .sort()
+    while (files.length > MAX_BACKUPS) {
+      fs.unlinkSync(path.join(BACKUP_DIR, files.shift()))
+    }
+  } catch (err) {
+    console.warn('db backup failed:', err.message)
+  }
+}
+
+function validDbSnapshot(snapshot) {
+  const arrays = ['users', 'prompts', 'images', 'steps', 'categories', 'platforms', 'favorites', 'uploads']
+  return snapshot && snapshot.schema === DB_SCHEMA && arrays.every((key) => Array.isArray(snapshot[key]))
+}
+
+function listBackups() {
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) return []
+    return fs
+      .readdirSync(BACKUP_DIR)
+      .filter((f) => f.startsWith('db-') && f.endsWith('.json'))
+      .sort()
+      .reverse()
+      .map((name) => {
+        const stat = fs.statSync(path.join(BACKUP_DIR, name))
+        return { name, size: stat.size, createdAt: stat.mtime.toISOString() }
+      })
+  } catch (err) {
+    console.warn('list backups failed:', err.message)
+    return []
+  }
+}
+
 function persist() {
+  backupDb()
   const tmp = DB_FILE + '.tmp'
   fs.writeFileSync(tmp, JSON.stringify(db, null, 2), 'utf8')
   fs.renameSync(tmp, DB_FILE)
@@ -1510,8 +1561,7 @@ admin.get('/data/export', (_req, res) => {
 // 数据恢复：仅管理员可调用，严格校验结构后原子写盘
 admin.post('/data/import', (req, res) => {
   const incoming = req.body && typeof req.body === 'object' ? req.body.data || req.body : null
-  const arrays = ['users', 'prompts', 'images', 'steps', 'categories', 'platforms', 'favorites', 'uploads']
-  if (!incoming || incoming.schema !== DB_SCHEMA || arrays.some((key) => !Array.isArray(incoming[key]))) {
+  if (!validDbSnapshot(incoming)) {
     return fail(res, '备份数据结构不合法', 400)
   }
   const backupFile = `${DB_FILE}.before-import-${Date.now()}.bak`
@@ -1523,6 +1573,31 @@ admin.post('/data/import', (req, res) => {
     ok(res, { imported: true, prompts: db.prompts.length })
   } catch (err) {
     return fail(res, '数据恢复失败：' + err.message, 500)
+  }
+})
+
+// 备份列表：供排查与一键回滚
+admin.get('/data/backups', (_req, res) => {
+  const rows = listBackups()
+  ok(res, { backups: rows, current: { prompts: db.prompts.length, users: db.users.length } })
+})
+
+// 从滚动备份恢复指定快照
+admin.post('/data/backups/:name/restore', (req, res) => {
+  const name = String(req.params.name || '')
+  if (!/^db-[\w-]+\.json$/.test(name)) return fail(res, '备份文件名不合法', 400)
+  const file = path.join(BACKUP_DIR, name)
+  if (!fs.existsSync(file)) return fail(res, '备份不存在', 404)
+  try {
+    const snapshot = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (!validDbSnapshot(snapshot)) return fail(res, '备份数据结构不合法', 400)
+    fs.copyFileSync(DB_FILE, `${DB_FILE}.before-restore-${Date.now()}.bak`)
+    db = snapshot
+    db.seq = db.seq || {}
+    persist()
+    ok(res, { restored: name, prompts: db.prompts.length })
+  } catch (err) {
+    return fail(res, '备份恢复失败：' + err.message, 500)
   }
 })
 

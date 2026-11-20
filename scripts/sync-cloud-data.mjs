@@ -68,6 +68,24 @@ async function main() {
   fs.writeFileSync(tmp, JSON.stringify(db, null, 2), 'utf8')
   fs.renameSync(tmp, DB_FILE)
 
+  // 同步的同时在本地 archive 留一份带时间戳的快照（保留最近 30 份），即使沙箱全毁也可恢复
+  try {
+    const archiveDir = path.join(path.dirname(DB_FILE), 'archive')
+    fs.mkdirSync(archiveDir, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    fs.writeFileSync(path.join(archiveDir, `db-${stamp}.json`), JSON.stringify(db, null, 2), 'utf8')
+    const archives = fs
+      .readdirSync(archiveDir)
+      .filter((f) => f.startsWith('db-') && f.endsWith('.json'))
+      .sort()
+    while (archives.length > 30) {
+      fs.unlinkSync(path.join(archiveDir, archives.shift()))
+    }
+    console.log(`[sync-cloud-data] 已存档：archive/db-${stamp}.json`)
+  } catch (err) {
+    console.warn('[sync-cloud-data] 存档失败（不影响同步）：', err.message)
+  }
+
   console.log(`[sync-cloud-data] 已从线上同步 ${db.prompts.length} 条提示词、${db.users.length} 个用户到本地`)
   console.log(`[sync-cloud-data] 目标文件：${DB_FILE}`)
 }
