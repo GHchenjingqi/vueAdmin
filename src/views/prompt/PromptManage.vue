@@ -79,14 +79,6 @@
       <el-row class="prompt-editor-layout">
         <el-col :span="12" class="prompt-editor-left">
           <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px" />
-          <div class="prompt-type">
-            <div class="prompt-images-title">{{ t('portal.contentType') }}</div>
-            <el-radio-group v-model="form.type" @change="handleTypeChange">
-              <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
-              <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
-            </el-radio-group>
-            <div class="prompt-parent-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</div>
-          </div>
           <div class="prompt-parent">
             <div class="prompt-parent-title">{{ t('prompt.parentPrompt') }}</div>
             <el-select
@@ -106,6 +98,14 @@
           </div>
         </el-col>
         <el-col :span="12" class="prompt-editor-right">
+          <div class="prompt-type">
+            <div class="prompt-images-title">{{ t('portal.contentType') }}</div>
+            <el-radio-group v-model="form.type" @change="handleTypeChange">
+              <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
+              <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
+            </el-radio-group>
+            <div class="prompt-parent-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</div>
+          </div>
           <div class="prompt-images">
             <div class="prompt-images-title">{{ t('prompt.images') }}</div>
             <SequenceStepEditor
@@ -727,12 +727,12 @@ onMounted(() => {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-.prompt-images {
-  margin-top: 0;
-  border-top: none;
-  padding-top: 0;
-}
 .prompt-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.prompt-images {
   margin-top: 16px;
   border-top: 1px solid var(--el-border-color-lighter);
   padding-top: 12px;

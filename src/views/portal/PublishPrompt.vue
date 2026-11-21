@@ -9,14 +9,6 @@
       <el-form label-position="top" @submit.prevent>
         <div class="publish-layout">
           <div class="publish-left">
-            <el-form-item :label="t('portal.contentType')" required>
-              <el-radio-group v-model="form.type">
-                <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
-                <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
-              </el-radio-group>
-              <p class="type-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</p>
-            </el-form-item>
-
             <el-form-item :label="t('prompt.parentPrompt')">
               <el-select
                 v-model="form.parentId"
@@ -64,6 +56,13 @@
           </div>
 
           <div class="publish-right">
+            <el-form-item :label="t('portal.contentType')" required>
+              <el-radio-group v-model="form.type">
+                <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
+                <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
+              </el-radio-group>
+              <p class="type-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</p>
+            </el-form-item>
             <div class="publish-images-title">{{ t('portal.images') }}</div>
             <SequenceStepEditor
               v-if="form.type === 'sequence'"
@@ -361,7 +360,7 @@ onMounted(() => void load())
 
 <style scoped>
 .publish-page {
-  max-width: 1180px;
+  width: min(1680px, calc(100% - 48px));
   margin: 0 auto;
 }
 
