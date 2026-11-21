@@ -18,6 +18,7 @@ router.use(optionalAuth)
 // ==================== 公开浏览 ====================
 router.get('/categories', portalController.categories)
 router.get('/platforms', portalController.platforms)
+router.get('/model-options', portalController.modelOptions)
 router.get('/prompts', portalController.list)
 router.get('/prompts/:id/related', portalController.related)
 router.get('/prompts/:id', portalController.detail)

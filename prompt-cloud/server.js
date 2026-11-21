@@ -1064,6 +1064,12 @@ portal.get('/platforms', (_req, res) => {
   ok(res, db.platforms.filter((p) => p.status === 1).sort((a, b) => a.sort - b.sort || a.id - b.id))
 })
 
+// 投稿表单用：库里已有的模型名（去重排序），与后台 /prompts/model-options 口径一致
+portal.get('/model-options', (_req, res) => {
+  const names = Array.from(new Set(livePrompts().map((p) => String(p.modelName || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+  ok(res, names)
+})
+
 portal.get('/prompts', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   const q = req.query

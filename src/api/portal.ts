@@ -78,6 +78,11 @@ export const portalApi = {
     return request.get<PromptPlatform[]>('/portal/platforms')
   },
 
+  /** 投稿表单用：库里已有的模型名，可下拉选择或手动录入新值 */
+  getModelOptions() {
+    return request.get<string[]>('/portal/model-options')
+  },
+
   getPrompts(params: PortalListQuery) {
     return request.get<PaginatedData<PortalPrompt>>('/portal/prompts', { params })
   },

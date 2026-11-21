@@ -26,7 +26,9 @@
             </el-select>
           </el-form-item>
           <el-form-item :label="t('portal.model')" required>
-            <el-input v-model="form.modelName" maxlength="100" :placeholder="t('portal.modelPlaceholder')" />
+            <el-select v-model="form.modelName" filterable allow-create default-first-option :placeholder="t('portal.modelPlaceholder')" style="width: 100%">
+              <el-option v-for="name in modelOptions" :key="name" :label="name" :value="name" />
+            </el-select>
           </el-form-item>
         </div>
 
@@ -87,6 +89,7 @@ const userStore = useUserStore()
 
 const categories = ref<PortalCategory[]>([])
 const platforms = ref<PromptPlatform[]>([])
+const modelOptions = ref<string[]>([])
 const form = reactive<PublishForm>({
   title: '',
   content: '',
@@ -114,15 +117,23 @@ const load = async (): Promise<void> => {
   }
   loading.value = true
   try {
-    const [categoryRes, platformRes] = await Promise.all([portalApi.getCategories(), portalApi.getPlatforms()])
-    categories.value = categoryRes.data
-    platforms.value = platformRes.data
+    const [categoryRes, platformRes, modelRes] = await Promise.allSettled([portalApi.getCategories(), portalApi.getPlatforms(), portalApi.getModelOptions()])
+    if (categoryRes.status === 'fulfilled') categories.value = categoryRes.value.data
+    else ElMessage.error(getErrorMessage(categoryRes.reason))
+    if (platformRes.status === 'fulfilled') platforms.value = platformRes.value.data
+    else ElMessage.error(getErrorMessage(platformRes.reason))
+    // 模型选项只是便利功能，接口异常时仍可手动录入，不阻断表单加载
+    if (modelRes.status === 'fulfilled') modelOptions.value = modelRes.value.data ?? []
     if (isEdit.value) {
       const res = await portalApi.getMinePrompt(editId.value)
       form.title = res.data.title
       form.content = res.data.content
       form.categoryId = res.data.categoryId
       form.modelName = res.data.modelName
+      // 编辑时若当前模型不在选项里（如自建的新模型），补上以保证回显可读
+      if (form.modelName && !modelOptions.value.includes(form.modelName)) {
+        modelOptions.value.unshift(form.modelName)
+      }
       form.type = res.data.type === 'sequence' ? 'sequence' : 'single'
       form.characterAnchor = res.data.characterAnchor || ''
       if (form.type === 'sequence') {
@@ -148,7 +159,7 @@ const load = async (): Promise<void> => {
       const groups = res.data.platformGroups?.length
         ? res.data.platformGroups
         : res.data.images?.length
-          ? [{ platformId: res.data.images[0].platformId || platformRes.data[0]?.id || 1, images: res.data.images, coverImage: '' }]
+          ? [{ platformId: res.data.images[0].platformId || platforms.value[0]?.id || 1, images: res.data.images, coverImage: '' }]
           : []
       form.platformGroups = groups.map((group) => ({
         platformId: group.platformId,
@@ -159,10 +170,10 @@ const load = async (): Promise<void> => {
           isCover: Boolean(image.isCover),
         })),
       }))
-    } else if (platformRes.data.length) {
-      form.platformGroups = [{ platformId: platformRes.data[0].id, images: [] }]
+    } else if (platforms.value.length) {
+      form.platformGroups = [{ platformId: platforms.value[0].id, images: [] }]
       form.steps = [
-        { name: '', actionPrompt: '', camera: null, seconds: 5, transition: null, platformGroups: [{ platformId: platformRes.data[0].id, images: [] }] },
+        { name: '', actionPrompt: '', camera: null, seconds: 5, transition: null, platformGroups: [{ platformId: platforms.value[0].id, images: [] }] },
       ]
     }
   } catch (err: unknown) {

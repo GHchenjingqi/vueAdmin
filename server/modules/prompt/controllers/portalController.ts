@@ -1,5 +1,6 @@
 import * as portalService from '../services/portalService.js'
 import * as platformService from '../services/platformService.js'
+import * as promptService from '../services/promptService.js'
 import * as registerService from '../services/registerService.js'
 import { portalUserId } from '../middleware/portalAuth.js'
 
@@ -14,6 +15,15 @@ export async function categories(_req: any, res: any, next: any) {
 export async function platforms(_req: any, res: any, next: any) {
   try {
     res.json({ code: 0, data: await platformService.listPlatformOptions() })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** 投稿表单用：库里已有的模型名（去重），可下拉选择或手动录入新值 */
+export async function modelOptions(_req: any, res: any, next: any) {
+  try {
+    res.json({ code: 0, data: await promptService.listModelOptions() })
   } catch (err) {
     next(err)
   }
