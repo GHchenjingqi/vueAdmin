@@ -27,11 +27,18 @@ export interface PortalMineQuery extends ListQueryParams {
   status?: PromptStatus
 }
 
+export interface PortalParentOption {
+  id: number
+  title: string
+}
+
 export interface PortalPayload {
   title: string
   content: string
   categoryId: number
   modelName: string
+  /** 关联的原提示词 ID；派生提示词只填写本次追问正文 */
+  parentId?: number | null
   /** 内容形态：single=单条，sequence=有序步骤套组 */
   type?: PromptType
   /** 角色锚定提示词，仅套组使用 */
@@ -81,6 +88,11 @@ export const portalApi = {
   /** 投稿表单用：库里已有的模型名，可下拉选择或手动录入新值 */
   getModelOptions() {
     return request.get<string[]>('/portal/model-options')
+  },
+
+  /** 投稿表单用：可关联的已发布提示词（远程搜索），编辑时排除自身防环 */
+  getParentOptions(params: { keyword?: string; excludeId?: number | string } = {}) {
+    return request.get<PortalParentOption[]>('/portal/parent-options', { params })
   },
 
   getPrompts(params: PortalListQuery) {

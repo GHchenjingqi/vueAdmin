@@ -15,6 +15,23 @@
           <p class="type-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</p>
         </el-form-item>
 
+        <el-form-item :label="t('prompt.parentPrompt')">
+          <el-select
+            v-model="form.parentId"
+            filterable
+            remote
+            clearable
+            :remote-method="searchParentOptions"
+            :loading="parentLoading"
+            :placeholder="t('prompt.parentPlaceholder')"
+            style="width: 100%"
+            @focus="searchParentOptions()"
+          >
+            <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
+          </el-select>
+          <p class="type-tip">{{ t('prompt.parentTip') }}</p>
+        </el-form-item>
+
         <el-form-item :label="t('portal.title')" required>
           <el-input v-model="form.title" maxlength="200" show-word-limit :placeholder="t('portal.titlePlaceholder')" />
         </el-form-item>
@@ -63,7 +80,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { portalApi, type PortalCategory, type PortalPayload } from '@/api'
+import { portalApi, type PortalCategory, type PortalParentOption, type PortalPayload } from '@/api'
 import type { PromptImageGroupInput, PromptPlatform, PromptStepInput, PromptType } from '@/api/prompt'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
@@ -75,6 +92,7 @@ interface PublishForm {
   title: string
   content: string
   categoryId: number | ''
+  parentId: number | null
   modelName: string
   type: PromptType
   characterAnchor: string
@@ -90,10 +108,13 @@ const userStore = useUserStore()
 const categories = ref<PortalCategory[]>([])
 const platforms = ref<PromptPlatform[]>([])
 const modelOptions = ref<string[]>([])
+const parentOptions = ref<PortalParentOption[]>([])
+const parentLoading = ref(false)
 const form = reactive<PublishForm>({
   title: '',
   content: '',
   categoryId: '',
+  parentId: null,
   modelName: '',
   type: 'single',
   characterAnchor: '',
@@ -109,6 +130,22 @@ const goMine = (): void => {
   void router.push('/portal/mine')
 }
 
+/** 远程搜索可关联的已发布提示词；编辑时排除自身，避免自关联 */
+const searchParentOptions = async (keyword = ''): Promise<void> => {
+  parentLoading.value = true
+  try {
+    const res = await portalApi.getParentOptions({
+      keyword: keyword.trim(),
+      excludeId: isEdit.value ? editId.value : undefined,
+    })
+    parentOptions.value = res.data
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err))
+  } finally {
+    parentLoading.value = false
+  }
+}
+
 const load = async (): Promise<void> => {
   if (!userStore.isLoggedIn) {
     ElMessage.warning(t('portal.loginRequired'))
@@ -116,6 +153,7 @@ const load = async (): Promise<void> => {
     return
   }
   loading.value = true
+  let parentTitleToRestore = ''
   try {
     const [categoryRes, platformRes, modelRes] = await Promise.allSettled([portalApi.getCategories(), portalApi.getPlatforms(), portalApi.getModelOptions()])
     if (categoryRes.status === 'fulfilled') categories.value = categoryRes.value.data
@@ -129,6 +167,8 @@ const load = async (): Promise<void> => {
       form.title = res.data.title
       form.content = res.data.content
       form.categoryId = res.data.categoryId
+      form.parentId = res.data.parentId ?? null
+      parentTitleToRestore = res.data.parentTitle ?? ''
       form.modelName = res.data.modelName
       // 编辑时若当前模型不在选项里（如自建的新模型），补上以保证回显可读
       if (form.modelName && !modelOptions.value.includes(form.modelName)) {
@@ -175,6 +215,11 @@ const load = async (): Promise<void> => {
       form.steps = [
         { name: '', actionPrompt: '', camera: null, seconds: 5, transition: null, platformGroups: [{ platformId: platforms.value[0].id, images: [] }] },
       ]
+    }
+    // 关联选项在回显后加载：编辑时排除自身；若原关联项不在默认列表里则补上，保证回显可读
+    await searchParentOptions()
+    if (form.parentId && parentTitleToRestore && !parentOptions.value.some((item) => item.id === form.parentId)) {
+      parentOptions.value.unshift({ id: form.parentId, title: parentTitleToRestore })
     }
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))
@@ -245,6 +290,7 @@ const handleSubmit = async (submit: boolean): Promise<void> => {
     title: form.title.trim(),
     content: form.content.trim(),
     categoryId: Number(form.categoryId),
+    parentId: form.parentId,
     modelName: form.modelName.trim(),
     type: form.type,
     characterAnchor: isSequence ? form.characterAnchor.trim() : null,

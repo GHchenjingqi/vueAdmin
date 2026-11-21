@@ -1070,6 +1070,16 @@ portal.get('/model-options', (_req, res) => {
   ok(res, names)
 })
 
+// 投稿表单用：可关联的已发布提示词（远程搜索），编辑时排除自身防环
+portal.get('/parent-options', (req, res) => {
+  const keyword = String(req.query.keyword || '').trim().toLowerCase()
+  const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null
+  let rows = livePrompts().filter((p) => p.status === 'published' && (!excludeId || p.id !== excludeId))
+  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows.sort((a, b) => b.id - a.id)
+  ok(res, rows.slice(0, 20).map((p) => ({ id: p.id, title: p.title })))
+})
+
 portal.get('/prompts', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   const q = req.query

@@ -42,6 +42,7 @@ export async function createUserPrompt(data: PortalPromptInput, userId: number) 
         content: data.content!.trim(),
         categoryId: Number(data.categoryId),
         modelName: data.modelName!.trim(),
+        parentId: data.parentId ? Number(data.parentId) : null,
         type: data.type === 'sequence' ? 'sequence' : 'single',
         characterAnchor: data.type === 'sequence' ? data.characterAnchor?.trim() || null : null,
         status: submitting ? 'pending' : 'draft',
@@ -89,7 +90,7 @@ export async function updateUserPrompt(id: number, userId: number, data: PortalP
   const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : existingImageCount > 0
   const submitting = data.submit === true
   if (submitting && !willHaveImages) throw new AppError(400, '提交审核必须上传至少一张效果图')
-  await validateInput(data, false)
+  await validateInput(data, false, id)
   await assertCategoryUsable(Number(data.categoryId))
 
   await sequelize.transaction(async (transaction) => {
@@ -99,6 +100,7 @@ export async function updateUserPrompt(id: number, userId: number, data: PortalP
         content: data.content!.trim(),
         categoryId: Number(data.categoryId),
         modelName: data.modelName!.trim(),
+        parentId: data.parentId ? Number(data.parentId) : null,
         type: data.type === 'sequence' ? 'sequence' : 'single',
         characterAnchor: data.type === 'sequence' ? data.characterAnchor?.trim() || null : null,
         ...(submitting ? { status: 'pending', rejectReason: null, reviewedBy: null, reviewedAt: null } : {}),

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     getCategories: vi.fn(),
     getPlatforms: vi.fn(),
     getModelOptions: vi.fn(),
+    getParentOptions: vi.fn(),
     getMinePrompt: vi.fn(),
     createMine: vi.fn(),
     updateMine: vi.fn(),
@@ -42,7 +43,21 @@ import PublishPrompt from '@/views/portal/PublishPrompt.vue'
 
 const stubComponent = (name?: string) => ({
   name,
-  props: ['modelValue', 'steps', 'characterAnchor', 'platforms', 'max', 'filterable', 'allowCreate', 'defaultFirstOption', 'placeholder'],
+  props: [
+    'modelValue',
+    'steps',
+    'characterAnchor',
+    'platforms',
+    'max',
+    'filterable',
+    'allowCreate',
+    'defaultFirstOption',
+    'placeholder',
+    'remote',
+    'loading',
+    'remoteMethod',
+    'clearable',
+  ],
   template: '<div class="stub"><slot /></div>',
   methods: { validate: () => Promise.resolve(true) },
 })
@@ -77,6 +92,7 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     mocks.portalApi.getCategories.mockResolvedValue({ data: [{ id: 1, name: '人物' }] })
     mocks.portalApi.getPlatforms.mockResolvedValue({ data: [{ id: 2, name: '通用' }] })
     mocks.portalApi.getModelOptions.mockResolvedValue({ data: ['Midjourney', 'Stable Diffusion'] })
+    mocks.portalApi.getParentOptions.mockResolvedValue({ data: [{ id: 5, title: '原始提示词' }] })
     mocks.portalApi.createMine.mockResolvedValue({ data: { id: 1 } })
     mocks.portalApi.updateMine.mockResolvedValue({ data: { id: 1 } })
   })
@@ -88,8 +104,10 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     await nextTick()
     const state = vm(wrapper)
     expect(state.modelOptions).toEqual(['Midjourney', 'Stable Diffusion'])
-    const select = wrapper.findComponent({ name: 'ElSelect' })
-    expect(select.exists()).toBe(true)
+    // 表单内三个下拉：关联原提示词 / 分类 / 模型，模型是最后一个
+    const selects = wrapper.findAllComponents({ name: 'ElSelect' })
+    const select = selects[selects.length - 1]
+    expect(select).toBeDefined()
     // stub 组件对无值布尔属性接收为空字符串，只断言属性已传入即可
     expect('filterable' in select.props()).toBe(true)
     expect('allowCreate' in select.props()).toBe(true)
@@ -152,5 +170,76 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     // 表单其余字段正常加载
     expect(state.categories).toHaveLength(1)
     expect(state.platforms).toHaveLength(1)
+  })
+
+  it('5. 新增时加载可关联的已发布提示词，关联下拉为可搜索远程下拉', async () => {
+    const wrapper = mountPage()
+    await nextTick()
+    await flushPromises()
+    await nextTick()
+    const state = vm(wrapper)
+    expect(state.parentOptions).toEqual([{ id: 5, title: '原始提示词' }])
+    expect(mocks.portalApi.getParentOptions).toHaveBeenCalledWith({ keyword: '', excludeId: undefined })
+    const parentSelect = wrapper.findAllComponents({ name: 'ElSelect' })[0]
+    expect('remote' in parentSelect.props()).toBe(true)
+    expect('filterable' in parentSelect.props()).toBe(true)
+  })
+
+  it('6. 选择原提示词后提交，payload 携带 parentId', async () => {
+    const wrapper = mountPage()
+    await nextTick()
+    await flushPromises()
+    await nextTick()
+    const state = vm(wrapper)
+    state.form.title = '追问'
+    state.form.content = '追问正文'
+    state.form.categoryId = 1
+    state.form.modelName = 'MJ'
+    state.form.parentId = 5
+    state.form.platformGroups = [{ platformId: 2, images: [{ url: '/uploads/a.png', filePath: 'f1', sort: 0, isCover: true }] }]
+    await state.handleSubmit(false)
+    const payload = mocks.portalApi.createMine.mock.calls[0][0]
+    expect(payload.parentId).toBe(5)
+  })
+
+  it('7. 编辑时回显原关联提示词、排除自身，且原关联项不在列表中时补回', async () => {
+    stableRoute.params.id = '9'
+    mocks.portalApi.getParentOptions.mockResolvedValue({ data: [{ id: 6, title: '另一条已发布' }] })
+    mocks.portalApi.getMinePrompt.mockResolvedValue({
+      data: {
+        id: 9,
+        title: '追问投稿',
+        content: '正文',
+        categoryId: 1,
+        modelName: 'MJ',
+        parentId: 5,
+        parentTitle: '原始提示词',
+        type: 'single',
+        steps: [],
+        platformGroups: [],
+        images: [],
+      },
+    })
+    const wrapper = mountPage()
+    await nextTick()
+    await flushPromises()
+    await nextTick()
+    const state = vm(wrapper)
+    expect(state.form.parentId).toBe(5)
+    expect(mocks.portalApi.getParentOptions).toHaveBeenCalledWith({ keyword: '', excludeId: 9 })
+    // 后端列表未返回原关联项时补上，保证下拉可读
+    expect(state.parentOptions).toEqual(expect.arrayContaining([{ id: 5, title: '原始提示词' }]))
+  })
+
+  it('8. 关联选项接口失败时不影响表单其他字段加载', async () => {
+    mocks.portalApi.getParentOptions.mockRejectedValue(new Error('network'))
+    const wrapper = mountPage()
+    await nextTick()
+    await flushPromises()
+    await nextTick()
+    const state = vm(wrapper)
+    expect(state.parentOptions).toEqual([])
+    expect(state.loading).toBe(false)
+    expect(state.categories).toHaveLength(1)
   })
 })

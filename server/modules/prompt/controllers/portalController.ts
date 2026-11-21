@@ -29,6 +29,17 @@ export async function modelOptions(_req: any, res: any, next: any) {
   }
 }
 
+/** 投稿表单用：可关联的已发布提示词（远程搜索），编辑时排除自身防环 */
+export async function parentOptions(req: any, res: any, next: any) {
+  try {
+    const keyword = req.query.keyword ? String(req.query.keyword) : undefined
+    const excludeId = req.query.excludeId ? Number(req.query.excludeId) : undefined
+    res.json({ code: 0, data: await promptService.listParentOptions(keyword, excludeId) })
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function list(req: any, res: any, next: any) {
   try {
     res.json({ code: 0, data: await portalService.listPublishedPrompts(req.query, portalUserId(req) || undefined) })
