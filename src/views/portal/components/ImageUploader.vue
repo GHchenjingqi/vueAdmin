@@ -1,11 +1,23 @@
 <template>
   <div class="image-uploader">
-    <div class="image-uploader-bar">
-      <el-upload :show-file-list="false" accept="image/*" :multiple="max > 1" :http-request="handleUpload" :before-upload="beforeUpload">
-        <el-button :icon="UploadFilled">{{ t('portal.uploadImage') }}</el-button>
-      </el-upload>
-      <span class="image-uploader-tip">{{ t('portal.imageTip') }} · {{ modelValue.length }}/{{ max }}</span>
-    </div>
+    <el-upload
+      class="image-uploader-drag"
+      drag
+      :show-file-list="false"
+      accept="image/*"
+      :multiple="max > 1"
+      :http-request="handleUpload"
+      :before-upload="beforeUpload"
+      :disabled="modelValue.length >= max"
+    >
+      <div class="image-uploader-dropzone">
+        <el-icon class="image-uploader-icon"><UploadFilled /></el-icon>
+        <div class="image-uploader-drag-text">
+          <span class="image-uploader-drag-title">{{ t('portal.uploadImage') }}</span>
+          <span class="image-uploader-tip">{{ t('portal.imageTip') }} · {{ modelValue.length }}/{{ max }}</span>
+        </div>
+      </div>
+    </el-upload>
 
     <div v-if="modelValue.length" class="image-uploader-list">
       <div v-for="(image, index) in modelValue" :key="image.url" class="image-uploader-item">
@@ -92,11 +104,41 @@ const removeImage = (index: number): void => {
 </script>
 
 <style scoped>
-.image-uploader-bar {
+.image-uploader-drag {
+  display: block;
+  width: 100%;
+}
+.image-uploader-drag :deep(.el-upload),
+.image-uploader-drag :deep(.el-upload-dragger) {
+  width: 100%;
+}
+
+.image-uploader-dropzone {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  flex-wrap: wrap;
+  min-height: 64px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+}
+
+.image-uploader-icon {
+  font-size: 30px;
+  color: var(--brand);
+}
+
+.image-uploader-drag-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.image-uploader-drag-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 .image-uploader-tip {

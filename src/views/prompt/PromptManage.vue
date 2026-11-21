@@ -78,24 +78,24 @@
     >
       <el-row class="prompt-editor-layout">
         <el-col :span="12" class="prompt-editor-left">
-          <div class="prompt-parent">
-            <div class="prompt-parent-title">{{ t('prompt.parentPrompt') }}</div>
-            <el-select
-              v-model="form.parentId"
-              filterable
-              remote
-              clearable
-              :remote-method="searchParentOptions"
-              :loading="parentLoading"
-              :placeholder="t('prompt.parentPlaceholder')"
-              style="width: 100%"
-              @focus="searchParentOptions()"
-            >
-              <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
-            </el-select>
-            <div class="prompt-parent-tip">{{ t('prompt.parentTip') }}</div>
-          </div>
-          <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px" />
+          <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px">
+            <template #parentId="{ modelValue, updateValue }">
+              <el-select
+                :model-value="modelValue as number | string | null"
+                filterable
+                remote
+                clearable
+                :remote-method="searchParentOptions"
+                :loading="parentLoading"
+                :placeholder="t('prompt.parentPlaceholder')"
+                style="width: 100%"
+                @focus="searchParentOptions()"
+                @update:model-value="updateValue as (v: number | string | null) => void"
+              >
+                <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
+              </el-select>
+            </template>
+          </ProForm>
         </el-col>
         <el-col :span="12" class="prompt-editor-right">
           <div class="prompt-type">
@@ -268,6 +268,7 @@ const statCards = computed(() => [
 ])
 
 const formSchema = computed(() => [
+  { prop: 'parentId', label: t('prompt.parentPrompt'), slot: 'parentId', span: 24 },
   { prop: 'title', label: t('prompt.title'), type: 'input', required: true, span: 24 },
   {
     prop: 'categoryIds',
@@ -711,15 +712,6 @@ onMounted(() => {
 }
 .prompt-editor-right {
   padding-left: 20px;
-}
-.prompt-parent {
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  padding-bottom: 12px;
-}
-.prompt-parent-title {
-  font-weight: 600;
-  margin-bottom: 8px;
 }
 .prompt-parent-tip {
   margin-top: 4px;
