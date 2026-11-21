@@ -103,14 +103,26 @@
             </div>
             <div class="prompt-panel-body">
               <template v-if="chain.length > 1">
-                <div v-for="(node, index) in chain" :key="node.id" class="chain-node" :class="{ 'chain-node-current': node.id === detail.id }">
+                <component
+                  :is="node.id === detail.id ? 'div' : 'router-link'"
+                  v-for="(node, index) in chain"
+                  :key="node.id"
+                  :to="node.id === detail.id ? undefined : `/portal/prompts/${node.id}`"
+                  class="chain-node"
+                  :class="{ 'chain-node-current': node.id === detail.id, 'chain-node-link': node.id !== detail.id }"
+                >
                   <div class="chain-node-head">
                     <span class="chain-node-index">{{ index + 1 }}</span>
                     <span class="chain-node-title">{{ node.title }}</span>
                     <span v-if="node.id === detail.id" class="chain-node-current-tag">{{ t('portal.currentStep') }}</span>
+                    <span v-else class="chain-node-upstream-tag">{{ t('portal.upstreamNode') }}</span>
                   </div>
                   <pre class="detail-content chain-content">{{ node.content }}</pre>
-                </div>
+                  <span v-if="node.id !== detail.id" class="chain-node-goto">
+                    {{ t('prompt.viewDetail') }}
+                    <el-icon><ArrowRight /></el-icon>
+                  </span>
+                </component>
               </template>
               <pre v-else class="detail-content">{{ detail.content }}</pre>
             </div>
@@ -573,6 +585,19 @@ onMounted(() => void load())
   border-color: var(--brand);
 }
 
+.chain-node-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.chain-node-link:hover {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand-soft);
+}
+
 .chain-node-head {
   display: flex;
   align-items: center;
@@ -601,6 +626,27 @@ onMounted(() => void load())
 .chain-node-current-tag {
   margin-left: auto;
   font-size: 11px;
+  color: var(--brand);
+}
+
+.chain-node-upstream-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 7px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--ink-3);
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.chain-node-goto {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: var(--gap-2);
+  font-size: 12px;
   color: var(--brand);
 }
 
