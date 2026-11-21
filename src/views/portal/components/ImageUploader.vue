@@ -30,7 +30,15 @@ import type { PromptImageItem } from '@/api/prompt'
 import { useI18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/error'
 
-const props = withDefaults(defineProps<{ modelValue: PromptImageItem[]; max?: number }>(), { max: 20 })
+const props = withDefaults(
+  defineProps<{
+    modelValue: PromptImageItem[]
+    max?: number
+    /** 自定义上传通道：后台等场景可传入自己的专用上传接口，默认走投稿上传 */
+    uploader?: (file: File) => Promise<{ data: { id: string; url: string } }>
+  }>(),
+  { max: 20 },
+)
 const emit = defineEmits<{ (e: 'update:modelValue', value: PromptImageItem[]): void }>()
 
 const { t } = useI18n()
@@ -58,7 +66,8 @@ const handleUpload = async (options: UploadRequestOptions): Promise<void> => {
     return
   }
   try {
-    const res = await portalApi.uploadImage(options.file)
+    const upload = props.uploader ?? portalApi.uploadImage
+    const res = await upload(options.file)
     const next = [...props.modelValue]
     next.push({ url: res.data.url, filePath: res.data.id, sort: next.length, isCover: next.length === 0 })
     emit('update:modelValue', next)

@@ -77,6 +77,14 @@
       destroy-on-close
     >
       <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="90px" />
+      <div class="prompt-type">
+        <div class="prompt-images-title">{{ t('portal.contentType') }}</div>
+        <el-radio-group v-model="form.type" @change="handleTypeChange">
+          <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
+          <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
+        </el-radio-group>
+        <div class="prompt-parent-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</div>
+      </div>
       <div class="prompt-parent">
         <div class="prompt-parent-title">{{ t('prompt.parentPrompt') }}</div>
         <el-select
@@ -96,19 +104,22 @@
       </div>
       <div class="prompt-images">
         <div class="prompt-images-title">{{ t('prompt.images') }}</div>
-        <el-upload :show-file-list="false" multiple accept="image/*" :http-request="handleUpload" :before-upload="beforeUpload">
-          <el-button :icon="UploadFilled">{{ t('prompt.uploadImage') }}</el-button>
-        </el-upload>
-        <div class="prompt-image-list">
-          <div v-for="(image, index) in form.images" :key="image.url" class="prompt-image-item">
-            <el-image :src="image.url" fit="cover" class="prompt-image-thumb" :preview-src-list="formImageUrls" :initial-index="index" />
-            <div class="prompt-image-actions">
-              <el-tag v-if="image.isCover" type="success" size="small">{{ t('prompt.cover') }}</el-tag>
-              <el-button link size="small" @click="setCover(index)">{{ t('prompt.setCover') }}</el-button>
-              <el-button link type="danger" size="small" @click="removeImage(index)">{{ t('common.delete') }}</el-button>
-            </div>
-          </div>
-        </div>
+        <SequenceStepEditor
+          v-if="form.type === 'sequence'"
+          :steps="form.steps"
+          :character-anchor="form.characterAnchor"
+          :platforms="platforms"
+          :uploader="promptApi.uploadImage"
+          @update:steps="form.steps = $event"
+          @update:character-anchor="form.characterAnchor = $event"
+        />
+        <PlatformImageGroups
+          v-else
+          :model-value="form.platformGroups"
+          :platforms="platforms"
+          :uploader="promptApi.uploadImage"
+          @update:model-value="form.platformGroups = $event"
+        />
       </div>
       <template #footer>
         <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
@@ -142,13 +153,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, type UploadRequestOptions } from 'element-plus'
-import { Plus, Edit, Delete, View, UploadFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Edit, Delete, View } from '@element-plus/icons-vue'
 import { promptApi } from '@/api'
-import type { PromptCategory, PromptImageItem, PromptItem, PromptPayload, PromptStats } from '@/api/prompt'
+import type { PromptCategory, PromptImageGroupInput, PromptItem, PromptPayload, PromptPlatform, PromptStats, PromptStepInput, PromptType } from '@/api/prompt'
 import { getErrorMessage } from '@/utils/error'
 import ProTable from '@/components/ProTable/index.vue'
 import ProForm from '@/components/ProForm/index.vue'
+import PlatformImageGroups from '@/views/portal/components/PlatformImageGroups.vue'
+import SequenceStepEditor from '@/views/portal/components/SequenceStepEditor.vue'
 import { useI18n } from '@/i18n'
 
 const { t, locale } = useI18n()
@@ -201,7 +214,10 @@ interface PromptForm {
   categoryIds: Array<number | string>
   parentId: number | string | null
   modelName: string
-  images: PromptImageItem[]
+  type: PromptType
+  characterAnchor: string
+  steps: PromptStepInput[]
+  platformGroups: PromptImageGroupInput[]
 }
 
 const rows = ref<PromptItem[]>([])
@@ -210,6 +226,7 @@ const pagination = reactive({ pageNum: 1, pageSize: 10, total: 0 })
 const searchParams = reactive<Record<string, unknown>>({ keyword: '', status: '', categoryId: '' })
 const categoryOptions = ref<PromptCategory[]>([])
 const modelOptions = ref<string[]>([])
+const platforms = ref<PromptPlatform[]>([])
 const parentOptions = ref<Array<{ id: number; title: string }>>([])
 const parentLoading = ref(false)
 const stats = ref<PromptStats>({ total: 0, published: 0, pending: 0, offline: 0, categories: 0, favorites: 0 })
@@ -221,10 +238,20 @@ const currentId = ref<number | null>(null)
 const detail = ref<PromptItem | null>(null)
 const formRef = ref<InstanceType<typeof ProForm> | null>(null)
 const tableRef = ref<InstanceType<typeof ProTable> | null>(null)
-const form = reactive<PromptForm>({ title: '', content: '', categoryId: '', categoryIds: [], parentId: null, modelName: '', images: [] })
+const form = reactive<PromptForm>({
+  title: '',
+  content: '',
+  categoryId: '',
+  categoryIds: [],
+  parentId: null,
+  modelName: '',
+  type: 'single',
+  characterAnchor: '',
+  steps: [],
+  platformGroups: [],
+})
 const selectedRows = ref<PromptItem[]>([])
 
-const formImageUrls = computed(() => form.images.map((image) => image.url))
 const detailImageUrls = computed(() => (detail.value?.images ?? []).map((image) => image.url))
 
 const statCards = computed(() => [
@@ -278,7 +305,11 @@ const fetchRows = async (): Promise<void> => {
 }
 
 const fetchOptions = async (): Promise<void> => {
-  const [categories, models] = await Promise.allSettled([promptApi.getCategoryOptions(), promptApi.getModelOptions()])
+  const [categories, models, platformList] = await Promise.allSettled([
+    promptApi.getCategoryOptions(),
+    promptApi.getModelOptions(),
+    promptApi.getPlatformOptions(),
+  ])
   if (categories.status === 'fulfilled') {
     categoryOptions.value = categories.value.data
   } else {
@@ -286,6 +317,8 @@ const fetchOptions = async (): Promise<void> => {
   }
   // 模型选项只是便利功能，接口异常时仍可手动录入，不阻断分类加载
   if (models.status === 'fulfilled') modelOptions.value = models.value.data ?? []
+  // 平台列表用于效果图按平台分组；加载失败时分组退化为默认平台
+  if (platformList.status === 'fulfilled') platforms.value = platformList.value.data ?? []
 }
 
 const searchParentOptions = async (keyword = ''): Promise<void> => {
@@ -325,8 +358,75 @@ const resetForm = (): void => {
   form.categoryIds = []
   form.parentId = null
   form.modelName = ''
-  form.images = []
+  form.type = 'single'
+  form.characterAnchor = ''
+  form.steps = []
+  form.platformGroups = []
 }
+
+/** 默认平台组：取第一个可用平台，异常时退化为 1（通用） */
+const defaultGroup = (): PromptImageGroupInput => ({ platformId: platforms.value[0]?.id ?? 1, images: [] })
+
+const defaultStep = (): PromptStepInput => ({
+  name: '',
+  actionPrompt: '',
+  camera: null,
+  seconds: 5,
+  transition: null,
+  platformGroups: [defaultGroup()],
+})
+
+/** 切换内容形态时保证对应编辑器至少有一个可编辑的组/步骤 */
+const ensureTypeDefaults = (): void => {
+  if (form.type === 'single') {
+    if (!form.platformGroups.length) form.platformGroups = [defaultGroup()]
+  } else if (!form.steps.length) {
+    form.steps = [defaultStep()]
+  }
+}
+
+const handleTypeChange = (): void => {
+  ensureTypeDefaults()
+}
+
+/** 服务端返回图片 → 表单平台组结构；旧数据无平台分组时归入第一张图所属平台 */
+const toFormGroups = (loaded: Pick<PromptItem, 'platformGroups' | 'images'>): PromptImageGroupInput[] => {
+  const groups = loaded.platformGroups?.length
+    ? loaded.platformGroups
+    : loaded.images?.length
+      ? [{ platformId: loaded.images[0].platformId || platforms.value[0]?.id || 1, images: loaded.images }]
+      : []
+  return groups.map((group) => ({
+    platformId: group.platformId,
+    images: group.images.map((image) => ({
+      url: image.url,
+      filePath: image.filePath ?? null,
+      sort: image.sort,
+      isCover: Boolean(image.isCover),
+    })),
+  }))
+}
+
+/** 服务端返回步骤 → 表单步骤结构 */
+const toFormSteps = (loaded: PromptItem): PromptStepInput[] =>
+  (loaded.steps ?? []).map((step) => ({
+    id: step.id,
+    stepOrder: step.stepOrder,
+    name: step.name,
+    actionPrompt: step.actionPrompt,
+    camera: step.camera,
+    seconds: step.seconds,
+    transition: step.transition,
+    platformGroups: (step.platformGroups ?? []).map((group) => ({
+      platformId: group.platformId,
+      images: group.images.map((image) => ({
+        url: image.url,
+        filePath: image.filePath ?? null,
+        sort: image.sort,
+        isCover: Boolean(image.isCover),
+      })),
+    })),
+  }))
 
 const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
   if (!categoryOptions.value.length) await fetchOptions()
@@ -346,12 +446,15 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
       form.parentId = loaded.parentId ?? null
       parentTitle = loaded.parentTitle ?? ''
       form.modelName = loaded.modelName
-      form.images = (loaded.images ?? []).map((image) => ({
-        url: image.url,
-        filePath: image.filePath ?? null,
-        sort: image.sort,
-        isCover: Boolean(image.isCover),
-      }))
+      form.type = loaded.type === 'sequence' ? 'sequence' : 'single'
+      form.characterAnchor = loaded.characterAnchor || ''
+      if (form.type === 'sequence') {
+        form.steps = toFormSteps(loaded)
+        form.platformGroups = []
+      } else {
+        form.platformGroups = toFormGroups(loaded)
+        form.steps = []
+      }
     } catch (err: unknown) {
       ElMessage.error(getErrorMessage(err))
       return
@@ -359,6 +462,7 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
   } else {
     isEdit.value = false
     currentId.value = null
+    ensureTypeDefaults()
   }
   await searchParentOptions()
   // 编辑时若当前关联项不在默认列表里（如标题变化），补上以保证回显可读
@@ -368,57 +472,50 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
   dialogVisible.value = true
 }
 
-/** 与后端 IMAGES_PER_GROUP 保持一致，避免批量上传后提交被服务端拒绝 */
-const MAX_IMAGES = 20
-/** 正在上传中的文件数：批量选择时 form.images 尚未 push，需要计入上限 */
-const pendingUploads = ref(0)
+const submitImagesTotal = (): number => {
+  if (form.type === 'sequence') {
+    return form.steps.reduce((sum, step) => sum + step.platformGroups.reduce((sub, group) => sub + group.images.length, 0), 0)
+  }
+  return form.platformGroups.reduce((sum, group) => sum + group.images.length, 0)
+}
 
-const beforeUpload = (file: File): boolean => {
-  if (!file.type.startsWith('image/')) {
-    ElMessage.error(t('prompt.imageTypeInvalid'))
+/** 提交前校验：规则与前台投稿页 PublishPrompt 保持一致 */
+const validateForm = (action: 'publish' | 'draft'): boolean => {
+  if (form.type === 'sequence') {
+    if (form.steps.length === 0) {
+      ElMessage.warning(t('portal.stepRequired'))
+      return false
+    }
+    for (const [index, step] of form.steps.entries()) {
+      if (!step.name.trim() || !step.actionPrompt.trim()) {
+        ElMessage.warning(t('portal.stepFieldRequired').replace('{n}', String(index + 1)))
+        return false
+      }
+      if (step.platformGroups.some((group) => group.images.length > 1)) {
+        ElMessage.warning(t('portal.stepImageLimit'))
+        return false
+      }
+      if (new Set(step.platformGroups.map((group) => group.platformId)).size !== step.platformGroups.length) {
+        ElMessage.warning(t('portal.platformDuplicate'))
+        return false
+      }
+    }
+  } else {
+    if (new Set(form.platformGroups.map((group) => group.platformId)).size !== form.platformGroups.length) {
+      ElMessage.warning(t('portal.platformDuplicate'))
+      return false
+    }
+  }
+  if (action === 'publish' && submitImagesTotal() === 0) {
+    ElMessage.warning(t('portal.imageRequired'))
     return false
   }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.error(t('prompt.imageSizeExceeded'))
-    return false
-  }
-  if (form.images.length + pendingUploads.value >= MAX_IMAGES) {
-    ElMessage.warning(t('prompt.imageLimitReached', { count: MAX_IMAGES }))
-    return false
-  }
-  pendingUploads.value += 1
   return true
 }
 
-const handleUpload = async (options: UploadRequestOptions): Promise<void> => {
-  try {
-    const res = await promptApi.uploadImage(options.file)
-    form.images.push({ url: res.data.url, filePath: res.data.id, sort: form.images.length, isCover: form.images.length === 0 })
-  } catch (err: unknown) {
-    ElMessage.error(getErrorMessage(err))
-  } finally {
-    pendingUploads.value = Math.max(0, pendingUploads.value - 1)
-  }
-}
-
-const setCover = (index: number): void => {
-  form.images.forEach((image, i) => {
-    image.isCover = i === index
-  })
-}
-
-const removeImage = (index: number): void => {
-  const removedWasCover = Boolean(form.images[index]?.isCover)
-  form.images.splice(index, 1)
-  if (removedWasCover && form.images.length) form.images[0].isCover = true
-}
-
 const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
-  const coverIndex = Math.max(
-    0,
-    form.images.findIndex((image) => Boolean(image.isCover)),
-  )
   const categoryIds = form.categoryIds.map(Number)
+  const isSequence = form.type === 'sequence'
   return {
     title: form.title,
     content: form.content,
@@ -426,18 +523,51 @@ const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
     categoryIds,
     parentId: form.parentId === null || form.parentId === '' ? null : Number(form.parentId),
     modelName: form.modelName,
+    type: form.type,
+    characterAnchor: isSequence ? form.characterAnchor.trim() || null : null,
+    steps: isSequence
+      ? form.steps.map((step, index) => ({
+          ...(step.id ? { id: step.id } : {}),
+          stepOrder: index + 1,
+          name: step.name.trim(),
+          actionPrompt: step.actionPrompt.trim(),
+          camera: step.camera?.trim() || null,
+          seconds: step.seconds,
+          transition: step.transition?.trim() || null,
+          platformGroups: step.platformGroups
+            .filter((group) => group.images.length > 0)
+            .map((group) => ({
+              platformId: Number(group.platformId),
+              images: group.images.map((image) => ({
+                url: image.url,
+                filePath: image.filePath ?? null,
+                sort: image.sort,
+                isCover: Boolean(image.isCover),
+              })),
+            })),
+        }))
+      : undefined,
     action,
-    images: form.images.map((image, index) => ({ url: image.url, filePath: image.filePath ?? null, sort: index, isCover: index === coverIndex })),
+    platformGroups: isSequence
+      ? undefined
+      : form.platformGroups
+          .filter((group) => group.images.length > 0)
+          .map((group) => ({
+            platformId: Number(group.platformId),
+            images: group.images.map((image, index) => ({
+              url: image.url,
+              filePath: image.filePath ?? null,
+              sort: index,
+              isCover: Boolean(image.isCover),
+            })),
+          })),
   }
 }
 
 const handleSubmit = async (action: 'publish' | 'draft'): Promise<void> => {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
-  if (action === 'publish' && form.images.length === 0) {
-    ElMessage.warning(t('prompt.imageRequired'))
-    return
-  }
+  if (!validateForm(action)) return
   submitting.value = true
   try {
     const payload = buildPayload(action)
@@ -585,30 +715,14 @@ onMounted(() => {
   border-top: 1px solid var(--el-border-color-lighter);
   padding-top: 12px;
 }
+.prompt-type {
+  margin-top: 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 12px;
+}
 .prompt-images-title {
   font-weight: 600;
   margin-bottom: 8px;
-}
-.prompt-image-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 12px;
-}
-.prompt-image-item {
-  width: 120px;
-}
-.prompt-image-thumb {
-  width: 120px;
-  height: 90px;
-  border-radius: 4px;
-}
-.prompt-image-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  margin-top: 4px;
 }
 .prompt-detail-title {
   margin: 0 0 4px;

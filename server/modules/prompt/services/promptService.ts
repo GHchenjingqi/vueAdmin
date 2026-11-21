@@ -498,7 +498,11 @@ export async function updatePrompt(id: number, data: PromptInput) {
       { transaction },
     )
     if (data.type === 'sequence') await replaceSteps(id, data, transaction)
-    else if (data.platformGroups !== undefined || data.images !== undefined) await replaceImages(id, data, transaction)
+    else {
+      // 套组改回单条时清理旧步骤记录，避免残留孤儿数据
+      await PromptStep.destroy({ where: { promptId: id }, transaction })
+      if (data.platformGroups !== undefined || data.images !== undefined) await replaceImages(id, data, transaction)
+    }
   })
   return getPromptById(id)
 }

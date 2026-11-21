@@ -75,7 +75,13 @@
 
       <div class="step-images">
         <label class="field-label">{{ t('portal.stepImages') }}</label>
-        <PlatformImageGroups :model-value="step.platformGroups" :platforms="platforms" :max="1" @update:model-value="update(index, 'platformGroups', $event)" />
+        <PlatformImageGroups
+          :model-value="step.platformGroups"
+          :platforms="platforms"
+          :max="1"
+          :uploader="uploader"
+          @update:model-value="update(index, 'platformGroups', $event)"
+        />
       </div>
     </div>
 
@@ -89,7 +95,13 @@ import type { PromptPlatform, PromptStepInput } from '@/api/prompt'
 import PlatformImageGroups from './PlatformImageGroups.vue'
 import { useI18n } from '@/i18n'
 
-const props = defineProps<{ steps: PromptStepInput[]; characterAnchor: string; platforms: PromptPlatform[] }>()
+const props = defineProps<{
+  steps: PromptStepInput[]
+  characterAnchor: string
+  platforms: PromptPlatform[]
+  /** 自定义上传通道，透传给 PlatformImageGroups */
+  uploader?: (file: File) => Promise<{ data: { id: string; url: string } }>
+}>()
 const emit = defineEmits<{
   (e: 'update:steps', value: PromptStepInput[]): void
   (e: 'update:characterAnchor', value: string): void
