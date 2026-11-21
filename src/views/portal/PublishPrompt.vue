@@ -7,64 +7,75 @@
 
     <div v-loading="loading" class="publish-card">
       <el-form label-position="top" @submit.prevent>
-        <el-form-item :label="t('portal.contentType')" required>
-          <el-radio-group v-model="form.type">
-            <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
-            <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
-          </el-radio-group>
-          <p class="type-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</p>
-        </el-form-item>
+        <div class="publish-layout">
+          <div class="publish-left">
+            <el-form-item :label="t('portal.contentType')" required>
+              <el-radio-group v-model="form.type">
+                <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
+                <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
+              </el-radio-group>
+              <p class="type-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</p>
+            </el-form-item>
 
-        <el-form-item :label="t('prompt.parentPrompt')">
-          <el-select
-            v-model="form.parentId"
-            filterable
-            remote
-            clearable
-            :remote-method="searchParentOptions"
-            :loading="parentLoading"
-            :placeholder="t('prompt.parentPlaceholder')"
-            style="width: 100%"
-            @focus="searchParentOptions()"
-          >
-            <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
-          </el-select>
-          <p class="type-tip">{{ t('prompt.parentTip') }}</p>
-        </el-form-item>
+            <el-form-item :label="t('prompt.parentPrompt')">
+              <el-select
+                v-model="form.parentId"
+                filterable
+                remote
+                clearable
+                :remote-method="searchParentOptions"
+                :loading="parentLoading"
+                :placeholder="t('prompt.parentPlaceholder')"
+                style="width: 100%"
+                @focus="searchParentOptions()"
+              >
+                <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
+              </el-select>
+              <p class="type-tip">{{ t('prompt.parentTip') }}</p>
+            </el-form-item>
 
-        <el-form-item :label="t('portal.title')" required>
-          <el-input v-model="form.title" maxlength="200" show-word-limit :placeholder="t('portal.titlePlaceholder')" />
-        </el-form-item>
+            <el-form-item :label="t('portal.title')" required>
+              <el-input v-model="form.title" maxlength="200" show-word-limit :placeholder="t('portal.titlePlaceholder')" />
+            </el-form-item>
 
-        <div class="publish-row">
-          <el-form-item :label="t('portal.category')" required>
-            <el-select v-model="form.categoryId" :placeholder="t('portal.categoryPlaceholder')" style="width: 100%">
-              <el-option v-for="category in categories" :key="category.id" :label="category.name" :value="category.id" />
-            </el-select>
-          </el-form-item>
-          <el-form-item :label="t('portal.model')" required>
-            <el-select v-model="form.modelName" filterable allow-create default-first-option :placeholder="t('portal.modelPlaceholder')" style="width: 100%">
-              <el-option v-for="name in modelOptions" :key="name" :label="name" :value="name" />
-            </el-select>
-          </el-form-item>
+            <div class="publish-row">
+              <el-form-item :label="t('portal.category')" required>
+                <el-select v-model="form.categoryId" :placeholder="t('portal.categoryPlaceholder')" style="width: 100%">
+                  <el-option v-for="category in categories" :key="category.id" :label="category.name" :value="category.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="t('portal.model')" required>
+                <el-select
+                  v-model="form.modelName"
+                  filterable
+                  allow-create
+                  default-first-option
+                  :placeholder="t('portal.modelPlaceholder')"
+                  style="width: 100%"
+                >
+                  <el-option v-for="name in modelOptions" :key="name" :label="name" :value="name" />
+                </el-select>
+              </el-form-item>
+            </div>
+
+            <el-form-item :label="t('portal.content')" required>
+              <el-input v-model="form.content" type="textarea" :rows="8" :placeholder="t('portal.contentPlaceholder')" />
+            </el-form-item>
+          </div>
+
+          <div class="publish-right">
+            <div class="publish-images-title">{{ t('portal.images') }}</div>
+            <SequenceStepEditor
+              v-if="form.type === 'sequence'"
+              :steps="form.steps"
+              :character-anchor="form.characterAnchor"
+              :platforms="platforms"
+              @update:steps="form.steps = $event"
+              @update:character-anchor="form.characterAnchor = $event"
+            />
+            <PlatformImageGroups v-else v-model="form.platformGroups" :platforms="platforms" />
+          </div>
         </div>
-
-        <el-form-item :label="t('portal.content')" required>
-          <el-input v-model="form.content" type="textarea" :rows="9" :placeholder="t('portal.contentPlaceholder')" />
-        </el-form-item>
-
-        <template v-if="form.type === 'sequence'">
-          <SequenceStepEditor
-            :steps="form.steps"
-            :character-anchor="form.characterAnchor"
-            :platforms="platforms"
-            @update:steps="form.steps = $event"
-            @update:character-anchor="form.characterAnchor = $event"
-          />
-        </template>
-        <el-form-item v-else :label="t('portal.images')" required>
-          <PlatformImageGroups v-model="form.platformGroups" :platforms="platforms" />
-        </el-form-item>
 
         <div class="publish-actions">
           <el-button @click="goMine">{{ t('common.cancel') }}</el-button>
@@ -350,7 +361,7 @@ onMounted(() => void load())
 
 <style scoped>
 .publish-page {
-  max-width: 880px;
+  max-width: 1180px;
   margin: 0 auto;
 }
 
@@ -383,6 +394,23 @@ onMounted(() => void load())
   color: var(--ink-3);
 }
 
+.publish-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.publish-left {
+  min-width: 0;
+}
+.publish-right {
+  min-width: 0;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+.publish-images-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
 .publish-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -396,6 +424,18 @@ onMounted(() => void load())
   margin-top: 12px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
+}
+
+@media (max-width: 980px) {
+  .publish-layout {
+    grid-template-columns: 1fr;
+  }
+  .publish-right {
+    padding-left: 0;
+    padding-top: 18px;
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
 }
 
 @media (max-width: 640px) {

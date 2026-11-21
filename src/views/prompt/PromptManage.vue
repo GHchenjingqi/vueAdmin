@@ -71,56 +71,62 @@
     <el-dialog
       v-model="dialogVisible"
       :title="isEdit ? t('prompt.editPrompt') : t('prompt.addPrompt')"
-      width="760px"
+      width="1180px"
       top="5vh"
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="90px" />
-      <div class="prompt-type">
-        <div class="prompt-images-title">{{ t('portal.contentType') }}</div>
-        <el-radio-group v-model="form.type" @change="handleTypeChange">
-          <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
-          <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
-        </el-radio-group>
-        <div class="prompt-parent-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</div>
-      </div>
-      <div class="prompt-parent">
-        <div class="prompt-parent-title">{{ t('prompt.parentPrompt') }}</div>
-        <el-select
-          v-model="form.parentId"
-          filterable
-          remote
-          clearable
-          :remote-method="searchParentOptions"
-          :loading="parentLoading"
-          :placeholder="t('prompt.parentPlaceholder')"
-          style="width: 100%"
-          @focus="searchParentOptions()"
-        >
-          <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
-        </el-select>
-        <div class="prompt-parent-tip">{{ t('prompt.parentTip') }}</div>
-      </div>
-      <div class="prompt-images">
-        <div class="prompt-images-title">{{ t('prompt.images') }}</div>
-        <SequenceStepEditor
-          v-if="form.type === 'sequence'"
-          :steps="form.steps"
-          :character-anchor="form.characterAnchor"
-          :platforms="platforms"
-          :uploader="promptApi.uploadImage"
-          @update:steps="form.steps = $event"
-          @update:character-anchor="form.characterAnchor = $event"
-        />
-        <PlatformImageGroups
-          v-else
-          :model-value="form.platformGroups"
-          :platforms="platforms"
-          :uploader="promptApi.uploadImage"
-          @update:model-value="form.platformGroups = $event"
-        />
-      </div>
+      <el-row class="prompt-editor-layout">
+        <el-col :span="12" class="prompt-editor-left">
+          <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px" />
+          <div class="prompt-type">
+            <div class="prompt-images-title">{{ t('portal.contentType') }}</div>
+            <el-radio-group v-model="form.type" @change="handleTypeChange">
+              <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
+              <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
+            </el-radio-group>
+            <div class="prompt-parent-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</div>
+          </div>
+          <div class="prompt-parent">
+            <div class="prompt-parent-title">{{ t('prompt.parentPrompt') }}</div>
+            <el-select
+              v-model="form.parentId"
+              filterable
+              remote
+              clearable
+              :remote-method="searchParentOptions"
+              :loading="parentLoading"
+              :placeholder="t('prompt.parentPlaceholder')"
+              style="width: 100%"
+              @focus="searchParentOptions()"
+            >
+              <el-option v-for="item in parentOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id" />
+            </el-select>
+            <div class="prompt-parent-tip">{{ t('prompt.parentTip') }}</div>
+          </div>
+        </el-col>
+        <el-col :span="12" class="prompt-editor-right">
+          <div class="prompt-images">
+            <div class="prompt-images-title">{{ t('prompt.images') }}</div>
+            <SequenceStepEditor
+              v-if="form.type === 'sequence'"
+              :steps="form.steps"
+              :character-anchor="form.characterAnchor"
+              :platforms="platforms"
+              :uploader="promptApi.uploadImage"
+              @update:steps="form.steps = $event"
+              @update:character-anchor="form.characterAnchor = $event"
+            />
+            <PlatformImageGroups
+              v-else
+              :model-value="form.platformGroups"
+              :platforms="platforms"
+              :uploader="promptApi.uploadImage"
+              @update:model-value="form.platformGroups = $event"
+            />
+          </div>
+        </el-col>
+      </el-row>
       <template #footer>
         <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
         <el-button :loading="submitting" @click="handleSubmit('draft')">{{ t('prompt.saveDraft') }}</el-button>
@@ -264,15 +270,6 @@ const statCards = computed(() => [
 const formSchema = computed(() => [
   { prop: 'title', label: t('prompt.title'), type: 'input', required: true },
   {
-    prop: 'categoryIds',
-    label: t('prompt.category'),
-    type: 'select',
-    required: true,
-    multiple: true,
-    options: () => categoryOptions.value.map((item) => ({ label: item.name, value: item.id })),
-    props: { 'multiple-limit': 10 },
-  },
-  {
     prop: 'modelName',
     label: t('prompt.model'),
     type: 'select',
@@ -282,7 +279,17 @@ const formSchema = computed(() => [
     options: () => modelOptions.value.map((name) => ({ label: name, value: name })),
     props: { 'allow-create': true, 'default-first-option': true },
   },
-  { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, props: { rows: 5 } },
+  {
+    prop: 'categoryIds',
+    label: t('prompt.category'),
+    type: 'select',
+    required: true,
+    multiple: true,
+    span: 24,
+    options: () => categoryOptions.value.map((item) => ({ label: item.name, value: item.id })),
+    props: { 'multiple-limit': 10 },
+  },
+  { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, span: 24, props: { rows: 8, autosize: false } },
 ])
 
 const fetchRows = async (): Promise<void> => {
@@ -696,6 +703,16 @@ onMounted(() => {
   height: 40px;
   border-radius: 4px;
 }
+.prompt-editor-layout {
+  align-items: stretch;
+}
+.prompt-editor-left {
+  padding-right: 20px;
+  border-right: 1px solid var(--el-border-color-lighter);
+}
+.prompt-editor-right {
+  padding-left: 20px;
+}
 .prompt-parent {
   margin-top: 16px;
   border-top: 1px solid var(--el-border-color-lighter);
@@ -711,9 +728,9 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 .prompt-images {
-  margin-top: 16px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  padding-top: 12px;
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
 }
 .prompt-type {
   margin-top: 16px;

@@ -31,7 +31,7 @@ import PromptManage from '@/views/prompt/PromptManage.vue'
 
 const stubComponent = (extra = '', name?: string) => ({
   name,
-  props: ['modelValue', 'platforms', 'max', 'uploader', 'steps', 'characterAnchor'],
+  props: ['modelValue', 'platforms', 'max', 'uploader', 'steps', 'characterAnchor', 'span', 'gutter', 'xs', 'sm', 'md', 'lg'],
   template: `<div class="stub" ${extra}><slot /><slot name="header-buttons" /><slot name="footer" /></div>`,
 })
 
