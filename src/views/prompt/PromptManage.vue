@@ -78,7 +78,6 @@
     >
       <el-row class="prompt-editor-layout">
         <el-col :span="12" class="prompt-editor-left">
-          <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px" />
           <div class="prompt-parent">
             <div class="prompt-parent-title">{{ t('prompt.parentPrompt') }}</div>
             <el-select
@@ -96,6 +95,7 @@
             </el-select>
             <div class="prompt-parent-tip">{{ t('prompt.parentTip') }}</div>
           </div>
+          <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px" />
         </el-col>
         <el-col :span="12" class="prompt-editor-right">
           <div class="prompt-type">
@@ -714,9 +714,9 @@ onMounted(() => {
   padding-left: 20px;
 }
 .prompt-parent {
-  margin-top: 16px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  padding-top: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding-bottom: 12px;
 }
 .prompt-parent-title {
   font-weight: 600;

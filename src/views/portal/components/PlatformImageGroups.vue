@@ -19,8 +19,6 @@
       </div>
       <ImageUploader :model-value="group.images" :max="max" :uploader="uploader" @update:model-value="updateImages(index, $event)" />
     </div>
-
-    <p class="platform-tip">{{ t('portal.platformTip') }}</p>
   </div>
 </template>
 
@@ -129,12 +127,5 @@ const addGroup = () => {
 }
 .add-group {
   flex-shrink: 0;
-}
-
-.platform-tip {
-  margin: 10px 0 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink-3);
 }
 </style>
