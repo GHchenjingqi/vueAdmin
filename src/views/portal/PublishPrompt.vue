@@ -63,7 +63,6 @@
               </el-radio-group>
               <p class="type-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</p>
             </el-form-item>
-            <div class="publish-images-title">{{ t('portal.images') }}</div>
             <SequenceStepEditor
               v-if="form.type === 'sequence'"
               :steps="form.steps"
@@ -72,7 +71,7 @@
               @update:steps="form.steps = $event"
               @update:character-anchor="form.characterAnchor = $event"
             />
-            <PlatformImageGroups v-else v-model="form.platformGroups" :platforms="platforms" />
+            <PlatformImageGroups v-else v-model="form.platformGroups" :platforms="platforms" :title="t('portal.images')" />
           </div>
         </div>
 

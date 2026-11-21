@@ -1,5 +1,9 @@
 <template>
   <div class="platform-groups">
+    <div class="groups-head">
+      <div class="groups-title">{{ title }}</div>
+      <el-button class="add-group" link type="primary" size="small" :disabled="!hasAvailable" @click="addGroup">+ {{ t('portal.addPlatformGroup') }}</el-button>
+    </div>
     <div v-for="(group, index) in modelValue" :key="index" class="platform-group">
       <div class="group-head">
         <span class="group-index">{{ String(index + 1).padStart(2, '0') }}</span>
@@ -16,7 +20,6 @@
       <ImageUploader :model-value="group.images" :max="max" :uploader="uploader" @update:model-value="updateImages(index, $event)" />
     </div>
 
-    <el-button class="add-group" :disabled="!hasAvailable" @click="addGroup">+ {{ t('portal.addPlatformGroup') }}</el-button>
     <p class="platform-tip">{{ t('portal.platformTip') }}</p>
   </div>
 </template>
@@ -32,10 +35,12 @@ const props = withDefaults(
     modelValue: PromptImageGroupInput[]
     platforms: PromptPlatform[]
     max?: number
+    /** 分组区标题，单条模式传「效果图」，步骤套组不传则不显示 */
+    title?: string
     /** 自定义上传通道，透传给 ImageUploader */
     uploader?: (file: File) => Promise<{ data: { id: string; url: string } }>
   }>(),
-  { max: 20 },
+  { max: 20, title: '' },
 )
 const emit = defineEmits<{ (e: 'update:modelValue', value: PromptImageGroupInput[]): void }>()
 const { t } = useI18n()
@@ -109,11 +114,21 @@ const addGroup = () => {
   max-width: 260px;
 }
 
+.groups-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.groups-title {
+  font-weight: 600;
+}
+.groups-title:empty {
+  display: none;
+}
 .add-group {
-  width: 100%;
-  border-style: dashed;
-  color: var(--brand);
-  border-color: var(--brand);
+  flex-shrink: 0;
 }
 
 .platform-tip {

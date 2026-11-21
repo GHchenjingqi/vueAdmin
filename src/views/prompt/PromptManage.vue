@@ -107,7 +107,6 @@
             <div class="prompt-parent-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</div>
           </div>
           <div class="prompt-images">
-            <div class="prompt-images-title">{{ t('prompt.images') }}</div>
             <SequenceStepEditor
               v-if="form.type === 'sequence'"
               :steps="form.steps"
@@ -121,6 +120,7 @@
               v-else
               :model-value="form.platformGroups"
               :platforms="platforms"
+              :title="t('prompt.images')"
               :uploader="promptApi.uploadImage"
               @update:model-value="form.platformGroups = $event"
             />
