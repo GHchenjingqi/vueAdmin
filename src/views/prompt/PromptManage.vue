@@ -268,7 +268,16 @@ const statCards = computed(() => [
 ])
 
 const formSchema = computed(() => [
-  { prop: 'title', label: t('prompt.title'), type: 'input', required: true },
+  { prop: 'title', label: t('prompt.title'), type: 'input', required: true, span: 24 },
+  {
+    prop: 'categoryIds',
+    label: t('prompt.category'),
+    type: 'select',
+    required: true,
+    multiple: true,
+    options: () => categoryOptions.value.map((item) => ({ label: item.name, value: item.id })),
+    props: { 'multiple-limit': 10 },
+  },
   {
     prop: 'modelName',
     label: t('prompt.model'),
@@ -278,16 +287,6 @@ const formSchema = computed(() => [
     placeholder: t('prompt.modelPlaceholder'),
     options: () => modelOptions.value.map((name) => ({ label: name, value: name })),
     props: { 'allow-create': true, 'default-first-option': true },
-  },
-  {
-    prop: 'categoryIds',
-    label: t('prompt.category'),
-    type: 'select',
-    required: true,
-    multiple: true,
-    span: 24,
-    options: () => categoryOptions.value.map((item) => ({ label: item.name, value: item.id })),
-    props: { 'multiple-limit': 10 },
   },
   { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, span: 24, props: { rows: 8, autosize: false } },
 ])
