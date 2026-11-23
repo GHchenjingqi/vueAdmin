@@ -27,7 +27,7 @@
       <el-table v-if="rows.length" :data="rows" row-key="id" style="width: 100%">
         <el-table-column :label="t('prompt.cover')" width="90">
           <template #default="{ row }">
-            <el-image v-if="row.coverImage" :src="row.coverImage" fit="cover" class="mine-cover" :preview-src-list="[row.coverImage]" />
+            <el-image v-if="row.coverImage" :src="row.coverImage" fit="cover" class="mine-cover" :preview-src-list="[row.coverImage]" preview-teleported />
             <span v-else class="mine-no-cover">-</span>
           </template>
         </el-table-column>

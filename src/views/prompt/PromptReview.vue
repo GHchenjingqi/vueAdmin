@@ -14,7 +14,14 @@
       @query="onQuery"
     >
       <template #column-coverImage="{ row }">
-        <el-image v-if="row.coverImage" :src="String(row.coverImage)" fit="cover" class="prompt-cover" :preview-src-list="[String(row.coverImage)]" />
+        <el-image
+          v-if="row.coverImage"
+          :src="String(row.coverImage)"
+          fit="cover"
+          class="prompt-cover"
+          :preview-src-list="[String(row.coverImage)]"
+          preview-teleported
+        />
         <span v-else>-</span>
       </template>
 

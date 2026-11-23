@@ -37,7 +37,14 @@
       </template>
 
       <template #column-coverImage="{ row }">
-        <el-image v-if="row.coverImage" :src="String(row.coverImage)" fit="cover" class="prompt-cover" :preview-src-list="[String(row.coverImage)]" />
+        <el-image
+          v-if="row.coverImage"
+          :src="String(row.coverImage)"
+          fit="cover"
+          class="prompt-cover"
+          :preview-src-list="[String(row.coverImage)]"
+          preview-teleported
+        />
         <span v-else>-</span>
       </template>
 
@@ -81,7 +88,7 @@
           <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px">
             <template #parentId="{ modelValue, updateValue }">
               <el-select
-                :model-value="modelValue as number | string | null"
+                :model-value="modelValue as ParentIdValue"
                 filterable
                 remote
                 clearable
@@ -171,6 +178,8 @@ import SequenceStepEditor from '@/views/portal/components/SequenceStepEditor.vue
 import { useI18n } from '@/i18n'
 
 const { t, locale } = useI18n()
+
+type ParentIdValue = number | string | null
 
 const statusOptions = computed(() => [
   { label: t('prompt.draft'), value: 'draft' },
