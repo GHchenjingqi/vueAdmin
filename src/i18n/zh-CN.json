@@ -1337,6 +1337,7 @@
     "imageRequired": "提交审核必须上传至少一张效果图",
     "imageSizeExceeded": "图片大小不能超过 15MB",
     "imageTip": "支持多图，第一张默认作为封面",
+    "imageDragTip": "按住图片拖拽可调整顺序（三视图请按正/侧/背排列）",
     "imageTypeInvalid": "只能上传图片文件",
     "images": "效果图",
     "login": "登录",

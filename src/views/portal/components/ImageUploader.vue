@@ -20,9 +20,25 @@
     </el-upload>
 
     <div v-if="modelValue.length" class="image-uploader-list">
-      <div v-for="(image, index) in modelValue" :key="image.url" class="image-uploader-item">
-        <el-image :src="image.url" fit="cover" class="image-uploader-thumb" :preview-src-list="imageUrls" :initial-index="index" />
+      <div
+        v-for="(image, index) in modelValue"
+        :key="image.url"
+        class="image-uploader-item"
+        :class="{ dragging: dragIndex === index, 'drag-over': dragOverIndex === index && dragIndex !== index }"
+        :draggable="modelValue.length > 1"
+        :title="t('portal.imageDragTip')"
+        @dragstart="onDragStart(index, $event)"
+        @dragover.prevent="onDragOver(index)"
+        @dragleave="onDragLeave(index)"
+        @drop.prevent="onDrop(index)"
+        @dragend="onDragEnd"
+      >
+        <div class="image-uploader-thumb-wrap">
+          <el-image :src="image.url" fit="cover" class="image-uploader-thumb" :draggable="false" :preview-src-list="imageUrls" :initial-index="index" />
+          <span class="image-uploader-order">{{ index + 1 }}</span>
+        </div>
         <div class="image-uploader-actions">
+          <el-icon class="image-uploader-grip"><Rank /></el-icon>
           <el-tag v-if="image.isCover" type="success" size="small" effect="dark">{{ t('portal.cover') }}</el-tag>
           <el-button v-else link size="small" @click="setCover(index)">{{ t('portal.setCover') }}</el-button>
           <el-button link type="danger" size="small" @click="removeImage(index)">{{ t('common.delete') }}</el-button>
@@ -34,9 +50,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage, type UploadRequestOptions } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { Rank, UploadFilled } from '@element-plus/icons-vue'
 import { portalApi } from '@/api'
 import type { PromptImageItem } from '@/api/prompt'
 import { useI18n } from '@/i18n'
@@ -55,6 +71,45 @@ const emit = defineEmits<{ (e: 'update:modelValue', value: PromptImageItem[]): v
 
 const { t } = useI18n()
 const imageUrls = computed(() => props.modelValue.map((image) => image.url))
+
+const dragIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+
+const onDragStart = (index: number, event: DragEvent): void => {
+  dragIndex.value = index
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+const onDragOver = (index: number): void => {
+  if (dragIndex.value !== null) dragOverIndex.value = index
+}
+
+const onDragLeave = (index: number): void => {
+  if (dragOverIndex.value === index) dragOverIndex.value = null
+}
+
+const endDrag = (): void => {
+  dragIndex.value = null
+  dragOverIndex.value = null
+}
+
+const onDrop = (index: number): void => {
+  const from = dragIndex.value
+  endDrag()
+  if (from === null || from === index) return
+  const next = [...props.modelValue]
+  const [moved] = next.splice(from, 1)
+  next.splice(index, 0, moved)
+  // sort 与渲染顺序一致：步骤套组提交时按 image.sort 保存，单条按数组下标保存
+  emit('update:modelValue', next.map((image, i) => ({ ...image, sort: i })))
+}
+
+const onDragEnd = (): void => {
+  endDrag()
+}
 
 const beforeUpload = (file: File): boolean => {
   if (props.modelValue.length >= props.max) {
@@ -160,12 +215,54 @@ const removeImage = (index: number): void => {
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--card-bg);
+  cursor: grab;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.image-uploader-item:active {
+  cursor: grabbing;
+}
+
+.image-uploader-item.dragging {
+  opacity: 0.4;
+}
+
+.image-uploader-item.drag-over {
+  box-shadow: 0 0 0 2px var(--brand);
+}
+
+.image-uploader-thumb-wrap {
+  position: relative;
 }
 
 .image-uploader-thumb {
   width: 100%;
   height: 96px;
   display: block;
+  user-select: none;
+}
+
+.image-uploader-order {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(31, 36, 48, 0.85);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.image-uploader-grip {
+  color: var(--ink-3);
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .image-uploader-actions {

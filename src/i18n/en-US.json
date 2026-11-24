@@ -1337,6 +1337,7 @@
     "imageRequired": "At least one image is required to submit for review",
     "imageSizeExceeded": "Image size cannot exceed 15MB",
     "imageTip": "Multiple images supported; the first one is the cover by default",
+    "imageDragTip": "Drag images to reorder (for three-view, arrange front / side / back)",
     "imageTypeInvalid": "Only image files are allowed",
     "images": "Images",
     "login": "Sign in",
