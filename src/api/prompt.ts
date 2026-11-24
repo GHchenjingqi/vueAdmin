@@ -126,6 +126,16 @@ export interface PromptStats {
   favorites: number
 }
 
+export interface IntegrationKeyInfo {
+  id: number
+  name: string
+  key: string
+  prefix: string
+  status: number
+  createdAt: string
+  lastUsedAt: string | null
+}
+
 export interface PromptListQuery extends ListQueryParams {
   categoryId?: number | string
   status?: string
@@ -263,6 +273,19 @@ export const promptApi = {
 
   rejectReview(id: number, reason: string) {
     return request.post<PromptItem>(`/prompt/reviews/${id}/reject`, { reason })
+  },
+
+  /** ==================== AI 推送密钥 ==================== */
+  getIntegrationKey() {
+    return request.get<IntegrationKeyInfo>('/prompt/integrations/key')
+  },
+
+  rotateIntegrationKey() {
+    return request.post<IntegrationKeyInfo>('/prompt/integrations/key/rotate', {})
+  },
+
+  setIntegrationKeyStatus(status: 0 | 1) {
+    return request.put<IntegrationKeyInfo>('/prompt/integrations/key/status', { status })
   },
 
   /** ==================== 统计 ==================== */

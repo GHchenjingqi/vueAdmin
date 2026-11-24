@@ -28,6 +28,9 @@ const MAX_CATEGORIES = 10
 const MAX_CHAIN_DEPTH = 20
 const DEFAULT_PLATFORM_ID = 1
 const DEFAULT_PLATFORM_NAMES = ['通用', '即梦', '可灵', 'GPT', 'Midjourney', 'Stable Diffusion', '通义万相']
+const AI_KEY_PREFIX = 'ppt_ai_'
+const AI_IMAGE_MAX_BYTES = 15 * 1024 * 1024
+const AI_FETCH_TIMEOUT_MS = 20000
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -339,6 +342,36 @@ function ensureSequence(db) {
   return migrated
 }
 
+// AI 推送：首次启动自动生成一个管理员可在设置页查看/轮换的 API Key
+function ensureIntegrationData(db) {
+  let migrated = false
+  if (!Array.isArray(db.apiKeys)) {
+    db.apiKeys = []
+    migrated = true
+  }
+  if (!Array.isArray(db.integrationCalls)) {
+    db.integrationCalls = []
+    migrated = true
+  }
+  db.seq = db.seq || {}
+  if (!db.apiKeys.length) {
+    const id = Math.max(0, ...db.apiKeys.map((k) => Number(k.id) || 0)) + 1
+    const admin = (db.users || []).find((u) => u.role === 'admin' && u.status === 1)
+    db.apiKeys.push({
+      id,
+      name: '默认 AI 推送密钥',
+      key: `${AI_KEY_PREFIX}${crypto.randomBytes(18).toString('hex')}`,
+      status: 1,
+      createdAt: nowIso(),
+      lastUsedAt: null,
+      createdBy: admin ? admin.id : null,
+    })
+    db.seq.apiKey = Math.max(Number(db.seq.apiKey) || 0, id)
+    migrated = true
+  }
+  return migrated
+}
+
 function loadDb() {
   let loaded = null
   try {
@@ -361,8 +394,10 @@ function loadDb() {
   const platformMigrated = ensurePlatforms(db)
   const sequenceMigrated = ensureSequence(db)
   const demoMigrated = ensureDemo(db)
-  if (demoMigrated || platformMigrated || sequenceMigrated || !loaded) {
+  const integrationMigrated = ensureIntegrationData(db)
+  if (demoMigrated || platformMigrated || sequenceMigrated || integrationMigrated || !loaded) {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8')
+    if (integrationMigrated) console.log('initialized AI push API key')
     if (demoMigrated && platformMigrated) console.log('seeded demo prompts and upgraded platform groups')
     else if (demoMigrated) console.log('seeded demo prompts into empty database')
     else if (platformMigrated) console.log('upgraded legacy images into default platform group')
@@ -496,6 +531,37 @@ function requireAdmin(req, res, next) {
   if (user.role !== 'admin') return fail(res, '您没有权限执行此操作', 403)
   req.user = user
   next()
+}
+
+function requireApiKey(req, res, next) {
+  const raw = String(req.headers['x-api-key'] || '').trim()
+  if (!raw) return fail(res, '缺少 X-API-Key 请求头', 401)
+  const record = (db.apiKeys || []).find((item) => item.key === raw && item.status === 1)
+  if (!record) return fail(res, 'API Key 无效或已停用', 401)
+  record.lastUsedAt = nowIso()
+  req.apiKey = record
+  next()
+}
+
+function publicApiKey(record) {
+  return {
+    id: record.id,
+    name: record.name,
+    key: record.key,
+    prefix: record.key.slice(0, 12),
+    status: record.status,
+    createdAt: record.createdAt,
+    lastUsedAt: record.lastUsedAt || null,
+  }
+}
+
+function rotateApiKey() {
+  const record = (db.apiKeys || [])[0]
+  if (!record) return null
+  record.key = `${AI_KEY_PREFIX}${crypto.randomBytes(18).toString('hex')}`
+  record.status = 1
+  record.rotatedAt = nowIso()
+  return record
 }
 
 function publicUser(u) {
@@ -885,6 +951,132 @@ function uploadHandler(req, res) {
   db.uploads.push({ ...result, filePath: req.file.filename, createdAt: nowIso() })
   persist()
   ok(res, result, 201)
+}
+
+// ============ AI 推送：图片 URL / base64 归一化 ============
+const AI_MIME_EXT = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/bmp': '.bmp',
+  'image/svg+xml': '.svg',
+}
+
+function aiImageExt(mime, fallbackName) {
+  const fromMime = AI_MIME_EXT[String(mime || '').toLowerCase().split(';')[0]]
+  if (fromMime) return fromMime
+  const fromName = path.extname(String(fallbackName || '')).toLowerCase()
+  return ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'].includes(fromName) ? fromName : '.png'
+}
+
+function isPublicHttpUrl(value) {
+  let parsed
+  try {
+    parsed = new URL(value)
+  } catch {
+    return false
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return false
+  const host = parsed.hostname.toLowerCase()
+  if (host === 'localhost' || host === '::1' || host === '127.0.0.1') return false
+  if (/^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false
+  return true
+}
+
+function decodeAiImageData(value, mimeHint, nameHint) {
+  const text = String(value || '')
+  const matched = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/i.exec(text)
+  const mime = (matched ? matched[1] : mimeHint || 'image/png').toLowerCase()
+  const base64 = matched ? matched[2] : text
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(base64)) throw new Error('图片 base64 格式不正确')
+  const buffer = Buffer.from(base64.replace(/\s+/g, ''), 'base64')
+  if (!buffer.length) throw new Error('图片内容为空')
+  return { buffer, mime, ext: aiImageExt(mime, nameHint) }
+}
+
+async function fetchAiImage(url) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS)
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: { 'User-Agent': 'PromptPlaza-AI-Push/1.0' },
+    })
+    if (!response.ok) throw new Error(`图片下载失败（HTTP ${response.status}）`)
+    const mime = String(response.headers.get('content-type') || '').toLowerCase()
+    if (!mime.startsWith('image/')) throw new Error('图片地址返回的不是图片内容')
+    const declared = Number(response.headers.get('content-length') || 0)
+    if (declared > AI_IMAGE_MAX_BYTES) throw new Error('图片大小不能超过 15MB')
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (!buffer.length) throw new Error('图片内容为空')
+    return { buffer, mime: mime.split(';')[0], ext: aiImageExt(mime, url) }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function ingestAiImage(input) {
+  const item = typeof input === 'string' ? { url: input } : input
+  if (!item || typeof item !== 'object') return null
+
+  let decoded = null
+  let nameHint = String(item.name || item.filename || '')
+  let reused = null
+
+  if (item.url) {
+    const url = String(item.url).trim()
+    if (url.startsWith('data:image/')) {
+      decoded = decodeAiImageData(url, item.mimeType, nameHint)
+    } else if (url.startsWith('/uploads/')) {
+      const file = path.basename(url)
+      const full = path.join(UPLOAD_DIR, file)
+      if (!file || !fs.existsSync(full)) throw new Error(`图片不存在：${url}`)
+      const stat = fs.statSync(full)
+      reused = { url, filePath: file, size: stat.size, mimetype: item.mimeType || 'image/png' }
+    } else if (isPublicHttpUrl(url)) {
+      decoded = await fetchAiImage(url)
+      nameHint = nameHint || path.basename(new URL(url).pathname)
+    } else {
+      throw new Error('图片地址必须是 http(s) 公网地址、data URL 或已上传的 /uploads/ 路径')
+    }
+  } else if (item.dataUrl) {
+    decoded = decodeAiImageData(item.dataUrl, item.mimeType, nameHint)
+  } else if (item.base64) {
+    decoded = decodeAiImageData(item.base64, item.mimeType, nameHint)
+  } else {
+    return null
+  }
+
+  if (reused) return reused
+  if (decoded.buffer.length > AI_IMAGE_MAX_BYTES) throw new Error('图片大小不能超过 15MB')
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${decoded.ext}`
+  fs.writeFileSync(path.join(UPLOAD_DIR, filename), decoded.buffer)
+  const result = { url: `/uploads/${filename}`, filePath: filename, size: decoded.buffer.length, mimetype: decoded.mime }
+  db.uploads.push({ ...result, name: nameHint || filename, source: 'ai', createdAt: nowIso() })
+  return result
+}
+
+async function normalizeAiGroups(data) {
+  const rawGroups = Array.isArray(data.platformGroups)
+    ? data.platformGroups
+    : Array.isArray(data.images) || Array.isArray(data.imageUrls)
+      ? [{ platformId: data.platformId || DEFAULT_PLATFORM_ID, images: [...(data.images || []), ...(data.imageUrls || [])] }]
+      : []
+
+  const groups = []
+  for (const raw of rawGroups) {
+    const group = raw && typeof raw === 'object' ? raw : { images: [raw] }
+    const images = []
+    for (const item of Array.isArray(group.images) ? group.images : []) {
+      const saved = await ingestAiImage(item)
+      if (saved) images.push(saved)
+    }
+    groups.push({ platformId: Number(group.platformId) || DEFAULT_PLATFORM_ID, images })
+  }
+  return groups
 }
 
 const MENU_TREE = [
@@ -1640,6 +1832,31 @@ admin.get('/stats', (req, res) => {
   })
 })
 
+// AI 推送密钥：仅管理员可查看/轮换，前端设置页使用
+admin.get('/integrations/key', (_req, res) => {
+  ensureIntegrationData(db)
+  ok(res, publicApiKey(db.apiKeys[0]))
+})
+
+admin.post('/integrations/key/rotate', (_req, res) => {
+  ensureIntegrationData(db)
+  const record = rotateApiKey()
+  if (!record) return fail(res, 'AI 推送密钥不存在', 404)
+  persist()
+  ok(res, publicApiKey(record))
+})
+
+admin.put('/integrations/key/status', (req, res) => {
+  ensureIntegrationData(db)
+  const record = db.apiKeys[0]
+  if (!record) return fail(res, 'AI 推送密钥不存在', 404)
+  const status = Number(req.body?.status)
+  if (status !== 0 && status !== 1) return fail(res, '状态值不合法', 400)
+  record.status = status
+  persist()
+  ok(res, publicApiKey(record))
+})
+
 // 数据备份：发布前把线上真实数据导出，避免本地构建产物覆盖线上维护内容
 admin.get('/data/export', (_req, res) => {
   persist()
@@ -1657,6 +1874,7 @@ admin.post('/data/import', (req, res) => {
     fs.copyFileSync(DB_FILE, backupFile)
     db = incoming
     db.seq = db.seq || {}
+    ensureIntegrationData(db)
     persist()
     ok(res, { imported: true, prompts: db.prompts.length })
   } catch (err) {
@@ -1682,6 +1900,7 @@ admin.post('/data/backups/:name/restore', (req, res) => {
     fs.copyFileSync(DB_FILE, `${DB_FILE}.before-restore-${Date.now()}.bak`)
     db = snapshot
     db.seq = db.seq || {}
+    ensureIntegrationData(db)
     persist()
     ok(res, { restored: name, prompts: db.prompts.length })
   } catch (err) {
@@ -1689,6 +1908,80 @@ admin.post('/data/backups/:name/restore', (req, res) => {
   }
 })
 
+// ============ AI 推送接口（X-API-Key 鉴权，仅创建/发布） ============
+const integration = express.Router()
+integration.use(requireApiKey)
+
+integration.get('/categories', (_req, res) => {
+  const poseIds = poseCategoryIds()
+  const rows = db.categories
+    .filter((c) => c.status === 1 && !poseIds.has(c.id))
+    .sort((a, b) => a.sort - b.sort || a.id - b.id)
+    .map((c) => ({ id: c.id, name: c.name }))
+  ok(res, rows)
+})
+
+integration.get('/prompts/:id', (req, res) => {
+  const prompt = db.prompts.find((p) => p.id === Number(req.params.id) && p.source === 'ai' && !p.isDeleted)
+  if (!prompt) return fail(res, '提示词不存在', 404)
+  ok(res, decorate(prompt))
+})
+
+integration.post('/prompts', async (req, res) => {
+  const data = req.body && typeof req.body === 'object' ? req.body : {}
+  if (data.type === 'sequence') return fail(res, 'AI 推送暂不支持套组类型', 400)
+
+  const idempotencyKey = String(data.idempotencyKey || '').trim().slice(0, 128)
+  if (idempotencyKey) {
+    const existingCall = (db.integrationCalls || []).find((call) => call.apiKeyId === req.apiKey.id && call.idempotencyKey === idempotencyKey)
+    if (existingCall) {
+      const existing = db.prompts.find((p) => p.id === existingCall.promptId && !p.isDeleted)
+      if (existing) return ok(res, { ...decorate(existing), idempotent: true }, 200, 'duplicate')
+    }
+  }
+
+  try {
+    const groups = await normalizeAiGroups(data)
+    const payload = { ...data, type: 'single', platformGroups: groups, images: undefined, imageUrls: undefined }
+    const status = data.status === 'pending' ? 'pending' : 'published'
+    const err = validationError(payload, status === 'published') || categoryError(payload) || parentError(payload)
+    if (err) return fail(res, err, 400)
+
+    const admin = (db.users || []).find((u) => u.role === 'admin' && u.status === 1)
+    const prompt = {
+      id: nextId('prompt'),
+      ...trimData(payload),
+      type: 'single',
+      status,
+      source: 'ai',
+      authorId: req.apiKey.createdBy || (admin ? admin.id : 1),
+      rejectReason: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      viewCount: 0,
+      isDeleted: 0,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    }
+    db.prompts.push(prompt)
+    replaceImages(prompt.id, payload)
+    if (idempotencyKey) {
+      db.integrationCalls.push({
+        id: nextId('integrationCall'),
+        apiKeyId: req.apiKey.id,
+        idempotencyKey,
+        promptId: prompt.id,
+        createdAt: nowIso(),
+      })
+    }
+    persist()
+    ok(res, { ...decorate(prompt), idempotent: false }, 201)
+  } catch (err) {
+    fail(res, err.message || 'AI 推送失败', 400)
+  }
+})
+
+api.use('/integrations', integration)
 api.use('/prompt', admin)
 api.use((_req, res) => fail(res, '接口不存在', 404))
 app.use('/api/v1', api)

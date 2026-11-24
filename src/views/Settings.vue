@@ -140,6 +140,43 @@
         <el-card shadow="never" class="settings-card">
           <template #header>
             <div class="q-title">
+              {{ t('settings.aiPushTitle') }}
+            </div>
+          </template>
+          <div class="ai-push-panel">
+            <div class="form-tip ai-push-tip">{{ t('settings.aiPushTip') }}</div>
+            <el-form :model="aiPushForm" label-width="100px" label-position="right">
+              <el-form-item :label="t('settings.apiKey')">
+                <el-input v-model="aiPushForm.key" readonly>
+                  <template #append>
+                    <el-button :icon="Document" @click="copyApiKey">{{ t('settings.copy') }}</el-button>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item :label="t('settings.keyEnabled')">
+                <el-switch
+                  v-model="aiPushForm.enabled"
+                  :active-text="t('settings.open')"
+                  :inactive-text="t('settings.close')"
+                  :loading="keySaving"
+                  @change="toggleApiKey"
+                />
+              </el-form-item>
+            </el-form>
+            <div class="ai-push-actions">
+              <el-button :icon="Refresh" :loading="keyRotating" @click="rotateApiKey">{{ t('settings.rotateKey') }}</el-button>
+            </div>
+            <div class="form-tip ai-push-endpoint">
+              {{ t('settings.aiPushEndpoint') }}：
+              <code>POST /api/v1/integrations/prompts</code>
+            </div>
+            <pre class="ai-push-example">{{ curlExample }}</pre>
+          </div>
+        </el-card>
+
+        <el-card shadow="never" class="settings-card">
+          <template #header>
+            <div class="q-title">
               {{ t('settings.watermark') }}
             </div>
           </template>
@@ -306,9 +343,10 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Delete, Check, Refresh, FolderOpened, Search, Document } from '@element-plus/icons-vue'
-import { settingApi } from '@/api'
+import { promptApi, settingApi } from '@/api'
+import type { IntegrationKeyInfo } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 import { getAccessToken } from '@/utils/request'
 import { useI18n } from '@/i18n'
@@ -519,7 +557,93 @@ const handleReset = () => {
   ElMessage.info(t('settings.resetToCurrent'))
 }
 
-onMounted(fetchSettings)
+const aiPushForm = reactive({ key: '', enabled: true })
+const keyRotating = ref(false)
+const keySaving = ref(false)
+
+const curlExample = computed(
+  () => `curl -X POST '${window.location.origin}/api/v1/integrations/prompts' \\
+  -H 'X-API-Key: ${aiPushForm.key || '<YOUR_KEY>'}' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "title": "示例标题",
+    "content": "提示词正文",
+    "categoryId": 10,
+    "modelName": "通用",
+    "imageUrls": ["https://example.com/poster.jpg"],
+    "status": "published",
+    "idempotencyKey": "ai-20261124-001"
+  }'`,
+)
+
+const applyKeyInfo = (info: IntegrationKeyInfo) => {
+  aiPushForm.key = info.key
+  aiPushForm.enabled = info.status === 1
+}
+
+const loadApiKey = async () => {
+  try {
+    const res = await promptApi.getIntegrationKey()
+    applyKeyInfo(res.data)
+  } catch (err) {
+    ElMessage.error(`${t('settings.keyLoadFailed')}：${getErrorMessage(err)}`)
+  }
+}
+
+const copyApiKey = async () => {
+  if (!aiPushForm.key) return
+  try {
+    await navigator.clipboard.writeText(aiPushForm.key)
+    ElMessage.success(t('settings.keyCopied'))
+  } catch {
+    const input = document.createElement('textarea')
+    input.value = aiPushForm.key
+    input.style.position = 'fixed'
+    input.style.opacity = '0'
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+    ElMessage.success(t('settings.keyCopied'))
+  }
+}
+
+const rotateApiKey = async () => {
+  try {
+    await ElMessageBox.confirm(t('settings.rotateConfirm'), t('settings.rotateKey'), { type: 'warning' })
+  } catch {
+    return
+  }
+  keyRotating.value = true
+  try {
+    const res = await promptApi.rotateIntegrationKey()
+    applyKeyInfo(res.data)
+    ElMessage.success(t('settings.rotateSuccess'))
+  } catch (err) {
+    ElMessage.error(`${t('settings.keyActionFailed')}：${getErrorMessage(err)}`)
+  } finally {
+    keyRotating.value = false
+  }
+}
+
+const toggleApiKey = async (value: string | number | boolean) => {
+  keySaving.value = true
+  try {
+    const res = await promptApi.setIntegrationKeyStatus(value ? 1 : 0)
+    applyKeyInfo(res.data)
+    ElMessage.success(t('settings.statusSuccess'))
+  } catch (err) {
+    aiPushForm.enabled = !value
+    ElMessage.error(`${t('settings.keyActionFailed')}：${getErrorMessage(err)}`)
+  } finally {
+    keySaving.value = false
+  }
+}
+
+onMounted(() => {
+  fetchSettings()
+  loadApiKey()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -542,6 +666,32 @@ onMounted(fetchSettings)
 
 .settings-card :deep(.el-card__body) {
   padding: 24px;
+}
+
+.ai-push-tip {
+  margin-bottom: 16px;
+}
+
+.ai-push-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 12px;
+}
+
+.ai-push-endpoint code {
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
+
+.ai-push-example {
+  margin: 10px 0 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
 }
 
 .upload-row {
