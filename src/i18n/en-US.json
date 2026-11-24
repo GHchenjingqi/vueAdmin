@@ -1222,6 +1222,7 @@
     "sort": "Sort",
     "promptCount": "Prompts",
     "manageTitle": "Prompts",
+    "poseManageTitle": "Pose Prompts",
     "addPrompt": "Add Prompt",
     "editPrompt": "Edit Prompt",
     "title": "Title",

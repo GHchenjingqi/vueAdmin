@@ -964,6 +964,19 @@ const MENU_TREE = [
         visible: true,
         children: [],
       },
+      {
+        id: 7,
+        parentId: 2,
+        name: '姿势管理',
+        path: '/pose-manage',
+        component: 'views/prompt/PoseManage.vue',
+        icon: 'Picture',
+        type: 'M',
+        sort: 4,
+        status: 1,
+        visible: true,
+        children: [],
+      },
     ],
   },
 ]
@@ -1295,9 +1308,16 @@ admin.use(requireAdmin)
 
 admin.post('/upload-image', upload.single('file'), uploadHandler)
 
-admin.get('/categories/options', (_req, res) =>
-  ok(res, db.categories.filter((c) => c.status === 1).sort((a, b) => a.sort - b.sort || a.id - b.id)),
-)
+admin.get('/categories/options', (req, res) => {
+  const poseIds = poseCategoryIds()
+  const isPoseScope = String(req.query.scope || '') === 'pose'
+  ok(
+    res,
+    db.categories
+      .filter((c) => (isPoseScope ? poseIds.has(c.id) : c.status === 1 && !poseIds.has(c.id)))
+      .sort((a, b) => a.sort - b.sort || a.id - b.id),
+  )
+})
 
 admin.get('/categories', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
@@ -1434,7 +1454,10 @@ admin.delete('/platforms/:id', (req, res) => {
 
 admin.get('/prompts', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
-  let rows = livePrompts()
+  const poseIds = poseCategoryIds()
+  let rows = livePrompts().filter((p) =>
+    String(req.query.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds),
+  )
   if (req.query.keyword) {
     const k = String(req.query.keyword).toLowerCase()
     rows = rows.filter((p) => String(p.title).toLowerCase().includes(k))
@@ -1454,7 +1477,13 @@ admin.get('/prompts/model-options', (_req, res) => {
 admin.get('/prompts/parent-options', (req, res) => {
   const keyword = String(req.query.keyword || '').trim().toLowerCase()
   const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null
-  let rows = livePrompts().filter((p) => p.status === 'published' && (!excludeId || p.id !== excludeId))
+  const poseIds = poseCategoryIds()
+  let rows = livePrompts().filter(
+    (p) =>
+      p.status === 'published' &&
+      (!excludeId || p.id !== excludeId) &&
+      (String(req.query.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds)),
+  )
   if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
   rows.sort((a, b) => b.id - a.id)
   ok(res, rows.slice(0, 20).map((p) => ({ id: p.id, title: p.title })))
@@ -1598,16 +1627,18 @@ admin.post('/reviews/:id/reject', (req, res) => {
   ok(res, decorate(prompt))
 })
 
-admin.get('/stats', (_req, res) =>
+admin.get('/stats', (req, res) => {
+  const poseIds = poseCategoryIds()
+  const rows = livePrompts().filter((p) => (String(req.query.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds)))
   ok(res, {
-    total: livePrompts().length,
-    published: livePrompts().filter((p) => p.status === 'published').length,
-    pending: livePrompts().filter((p) => p.status === 'pending').length,
-    offline: livePrompts().filter((p) => p.status === 'offline').length,
+    total: rows.length,
+    published: rows.filter((p) => p.status === 'published').length,
+    pending: rows.filter((p) => p.status === 'pending').length,
+    offline: rows.filter((p) => p.status === 'offline').length,
     categories: db.categories.filter((c) => c.status === 1).length,
     favorites: db.favorites.length,
-  }),
-)
+  })
+})
 
 // 数据备份：发布前把线上真实数据导出，避免本地构建产物覆盖线上维护内容
 admin.get('/data/export', (_req, res) => {

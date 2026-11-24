@@ -12,7 +12,7 @@
     <ProTable
       ref="tableRef"
       :key="locale"
-      :title="t('prompt.manageTitle')"
+      :title="pose ? t('prompt.poseManageTitle') : t('prompt.manageTitle')"
       :columns="columns"
       :data="rows"
       :loading="loading"
@@ -20,7 +20,7 @@
       :pagination="pagination"
       :search-params="searchParams"
       :search-fields="searchFields"
-      column-settings-key="prompt_manage_list"
+      :column-settings-key="pose ? 'pose_manage_list' : 'prompt_manage_list'"
       show-selection
       reserve-selection
       row-key="id"
@@ -189,6 +189,10 @@ import { useI18n } from '@/i18n'
 
 const { t, locale } = useI18n()
 
+/** 姿势管理页复用本组件，仅切换数据范围与标题；默认普通提示词 */
+const props = withDefaults(defineProps<{ pose?: boolean }>(), { pose: false })
+const dataScope = computed(() => (props.pose ? ({ scope: 'pose' } as const) : {}))
+
 type ParentIdValue = number | string | null
 
 const statusOptions = computed(() => [
@@ -329,6 +333,7 @@ const fetchRows = async (): Promise<void> => {
       keyword: String(searchParams.keyword || '') || undefined,
       status: String(searchParams.status || '') || undefined,
       categoryId: String(searchParams.categoryId || '') || undefined,
+      ...dataScope.value,
     })
     rows.value = res.data.rows
     pagination.total = res.data.total
@@ -340,7 +345,7 @@ const fetchRows = async (): Promise<void> => {
 }
 
 const fetchOptions = async (): Promise<void> => {
-  const [categories, platformList] = await Promise.allSettled([promptApi.getCategoryOptions(), promptApi.getPlatformOptions()])
+  const [categories, platformList] = await Promise.allSettled([promptApi.getCategoryOptions(dataScope.value), promptApi.getPlatformOptions()])
   if (categories.status === 'fulfilled') {
     categoryOptions.value = categories.value.data
   } else {
@@ -356,6 +361,7 @@ const searchParentOptions = async (keyword = ''): Promise<void> => {
     const res = await promptApi.getParentOptions({
       keyword: keyword.trim(),
       excludeId: isEdit.value && currentId.value !== null ? currentId.value : undefined,
+      ...dataScope.value,
     })
     parentOptions.value = res.data
   } catch (err: unknown) {
@@ -367,7 +373,7 @@ const searchParentOptions = async (keyword = ''): Promise<void> => {
 
 const fetchStats = async (): Promise<void> => {
   try {
-    const res = await promptApi.getStats()
+    const res = await promptApi.getStats(dataScope.value)
     stats.value = res.data
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))

@@ -1222,6 +1222,7 @@
     "sort": "排序",
     "promptCount": "提示词数",
     "manageTitle": "提示词管理",
+    "poseManageTitle": "姿势提示词管理",
     "addPrompt": "新增提示词",
     "editPrompt": "编辑提示词",
     "title": "标题",

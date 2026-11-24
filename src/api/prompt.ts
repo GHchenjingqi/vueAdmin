@@ -130,6 +130,8 @@ export interface PromptListQuery extends ListQueryParams {
   categoryId?: number | string
   status?: string
   source?: string
+  /** pose=只读姿势参考库数据；默认排除姿势数据 */
+  scope?: 'pose'
 }
 
 export interface PromptPayload {
@@ -170,8 +172,8 @@ export const promptApi = {
     return request.get<PaginatedData<PromptCategory>>('/prompt/categories', { params })
   },
 
-  getCategoryOptions() {
-    return request.get<PromptCategory[]>('/prompt/categories/options')
+  getCategoryOptions(params: { scope?: 'pose' } = {}) {
+    return request.get<PromptCategory[]>('/prompt/categories/options', { params })
   },
 
   createCategory(data: Partial<PromptCategory>) {
@@ -214,7 +216,7 @@ export const promptApi = {
   },
 
   /** 关联原提示词：搜索可关联的已发布提示词 */
-  getParentOptions(params: { keyword?: string; excludeId?: number } = {}) {
+  getParentOptions(params: { keyword?: string; excludeId?: number; scope?: 'pose' } = {}) {
     return request.get<Array<{ id: number; title: string }>>('/prompt/prompts/parent-options', { params })
   },
 
@@ -264,7 +266,7 @@ export const promptApi = {
   },
 
   /** ==================== 统计 ==================== */
-  getStats() {
-    return request.get<PromptStats>('/prompt/stats')
+  getStats(params: { scope?: 'pose' } = {}) {
+    return request.get<PromptStats>('/prompt/stats', { params })
   },
 }
