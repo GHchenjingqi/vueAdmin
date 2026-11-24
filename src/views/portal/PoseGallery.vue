@@ -288,14 +288,11 @@ const openDetail = (id: number): void => {
 const fetchAll = async (): Promise<void> => {
   loading.value = true
   try {
-    const categoriesRes = await portalApi.getCategories()
-    const parent = categoriesRes.data.find((item) => item.name === '姿势')
-    if (!parent) return
-    const first = await portalApi.getPrompts({ page: 1, pageSize: 100, categoryId: parent.id })
+    const first = await portalApi.getPrompts({ page: 1, pageSize: 100, scope: 'pose' })
     const pageCount = Math.ceil(first.data.total / 100)
     const rest = await Promise.all(
       Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
-        portalApi.getPrompts({ page: index + 2, pageSize: 100, categoryId: parent.id }),
+        portalApi.getPrompts({ page: index + 2, pageSize: 100, scope: 'pose' }),
       ),
     )
     rows.value = [first, ...rest]

@@ -21,6 +21,8 @@ export interface PortalPrompt extends PromptItem {
 export interface PortalListQuery extends ListQueryParams {
   categoryId?: number | string
   sort?: 'latest' | 'popular'
+  /** pose=只读姿势参考库数据；默认排除姿势数据 */
+  scope?: 'pose'
 }
 
 export interface PortalMineQuery extends ListQueryParams {
@@ -77,8 +79,8 @@ export const portalApi = {
   },
 
   /** ==================== 公开浏览 ==================== */
-  getCategories() {
-    return request.get<PortalCategory[]>('/portal/categories')
+  getCategories(params: { scope?: 'pose' } = {}) {
+    return request.get<PortalCategory[]>('/portal/categories', { params })
   },
 
   getPlatforms() {

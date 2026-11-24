@@ -639,6 +639,27 @@ function hasCategory(prompt, categoryId) {
   return resolveCategoryIds(prompt).includes(Number(categoryId))
 }
 
+/** 姿势分类树：根分类名为「姿势」，包含其所有后代；不依赖分类启用状态 */
+function poseCategoryIds() {
+  const ids = new Set(db.categories.filter((c) => c.name === '姿势').map((c) => c.id))
+  if (!ids.size) return ids
+  let expanded = true
+  while (expanded) {
+    expanded = false
+    for (const c of db.categories) {
+      if (c.parentId && ids.has(Number(c.parentId)) && !ids.has(c.id)) {
+        ids.add(c.id)
+        expanded = true
+      }
+    }
+  }
+  return ids
+}
+
+function isPosePrompt(prompt, poseIds = poseCategoryIds()) {
+  return resolveCategoryIds(prompt).some((id) => poseIds.has(id))
+}
+
 function decorate(prompt) {
   const category = db.categories.find((c) => c.id === prompt.categoryId)
   const categoryIds = resolveCategoryIds(prompt)
@@ -1052,9 +1073,11 @@ api.get('/menus', requireUser, (_req, res) => ok(res, flattenMenus(MENU_TREE)))
 
 const portal = express.Router()
 
-portal.get('/categories', (_req, res) => {
+portal.get('/categories', (req, res) => {
+  const poseIds = poseCategoryIds()
+  const scope = String(req.query.scope || '')
   const rows = db.categories
-    .filter((c) => c.status === 1)
+    .filter((c) => (scope === 'pose' ? poseIds.has(c.id) : c.status === 1 && !poseIds.has(c.id)))
     .sort((a, b) => a.sort - b.sort || a.id - b.id)
     .map((c) => ({ ...c, promptCount: livePrompts().filter((p) => hasCategory(p, c.id) && p.status === 'published').length }))
   ok(res, rows)
@@ -1083,7 +1106,8 @@ portal.get('/parent-options', (req, res) => {
 portal.get('/prompts', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   const q = req.query
-  let rows = livePrompts().filter((p) => p.status === 'published')
+  const poseIds = poseCategoryIds()
+  let rows = livePrompts().filter((p) => p.status === 'published' && (String(q.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds)))
   if (q.keyword) {
     const k = String(q.keyword).toLowerCase()
     rows = rows.filter((p) => [p.title, p.content, p.modelName].some((v) => String(v).toLowerCase().includes(k)))
