@@ -332,4 +332,30 @@ describe('PromptManage.vue 后台发布能力对齐', () => {
     const payload = mocks.promptApi.createPrompt.mock.calls[0][0]
     expect(payload.platformGroups[0].images[0].url).toBe('/uploads/new.png')
   })
+
+  it('9. 模型由右侧效果图平台组联动派生：新增平台组后左侧模型集合与 form.modelName 同步', async () => {
+    mocks.promptApi.getPlatformOptions.mockResolvedValue({
+      data: [
+        { id: 2, name: '通用' },
+        { id: 8, name: 'SenseNova' },
+        { id: 9, name: '混元' },
+      ],
+    })
+    const wrapper = mountPage()
+    await nextTick()
+    await nextTick()
+    const state = vm(wrapper)
+    await state.openDialog()
+    await nextTick()
+
+    expect(state.derivedModelNames).toEqual(['通用'])
+    state.form.platformGroups = [
+      { platformId: 8, images: [] },
+      { platformId: 9, images: [] },
+      { platformId: 8, images: [] },
+    ]
+    await nextTick()
+    expect(state.derivedModelNames).toEqual(['SenseNova', '混元'])
+    expect(state.form.modelName).toBe('SenseNova / 混元')
+  })
 })

@@ -1,10 +1,18 @@
 <template>
   <div v-loading="loading" class="detail-page">
     <div class="detail-container">
-      <el-breadcrumb separator="/" class="detail-breadcrumb">
-        <el-breadcrumb-item :to="{ path: '/portal/prompts' }">{{ t('portal.navSquare') }}</el-breadcrumb-item>
-        <el-breadcrumb-item>{{ detail?.title || t('portal.detail') }}</el-breadcrumb-item>
-      </el-breadcrumb>
+      <div class="detail-topline">
+        <el-breadcrumb separator="/" class="detail-breadcrumb">
+          <el-breadcrumb-item :to="{ path: '/portal/prompts' }">{{ t('portal.navSquare') }}</el-breadcrumb-item>
+          <el-breadcrumb-item>{{ detail?.title || t('portal.detail') }}</el-breadcrumb-item>
+        </el-breadcrumb>
+        <div v-if="detail" class="detail-topline-actions">
+          <el-button :type="favorited ? 'primary' : 'default'" :icon="favorited ? StarFilled : Star" @click="toggleFavorite">
+            {{ favorited ? t('portal.favoriteRemove') : t('portal.favoriteAdd') }}
+          </el-button>
+          <el-button :icon="Back" @click="goBack">{{ t('portal.backToSquare') }}</el-button>
+        </div>
+      </div>
 
       <template v-if="detail">
         <!-- 标题区：作为整页视觉焦点，聚合标题 / 作者 / 标签 / 统计 -->
@@ -63,7 +71,6 @@
               <el-image
                 v-if="gallery.length"
                 :src="activeImage"
-                fit="contain"
                 class="detail-main-image"
                 :preview-src-list="gallery"
                 :initial-index="activeIndex"
@@ -71,19 +78,19 @@
               <div v-else class="detail-main-placeholder">
                 <el-icon :size="40"><Picture /></el-icon>
               </div>
-            </div>
 
-            <div v-if="gallery.length > 1" class="detail-thumbs">
-              <button
-                v-for="(url, index) in gallery"
-                :key="url"
-                type="button"
-                class="detail-thumb"
-                :class="{ active: index === activeIndex }"
-                @click="activeIndex = index"
-              >
-                <img :src="url" :alt="`${detail.title} ${index + 1}`" />
-              </button>
+              <div v-if="gallery.length > 1" class="detail-thumbs">
+                <button
+                  v-for="(url, index) in gallery"
+                  :key="url"
+                  type="button"
+                  class="detail-thumb"
+                  :class="{ active: index === activeIndex }"
+                  @click="activeIndex = index"
+                >
+                  <img :src="url" :alt="`${detail.title} ${index + 1}`" />
+                </button>
+              </div>
             </div>
           </section>
 
@@ -117,7 +124,10 @@
                     <span v-if="node.id === detail.id" class="chain-node-current-tag">{{ t('portal.currentStep') }}</span>
                     <span v-else class="chain-node-upstream-tag">{{ t('portal.upstreamNode') }}</span>
                   </div>
-                  <pre class="detail-content chain-content">{{ node.content }}</pre>
+                  <pre
+                    class="detail-content chain-content"
+                    :class="{ 'chain-content-collapsed': node.id !== detail.id }"
+                  >{{ node.content }}</pre>
                   <span v-if="node.id !== detail.id" class="chain-node-goto">
                     {{ t('prompt.viewDetail') }}
                     <el-icon><ArrowRight /></el-icon>
@@ -125,12 +135,6 @@
                 </component>
               </template>
               <pre v-else class="detail-content">{{ detail.content }}</pre>
-            </div>
-            <div class="prompt-panel-foot">
-              <el-button :type="favorited ? 'primary' : 'default'" :icon="favorited ? StarFilled : Star" @click="toggleFavorite">
-                {{ favorited ? t('portal.favoriteRemove') : t('portal.favoriteAdd') }}
-              </el-button>
-              <el-button :icon="Back" @click="goBack">{{ t('portal.backToSquare') }}</el-button>
             </div>
           </section>
         </div>
@@ -297,8 +301,21 @@ onMounted(() => void load())
   margin: 0 auto;
 }
 
-.detail-breadcrumb {
+.detail-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-3);
   margin-bottom: var(--gap-3);
+}
+
+.detail-topline-actions {
+  display: flex;
+  gap: var(--gap-2);
+  flex-shrink: 0;
+}
+
+.detail-breadcrumb {
   font-size: var(--gap-3);
 }
 
@@ -476,53 +493,90 @@ onMounted(() => void load())
   color: var(--ink-3);
 }
 
-/* 固定矮画框：图片高度受控，不再随栏宽被拉高；中性灰底 contain */
+/* 图片自适应：宽度铺满、高度按原图比例 */
 .gallery-frame {
-  height: 280px;
+  position: relative;
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
   background: var(--page-bg);
   border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 .detail-main-image {
+  display: block;
   width: 100%;
-  height: 100%;
+}
+
+.detail-main-image :deep(.el-image__inner) {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .detail-main-placeholder {
+  min-height: 200px;
   width: 100%;
-  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--ink-3);
 }
 
+/* 缩略图导航：悬浮在图片右侧，竖排 */
 .detail-thumbs {
+  position: absolute;
+  top: var(--gap-2);
+  right: var(--gap-2);
+  z-index: 2;
   display: flex;
+  flex-direction: column;
   gap: var(--gap-2);
-  margin-top: var(--gap-3);
-  overflow-x: auto;
+  max-height: calc(100% - var(--gap-2) * 2);
+  padding: var(--gap-1);
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
 }
 
 .detail-thumb {
+  position: relative;
   width: 56px;
   height: 56px;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 2px solid transparent;
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
   background: var(--page-bg);
   flex-shrink: 0;
+  opacity: 0.55;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.detail-thumb:hover {
+  opacity: 0.9;
 }
 
 .detail-thumb.active {
   border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-soft);
+  opacity: 1;
+}
+
+/* 左侧竖条指示，强化竖排导航的选中态 */
+.detail-thumb.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--brand);
+  z-index: 1;
 }
 
 .detail-thumb img {
@@ -654,6 +708,16 @@ onMounted(() => void load())
   max-height: 220px;
 }
 
+/* 非当前节点（上游）正文仅显示 2 行，直接折叠 */
+.chain-content-collapsed {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  max-height: none;
+}
+
 .detail-content {
   margin: 0;
   font-family: var(--font-mono, 'SF Mono', Consolas, 'Liberation Mono', monospace);
@@ -664,13 +728,6 @@ onMounted(() => void load())
   color: var(--ink-2);
   max-height: 360px;
   overflow-y: auto;
-}
-
-.prompt-panel-foot {
-  display: flex;
-  gap: var(--gap-2);
-  padding: var(--gap-3) var(--gap-4);
-  border-top: 1px solid var(--line);
 }
 
 /* ---- 追问衍生 ---- */
@@ -732,7 +789,7 @@ onMounted(() => void load())
   gap: var(--gap-3);
 }
 
-/* 相关推荐是整齐网格，封面统一裁切高度，避免竖图把某一行撑得过高 */
+/* 相关推荐是整齐网格：封面固定等高、cover 铺满裁切，视觉整齐无留白 */
 .detail-related-grid :deep(.prompt-card) {
   border-radius: var(--detail-radius);
 }
@@ -760,8 +817,45 @@ onMounted(() => void load())
     gap: var(--gap-3);
   }
 
-  .gallery-frame {
-    height: 220px;
+  .detail-thumbs {
+    right: 8px;
+    top: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* 顶栏：面包屑独占一行，收藏/返回按钮换行到下一行右对齐 */
+  .detail-topline {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .detail-topline-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .detail-title {
+    font-size: 20px;
+  }
+
+  .detail-header {
+    padding: var(--gap-4);
+  }
+
+  .detail-header-meta {
+    flex-wrap: wrap;
+    gap: var(--gap-2);
+  }
+
+  .detail-thumb {
+    width: 44px;
+    height: 44px;
+  }
+
+  .prompt-panel-head {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 }
 </style>

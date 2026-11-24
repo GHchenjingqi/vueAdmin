@@ -94,7 +94,7 @@ const handleSubmit = async () => {
     ElMessage.success(t('forcePwd.changeSuccess'))
     userStore.setPasswordResetRequired(false)
     await initDynamicRoutes()
-    router.push('/')
+    router.push('/dashboard')
   } catch (err: unknown) {
     const axiosErr = err as { response?: { data?: { message?: string } } }
     ElMessage.error(axiosErr.response?.data?.message || getErrorMessage(err) || t('forcePwd.changeFailed'))

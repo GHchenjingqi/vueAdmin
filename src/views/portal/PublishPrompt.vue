@@ -37,16 +37,12 @@
                 </el-select>
               </el-form-item>
               <el-form-item :label="t('portal.model')" required>
-                <el-select
-                  v-model="form.modelName"
-                  filterable
-                  allow-create
-                  default-first-option
-                  :placeholder="t('portal.modelPlaceholder')"
-                  style="width: 100%"
-                >
-                  <el-option v-for="name in modelOptions" :key="name" :label="name" :value="name" />
-                </el-select>
+                <div class="model-derived">
+                  <template v-if="derivedModelNames.length">
+                    <el-tag v-for="name in derivedModelNames" :key="name" size="small" type="primary" effect="light">{{ name }}</el-tag>
+                  </template>
+                  <span v-else class="model-derived-empty">{{ t('portal.modelFromPlatforms') }}</span>
+                </div>
               </el-form-item>
             </div>
 
@@ -71,7 +67,7 @@
               @update:steps="form.steps = $event"
               @update:character-anchor="form.characterAnchor = $event"
             />
-            <PlatformImageGroups v-else v-model="form.platformGroups" :platforms="platforms" :title="t('portal.images')" />
+            <PlatformImageGroups v-else v-model="form.platformGroups" :platforms="platforms" :title="t('portal.images')" layout="tabs" />
           </div>
         </div>
 
@@ -86,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { portalApi, type PortalCategory, type PortalParentOption, type PortalPayload } from '@/api'
@@ -94,6 +90,7 @@ import type { PromptImageGroupInput, PromptPlatform, PromptStepInput, PromptType
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/error'
+import { deriveModelNames, joinModelNames } from '@/utils/modelNames'
 import PlatformImageGroups from './components/PlatformImageGroups.vue'
 import SequenceStepEditor from './components/SequenceStepEditor.vue'
 
@@ -116,7 +113,6 @@ const userStore = useUserStore()
 
 const categories = ref<PortalCategory[]>([])
 const platforms = ref<PromptPlatform[]>([])
-const modelOptions = ref<string[]>([])
 const parentOptions = ref<PortalParentOption[]>([])
 const parentLoading = ref(false)
 const form = reactive<PublishForm>({
@@ -134,6 +130,19 @@ const loading = ref(false)
 const submitting = ref(false)
 const editId = computed(() => Number(route.params.id) || 0)
 const isEdit = computed(() => editId.value > 0)
+
+/** 左侧模型 = 右侧效果图平台组的平台名集合（套组取所有步骤的平台组），实时联动 */
+const derivedModelNames = computed(() => {
+  const groups = form.type === 'sequence' ? form.steps.flatMap((step) => step.platformGroups) : form.platformGroups
+  return deriveModelNames(groups, platforms.value)
+})
+watch(
+  derivedModelNames,
+  (names) => {
+    form.modelName = joinModelNames(names)
+  },
+  { immediate: true },
+)
 
 const goMine = (): void => {
   void router.push('/portal/mine')
@@ -164,13 +173,11 @@ const load = async (): Promise<void> => {
   loading.value = true
   let parentTitleToRestore = ''
   try {
-    const [categoryRes, platformRes, modelRes] = await Promise.allSettled([portalApi.getCategories(), portalApi.getPlatforms(), portalApi.getModelOptions()])
+    const [categoryRes, platformRes] = await Promise.allSettled([portalApi.getCategories(), portalApi.getPlatforms()])
     if (categoryRes.status === 'fulfilled') categories.value = categoryRes.value.data
     else ElMessage.error(getErrorMessage(categoryRes.reason))
     if (platformRes.status === 'fulfilled') platforms.value = platformRes.value.data
     else ElMessage.error(getErrorMessage(platformRes.reason))
-    // 模型选项只是便利功能，接口异常时仍可手动录入，不阻断表单加载
-    if (modelRes.status === 'fulfilled') modelOptions.value = modelRes.value.data ?? []
     if (isEdit.value) {
       const res = await portalApi.getMinePrompt(editId.value)
       form.title = res.data.title
@@ -178,11 +185,7 @@ const load = async (): Promise<void> => {
       form.categoryId = res.data.categoryId
       form.parentId = res.data.parentId ?? null
       parentTitleToRestore = res.data.parentTitle ?? ''
-      form.modelName = res.data.modelName
-      // 编辑时若当前模型不在选项里（如自建的新模型），补上以保证回显可读
-      if (form.modelName && !modelOptions.value.includes(form.modelName)) {
-        modelOptions.value.unshift(form.modelName)
-      }
+      // 模型不再取存档值，统一由右侧效果图平台组派生（见 derivedModelNames watch）
       form.type = res.data.type === 'sequence' ? 'sequence' : 'single'
       form.characterAnchor = res.data.characterAnchor || ''
       if (form.type === 'sequence') {
@@ -413,6 +416,23 @@ onMounted(() => void load())
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
+}
+
+.model-derived {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--page-bg);
+}
+.model-derived-empty {
+  color: var(--ink-3);
+  font-size: 13px;
 }
 
 .publish-actions {

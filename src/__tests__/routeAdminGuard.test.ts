@@ -15,6 +15,21 @@ function loginAs(roles: string[]): void {
 }
 
 describe('后台路由守卫：仅管理员可访问', () => {
+  it('访问站点根路径重定向到前台提示词广场（发布链接直达广场，无需登录）', async () => {
+    await router.push('/')
+
+    expect(router.currentRoute.value.path).toBe('/portal/prompts')
+  })
+
+  it('已登录管理员访问后台登录页回到后台首页', async () => {
+    addDynamicRoutes(backendMenus)
+    loginAs(['admin'])
+
+    await router.push('/login')
+
+    expect(router.currentRoute.value.path).toBe('/dashboard')
+  })
+
   beforeEach(() => {
     localStorage.clear()
     useUserStore(pinia).logout()

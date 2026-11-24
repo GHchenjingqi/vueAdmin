@@ -86,6 +86,14 @@
       <el-row class="prompt-editor-layout">
         <el-col :span="12" class="prompt-editor-left">
           <ProForm ref="formRef" v-model="form" :schema="formSchema" :columns="2" :show-actions="false" label-width="100px">
+            <template #modelName>
+              <div class="model-derived">
+                <template v-if="derivedModelNames.length">
+                  <el-tag v-for="name in derivedModelNames" :key="name" size="small" type="primary" effect="light">{{ name }}</el-tag>
+                </template>
+                <span v-else class="model-derived-empty">{{ t('portal.modelFromPlatforms') }}</span>
+              </div>
+            </template>
             <template #parentId="{ modelValue, updateValue }">
               <el-select
                 :model-value="modelValue as ParentIdValue"
@@ -128,6 +136,7 @@
               :model-value="form.platformGroups"
               :platforms="platforms"
               :title="t('prompt.images')"
+              layout="tabs"
               :uploader="promptApi.uploadImage"
               @update:model-value="form.platformGroups = $event"
             />
@@ -165,12 +174,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, View } from '@element-plus/icons-vue'
 import { promptApi } from '@/api'
 import type { PromptCategory, PromptImageGroupInput, PromptItem, PromptPayload, PromptPlatform, PromptStats, PromptStepInput, PromptType } from '@/api/prompt'
 import { getErrorMessage } from '@/utils/error'
+import { deriveModelNames, joinModelNames } from '@/utils/modelNames'
 import ProTable from '@/components/ProTable/index.vue'
 import ProForm from '@/components/ProForm/index.vue'
 import PlatformImageGroups from '@/views/portal/components/PlatformImageGroups.vue'
@@ -240,7 +250,6 @@ const loading = ref(false)
 const pagination = reactive({ pageNum: 1, pageSize: 10, total: 0 })
 const searchParams = reactive<Record<string, unknown>>({ keyword: '', status: '', categoryId: '' })
 const categoryOptions = ref<PromptCategory[]>([])
-const modelOptions = ref<string[]>([])
 const platforms = ref<PromptPlatform[]>([])
 const parentOptions = ref<Array<{ id: number; title: string }>>([])
 const parentLoading = ref(false)
@@ -267,6 +276,19 @@ const form = reactive<PromptForm>({
 })
 const selectedRows = ref<PromptItem[]>([])
 
+/** 左侧模型 = 右侧效果图平台组的平台名集合（套组取所有步骤的平台组），实时联动 */
+const derivedModelNames = computed(() => {
+  const groups = form.type === 'sequence' ? form.steps.flatMap((step) => step.platformGroups) : form.platformGroups
+  return deriveModelNames(groups, platforms.value)
+})
+watch(
+  derivedModelNames,
+  (names) => {
+    form.modelName = joinModelNames(names)
+  },
+  { immediate: true },
+)
+
 const detailImageUrls = computed(() => (detail.value?.images ?? []).map((image) => image.url))
 
 const statCards = computed(() => [
@@ -291,12 +313,9 @@ const formSchema = computed(() => [
   {
     prop: 'modelName',
     label: t('prompt.model'),
-    type: 'select',
+    type: 'custom',
+    slot: 'modelName',
     required: true,
-    filterable: true,
-    placeholder: t('prompt.modelPlaceholder'),
-    options: () => modelOptions.value.map((name) => ({ label: name, value: name })),
-    props: { 'allow-create': true, 'default-first-option': true },
   },
   { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, span: 24, props: { rows: 8, autosize: false } },
 ])
@@ -321,18 +340,12 @@ const fetchRows = async (): Promise<void> => {
 }
 
 const fetchOptions = async (): Promise<void> => {
-  const [categories, models, platformList] = await Promise.allSettled([
-    promptApi.getCategoryOptions(),
-    promptApi.getModelOptions(),
-    promptApi.getPlatformOptions(),
-  ])
+  const [categories, platformList] = await Promise.allSettled([promptApi.getCategoryOptions(), promptApi.getPlatformOptions()])
   if (categories.status === 'fulfilled') {
     categoryOptions.value = categories.value.data
   } else {
     ElMessage.error(getErrorMessage(categories.reason))
   }
-  // 模型选项只是便利功能，接口异常时仍可手动录入，不阻断分类加载
-  if (models.status === 'fulfilled') modelOptions.value = models.value.data ?? []
   // 平台列表用于效果图按平台分组；加载失败时分组退化为默认平台
   if (platformList.status === 'fulfilled') platforms.value = platformList.value.data ?? []
 }
@@ -461,7 +474,7 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
       form.categoryId = form.categoryIds[0]
       form.parentId = loaded.parentId ?? null
       parentTitle = loaded.parentTitle ?? ''
-      form.modelName = loaded.modelName
+      // 模型不再取存档值，统一由右侧效果图平台组派生（见 derivedModelNames watch）
       form.type = loaded.type === 'sequence' ? 'sequence' : 'single'
       form.characterAnchor = loaded.characterAnchor || ''
       if (form.type === 'sequence') {
@@ -740,6 +753,22 @@ onMounted(() => {
 .prompt-images-title {
   font-weight: 600;
   margin-bottom: 8px;
+}
+.model-derived {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  background: var(--el-fill-color-lighter);
+}
+.model-derived-empty {
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
 }
 .prompt-detail-title {
   margin: 0 0 4px;

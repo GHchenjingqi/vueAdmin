@@ -17,7 +17,7 @@ export const savedPath: string = window.location.pathname
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/portal/prompts',
     name: 'Layout',
     component: Layout,
     meta: { requiresAuth: true },
@@ -53,6 +53,12 @@ const routes = [
         name: 'PortalPrompts',
         component: () => import('@/views/portal/PromptSquare.vue'),
         meta: { title: '提示词广场' },
+      },
+      {
+        path: 'poses',
+        name: 'PortalPoses',
+        component: () => import('@/views/portal/PoseGallery.vue'),
+        meta: { title: '姿势参考库' },
       },
       {
         path: 'prompts/:id',
@@ -151,7 +157,8 @@ router.beforeEach((to, _from, next) => {
     if (passwordResetRequired && currentPath !== '/force-password-change') {
       next({ path: '/force-password-change' })
     } else {
-      next({ path: '/' })
+      // 已登录用户误入 /login 时回到后台首页（站点根路径 '/' 现为前台广场）
+      next({ path: '/dashboard' })
     }
   } else if (isBackendRoute && isLoggedIn && !isAdmin) {
     // 非管理员禁止进入后台（手动输入后台路径同样拦截），统一回到前台广场

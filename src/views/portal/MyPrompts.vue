@@ -23,8 +23,8 @@
       </el-input>
     </div>
 
-    <div v-loading="loading" class="mine-card">
-      <el-table v-if="rows.length" :data="rows" row-key="id" style="width: 100%">
+    <div v-loading="loading" class="mine-card" :class="{ 'mine-table-scroll': isNarrow }">
+      <el-table v-if="rows.length" :data="rows" row-key="id" :style="isNarrow ? { minWidth: '900px' } : { width: '100%' }">
         <el-table-column :label="t('prompt.cover')" width="90">
           <template #default="{ row }">
             <el-image v-if="row.coverImage" :src="row.coverImage" fit="cover" class="mine-cover" :preview-src-list="[row.coverImage]" preview-teleported />
@@ -45,7 +45,7 @@
         <el-table-column :label="t('prompt.rejectReason')" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">{{ row.rejectReason || '-' }}</template>
         </el-table-column>
-        <el-table-column :label="t('portal.actions')" width="230" fixed="right">
+        <el-table-column :label="t('portal.actions')" width="230" :fixed="isNarrow ? false : 'right'">
           <template #default="{ row }">
             <el-button v-if="canEdit(row.status)" link type="primary" size="small" @click="edit(row.id)">
               {{ t('common.edit') }}
@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
@@ -91,6 +91,12 @@ const page = ref(1)
 const pageSize = 10
 const total = ref(0)
 const loading = ref(false)
+
+const isNarrow = ref(false)
+let mq: MediaQueryList | null = null
+const syncNarrow = (event: MediaQueryList | MediaQueryListEvent): void => {
+  isNarrow.value = event.matches
+}
 
 type TagType = 'success' | 'info' | 'warning' | 'danger'
 const statusType = (value: unknown): TagType => {
@@ -166,12 +172,20 @@ const remove = async (id: number): Promise<void> => {
 }
 
 onMounted(() => {
+  mq = window.matchMedia('(max-width: 900px)')
+  syncNarrow(mq)
+  mq.addEventListener('change', syncNarrow)
   if (!userStore.isLoggedIn) {
     ElMessage.warning(t('portal.loginRequired'))
     void router.push({ path: '/portal/login', query: { redirect: route.fullPath } })
     return
   }
   void fetchList()
+})
+
+onUnmounted(() => {
+  mq?.removeEventListener('change', syncNarrow)
+  mq = null
 })
 </script>
 
@@ -210,6 +224,11 @@ onMounted(() => {
   min-height: 200px;
 }
 
+.mine-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .mine-cover {
   width: 56px;
   height: 42px;
@@ -224,5 +243,16 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .mine-head h1 {
+    font-size: 20px;
+  }
+
+  .mine-filters :deep(.el-select),
+  .mine-filters :deep(.el-input) {
+    width: 100% !important;
+  }
 }
 </style>

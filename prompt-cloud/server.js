@@ -842,7 +842,7 @@ const storage = multer.diskStorage({
 const allowedExt = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase()
     if (!allowedExt.includes(ext)) return cb(new Error('仅支持 png/jpg/gif/webp/bmp/svg 图片'))
@@ -1646,7 +1646,7 @@ app.get('*', (req, res) => {
 
 app.use((err, _req, res, _next) => {
   const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 400 : 500)
-  const message = err.code === 'LIMIT_FILE_SIZE' ? '图片大小不能超过 5MB' : err.message || '服务器内部错误'
+  const message = err.code === 'LIMIT_FILE_SIZE' ? '图片大小不能超过 15MB' : err.message || '服务器内部错误'
   fail(res, message, status)
 })
 

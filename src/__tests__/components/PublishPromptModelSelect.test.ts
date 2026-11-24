@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   portalApi: {
     getCategories: vi.fn(),
     getPlatforms: vi.fn(),
-    getModelOptions: vi.fn(),
     getParentOptions: vi.fn(),
     getMinePrompt: vi.fn(),
     createMine: vi.fn(),
@@ -43,21 +42,7 @@ import PublishPrompt from '@/views/portal/PublishPrompt.vue'
 
 const stubComponent = (name?: string) => ({
   name,
-  props: [
-    'modelValue',
-    'steps',
-    'characterAnchor',
-    'platforms',
-    'max',
-    'filterable',
-    'allowCreate',
-    'defaultFirstOption',
-    'placeholder',
-    'remote',
-    'loading',
-    'remoteMethod',
-    'clearable',
-  ],
+  props: ['modelValue', 'steps', 'characterAnchor', 'platforms', 'max', 'filterable', 'remote', 'loading', 'remoteMethod', 'clearable'],
   template: '<div class="stub"><slot /></div>',
   methods: { validate: () => Promise.resolve(true) },
 })
@@ -77,44 +62,50 @@ const mountPage = () =>
         'el-select': stubComponent('ElSelect'),
         'el-option': stubComponent(),
         'el-button': stubComponent(),
+        'el-tag': { template: '<span class="model-tag"><slot /></span>' },
       },
     },
   })
 
 const vm = (wrapper: ReturnType<typeof mountPage>) => wrapper.vm as unknown as Record<string, any>
 
-describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
+const platforms = [
+  { id: 2, name: '即梦' },
+  { id: 4, name: 'GPT' },
+  { id: 9, name: '混元' },
+]
+
+describe('PublishPrompt.vue 模型由效果图平台组联动派生', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
     routeParams.id = ''
     stableRoute.params.id = ''
     mocks.portalApi.getCategories.mockResolvedValue({ data: [{ id: 1, name: '人物' }] })
-    mocks.portalApi.getPlatforms.mockResolvedValue({ data: [{ id: 2, name: '通用' }] })
-    mocks.portalApi.getModelOptions.mockResolvedValue({ data: ['Midjourney', 'Stable Diffusion'] })
+    mocks.portalApi.getPlatforms.mockResolvedValue({ data: platforms })
     mocks.portalApi.getParentOptions.mockResolvedValue({ data: [{ id: 5, title: '原始提示词' }] })
     mocks.portalApi.createMine.mockResolvedValue({ data: { id: 1 } })
     mocks.portalApi.updateMine.mockResolvedValue({ data: { id: 1 } })
   })
 
-  it('1. 加载后模型选项来自公开接口，且模型字段渲染为可搜索下拉（filterable + allow-create）', async () => {
+  it('1. 右侧新增平台组后，左侧模型集合与 form.modelName 同步（去重、按平台组顺序）', async () => {
     const wrapper = mountPage()
     await nextTick()
     await flushPromises()
     await nextTick()
     const state = vm(wrapper)
-    expect(state.modelOptions).toEqual(['Midjourney', 'Stable Diffusion'])
-    // 表单内三个下拉：关联原提示词 / 分类 / 模型，模型是最后一个
-    const selects = wrapper.findAllComponents({ name: 'ElSelect' })
-    const select = selects[selects.length - 1]
-    expect(select).toBeDefined()
-    // stub 组件对无值布尔属性接收为空字符串，只断言属性已传入即可
-    expect('filterable' in select.props()).toBe(true)
-    expect('allowCreate' in select.props()).toBe(true)
-    expect('defaultFirstOption' in select.props()).toBe(true)
+
+    state.form.platformGroups = [
+      { platformId: 2, images: [] },
+      { platformId: 4, images: [] },
+      { platformId: 2, images: [] },
+    ]
+    await nextTick()
+    expect(state.derivedModelNames).toEqual(['即梦', 'GPT'])
+    expect(state.form.modelName).toBe('即梦 / GPT')
   })
 
-  it('2. 手动录入新模型后提交，payload 携带手输的值', async () => {
+  it('2. 提交时 payload.modelName 为平台名集合，忽略手填旧值', async () => {
     const wrapper = mountPage()
     await nextTick()
     await flushPromises()
@@ -123,16 +114,18 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     state.form.title = '标题'
     state.form.content = '正文'
     state.form.categoryId = 1
-    state.form.modelName = '自研模型 X'
-    state.form.platformGroups = [{ platformId: 2, images: [{ url: '/uploads/a.png', filePath: 'f1', sort: 0, isCover: true }] }]
+    state.form.modelName = '手填旧值'
+    state.form.platformGroups = [
+      { platformId: 4, images: [{ url: '/uploads/a.png', filePath: 'f1', sort: 0, isCover: true }] },
+      { platformId: 9, images: [] },
+    ]
+    await nextTick()
     await state.handleSubmit(false)
-    expect(mocks.portalApi.createMine).toHaveBeenCalledTimes(1)
     const payload = mocks.portalApi.createMine.mock.calls[0][0]
-    expect(payload.modelName).toBe('自研模型 X')
+    expect(payload.modelName).toBe('GPT / 混元')
   })
 
-  it('3. 编辑时若当前模型不在选项列表中，补进列表保证回显', async () => {
-    routeParams.id = '9'
+  it('3. 编辑时左侧模型由平台组派生，不取存档的 modelName', async () => {
     stableRoute.params.id = '9'
     mocks.portalApi.getMinePrompt.mockResolvedValue({
       data: {
@@ -140,11 +133,11 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
         title: '旧投稿',
         content: '正文',
         categoryId: 1,
-        modelName: '冷门模型',
+        modelName: '过时模型',
         type: 'single',
         characterAnchor: '',
         steps: [],
-        platformGroups: [],
+        platformGroups: [{ platformId: 9, images: [{ url: '/uploads/a.png', filePath: 'f1', sort: 0, isCover: true }] }],
         images: [],
       },
     })
@@ -153,23 +146,24 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     await flushPromises()
     await nextTick()
     const state = vm(wrapper)
-    expect(state.form.modelName).toBe('冷门模型')
-    expect(state.modelOptions).toContain('冷门模型')
-    expect(state.modelOptions[0]).toBe('冷门模型')
+    expect(state.derivedModelNames).toEqual(['混元'])
+    expect(state.form.modelName).toBe('混元')
   })
 
-  it('4. 模型选项接口失败时仍能手动录入，不阻断表单加载', async () => {
-    mocks.portalApi.getModelOptions.mockRejectedValue(new Error('network'))
+  it('4. 套组模式的模型来自所有步骤的平台组，跨步骤去重', async () => {
     const wrapper = mountPage()
     await nextTick()
     await flushPromises()
     await nextTick()
     const state = vm(wrapper)
-    expect(state.modelOptions).toEqual([])
-    expect(state.loading).toBe(false)
-    // 表单其余字段正常加载
-    expect(state.categories).toHaveLength(1)
-    expect(state.platforms).toHaveLength(1)
+    state.form.type = 'sequence'
+    state.form.steps = [
+      { name: '步骤1', platformGroups: [{ platformId: 2, images: [] }] },
+      { name: '步骤2', platformGroups: [{ platformId: 2, images: [] }, { platformId: 9, images: [] }] },
+    ]
+    await nextTick()
+    expect(state.derivedModelNames).toEqual(['即梦', '混元'])
+    expect(state.form.modelName).toBe('即梦 / 混元')
   })
 
   it('5. 新增时加载可关联的已发布提示词，关联下拉为可搜索远程下拉', async () => {
@@ -194,9 +188,9 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     state.form.title = '追问'
     state.form.content = '追问正文'
     state.form.categoryId = 1
-    state.form.modelName = 'MJ'
     state.form.parentId = 5
     state.form.platformGroups = [{ platformId: 2, images: [{ url: '/uploads/a.png', filePath: 'f1', sort: 0, isCover: true }] }]
+    await nextTick()
     await state.handleSubmit(false)
     const payload = mocks.portalApi.createMine.mock.calls[0][0]
     expect(payload.parentId).toBe(5)
@@ -227,7 +221,6 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     const state = vm(wrapper)
     expect(state.form.parentId).toBe(5)
     expect(mocks.portalApi.getParentOptions).toHaveBeenCalledWith({ keyword: '', excludeId: 9 })
-    // 后端列表未返回原关联项时补上，保证下拉可读
     expect(state.parentOptions).toEqual(expect.arrayContaining([{ id: 5, title: '原始提示词' }]))
   })
 
@@ -241,5 +234,16 @@ describe('PublishPrompt.vue 模型字段可下拉+手输', () => {
     expect(state.parentOptions).toEqual([])
     expect(state.loading).toBe(false)
     expect(state.categories).toHaveLength(1)
+  })
+
+  it('9. 单条模式的效果图平台组使用 tab 布局（与后台一致）', async () => {
+    const wrapper = mountPage()
+    await nextTick()
+    await flushPromises()
+    await nextTick()
+    const groups = wrapper.findComponent({ name: 'PlatformImageGroups' })
+    expect(groups.exists()).toBe(true)
+    // stub 未声明 layout prop，会落到 attrs 上
+    expect(groups.attributes('layout')).toBe('tabs')
   })
 })

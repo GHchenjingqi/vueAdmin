@@ -324,7 +324,7 @@ const handleLogin = async (): Promise<void> => {
       }
       const menuStore = useMenuStore()
       const firstPath = menuStore.findFirstMenuPath()
-      router.push(firstPath || '/')
+      router.push(firstPath || '/dashboard')
     }
   } catch (err: unknown) {
     const axiosErr = err as { response?: { data?: { message?: string } }; message?: string }

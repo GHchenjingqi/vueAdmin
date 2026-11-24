@@ -87,4 +87,18 @@ describe('PromptDetail 派生链节点', () => {
     expect(tos.some((t) => t && t.includes('/portal/prompts/1'))).toBe(true)
     expect(tos.some((t) => t && t.includes('/portal/prompts/2'))).toBe(true)
   })
+
+  it('非当前节点正文带折叠 class（仅显示 2 行），当前节点正文不折叠', async () => {
+    const wrapper = mountPage()
+    await nextTick()
+    await nextTick()
+    await nextTick()
+
+    const contents = wrapper.findAll('.chain-content')
+    expect(contents).toHaveLength(3)
+    // 前两个上游节点折叠，当前节点（index 2）完整显示
+    expect(contents[0].classes()).toContain('chain-content-collapsed')
+    expect(contents[1].classes()).toContain('chain-content-collapsed')
+    expect(contents[2].classes()).not.toContain('chain-content-collapsed')
+  })
 })

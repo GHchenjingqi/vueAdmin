@@ -65,7 +65,7 @@ const beforeUpload = (file: File): boolean => {
     ElMessage.error(t('portal.imageTypeInvalid'))
     return false
   }
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > 15 * 1024 * 1024) {
     ElMessage.error(t('portal.imageSizeExceeded'))
     return false
   }

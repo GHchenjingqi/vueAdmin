@@ -49,6 +49,10 @@
             <el-icon><Compass /></el-icon>
             <span>{{ t('portal.navSquare') }}</span>
           </router-link>
+          <router-link to="/portal/poses" class="side-nav-item">
+            <el-icon><Picture /></el-icon>
+            <span>{{ t('portal.navPoses') }}</span>
+          </router-link>
           <router-link to="/portal/publish" class="side-nav-item">
             <el-icon><EditPen /></el-icon>
             <span>{{ t('portal.navPublish') }}</span>
@@ -68,7 +72,7 @@
         </nav>
 
         <div class="side-bottom">
-          <router-link v-if="isAdmin" to="/" class="side-admin-link">
+          <router-link v-if="isAdmin" to="/dashboard" class="side-admin-link">
             <el-icon><Setting /></el-icon>
             <span>{{ t('portal.navAdmin') }}</span>
           </router-link>
@@ -88,7 +92,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, Search, MagicStick, Compass, EditPen, Document, Star, Setting } from '@element-plus/icons-vue'
+import { ArrowDown, Search, MagicStick, Compass, Picture, EditPen, Document, Star, Setting } from '@element-plus/icons-vue'
 import { authApi } from '@/api'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
@@ -366,7 +370,6 @@ const handleUserCommand = async (command: string): Promise<void> => {
     max-width: none;
   }
 
-  .front-login-link,
   .front-user-name {
     display: none;
   }
@@ -403,6 +406,33 @@ const handleUserCommand = async (command: string): Promise<void> => {
   .front-main {
     margin-left: 0;
     padding: 16px 12px;
+  }
+}
+
+/* 窄屏：顶部通栏改两行——第一行品牌 + 账户，第二行搜索框占满整行 */
+@media (max-width: 640px) {
+  .front-header {
+    height: auto;
+  }
+
+  .front-header-inner {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .front-search {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .front-actions {
+    margin-left: auto;
+  }
+
+  .front-search .el-button {
+    padding: 0 14px;
   }
 }
 </style>
