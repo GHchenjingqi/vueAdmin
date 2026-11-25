@@ -53,6 +53,14 @@
             <el-icon><Picture /></el-icon>
             <span>{{ t('portal.navPoses') }}</span>
           </router-link>
+          <router-link to="/portal/collections" class="side-nav-item">
+            <el-icon><Files /></el-icon>
+            <span>{{ t('portal.navCollections') }}</span>
+          </router-link>
+          <router-link to="/portal/characters" class="side-nav-item">
+            <el-icon><Avatar /></el-icon>
+            <span>{{ t('portal.navCharacters') }}</span>
+          </router-link>
           <router-link to="/portal/publish" class="side-nav-item">
             <el-icon><EditPen /></el-icon>
             <span>{{ t('portal.navPublish') }}</span>
@@ -92,7 +100,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, Search, MagicStick, Compass, Picture, EditPen, Document, Star, Setting } from '@element-plus/icons-vue'
+import { ArrowDown, Search, MagicStick, Compass, Picture, Files, Avatar, EditPen, Document, Star, Setting } from '@element-plus/icons-vue'
 import { authApi } from '@/api'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'

@@ -25,6 +25,7 @@ const IMAGES_PER_GROUP = 20
 const IMAGES_PER_STEP_GROUP = 1
 const MAX_STEPS = 100
 const MAX_CATEGORIES = 10
+const MAX_RELATED_PROMPTS = 50
 const MAX_CHAIN_DEPTH = 20
 const DEFAULT_PLATFORM_ID = 1
 const DEFAULT_PLATFORM_NAMES = ['通用', '即梦', '可灵', 'GPT', 'Midjourney', 'Stable Diffusion', '通义万相']
@@ -372,6 +373,32 @@ function ensureIntegrationData(db) {
   return migrated
 }
 
+// 短剧方向特殊分类：「提示词专题」与「角色库」的固定归属分类，缺失时自动补种
+const SPECIAL_CATEGORY_NAMES = { collection: '提示词', character: '角色库' }
+
+function ensureSpecialCategories(db) {
+  let migrated = false
+  db.seq = db.seq || {}
+  for (const name of Object.values(SPECIAL_CATEGORY_NAMES)) {
+    if (!db.categories.some((c) => c.name === name)) {
+      const id = Math.max(0, ...db.categories.map((c) => Number(c.id) || 0)) + 1
+      db.categories.push({
+        id,
+        name,
+        description: null,
+        sort: 0,
+        status: 1,
+        parentId: null,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      })
+      db.seq.category = Math.max(Number(db.seq.category) || 0, id)
+      migrated = true
+    }
+  }
+  return migrated
+}
+
 function loadDb() {
   let loaded = null
   try {
@@ -395,9 +422,11 @@ function loadDb() {
   const sequenceMigrated = ensureSequence(db)
   const demoMigrated = ensureDemo(db)
   const integrationMigrated = ensureIntegrationData(db)
-  if (demoMigrated || platformMigrated || sequenceMigrated || integrationMigrated || !loaded) {
+  const specialCategoryMigrated = ensureSpecialCategories(db)
+  if (demoMigrated || platformMigrated || sequenceMigrated || integrationMigrated || specialCategoryMigrated || !loaded) {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8')
     if (integrationMigrated) console.log('initialized AI push API key')
+    if (specialCategoryMigrated) console.log('ensured special categories for collections and character library')
     if (demoMigrated && platformMigrated) console.log('seeded demo prompts and upgraded platform groups')
     else if (demoMigrated) console.log('seeded demo prompts into empty database')
     else if (platformMigrated) console.log('upgraded legacy images into default platform group')
@@ -638,12 +667,16 @@ function publicPoseImage(img) {
 }
 
 function hasPromptResultImages(prompt) {
+  if (prompt.type === 'collection') return relatedIdsOf(prompt).length > 0
+  if (prompt.type === 'character') return imagesOf(prompt.id).length > 0
   return (prompt.type === 'character-pose' ? resultImagesOf(prompt.id) : imagesOf(prompt.id)).length > 0
 }
 
 function writePromptImages(promptId, data) {
   if (data.type === 'sequence') replaceSteps(promptId, data)
   else if (data.type === 'character-pose') replaceCharacterPose(promptId, data)
+  else if (data.type === 'character') replaceCharacterLibrary(promptId, data)
+  else if (data.type === 'collection') db.images = db.images.filter((img) => img.promptId !== promptId)
   else if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(promptId, data)
 }
 
@@ -661,6 +694,53 @@ function characterPoseOf(promptId) {
     }
   })
   return { characterImage: publicPoseImage(character), poses }
+}
+
+/** 专题关联的提示词 ID 列表（存于 prompt.relatedIds，去重） */
+function relatedIdsOf(prompt) {
+  const raw = Array.isArray(prompt.relatedIds) ? prompt.relatedIds : []
+  return Array.from(new Set(raw.map(Number).filter((id) => Number.isFinite(id) && id > 0)))
+}
+
+function relatedPromptBrief(id) {
+  const target = livePrompts().find((p) => p.id === Number(id) && p.status === 'published')
+  if (!target) return null
+  const imgs = imagesOf(target.id)
+  const cover = imgs.find((img) => img.isCover === 1) || imgs[0]
+  const category = db.categories.find((c) => c.id === target.categoryId)
+  return {
+    id: target.id,
+    title: target.title,
+    coverImage: cover ? cover.url : '',
+    modelName: target.modelName || '',
+    categoryName: category ? category.name : '',
+    type: target.type || 'single',
+  }
+}
+
+function relatedPromptsOf(prompt) {
+  return relatedIdsOf(prompt)
+    .map((id) => relatedPromptBrief(id))
+    .filter(Boolean)
+}
+
+/** 角色库资产：三视图 / 服装三视图 / 发型特写 / 道具图 四组，usage 即组名 */
+const CHARACTER_LIBRARY_GROUPS = [
+  { key: 'turnarounds', usage: 'char-view' },
+  { key: 'costumes', usage: 'costume' },
+  { key: 'hairstyles', usage: 'hairstyle' },
+  { key: 'props', usage: 'prop' },
+]
+
+function characterLibraryOf(promptId) {
+  const images = imagesOf(promptId)
+  const result = {}
+  for (const group of CHARACTER_LIBRARY_GROUPS) {
+    result[group.key] = images
+      .filter((img) => img.usage === group.usage)
+      .map((img) => ({ url: img.url, filePath: img.filePath ?? null, sort: img.sort ?? 0 }))
+  }
+  return result
 }
 
 function stepsOf(promptId) {
@@ -687,6 +767,12 @@ function stepsOf(promptId) {
 /** 分类多选：优先 categoryIds，未传时回退 categoryId，兼容投稿等旧调用方 */
 function resolveCategoryIds(data) {
   const raw = Array.isArray(data.categoryIds) && data.categoryIds.length ? data.categoryIds : [data.categoryId]
+  return Array.from(new Set(raw.map(Number).filter((id) => Number.isFinite(id) && id > 0)))
+}
+
+/** 专题关联提示词入参：去重 + 过滤非法值 */
+function relatedInputIds(data) {
+  const raw = Array.isArray(data.relatedIds) ? data.relatedIds : []
   return Array.from(new Set(raw.map(Number).filter((id) => Number.isFinite(id) && id > 0)))
 }
 
@@ -768,6 +854,31 @@ function isPosePrompt(prompt, poseIds = poseCategoryIds()) {
   return resolveCategoryIds(prompt).some((id) => poseIds.has(id))
 }
 
+/** 提示词数据分组：pose=姿势库，collection=提示词专题，character=角色库，null=普通提示词 */
+function promptGroup(prompt, poseIds = poseCategoryIds()) {
+  if (prompt.type === 'collection') return 'collection'
+  if (prompt.type === 'character') return 'character'
+  if (isPosePrompt(prompt, poseIds)) return 'pose'
+  return null
+}
+
+function matchesScope(prompt, scope, poseIds) {
+  return String(scope || '') === '' ? promptGroup(prompt, poseIds) === null : promptGroup(prompt, poseIds) === String(scope)
+}
+
+/** 特殊类型归属分类 ID：分类缺失时返回 null（由 ensureSpecialCategories 兜底补种） */
+function specialCategoryId(type) {
+  const name = SPECIAL_CATEGORY_NAMES[type]
+  if (!name) return null
+  const category = db.categories.find((c) => c.name === name)
+  return category ? category.id : null
+}
+
+/** 全部特殊分类 ID（提示词专题 + 角色库），用于在广场/普通列表中隐藏 */
+function specialCategoryIds() {
+  return new Set(Object.values(SPECIAL_CATEGORY_NAMES).map((name) => db.categories.find((c) => c.name === name)?.id).filter(Boolean))
+}
+
 function decorate(prompt) {
   const category = db.categories.find((c) => c.id === prompt.categoryId)
   const categoryIds = resolveCategoryIds(prompt)
@@ -779,13 +890,20 @@ function decorate(prompt) {
   const parentMeta = resolveParentChain(prompt)
   const isSequence = prompt.type === 'sequence'
   const isCharacterPose = prompt.type === 'character-pose'
+  const isCollection = prompt.type === 'collection'
+  const isCharacter = prompt.type === 'character'
   const steps = isSequence ? stepsOf(prompt.id) : []
   const characterPoseData = isCharacterPose ? characterPoseOf(prompt.id) : null
+  const characterLibraryData = isCharacter ? characterLibraryOf(prompt.id) : null
+  const relatedPrompts = isCollection ? relatedPromptsOf(prompt) : []
+  const relatedBriefs = relatedPrompts.map((item) => ({ id: item.id, coverImage: item.coverImage }))
   const coverPool = isSequence && steps.length && steps[0].platformGroups.length
     ? steps[0].platformGroups[0].images
     : isCharacterPose
       ? resultImagesOf(prompt.id)
-      : images
+      : isCollection
+        ? relatedBriefs.map((brief) => ({ isCover: 0, url: brief.coverImage })).filter((item) => item.url)
+        : images
   const cover = coverPool.find((img) => img.isCover === 1) || coverPool[0]
   return {
     id: prompt.id,
@@ -805,6 +923,9 @@ function decorate(prompt) {
     characterAnchor: prompt.characterAnchor ?? null,
     steps,
     characterPose: characterPoseData,
+    characterLibrary: characterLibraryData,
+    relatedIds: isCollection ? relatedIdsOf(prompt) : [],
+    relatedPrompts,
     status: prompt.status,
     source: prompt.source,
     authorId: prompt.authorId,
@@ -838,6 +959,10 @@ function inputGroups(data) {
 }
 
 function countInputImages(data) {
+  if (data.type === 'character') {
+    const payload = data.characterLibrary && typeof data.characterLibrary === 'object' ? data.characterLibrary : {}
+    return CHARACTER_LIBRARY_GROUPS.reduce((sum, group) => sum + (Array.isArray(payload[group.key]) ? payload[group.key].filter((img) => img && img.url).length : 0), 0)
+  }
   if (data.type === 'character-pose') {
     return (Array.isArray(data.characterPose?.poses) ? data.characterPose.poses : []).reduce(
       (sum, pose) =>
@@ -972,8 +1097,33 @@ function replaceCharacterPose(promptId, data) {
   })
 }
 
-function characterPoseError(data, requireGenerated) {
-  const payload = data.characterPose && typeof data.characterPose === 'object' ? data.characterPose : {}
+/** 角色库：按四组写入 usage 标记的图片，无平台分组概念 */
+function replaceCharacterLibrary(promptId, data) {
+  db.images = db.images.filter((img) => img.promptId !== promptId)
+  const payload = data.characterLibrary && typeof data.characterLibrary === 'object' ? data.characterLibrary : {}
+  let first = true
+  for (const group of CHARACTER_LIBRARY_GROUPS) {
+    const images = Array.isArray(payload[group.key]) ? payload[group.key] : []
+    images.forEach((img, index) => {
+      if (!img || !img.url) return
+      db.images.push({
+        id: nextId('image'),
+        promptId,
+        platformId: DEFAULT_PLATFORM_ID,
+        stepId: null,
+        url: String(img.url),
+        filePath: img.filePath ?? null,
+        sort: index,
+        isCover: first ? 1 : 0,
+        usage: group.usage,
+        imageKey: group.usage,
+      })
+      first = false
+    })
+  }
+}
+
+function characterPoseError(data, requireGenerated) {  const payload = data.characterPose && typeof data.characterPose === 'object' ? data.characterPose : {}
   if (!payload.characterImage || !payload.characterImage.url) return '请选择角色图'
   const poses = Array.isArray(payload.poses) ? payload.poses : []
   if (!poses.length) return '请至少添加一个姿势'
@@ -994,7 +1144,28 @@ function characterPoseError(data, requireGenerated) {
 
 function validationError(data, requireImage) {
   if (!data.title || !String(data.title).trim()) return '标题不能为空'
-  if (!data.content || !String(data.content).trim()) return '提示词正文不能为空'
+  // 角色库的描述可选；其余类型正文必填
+  if (data.type !== 'character' && (!data.content || !String(data.content).trim())) return '提示词正文不能为空'
+  if (data.type === 'collection') {
+    const ids = relatedInputIds(data)
+    if (!ids.length) return '请至少关联一个提示词'
+    if (ids.length > MAX_RELATED_PROMPTS) return `最多关联 ${MAX_RELATED_PROMPTS} 个提示词`
+    for (const id of ids) {
+      const target = livePrompts().find((p) => p.id === id && p.status === 'published')
+      if (!target) return '关联的提示词不存在或未发布'
+      if (target.type === 'collection' || target.type === 'character') return '专题不能关联提示词专题或角色库'
+    }
+    return null
+  }
+  if (data.type === 'character') {
+    const payload = data.characterLibrary && typeof data.characterLibrary === 'object' ? data.characterLibrary : {}
+    for (const group of CHARACTER_LIBRARY_GROUPS) {
+      const images = Array.isArray(payload[group.key]) ? payload[group.key] : []
+      if (images.filter((img) => img && img.url).length > IMAGES_PER_GROUP) return `每组最多上传 ${IMAGES_PER_GROUP} 张图片`
+    }
+    if (requireImage && countInputImages(data) === 0) return '请至少上传一张角色资产图'
+    return null
+  }
   if (!data.modelName || !String(data.modelName).trim()) return '模型名称不能为空'
   const categoryIds = resolveCategoryIds(data)
   if (!categoryIds.length) return '请选择分类'
@@ -1041,15 +1212,20 @@ function findOwned(id, userId) {
 }
 
 function trimData(data) {
+  const type = ['sequence', 'character-pose', 'collection', 'character'].includes(data.type) ? data.type : 'single'
+  // 特殊类型强制归属固定分类（提示词专题→「提示词」，角色库→「角色库」），分类缺失时由启动迁移兜底
+  const specialId = type === 'collection' || type === 'character' ? specialCategoryId(type) : null
+  const categoryIds = specialId ? [specialId] : resolveCategoryIds(data)
   return {
     title: String(data.title || '').trim(),
     content: String(data.content || '').trim(),
-    categoryId: resolveCategoryIds(data)[0],
-    categoryIds: resolveCategoryIds(data),
+    categoryId: categoryIds[0],
+    categoryIds,
     parentId: data.parentId ? Number(data.parentId) : null,
-    modelName: String(data.modelName || '').trim(),
-    type: data.type === 'sequence' || data.type === 'character-pose' ? data.type : 'single',
+    modelName: String(data.modelName || '').trim() || (specialId ? '通用' : ''),
+    type,
     characterAnchor: data.type === 'sequence' && data.characterAnchor ? String(data.characterAnchor).trim() : null,
+    ...(type === 'collection' ? { relatedIds: relatedInputIds(data) } : {}),
   }
 }
 
@@ -1304,6 +1480,32 @@ const MENU_TREE = [
         visible: true,
         children: [],
       },
+      {
+        id: 8,
+        parentId: 2,
+        name: '提示词专题',
+        path: '/prompt-collections',
+        component: 'views/prompt/CollectionManage.vue',
+        icon: 'Files',
+        type: 'M',
+        sort: 5,
+        status: 1,
+        visible: true,
+        children: [],
+      },
+      {
+        id: 9,
+        parentId: 2,
+        name: '角色库',
+        path: '/character-library',
+        component: 'views/prompt/CharacterLibraryManage.vue',
+        icon: 'Avatar',
+        type: 'M',
+        sort: 6,
+        status: 1,
+        visible: true,
+        children: [],
+      },
     ],
   },
 ]
@@ -1415,9 +1617,14 @@ const portal = express.Router()
 
 portal.get('/categories', (req, res) => {
   const poseIds = poseCategoryIds()
+  const specialIds = specialCategoryIds()
   const scope = String(req.query.scope || '')
   const rows = db.categories
-    .filter((c) => (scope === 'pose' ? poseIds.has(c.id) : c.status === 1 && !poseIds.has(c.id)))
+    .filter((c) => {
+      if (scope === 'pose') return poseIds.has(c.id)
+      if (scope === 'collection' || scope === 'character') return c.id === specialCategoryId(scope)
+      return c.status === 1 && !poseIds.has(c.id) && !specialIds.has(c.id)
+    })
     .sort((a, b) => a.sort - b.sort || a.id - b.id)
     .map((c) => ({ ...c, promptCount: livePrompts().filter((p) => hasCategory(p, c.id) && p.status === 'published').length }))
   ok(res, rows)
@@ -1437,17 +1644,31 @@ portal.get('/model-options', (_req, res) => {
 portal.get('/parent-options', (req, res) => {
   const keyword = String(req.query.keyword || '').trim().toLowerCase()
   const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null
-  let rows = livePrompts().filter((p) => p.status === 'published' && (!excludeId || p.id !== excludeId))
+  let rows = livePrompts().filter(
+    (p) => p.status === 'published' && p.type !== 'collection' && p.type !== 'character' && (!excludeId || p.id !== excludeId),
+  )
   if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
   rows.sort((a, b) => b.id - a.id)
   ok(res, rows.slice(0, 20).map((p) => ({ id: p.id, title: p.title })))
+})
+
+// 专题发布用：可关联提示词（带封面），排除专题与角色库自身
+portal.get('/related-options', (req, res) => {
+  const keyword = String(req.query.keyword || '').trim().toLowerCase()
+  const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null
+  let rows = livePrompts().filter(
+    (p) => p.status === 'published' && p.type !== 'collection' && p.type !== 'character' && (!excludeId || p.id !== excludeId),
+  )
+  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows.sort((a, b) => b.id - a.id)
+  ok(res, rows.slice(0, 20).map((p) => relatedPromptBrief(p.id)))
 })
 
 portal.get('/prompts', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   const q = req.query
   const poseIds = poseCategoryIds()
-  let rows = livePrompts().filter((p) => p.status === 'published' && (String(q.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds)))
+  let rows = livePrompts().filter((p) => p.status === 'published' && matchesScope(p, q.scope, poseIds))
   if (q.keyword) {
     const k = String(q.keyword).toLowerCase()
     rows = rows.filter((p) => [p.title, p.content, p.modelName].some((v) => String(v).toLowerCase().includes(k)))
@@ -1529,7 +1750,8 @@ portal.get('/mine/:id', (req, res) => {
 portal.post('/mine', (req, res) => {
   const data = req.body || {}
   const submitting = data.submit === true
-  const err = validationError(data, submitting) || categoryError(data) || parentError(data)
+  const skipCategoryCheck = data.type === 'collection' || data.type === 'character'
+  const err = validationError(data, submitting) || (skipCategoryCheck ? null : categoryError(data)) || parentError(data)
   if (err) return fail(res, err, 400)
   const fields = trimData(data)
   const prompt = {
@@ -1559,10 +1781,11 @@ portal.put('/mine/:id', (req, res) => {
   const data = req.body || {}
   const submitting = data.submit === true
   const existing = imagesOf(prompt.id).length
-  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined
+  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined || data.characterLibrary !== undefined
   const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : existing > 0
-  if (submitting && !willHaveImages) return fail(res, '提交审核必须上传至少一张效果图', 400)
-  const err = validationError(data, false) || categoryError(data) || parentError(data, prompt.id)
+  if (submitting && !willHaveImages && data.type !== 'collection') return fail(res, '提交审核必须上传至少一张效果图', 400)
+  const skipCategoryCheck = data.type === 'collection' || data.type === 'character'
+  const err = validationError(data, false) || (skipCategoryCheck ? null : categoryError(data)) || parentError(data, prompt.id)
   if (err) return fail(res, err, 400)
   Object.assign(prompt, trimData(data), {
     status: submitting ? 'pending' : prompt.status,
@@ -1635,11 +1858,16 @@ admin.post('/upload-image', upload.single('file'), uploadHandler)
 
 admin.get('/categories/options', (req, res) => {
   const poseIds = poseCategoryIds()
-  const isPoseScope = String(req.query.scope || '') === 'pose'
+  const specialIds = specialCategoryIds()
+  const scope = String(req.query.scope || '')
   ok(
     res,
     db.categories
-      .filter((c) => (isPoseScope ? poseIds.has(c.id) : c.status === 1 && !poseIds.has(c.id)))
+      .filter((c) => {
+        if (scope === 'pose') return poseIds.has(c.id)
+        if (scope === 'collection' || scope === 'character') return c.id === specialCategoryId(scope)
+        return c.status === 1 && !poseIds.has(c.id) && !specialIds.has(c.id)
+      })
       .sort((a, b) => a.sort - b.sort || a.id - b.id),
   )
 })
@@ -1662,12 +1890,15 @@ admin.post('/categories', (req, res) => {
   const name = String(data.name || '').trim()
   if (!name) return fail(res, '分类名称不能为空', 400)
   if (db.categories.some((c) => c.name === name)) return fail(res, '分类名称已存在', 400)
+  const parent = parentCategoryFor(data)
+  if (typeof parent === 'string') return fail(res, parent, 400)
   const category = {
     id: nextId('category'),
     name,
     description: data.description ?? null,
     sort: Number.isFinite(Number(data.sort)) ? Number(data.sort) : 0,
     status: data.status === undefined ? 1 : Number(data.status),
+    parentId: parent === null ? null : parent.id,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   }
@@ -1675,6 +1906,17 @@ admin.post('/categories', (req, res) => {
   persist()
   ok(res, { ...category, promptCount: 0 }, 201)
 })
+
+/** 校验并解析分类父节点：返回分类对象、null（顶级）或错误文案 */
+function parentCategoryFor(data) {
+  if (data.parentId === undefined || data.parentId === null || data.parentId === '') return null
+  const id = Number(data.parentId)
+  if (!Number.isFinite(id) || id <= 0) return '目标分类无效'
+  const parent = db.categories.find((c) => c.id === id)
+  if (!parent) return '目标分类不存在'
+  if (parent.parentId) return '只能并入一级分类（最多两级）'
+  return parent
+}
 
 admin.put('/categories/:id', (req, res) => {
   const category = db.categories.find((c) => c.id === Number(req.params.id))
@@ -1689,6 +1931,20 @@ admin.put('/categories/:id', (req, res) => {
   if (data.description !== undefined) category.description = data.description
   if (data.sort !== undefined) category.sort = Number(data.sort)
   if (data.status !== undefined) category.status = Number(data.status)
+  if (data.parentId !== undefined) {
+    if (data.parentId === null || data.parentId === '') {
+      category.parentId = null
+    } else {
+      const parent = parentCategoryFor(data)
+      if (typeof parent === 'string') return fail(res, parent, 400)
+      if (!parent) return fail(res, '目标分类无效', 400)
+      if (parent.id === category.id) return fail(res, '不能并入自身', 400)
+      // 已含子分类的分类不能再并入其他分类，否则会出现三级层级
+      if (db.categories.some((c) => c.parentId === category.id)) return fail(res, '该分类包含子分类，不能并入其他分类', 400)
+      if (category.parentId === parent.id) return fail(res, '该分类已在此分类下', 400)
+      category.parentId = parent.id
+    }
+  }
   category.updatedAt = nowIso()
   persist()
   ok(res, { ...category, promptCount: livePrompts().filter((p) => hasCategory(p, category.id)).length })
@@ -1780,9 +2036,7 @@ admin.delete('/platforms/:id', (req, res) => {
 admin.get('/prompts', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   const poseIds = poseCategoryIds()
-  let rows = livePrompts().filter((p) =>
-    String(req.query.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds),
-  )
+  let rows = livePrompts().filter((p) => matchesScope(p, req.query.scope, poseIds))
   if (req.query.keyword) {
     const k = String(req.query.keyword).toLowerCase()
     rows = rows.filter((p) => String(p.title).toLowerCase().includes(k))
@@ -1803,15 +2057,28 @@ admin.get('/prompts/parent-options', (req, res) => {
   const keyword = String(req.query.keyword || '').trim().toLowerCase()
   const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null
   const poseIds = poseCategoryIds()
-  let rows = livePrompts().filter(
-    (p) =>
-      p.status === 'published' &&
-      (!excludeId || p.id !== excludeId) &&
-      (String(req.query.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds)),
-  )
+  let rows = livePrompts().filter((p) => {
+    if (p.status !== 'published' || (excludeId && p.id === excludeId)) return false
+    // 专题与角色库不能作为派生来源
+    if (p.type === 'collection' || p.type === 'character') return false
+    const group = promptGroup(p, poseIds)
+    return String(req.query.scope || '') === 'pose' ? group === 'pose' : group === null
+  })
   if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
   rows.sort((a, b) => b.id - a.id)
   ok(res, rows.slice(0, 20).map((p) => ({ id: p.id, title: p.title })))
+})
+
+// 专题/角色库选择资产用：返回带封面的可关联提示词（排除专题与角色库自身）
+admin.get('/prompts/related-options', (req, res) => {
+  const keyword = String(req.query.keyword || '').trim().toLowerCase()
+  const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null
+  let rows = livePrompts().filter(
+    (p) => p.status === 'published' && p.type !== 'collection' && p.type !== 'character' && (!excludeId || p.id !== excludeId),
+  )
+  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows.sort((a, b) => b.id - a.id)
+  ok(res, rows.slice(0, 20).map((p) => relatedPromptBrief(p.id)))
 })
 
 admin.get('/prompts/:id', (req, res) => {
@@ -1823,7 +2090,9 @@ admin.get('/prompts/:id', (req, res) => {
 admin.post('/prompts', (req, res) => {
   const data = req.body || {}
   const publishing = data.action === 'publish'
-  const err = validationError(data, publishing) || categoryError(data) || parentError(data)
+  // 专题/角色库的分类由服务端强制归属，跳过用户传入分类的校验
+  const skipCategoryCheck = data.type === 'collection' || data.type === 'character'
+  const err = validationError(data, publishing) || (skipCategoryCheck ? null : categoryError(data)) || parentError(data)
   if (err) return fail(res, err, 400)
   const prompt = {
     id: nextId('prompt'),
@@ -1850,10 +2119,11 @@ admin.put('/prompts/:id', (req, res) => {
   if (!prompt) return fail(res, '提示词不存在', 404)
   const data = req.body || {}
   const publishing = data.action === 'publish'
-  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined || data.characterPose !== undefined
+  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined || data.characterPose !== undefined || data.characterLibrary !== undefined
   const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : hasPromptResultImages(prompt)
   if (publishing && !willHaveImages) return fail(res, '正式发布的提示词必须上传至少一张效果图', 400)
-  const err = validationError(data, false) || categoryError(data) || parentError(data, prompt.id)
+  const skipCategoryCheck = data.type === 'collection' || data.type === 'character'
+  const err = validationError(data, false) || (skipCategoryCheck ? null : categoryError(data)) || parentError(data, prompt.id)
   if (err) return fail(res, err, 400)
   Object.assign(prompt, trimData(data), {
     status: publishing ? 'published' : prompt.status,
@@ -1952,7 +2222,7 @@ admin.post('/reviews/:id/reject', (req, res) => {
 
 admin.get('/stats', (req, res) => {
   const poseIds = poseCategoryIds()
-  const rows = livePrompts().filter((p) => (String(req.query.scope || '') === 'pose' ? isPosePrompt(p, poseIds) : !isPosePrompt(p, poseIds)))
+  const rows = livePrompts().filter((p) => matchesScope(p, req.query.scope, poseIds))
   ok(res, {
     total: rows.length,
     published: rows.filter((p) => p.status === 'published').length,
@@ -2060,7 +2330,7 @@ integration.get('/prompts/:id', (req, res) => {
 
 integration.post('/prompts', async (req, res) => {
   const data = req.body && typeof req.body === 'object' ? req.body : {}
-  if (data.type === 'sequence' || data.type === 'character-pose') return fail(res, 'AI 推送暂不支持套组或角色姿势组合', 400)
+  if (data.type && data.type !== 'single') return fail(res, 'AI 推送仅支持单条提示词（single）', 400)
 
   const idempotencyKey = String(data.idempotencyKey || '').trim().slice(0, 128)
   if (idempotencyKey) {

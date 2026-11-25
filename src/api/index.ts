@@ -34,6 +34,12 @@ export type {
   PromptCharacterPoseInput,
   PromptPose,
   PromptPoseInput,
+  PromptScope,
+  PromptType,
+  PromptRelatedBrief,
+  PromptCharacterLibrary,
+  PromptCharacterLibraryInput,
+  PromptLibraryImage,
 } from './prompt'
 export { portalApi } from './portal'
 export type { PortalCategory, PortalPrompt, PortalListQuery, PortalPayload, PortalParentOption } from './portal'

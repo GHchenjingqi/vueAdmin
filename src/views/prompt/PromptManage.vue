@@ -12,7 +12,7 @@
     <ProTable
       ref="tableRef"
       :key="locale"
-      :title="pose ? t('prompt.poseManageTitle') : t('prompt.manageTitle')"
+      :title="pageTitle"
       :columns="columns"
       :data="rows"
       :loading="loading"
@@ -20,7 +20,7 @@
       :pagination="pagination"
       :search-params="searchParams"
       :search-fields="searchFields"
-      :column-settings-key="pose ? 'pose_manage_list' : 'prompt_manage_list'"
+      :column-settings-key="`${adminMode}_manage_list`"
       show-selection
       reserve-selection
       row-key="id"
@@ -113,7 +113,7 @@
           </ProForm>
         </el-col>
         <el-col :span="12" class="prompt-editor-right">
-          <div class="prompt-type">
+          <div v-if="adminMode === 'normal' || adminMode === 'pose'" class="prompt-type">
             <div class="prompt-images-title">{{ t('portal.contentType') }}</div>
             <el-radio-group v-model="form.type" @change="handleTypeChange">
               <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
@@ -122,9 +122,45 @@
             </el-radio-group>
             <div class="prompt-parent-tip">{{ contentTypeTip }}</div>
           </div>
+          <div v-else class="prompt-type">
+            <div class="prompt-images-title">{{ adminMode === 'collection' ? t('portal.typeCollection') : t('portal.typeCharacter') }}</div>
+            <div class="prompt-parent-tip">{{ adminMode === 'collection' ? t('portal.typeCollectionTip') : t('portal.typeCharacterTip') }}</div>
+          </div>
           <div class="prompt-images">
+            <template v-if="adminMode === 'collection'">
+              <div class="collection-related">
+                <div class="prompt-images-title">{{ t('portal.relatedPrompts') }}</div>
+                <el-select
+                  v-model="form.relatedIds"
+                  multiple
+                  filterable
+                  remote
+                  :remote-method="searchRelatedOptions"
+                  :loading="relatedLoading"
+                  :placeholder="t('portal.relatedPlaceholder')"
+                  style="width: 100%"
+                  @focus="searchRelatedOptions()"
+                >
+                  <el-option v-for="item in relatedOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id">
+                    <div class="related-option">
+                      <el-image v-if="item.coverImage" :src="item.coverImage" fit="cover" class="related-option-cover" />
+                      <span class="related-option-title">{{ item.title }}</span>
+                      <span class="related-option-model">{{ item.modelName }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+                <p class="prompt-parent-tip">{{ t('portal.relatedHint') }}</p>
+                <div v-if="selectedRelatedBriefs.length" class="related-preview">
+                  <div v-for="item in selectedRelatedBriefs" :key="item.id" class="related-preview-item">
+                    <el-image v-if="item.coverImage" :src="item.coverImage" fit="cover" class="related-preview-cover" />
+                    <span class="related-preview-title">{{ item.title }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <CharacterLibraryEditor v-else-if="adminMode === 'character'" v-model="form.characterLibrary" source="admin" :uploader="promptApi.uploadImage" />
             <SequenceStepEditor
-              v-if="form.type === 'sequence'"
+              v-else-if="form.type === 'sequence'"
               :steps="form.steps"
               :character-anchor="form.characterAnchor"
               :platforms="platforms"
@@ -188,12 +224,15 @@ import { Plus, Edit, Delete, View } from '@element-plus/icons-vue'
 import { promptApi } from '@/api'
 import type {
   PromptCategory,
+  PromptCharacterLibraryInput,
   PromptCharacterPose,
   PromptCharacterPoseInput,
   PromptImageGroupInput,
   PromptItem,
   PromptPayload,
   PromptPlatform,
+  PromptRelatedBrief,
+  PromptScope,
   PromptStats,
   PromptStepInput,
   PromptType,
@@ -205,13 +244,24 @@ import ProForm from '@/components/ProForm/index.vue'
 import PlatformImageGroups from '@/views/portal/components/PlatformImageGroups.vue'
 import SequenceStepEditor from '@/views/portal/components/SequenceStepEditor.vue'
 import CharacterPoseEditor from '@/views/portal/components/CharacterPoseEditor.vue'
+import CharacterLibraryEditor from '@/views/portal/components/CharacterLibraryEditor.vue'
 import { useI18n } from '@/i18n'
 
 const { t, locale } = useI18n()
 
-/** 姿势管理页复用本组件，仅切换数据范围与标题；默认普通提示词 */
-const props = withDefaults(defineProps<{ pose?: boolean }>(), { pose: false })
-const dataScope = computed(() => (props.pose ? ({ scope: 'pose' } as const) : {}))
+/** 管理页模式：normal=普通提示词，pose=姿势，collection=提示词专题，character=角色库 */
+type AdminPromptMode = 'normal' | 'pose' | 'collection' | 'character'
+
+/** 姿势/专题/角色库管理页复用本组件，仅切换数据范围、标题与编辑模板 */
+const props = withDefaults(defineProps<{ pose?: boolean; mode?: AdminPromptMode }>(), { pose: false, mode: undefined })
+const adminMode = computed<AdminPromptMode>(() => props.mode ?? (props.pose ? 'pose' : 'normal'))
+const dataScope = computed<{ scope: PromptScope } | undefined>(() => (adminMode.value === 'normal' ? undefined : { scope: adminMode.value }))
+const pageTitle = computed(() => {
+  if (adminMode.value === 'pose') return t('prompt.poseManageTitle')
+  if (adminMode.value === 'collection') return t('prompt.collectionManageTitle')
+  if (adminMode.value === 'character') return t('prompt.characterManageTitle')
+  return t('prompt.manageTitle')
+})
 
 type ParentIdValue = number | string | null
 
@@ -268,7 +318,13 @@ interface PromptForm {
   steps: PromptStepInput[]
   platformGroups: PromptImageGroupInput[]
   characterPose: PromptCharacterPoseInput
+  characterLibrary: PromptCharacterLibraryInput
+  relatedIds: number[]
+  /** 已选中关联项的摘要缓存（编辑回显用） */
+  relatedBriefs: PromptRelatedBrief[]
 }
+
+const emptyCharacterLibrary = (): PromptCharacterLibraryInput => ({ turnarounds: [], costumes: [], hairstyles: [], props: [] })
 
 const rows = ref<PromptItem[]>([])
 const loading = ref(false)
@@ -278,6 +334,8 @@ const categoryOptions = ref<PromptCategory[]>([])
 const platforms = ref<PromptPlatform[]>([])
 const parentOptions = ref<Array<{ id: number; title: string }>>([])
 const parentLoading = ref(false)
+const relatedOptions = ref<PromptRelatedBrief[]>([])
+const relatedLoading = ref(false)
 const stats = ref<PromptStats>({ total: 0, published: 0, pending: 0, offline: 0, categories: 0, favorites: 0 })
 const dialogVisible = ref(false)
 const detailVisible = ref(false)
@@ -299,17 +357,24 @@ const form = reactive<PromptForm>({
   steps: [],
   platformGroups: [],
   characterPose: { characterImage: null, poses: [] },
+  characterLibrary: emptyCharacterLibrary(),
+  relatedIds: [],
+  relatedBriefs: [],
 })
 const selectedRows = ref<PromptItem[]>([])
 
 /** 左侧模型 = 右侧效果图平台组的平台名集合（套组取所有步骤的平台组），实时联动 */
 const contentTypeTip = computed(() => {
+  if (adminMode.value === 'collection') return t('portal.typeCollectionTip')
+  if (adminMode.value === 'character') return t('portal.typeCharacterTip')
   if (form.type === 'sequence') return t('portal.typeSequenceTip')
   if (form.type === 'character-pose') return t('portal.typeCharacterPoseTip')
   return t('portal.typeSingleTip')
 })
 
 const derivedModelNames = computed(() => {
+  // 专题/角色库不按平台派生模型，服务端固定为「通用」
+  if (adminMode.value === 'collection' || adminMode.value === 'character') return []
   if (form.type === 'sequence')
     return deriveModelNames(
       form.steps.flatMap((step) => step.platformGroups),
@@ -339,27 +404,67 @@ const statCards = computed(() => [
   { label: t('prompt.favoriteCount'), value: stats.value.favorites },
 ])
 
-const formSchema = computed(() => [
-  { prop: 'parentId', label: t('prompt.parentPrompt'), slot: 'parentId', span: 24 },
-  { prop: 'title', label: t('prompt.title'), type: 'input', required: true, span: 24 },
-  {
-    prop: 'categoryIds',
-    label: t('prompt.category'),
-    type: 'select',
-    required: true,
-    multiple: true,
-    options: () => categoryOptions.value.map((item) => ({ label: item.name, value: item.id })),
-    props: { 'multiple-limit': 10 },
-  },
-  {
-    prop: 'modelName',
-    label: t('prompt.model'),
-    type: 'custom',
-    slot: 'modelName',
-    required: true,
-  },
-  { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, span: 24, props: { rows: 8, autosize: false } },
-])
+const formSchema = computed(() => {
+  // 专题：标题 + 通用描述 + 关联提示词；角色库：标题 + 角色描述（分类/模型/派生来源由服务端固定）
+  if (adminMode.value === 'collection' || adminMode.value === 'character') {
+    return [
+      { prop: 'title', label: t('prompt.title'), type: 'input', required: true, span: 24 },
+      {
+        prop: 'content',
+        label: adminMode.value === 'collection' ? t('portal.collectionDescLabel') : t('portal.characterDescLabel'),
+        type: 'textarea',
+        required: adminMode.value === 'collection',
+        span: 24,
+        props: { rows: 8, autosize: false },
+      },
+    ]
+  }
+  return [
+    { prop: 'parentId', label: t('prompt.parentPrompt'), slot: 'parentId', span: 24 },
+    { prop: 'title', label: t('prompt.title'), type: 'input', required: true, span: 24 },
+    {
+      prop: 'categoryIds',
+      label: t('prompt.category'),
+      type: 'select',
+      required: true,
+      multiple: true,
+      options: () => categoryOptions.value.map((item) => ({ label: item.name, value: item.id })),
+      props: { 'multiple-limit': 10 },
+    },
+    {
+      prop: 'modelName',
+      label: t('prompt.model'),
+      type: 'custom',
+      slot: 'modelName',
+      required: true,
+    },
+    { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, span: 24, props: { rows: 8, autosize: false } },
+  ]
+})
+
+/** 专题选择器：搜索可关联的已发布提示词（含封面） */
+const searchRelatedOptions = async (keyword = ''): Promise<void> => {
+  relatedLoading.value = true
+  try {
+    const res = await promptApi.getRelatedOptions({
+      keyword: keyword.trim(),
+      excludeId: isEdit.value && currentId.value !== null ? currentId.value : undefined,
+    })
+    relatedOptions.value = res.data
+    // 编辑回显：已选中但不在默认列表的项补进来，保证可读
+    for (const brief of form.relatedBriefs) {
+      if (!relatedOptions.value.some((item) => item.id === brief.id)) relatedOptions.value.unshift(brief)
+    }
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err))
+  } finally {
+    relatedLoading.value = false
+  }
+}
+
+const selectedRelatedBriefs = computed(() =>
+  form.relatedIds.map((id) => relatedOptions.value.find((item) => item.id === id)).filter((item): item is PromptRelatedBrief => Boolean(item)),
+)
 
 const fetchRows = async (): Promise<void> => {
   loading.value = true
@@ -370,7 +475,7 @@ const fetchRows = async (): Promise<void> => {
       keyword: String(searchParams.keyword || '') || undefined,
       status: String(searchParams.status || '') || undefined,
       categoryId: String(searchParams.categoryId || '') || undefined,
-      ...dataScope.value,
+      ...(dataScope.value ?? {}),
     })
     rows.value = res.data.rows
     pagination.total = res.data.total
@@ -382,7 +487,7 @@ const fetchRows = async (): Promise<void> => {
 }
 
 const fetchOptions = async (): Promise<void> => {
-  const [categories, platformList] = await Promise.allSettled([promptApi.getCategoryOptions(dataScope.value), promptApi.getPlatformOptions()])
+  const [categories, platformList] = await Promise.allSettled([promptApi.getCategoryOptions(dataScope.value ?? {}), promptApi.getPlatformOptions()])
   if (categories.status === 'fulfilled') {
     categoryOptions.value = categories.value.data
   } else {
@@ -398,7 +503,7 @@ const searchParentOptions = async (keyword = ''): Promise<void> => {
     const res = await promptApi.getParentOptions({
       keyword: keyword.trim(),
       excludeId: isEdit.value && currentId.value !== null ? currentId.value : undefined,
-      ...dataScope.value,
+      ...(dataScope.value ?? {}),
     })
     parentOptions.value = res.data
   } catch (err: unknown) {
@@ -410,7 +515,7 @@ const searchParentOptions = async (keyword = ''): Promise<void> => {
 
 const fetchStats = async (): Promise<void> => {
   try {
-    const res = await promptApi.getStats(dataScope.value)
+    const res = await promptApi.getStats(dataScope.value ?? {})
     stats.value = res.data
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))
@@ -430,11 +535,14 @@ const resetForm = (): void => {
   form.categoryIds = []
   form.parentId = null
   form.modelName = ''
-  form.type = 'single'
+  form.type = adminMode.value === 'collection' ? 'collection' : adminMode.value === 'character' ? 'character' : 'single'
   form.characterAnchor = ''
   form.steps = []
   form.platformGroups = []
   form.characterPose = { characterImage: null, poses: [] }
+  form.characterLibrary = emptyCharacterLibrary()
+  form.relatedIds = []
+  form.relatedBriefs = []
 }
 
 /** 默认平台组：取第一个可用平台，异常时退化为 1（通用） */
@@ -533,7 +641,7 @@ const toFormCharacterPose = (value: PromptCharacterPose | null | undefined): Pro
 })
 
 const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
-  if (!categoryOptions.value.length) await fetchOptions()
+  if (!categoryOptions.value.length && (adminMode.value === 'normal' || adminMode.value === 'pose')) await fetchOptions()
   resetForm()
   let parentTitle = ''
   if (row) {
@@ -550,10 +658,21 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
       form.parentId = loaded.parentId ?? null
       parentTitle = loaded.parentTitle ?? ''
       // 模型不再取存档值，统一由右侧效果图平台组派生（见 derivedModelNames watch）
-      form.type = loaded.type === 'sequence' || loaded.type === 'character-pose' ? loaded.type : 'single'
+      form.type = ['sequence', 'character-pose', 'collection', 'character'].includes(String(loaded.type)) ? (loaded.type as PromptType) : 'single'
       form.characterAnchor = loaded.characterAnchor || ''
       form.characterPose = toFormCharacterPose(loaded.characterPose)
-      if (form.type === 'sequence') {
+      if (loaded.type === 'collection') {
+        form.relatedIds = [...(loaded.relatedIds ?? [])]
+        form.relatedBriefs = [...(loaded.relatedPrompts ?? [])]
+      } else if (loaded.type === 'character') {
+        const library = loaded.characterLibrary
+        form.characterLibrary = {
+          turnarounds: (library?.turnarounds ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          costumes: (library?.costumes ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          hairstyles: (library?.hairstyles ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          props: (library?.props ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+        }
+      } else if (form.type === 'sequence') {
         form.steps = toFormSteps(loaded)
         form.platformGroups = []
       } else if (form.type === 'character-pose') {
@@ -572,15 +691,22 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
     currentId.value = null
     ensureTypeDefaults()
   }
-  await searchParentOptions()
-  // 编辑时若当前关联项不在默认列表里（如标题变化），补上以保证回显可读
-  if (form.parentId && parentTitle && !parentOptions.value.some((item) => item.id === Number(form.parentId))) {
-    parentOptions.value.unshift({ id: Number(form.parentId), title: parentTitle })
+  if (adminMode.value === 'collection') await searchRelatedOptions()
+  if (adminMode.value === 'normal' || adminMode.value === 'pose') {
+    await searchParentOptions()
+    // 编辑时若当前关联项不在默认列表里（如标题变化），补上以保证回显可读
+    if (form.parentId && parentTitle && !parentOptions.value.some((item) => item.id === Number(form.parentId))) {
+      parentOptions.value.unshift({ id: Number(form.parentId), title: parentTitle })
+    }
   }
   dialogVisible.value = true
 }
 
 const submitImagesTotal = (): number => {
+  if (form.type === 'collection') return 0
+  if (form.type === 'character') {
+    return Object.values(form.characterLibrary).reduce((sum, images) => sum + images.length, 0)
+  }
   if (form.type === 'sequence') {
     return form.steps.reduce((sum, step) => sum + step.platformGroups.reduce((sub, group) => sub + group.images.length, 0), 0)
   }
@@ -592,6 +718,20 @@ const submitImagesTotal = (): number => {
 
 /** 提交前校验：规则与前台投稿页 PublishPrompt 保持一致 */
 const validateForm = (action: 'publish' | 'draft'): boolean => {
+  if (form.type === 'collection') {
+    if (!form.relatedIds.length) {
+      ElMessage.warning(t('portal.relatedRequired'))
+      return false
+    }
+    return true
+  }
+  if (form.type === 'character') {
+    if (action === 'publish' && submitImagesTotal() === 0) {
+      ElMessage.warning(t('portal.characterLibraryRequired'))
+      return false
+    }
+    return true
+  }
   if (form.type === 'character-pose') {
     if (!form.characterPose.characterImage?.url) {
       ElMessage.warning(t('portal.characterRequired'))
@@ -649,6 +789,27 @@ const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
   const categoryIds = form.categoryIds.map(Number)
   const isSequence = form.type === 'sequence'
   const isCharacterPose = form.type === 'character-pose'
+  // 专题/角色库：分类与模型由服务端强制归属，客户端不传
+  if (form.type === 'collection' || form.type === 'character') {
+    return {
+      title: form.title,
+      content: form.content,
+      categoryId: 0,
+      modelName: '',
+      type: form.type,
+      relatedIds: form.type === 'collection' ? [...form.relatedIds] : undefined,
+      characterLibrary:
+        form.type === 'character'
+          ? {
+              turnarounds: form.characterLibrary.turnarounds.filter((img) => img.url),
+              costumes: form.characterLibrary.costumes.filter((img) => img.url),
+              hairstyles: form.characterLibrary.hairstyles.filter((img) => img.url),
+              props: form.characterLibrary.props.filter((img) => img.url),
+            }
+          : undefined,
+      action,
+    }
+  }
   return {
     title: form.title,
     content: form.content,

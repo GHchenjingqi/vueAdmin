@@ -49,6 +49,66 @@
         <!-- 套组：有序步骤时间轴 -->
         <SequenceTimeline v-if="isSequence && detail" :detail="detail" />
 
+        <!-- 提示词专题：上方白色提示词卡片，下方关联效果合集 -->
+        <template v-else-if="isCollection && detail">
+          <section class="topic-card">
+            <div class="topic-card-head">
+              <span class="topic-badge">{{ t('portal.typeCollection') }}</span>
+              <el-button size="small" text :icon="DocumentCopy" @click="copyContent">{{ t('portal.copy') }}</el-button>
+            </div>
+            <pre class="topic-content">{{ detail.content || t('portal.collectionNoDesc') }}</pre>
+            <div class="topic-meta">
+              <span class="detail-author">
+                <span class="author-avatar">{{ (detail.authorName || '?').charAt(0) }}</span>
+                {{ detail.authorName || '-' }}
+              </span>
+              <span class="topic-count">{{ detail.relatedPrompts?.length ?? 0 }} {{ t('portal.collectionEffects') }}</span>
+            </div>
+          </section>
+
+          <section class="topic-effects">
+            <h2 class="related-title">{{ t('portal.collectionEffectsTitle') }}</h2>
+            <div class="topic-effects-grid">
+              <router-link v-for="item in detail.relatedPrompts" :key="item.id" :to="`/portal/prompts/${item.id}`" class="topic-effect-card">
+                <div class="topic-effect-cover-wrap">
+                  <img v-if="item.coverImage" :src="item.coverImage" :alt="item.title" class="topic-effect-cover" />
+                  <div v-else class="topic-effect-cover-empty">
+                    <el-icon :size="28"><Picture /></el-icon>
+                  </div>
+                </div>
+                <div class="topic-effect-body">
+                  <span class="topic-effect-title">{{ item.title }}</span>
+                  <span class="topic-effect-model">{{ item.modelName || '-' }}</span>
+                </div>
+              </router-link>
+            </div>
+            <el-empty v-if="!detail.relatedPrompts?.length" :description="t('portal.collectionEmpty')" />
+          </section>
+        </template>
+
+        <!-- 角色库：无限画布 -->
+        <template v-else-if="isCharacter && detail">
+          <section class="character-canvas-section">
+            <CharacterCanvas :value="detail.characterLibrary ?? { turnarounds: [], costumes: [], hairstyles: [], props: [] }" />
+          </section>
+          <section v-if="detail.content" class="character-desc-section">
+            <div class="prompt-panel">
+              <div class="prompt-panel-head">
+                <span class="prompt-panel-title">
+                  <el-icon><Document /></el-icon>
+                  {{ t('portal.characterDescLabel') }}
+                </span>
+                <span class="prompt-panel-actions">
+                  <el-button size="small" text :icon="DocumentCopy" @click="copyContent">{{ t('portal.copy') }}</el-button>
+                </span>
+              </div>
+              <div class="prompt-panel-body">
+                <pre class="detail-content">{{ detail.content }}</pre>
+              </div>
+            </div>
+          </section>
+        </template>
+
         <div v-else class="detail-layout">
           <!-- 左：作品图集 -->
           <section class="detail-gallery">
@@ -170,6 +230,7 @@ import { copyText } from '@/utils/clipboard'
 import PromptCard from './components/PromptCard.vue'
 import SequenceTimeline from './components/SequenceTimeline.vue'
 import CharacterPoseGallery from './components/CharacterPoseGallery.vue'
+import CharacterCanvas from './components/CharacterCanvas.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -185,6 +246,8 @@ const activePlatformIndex = ref(0)
 
 const isSequence = computed(() => detail.value?.type === 'sequence')
 const isCharacterPose = computed(() => detail.value?.type === 'character-pose')
+const isCollection = computed(() => detail.value?.type === 'collection')
+const isCharacter = computed(() => detail.value?.type === 'character')
 const chain = computed(() => detail.value?.chain ?? [])
 const followUps = computed(() => (detail.value?.children ?? []).filter((child) => child.status === 'published'))
 const fullChainText = computed(() => chain.value.map((node, index) => `${index + 1}. ${node.title}\n${node.content}`).join('\n\n'))
@@ -853,5 +916,128 @@ onMounted(() => void load())
     flex-wrap: wrap;
     gap: 6px;
   }
+}
+
+/* ==================== 提示词专题：白色卡片 + 效果合集 ==================== */
+.topic-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  padding: 22px 26px;
+  margin-bottom: 24px;
+}
+
+.topic-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.topic-badge {
+  display: inline-flex;
+  padding: 4px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.topic-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 15px;
+  line-height: 1.8;
+  font-family: inherit;
+}
+
+.topic-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+.topic-count {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.topic-effects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.topic-effect-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s;
+}
+
+.topic-effect-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.1));
+}
+
+.topic-effect-cover-wrap {
+  height: 170px;
+  background: var(--page-bg);
+}
+
+.topic-effect-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.topic-effect-cover-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+}
+
+.topic-effect-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.topic-effect-title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topic-effect-model {
+  font-size: 11px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.character-canvas-section {
+  margin-bottom: 20px;
+}
+
+.character-desc-section {
+  margin-bottom: 20px;
 }
 </style>

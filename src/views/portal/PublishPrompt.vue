@@ -9,7 +9,7 @@
       <el-form label-position="top" @submit.prevent>
         <div class="publish-layout">
           <div class="publish-left">
-            <el-form-item :label="t('prompt.parentPrompt')">
+            <el-form-item v-if="publishMode === 'normal'" :label="t('prompt.parentPrompt')">
               <el-select
                 v-model="form.parentId"
                 filterable
@@ -30,7 +30,7 @@
               <el-input v-model="form.title" maxlength="200" show-word-limit :placeholder="t('portal.titlePlaceholder')" />
             </el-form-item>
 
-            <div class="publish-row">
+            <div v-if="publishMode === 'normal'" class="publish-row">
               <el-form-item :label="t('portal.category')" required>
                 <el-select v-model="form.categoryId" :placeholder="t('portal.categoryPlaceholder')" style="width: 100%">
                   <el-option v-for="category in categories" :key="category.id" :label="category.name" :value="category.id" />
@@ -45,14 +45,28 @@
                 </div>
               </el-form-item>
             </div>
+            <div v-else class="publish-row">
+              <el-form-item :label="t('portal.category')">
+                <el-tag type="warning" effect="plain">{{ publishMode === 'collection' ? t('portal.typeCollection') : t('portal.typeCharacter') }}</el-tag>
+              </el-form-item>
+            </div>
 
-            <el-form-item :label="t('portal.content')" required>
-              <el-input v-model="form.content" type="textarea" :rows="8" :placeholder="t('portal.contentPlaceholder')" />
+            <el-form-item
+              :label="
+                publishMode === 'collection'
+                  ? t('portal.collectionDescLabel')
+                  : publishMode === 'character'
+                    ? t('portal.characterDescLabel')
+                    : t('portal.content')
+              "
+              :required="publishMode === 'collection'"
+            >
+              <el-input v-model="form.content" type="textarea" :rows="8" :placeholder="publishMode === 'normal' ? t('portal.contentPlaceholder') : ''" />
             </el-form-item>
           </div>
 
           <div class="publish-right">
-            <el-form-item :label="t('portal.contentType')" required>
+            <el-form-item v-if="publishMode === 'normal'" :label="t('portal.contentType')" required>
               <el-radio-group v-model="form.type">
                 <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
                 <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
@@ -60,8 +74,43 @@
               </el-radio-group>
               <p class="type-tip">{{ contentTypeTip }}</p>
             </el-form-item>
+            <div v-else class="publish-fixed-type">
+              <div class="publish-images-title">{{ publishMode === 'collection' ? t('portal.typeCollection') : t('portal.typeCharacter') }}</div>
+              <p class="type-tip">{{ publishMode === 'collection' ? t('portal.typeCollectionTip') : t('portal.typeCharacterTip') }}</p>
+            </div>
+            <template v-if="publishMode === 'collection'">
+              <el-form-item :label="t('portal.relatedPrompts')" required>
+                <el-select
+                  v-model="form.relatedIds"
+                  multiple
+                  filterable
+                  remote
+                  :remote-method="searchRelatedOptions"
+                  :loading="relatedLoading"
+                  :placeholder="t('portal.relatedPlaceholder')"
+                  style="width: 100%"
+                  @focus="searchRelatedOptions()"
+                >
+                  <el-option v-for="item in relatedOptions" :key="item.id" :label="`#${item.id} ${item.title}`" :value="item.id">
+                    <div class="related-option">
+                      <el-image v-if="item.coverImage" :src="item.coverImage" fit="cover" class="related-option-cover" />
+                      <span class="related-option-title">{{ item.title }}</span>
+                      <span class="related-option-model">{{ item.modelName }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+                <p class="type-tip">{{ t('portal.relatedHint') }}</p>
+              </el-form-item>
+              <div v-if="selectedRelatedBriefs.length" class="related-preview">
+                <div v-for="item in selectedRelatedBriefs" :key="item.id" class="related-preview-item">
+                  <el-image v-if="item.coverImage" :src="item.coverImage" fit="cover" class="related-preview-cover" />
+                  <span class="related-preview-title">{{ item.title }}</span>
+                </div>
+              </div>
+            </template>
+            <CharacterLibraryEditor v-else-if="publishMode === 'character'" v-model="form.characterLibrary" source="portal" />
             <SequenceStepEditor
-              v-if="form.type === 'sequence'"
+              v-else-if="form.type === 'sequence'"
               :steps="form.steps"
               :character-anchor="form.characterAnchor"
               :platforms="platforms"
@@ -88,7 +137,16 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { portalApi, type PortalCategory, type PortalParentOption, type PortalPayload } from '@/api'
-import type { PromptCharacterPose, PromptCharacterPoseInput, PromptImageGroupInput, PromptPlatform, PromptStepInput, PromptType } from '@/api/prompt'
+import type {
+  PromptCharacterLibraryInput,
+  PromptCharacterPose,
+  PromptCharacterPoseInput,
+  PromptImageGroupInput,
+  PromptPlatform,
+  PromptRelatedBrief,
+  PromptStepInput,
+  PromptType,
+} from '@/api/prompt'
 import { useUserStore } from '@/stores'
 import { useI18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/error'
@@ -96,6 +154,10 @@ import { deriveModelNames, joinModelNames } from '@/utils/modelNames'
 import PlatformImageGroups from './components/PlatformImageGroups.vue'
 import SequenceStepEditor from './components/SequenceStepEditor.vue'
 import CharacterPoseEditor from './components/CharacterPoseEditor.vue'
+import CharacterLibraryEditor from './components/CharacterLibraryEditor.vue'
+
+/** 发布页模式：normal=普通投稿，collection=提示词专题，character=角色库 */
+type PublishMode = 'normal' | 'collection' | 'character'
 
 interface PublishForm {
   title: string
@@ -108,17 +170,26 @@ interface PublishForm {
   steps: PromptStepInput[]
   platformGroups: PromptImageGroupInput[]
   characterPose: PromptCharacterPoseInput
+  characterLibrary: PromptCharacterLibraryInput
+  relatedIds: number[]
+  relatedBriefs: PromptRelatedBrief[]
 }
+
+const props = withDefaults(defineProps<{ mode?: PublishMode }>(), { mode: 'normal' })
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
+const publishMode = computed<PublishMode>(() => (props.mode === 'collection' || props.mode === 'character' ? props.mode : 'normal'))
+
 const categories = ref<PortalCategory[]>([])
 const platforms = ref<PromptPlatform[]>([])
 const parentOptions = ref<PortalParentOption[]>([])
 const parentLoading = ref(false)
+const relatedOptions = ref<PromptRelatedBrief[]>([])
+const relatedLoading = ref(false)
 const form = reactive<PublishForm>({
   title: '',
   content: '',
@@ -130,6 +201,9 @@ const form = reactive<PublishForm>({
   steps: [],
   platformGroups: [],
   characterPose: { characterImage: null, poses: [] },
+  characterLibrary: { turnarounds: [], costumes: [], hairstyles: [], props: [] },
+  relatedIds: [],
+  relatedBriefs: [],
 })
 const loading = ref(false)
 const submitting = ref(false)
@@ -138,12 +212,15 @@ const isEdit = computed(() => editId.value > 0)
 
 /** 左侧模型 = 右侧效果图平台组的平台名集合（套组取所有步骤的平台组），实时联动 */
 const contentTypeTip = computed(() => {
+  if (publishMode.value === 'collection') return t('portal.typeCollectionTip')
+  if (publishMode.value === 'character') return t('portal.typeCharacterTip')
   if (form.type === 'sequence') return t('portal.typeSequenceTip')
   if (form.type === 'character-pose') return t('portal.typeCharacterPoseTip')
   return t('portal.typeSingleTip')
 })
 
 const derivedModelNames = computed(() => {
+  if (publishMode.value === 'collection' || publishMode.value === 'character') return []
   if (form.type === 'sequence')
     return deriveModelNames(
       form.steps.flatMap((step) => step.platformGroups),
@@ -213,6 +290,29 @@ const searchParentOptions = async (keyword = ''): Promise<void> => {
   }
 }
 
+/** 专题关联选择器：远程搜索已发布提示词（含封面） */
+const searchRelatedOptions = async (keyword = ''): Promise<void> => {
+  relatedLoading.value = true
+  try {
+    const res = await portalApi.getRelatedOptions({
+      keyword: keyword.trim(),
+      excludeId: isEdit.value ? editId.value : undefined,
+    })
+    relatedOptions.value = res.data
+    for (const brief of form.relatedBriefs) {
+      if (!relatedOptions.value.some((item) => item.id === brief.id)) relatedOptions.value.unshift(brief)
+    }
+  } catch (err: unknown) {
+    ElMessage.error(getErrorMessage(err))
+  } finally {
+    relatedLoading.value = false
+  }
+}
+
+const selectedRelatedBriefs = computed(() =>
+  form.relatedIds.map((id) => relatedOptions.value.find((item) => item.id === id)).filter((item): item is PromptRelatedBrief => Boolean(item)),
+)
+
 const load = async (): Promise<void> => {
   if (!userStore.isLoggedIn) {
     ElMessage.warning(t('portal.loginRequired'))
@@ -229,16 +329,38 @@ const load = async (): Promise<void> => {
     else ElMessage.error(getErrorMessage(platformRes.reason))
     if (isEdit.value) {
       const res = await portalApi.getMinePrompt(editId.value)
+      // 编辑类型与当前发布页不匹配时跳到对应编辑器
+      const loadedType = res.data.type || 'single'
+      if (publishMode.value === 'normal' && (loadedType === 'collection' || loadedType === 'character')) {
+        const target = loadedType === 'collection' ? `/portal/publish-collection/${editId.value}` : `/portal/publish-character/${editId.value}`
+        void router.replace(target)
+        return
+      }
+      if (publishMode.value !== 'normal' && loadedType !== publishMode.value) {
+        void router.replace(`/portal/publish/${editId.value}`)
+        return
+      }
       form.title = res.data.title
       form.content = res.data.content
       form.categoryId = res.data.categoryId
       form.parentId = res.data.parentId ?? null
       parentTitleToRestore = res.data.parentTitle ?? ''
       // 模型不再取存档值，统一由右侧效果图平台组派生（见 derivedModelNames watch）
-      form.type = res.data.type === 'sequence' || res.data.type === 'character-pose' ? res.data.type : 'single'
+      form.type = ['sequence', 'character-pose', 'collection', 'character'].includes(loadedType) ? (loadedType as PromptType) : 'single'
       form.characterAnchor = res.data.characterAnchor || ''
       form.characterPose = toFormCharacterPose(res.data.characterPose)
-      if (form.type === 'sequence') {
+      if (loadedType === 'collection') {
+        form.relatedIds = [...(res.data.relatedIds ?? [])]
+        form.relatedBriefs = [...(res.data.relatedPrompts ?? [])]
+      } else if (loadedType === 'character') {
+        const library = res.data.characterLibrary
+        form.characterLibrary = {
+          turnarounds: (library?.turnarounds ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          costumes: (library?.costumes ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          hairstyles: (library?.hairstyles ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          props: (library?.props ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+        }
+      } else if (form.type === 'sequence') {
         form.steps = (res.data.steps || []).map((step) => ({
           id: step.id,
           stepOrder: step.stepOrder,
@@ -272,16 +394,24 @@ const load = async (): Promise<void> => {
           isCover: Boolean(image.isCover),
         })),
       }))
-    } else if (platforms.value.length) {
+    } else if (publishMode.value === 'normal' && platforms.value.length) {
       form.platformGroups = [{ platformId: platforms.value[0].id, images: [] }]
       form.steps = [
         { name: '', actionPrompt: '', camera: null, seconds: 5, transition: null, platformGroups: [{ platformId: platforms.value[0].id, images: [] }] },
       ]
     }
-    // 关联选项在回显后加载：编辑时排除自身；若原关联项不在默认列表里则补上，保证回显可读
-    await searchParentOptions()
-    if (form.parentId && parentTitleToRestore && !parentOptions.value.some((item) => item.id === form.parentId)) {
-      parentOptions.value.unshift({ id: form.parentId, title: parentTitleToRestore })
+    if (publishMode.value === 'collection') {
+      // 专题：回显后加载关联选项；若原关联项不在默认列表里则补上，保证回显可读
+      await searchRelatedOptions()
+      for (const brief of form.relatedBriefs) {
+        if (!relatedOptions.value.some((item) => item.id === brief.id)) relatedOptions.value.unshift(brief)
+      }
+    } else if (publishMode.value === 'normal') {
+      // 关联选项在回显后加载：编辑时排除自身；若原关联项不在默认列表里则补上，保证回显可读
+      await searchParentOptions()
+      if (form.parentId && parentTitleToRestore && !parentOptions.value.some((item) => item.id === form.parentId)) {
+        parentOptions.value.unshift({ id: form.parentId, title: parentTitleToRestore })
+      }
     }
   } catch (err: unknown) {
     ElMessage.error(getErrorMessage(err))
@@ -295,20 +425,37 @@ const handleSubmit = async (submit: boolean): Promise<void> => {
     ElMessage.warning(t('portal.titleRequired'))
     return
   }
-  if (!form.content.trim()) {
-    ElMessage.warning(t('portal.contentRequired'))
-    return
+  // 专题/角色库：分类与模型由服务端强制归属
+  if (publishMode.value === 'collection') {
+    if (!form.content.trim()) {
+      ElMessage.warning(t('portal.contentRequired'))
+      return
+    }
+    if (!form.relatedIds.length) {
+      ElMessage.warning(t('portal.relatedRequired'))
+      return
+    }
+  } else if (publishMode.value === 'character') {
+    if (submit && Object.values(form.characterLibrary).reduce((sum, images) => sum + images.length, 0) === 0) {
+      ElMessage.warning(t('portal.characterLibraryRequired'))
+      return
+    }
+  } else {
+    if (!form.content.trim()) {
+      ElMessage.warning(t('portal.contentRequired'))
+      return
+    }
+    if (!form.categoryId) {
+      ElMessage.warning(t('portal.categoryRequired'))
+      return
+    }
+    if (!form.modelName.trim()) {
+      ElMessage.warning(t('portal.modelRequired'))
+      return
+    }
   }
-  if (!form.categoryId) {
-    ElMessage.warning(t('portal.categoryRequired'))
-    return
-  }
-  if (!form.modelName.trim()) {
-    ElMessage.warning(t('portal.modelRequired'))
-    return
-  }
-  const isSequence = form.type === 'sequence'
-  const isCharacterPose = form.type === 'character-pose'
+  const isSequence = publishMode.value === 'normal' && form.type === 'sequence'
+  const isCharacterPose = publishMode.value === 'normal' && form.type === 'character-pose'
   if (isCharacterPose) {
     if (!form.characterPose.characterImage?.url) {
       ElMessage.warning(t('portal.characterRequired'))
@@ -366,6 +513,40 @@ const handleSubmit = async (submit: boolean): Promise<void> => {
       ElMessage.warning(t('portal.platformDuplicate'))
       return
     }
+  }
+
+  // 专题/角色库：独立载荷，分类与模型由服务端强制归属
+  if (publishMode.value === 'collection' || publishMode.value === 'character') {
+    const specialPayload: PortalPayload = {
+      title: form.title.trim(),
+      content: form.content.trim(),
+      categoryId: 0,
+      modelName: '',
+      type: publishMode.value,
+      relatedIds: publishMode.value === 'collection' ? [...form.relatedIds] : undefined,
+      characterLibrary:
+        publishMode.value === 'character'
+          ? {
+              turnarounds: form.characterLibrary.turnarounds.filter((img) => img.url),
+              costumes: form.characterLibrary.costumes.filter((img) => img.url),
+              hairstyles: form.characterLibrary.hairstyles.filter((img) => img.url),
+              props: form.characterLibrary.props.filter((img) => img.url),
+            }
+          : undefined,
+      submit,
+    }
+    submitting.value = true
+    try {
+      if (isEdit.value) await portalApi.updateMine(editId.value, specialPayload)
+      else await portalApi.createMine(specialPayload)
+      ElMessage.success(submit ? t('portal.submitSuccess') : t('portal.createSuccess'))
+      goMine()
+    } catch (err: unknown) {
+      ElMessage.error(getErrorMessage(err))
+    } finally {
+      submitting.value = false
+    }
+    return
   }
 
   const payload: PortalPayload = {
@@ -533,6 +714,64 @@ onMounted(() => void load())
   margin-top: 12px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
+}
+
+.publish-fixed-type {
+  margin-bottom: 6px;
+}
+.publish-images-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.related-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.related-option-cover {
+  width: 40px;
+  height: 28px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.related-option-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.related-option-model {
+  font-size: 12px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.related-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+.related-preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--page-bg);
+}
+.related-preview-cover {
+  width: 100%;
+  height: 90px;
+  border-radius: 4px;
+}
+.related-preview-title {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 980px) {

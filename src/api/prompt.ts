@@ -5,7 +5,9 @@ import request from '@/utils/request'
 import type { PaginatedData, ListQueryParams } from '@/types/response'
 
 export type PromptStatus = 'draft' | 'pending' | 'published' | 'rejected' | 'offline'
-export type PromptType = 'single' | 'sequence' | 'character-pose'
+export type PromptType = 'single' | 'sequence' | 'character-pose' | 'collection' | 'character'
+/** 数据范围：pose=姿势库，collection=提示词专题，character=角色库；缺省为普通提示词 */
+export type PromptScope = 'pose' | 'collection' | 'character'
 
 /** 角色 + 姿势组合：一个角色图，多个姿势，每个姿势需对应生成图 */
 export interface PromptPoseInput {
@@ -30,12 +32,42 @@ export interface PromptCharacterPose {
   poses: PromptPose[]
 }
 
+/** 角色库资产：四组图片（角色三视图 / 服装三视图 / 发型特写 / 道具图） */
+export interface PromptCharacterLibrary {
+  turnarounds: PromptLibraryImage[]
+  costumes: PromptLibraryImage[]
+  hairstyles: PromptLibraryImage[]
+  props: PromptLibraryImage[]
+}
+
+export interface PromptLibraryImage {
+  url: string
+  filePath?: string | null
+  sort?: number
+}
+
+export type PromptCharacterLibraryInput = {
+  [K in keyof PromptCharacterLibrary]: Array<{ url: string; filePath?: string | null }>
+}
+
+/** 专题关联的提示词摘要（含封面，用于合集展示与选择器回显） */
+export interface PromptRelatedBrief {
+  id: number
+  title: string
+  coverImage: string
+  modelName: string
+  categoryName: string
+  type: PromptType
+}
+
 export interface PromptCategory {
   id: number
   name: string
   description: string | null
   sort: number
   status: number
+  /** 父分类 ID；null/缺省为一级分类，最多两级 */
+  parentId?: number | null
   promptCount?: number
   createdAt?: string
   updatedAt?: string
@@ -130,6 +162,10 @@ export interface PromptItem {
   characterAnchor?: string | null
   steps?: PromptStep[]
   characterPose?: PromptCharacterPose | null
+  characterLibrary?: PromptCharacterLibrary | null
+  /** 专题：关联的提示词 ID 与摘要 */
+  relatedIds?: number[]
+  relatedPrompts?: PromptRelatedBrief[]
   status: PromptStatus
   source: 'admin' | 'user'
   authorId: number
@@ -164,8 +200,8 @@ export interface PromptListQuery extends ListQueryParams {
   categoryId?: number | string
   status?: string
   source?: string
-  /** pose=只读姿势参考库数据；默认排除姿势数据 */
-  scope?: 'pose'
+  /** pose/collection/character=只读对应板块数据；默认排除全部特殊板块 */
+  scope?: PromptScope
 }
 
 export interface PromptPayload {
@@ -179,6 +215,9 @@ export interface PromptPayload {
   characterAnchor?: string | null
   steps?: PromptStepInput[]
   characterPose?: PromptCharacterPoseInput
+  characterLibrary?: PromptCharacterLibraryInput
+  /** 专题：关联的提示词 ID 集合 */
+  relatedIds?: number[]
   action?: 'publish' | 'draft'
   images?: PromptImageItem[]
   platformGroups?: PromptImageGroupInput[]
@@ -207,7 +246,7 @@ export const promptApi = {
     return request.get<PaginatedData<PromptCategory>>('/prompt/categories', { params })
   },
 
-  getCategoryOptions(params: { scope?: 'pose' } = {}) {
+  getCategoryOptions(params: { scope?: PromptScope } = {}) {
     return request.get<PromptCategory[]>('/prompt/categories/options', { params })
   },
 
@@ -251,8 +290,13 @@ export const promptApi = {
   },
 
   /** 关联原提示词：搜索可关联的已发布提示词 */
-  getParentOptions(params: { keyword?: string; excludeId?: number; scope?: 'pose' } = {}) {
+  getParentOptions(params: { keyword?: string; excludeId?: number; scope?: PromptScope } = {}) {
     return request.get<Array<{ id: number; title: string }>>('/prompt/prompts/parent-options', { params })
+  },
+
+  /** 专题关联提示词选择器：搜索已发布提示词（含封面摘要） */
+  getRelatedOptions(params: { keyword?: string; excludeId?: number } = {}) {
+    return request.get<PromptRelatedBrief[]>('/prompt/prompts/related-options', { params })
   },
 
   getPrompts(params: PromptListQuery) {
@@ -314,7 +358,7 @@ export const promptApi = {
   },
 
   /** ==================== 统计 ==================== */
-  getStats(params: { scope?: 'pose' } = {}) {
+  getStats(params: { scope?: PromptScope } = {}) {
     return request.get<PromptStats>('/prompt/stats', { params })
   },
 }

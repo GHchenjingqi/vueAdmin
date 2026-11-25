@@ -8,10 +8,13 @@ import request from '@/utils/request'
 import type { PaginatedData, ListQueryParams } from '@/types/response'
 import type {
   PromptCategory,
+  PromptCharacterLibraryInput,
   PromptCharacterPoseInput,
   PromptImageGroupInput,
   PromptItem,
   PromptPlatform,
+  PromptRelatedBrief,
+  PromptScope,
   PromptStatus,
   PromptStepInput,
   PromptType,
@@ -30,8 +33,8 @@ export interface PortalPrompt extends PromptItem {
 export interface PortalListQuery extends ListQueryParams {
   categoryId?: number | string
   sort?: 'latest' | 'popular'
-  /** pose=只读姿势参考库数据；默认排除姿势数据 */
-  scope?: 'pose'
+  /** pose/collection/character=只读对应板块数据；默认排除全部特殊板块 */
+  scope?: PromptScope
 }
 
 export interface PortalMineQuery extends ListQueryParams {
@@ -50,7 +53,7 @@ export interface PortalPayload {
   modelName: string
   /** 关联的原提示词 ID；派生提示词只填写本次追问正文 */
   parentId?: number | null
-  /** 内容形态：single=单条，sequence=有序步骤套组 */
+  /** 内容形态：single=单条，sequence=有序步骤套组，character-pose=角色姿势，collection=提示词专题，character=角色库 */
   type?: PromptType
   /** 角色锚定提示词，仅套组使用 */
   characterAnchor?: string | null
@@ -62,6 +65,10 @@ export interface PortalPayload {
   platformGroups?: PromptImageGroupInput[]
   /** 角色 + 姿势组合，仅 type=character-pose 使用 */
   characterPose?: PromptCharacterPoseInput
+  /** 角色库资产分组，仅 type=character 使用 */
+  characterLibrary?: PromptCharacterLibraryInput
+  /** 专题关联提示词 ID 集合，仅 type=collection 使用 */
+  relatedIds?: number[]
 }
 
 export interface PortalRegisterParams {
@@ -90,7 +97,7 @@ export const portalApi = {
   },
 
   /** ==================== 公开浏览 ==================== */
-  getCategories(params: { scope?: 'pose' } = {}) {
+  getCategories(params: { scope?: PromptScope } = {}) {
     return request.get<PortalCategory[]>('/portal/categories', { params })
   },
 
@@ -106,6 +113,11 @@ export const portalApi = {
   /** 投稿表单用：可关联的已发布提示词（远程搜索），编辑时排除自身防环 */
   getParentOptions(params: { keyword?: string; excludeId?: number | string } = {}) {
     return request.get<PortalParentOption[]>('/portal/parent-options', { params })
+  },
+
+  /** 专题发布用：可关联提示词选择器（含封面摘要） */
+  getRelatedOptions(params: { keyword?: string; excludeId?: number | string } = {}) {
+    return request.get<PromptRelatedBrief[]>('/portal/related-options', { params })
   },
 
   getPrompts(params: PortalListQuery) {

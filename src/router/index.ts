@@ -61,6 +61,18 @@ const routes = [
         meta: { title: '姿势参考库' },
       },
       {
+        path: 'collections',
+        name: 'PortalCollections',
+        component: () => import('@/views/portal/CollectionSquare.vue'),
+        meta: { title: '提示词专题' },
+      },
+      {
+        path: 'characters',
+        name: 'PortalCharacters',
+        component: () => import('@/views/portal/CharacterSquare.vue'),
+        meta: { title: '角色库' },
+      },
+      {
         path: 'prompts/:id',
         name: 'PortalPromptDetail',
         component: () => import('@/views/portal/PromptDetail.vue'),
@@ -77,6 +89,30 @@ const routes = [
         name: 'PortalEdit',
         component: () => import('@/views/portal/PublishPrompt.vue'),
         meta: { title: '编辑投稿' },
+      },
+      {
+        path: 'publish-collection',
+        name: 'PortalPublishCollection',
+        component: () => import('@/views/portal/PublishCollection.vue'),
+        meta: { title: '发布提示词专题' },
+      },
+      {
+        path: 'publish-collection/:id',
+        name: 'PortalPublishCollectionEdit',
+        component: () => import('@/views/portal/PublishCollection.vue'),
+        meta: { title: '编辑提示词专题' },
+      },
+      {
+        path: 'publish-character',
+        name: 'PortalPublishCharacter',
+        component: () => import('@/views/portal/PublishCharacter.vue'),
+        meta: { title: '发布角色' },
+      },
+      {
+        path: 'publish-character/:id',
+        name: 'PortalPublishCharacterEdit',
+        component: () => import('@/views/portal/PublishCharacter.vue'),
+        meta: { title: '编辑角色' },
       },
       {
         path: 'mine',
