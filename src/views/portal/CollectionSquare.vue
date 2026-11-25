@@ -116,6 +116,7 @@ onMounted(() => void load())
 .collection-hero h1 {
   margin: 0 0 6px;
   font-size: 22px;
+  color: #fff;
 }
 .collection-hero p {
   margin: 0;

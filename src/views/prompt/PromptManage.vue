@@ -1081,4 +1081,53 @@ onMounted(() => {
   border-radius: 4px;
   font-family: inherit;
 }
+/* 专题关联提示词：下拉选项与已选预览（缺样式会导致封面图按原图尺寸撑爆下拉面板） */
+.related-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.related-option-cover {
+  width: 40px;
+  height: 28px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.related-option-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.related-option-model {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+}
+.related-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+.related-preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 4px;
+  background: var(--el-fill-color-lighter);
+}
+.related-preview-cover {
+  width: 100%;
+  height: 90px;
+  border-radius: 4px;
+}
+.related-preview-title {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>

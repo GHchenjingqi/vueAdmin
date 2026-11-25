@@ -104,6 +104,7 @@ onMounted(() => void load())
 .character-hero h1 {
   margin: 0 0 6px;
   font-size: 22px;
+  color: #fff;
 }
 .character-hero p {
   margin: 0;

@@ -35,7 +35,11 @@
           <template #default="{ row }">
             <div
               class="category-name-cell"
-              :class="{ 'drop-target': dragOverId === asCategory(row).id && canDropOn(asCategory(row)), 'drag-disabled': !canDragRow(row) }"
+              :class="{
+                'drop-target': dragOverId === asCategory(row).id && canDropOn(asCategory(row)),
+                'drag-disabled': !canDragRow(row),
+                'is-child': Boolean(asCategory(row).parentId),
+              }"
               draggable="true"
               @dragstart="onDragStart($event, asCategory(row))"
               @dragend="onDragEnd"
@@ -344,6 +348,10 @@ onMounted(fetchRows)
 }
 .category-name-cell.drag-disabled {
   cursor: default;
+}
+/* 二级分类整体右移，与一级分类拉开视觉层级 */
+.category-name-cell.is-child {
+  margin-left: 32px;
 }
 .category-name-cell.drop-target {
   outline: 2px dashed var(--el-color-primary);

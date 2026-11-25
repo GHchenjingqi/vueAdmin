@@ -1,19 +1,26 @@
 <template>
   <div class="cl-editor">
     <p class="cl-tip">{{ t('portal.characterLibraryTip') }}</p>
-    <div v-for="group in GROUPS" :key="group.key" class="cl-group">
-      <div class="cl-group-head">
-        <span class="cl-group-title">{{ t(group.titleKey) }}</span>
-        <el-button size="small" :icon="FolderOpened" @click="openPicker(group.key)">{{ t('portal.pickFromLibrary') }}</el-button>
-      </div>
-      <ImageUploader
-        :model-value="modelValue[group.key]"
-        :max="20"
-        :show-cover="false"
-        :uploader="uploader"
-        @update:model-value="updateGroup(group.key, $event)"
-      />
-    </div>
+    <el-tabs v-model="activeGroup" class="cl-tabs">
+      <el-tab-pane v-for="group in GROUPS" :key="group.key" :name="group.key">
+        <template #label>
+          <span class="cl-tab-label">
+            {{ t(group.titleKey) }}
+            <span v-if="countOf(group.key)" class="cl-tab-count">{{ countOf(group.key) }}</span>
+          </span>
+        </template>
+        <div class="cl-group-head">
+          <el-button size="small" :icon="FolderOpened" @click="openPicker(group.key)">{{ t('portal.pickFromLibrary') }}</el-button>
+        </div>
+        <ImageUploader
+          :model-value="modelValue[group.key]"
+          :max="20"
+          :show-cover="false"
+          :uploader="uploader"
+          @update:model-value="updateGroup(group.key, $event)"
+        />
+      </el-tab-pane>
+    </el-tabs>
 
     <ImagePickerDialog v-model="pickerVisible" scope="character" :source="source" :title="pickerTitle" @select="onPickImage" />
   </div>
@@ -49,10 +56,14 @@ const GROUPS = [
 
 type GroupKey = (typeof GROUPS)[number]['key']
 
+const activeGroup = ref<GroupKey>('turnarounds')
+
 const pickerVisible = ref(false)
 const pickerGroup = ref<GroupKey>('turnarounds')
 
 const pickerTitle = computed(() => t(GROUPS.find((group) => group.key === pickerGroup.value)?.titleKey ?? ''))
+
+const countOf = (key: GroupKey): number => props.modelValue[key]?.length ?? 0
 
 const openPicker = (key: GroupKey): void => {
   pickerGroup.value = key
@@ -87,19 +98,25 @@ const onPickImage = (image: PromptImageItem): void => {
   line-height: 1.6;
   color: var(--el-text-color-secondary);
 }
-.cl-group {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  padding: 10px 12px;
-}
 .cl-group-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 8px;
 }
-.cl-group-title {
-  font-weight: 600;
-  font-size: 13px;
+.cl-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cl-tab-count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: var(--el-color-primary);
+  border-radius: 8px;
 }
 </style>

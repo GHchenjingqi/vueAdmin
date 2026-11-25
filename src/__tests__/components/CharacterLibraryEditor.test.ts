@@ -27,6 +27,8 @@ const mountEditor = (value?: Partial<PromptCharacterLibraryInput>) =>
         ImagePickerDialog: { template: '<div class="stub-picker" />' },
         'el-button': { template: '<button class="stub-button"><slot /></button>', emits: ['click'] },
         'el-image': { template: '<img class="stub-image" />' },
+        'el-tabs': { template: '<div class="stub-tabs"><slot /></div>' },
+        'el-tab-pane': { props: ['name', 'label'], template: '<div class="stub-pane"><slot name="label" /><slot /></div>' },
       },
     },
   })
