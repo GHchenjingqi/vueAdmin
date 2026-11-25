@@ -1,17 +1,25 @@
 <template>
   <div class="cp-showcase">
-    <div v-if="value.characterImage" class="cp-character">
-      <div class="cp-label">{{ t('portal.characterImage') }}</div>
-      <el-image :src="value.characterImage.url" fit="contain" class="cp-character-image" :preview-src-list="characterUrls" />
-    </div>
-
     <div v-for="(pose, index) in value.poses" :key="pose.key" class="cp-block">
       <div class="cp-label">{{ t('portal.poseNumber').replace('{n}', String(index + 1)) }}</div>
-      <div class="cp-row">
-        <div v-if="pose.poseImage" class="cp-reference">
-          <el-image :src="pose.poseImage.url" fit="contain" class="cp-reference-image" :preview-src-list="referenceUrls" />
-          <span class="cp-caption">{{ t('portal.poseImage') }}</span>
+      <div class="cp-formula">
+        <!-- 左侧：上角色图、中「+」、下姿势图 -->
+        <div class="cp-inputs">
+          <div v-if="value.characterImage" class="cp-input">
+            <span class="cp-caption">{{ t('portal.characterImage') }}</span>
+            <el-image :src="value.characterImage.url" fit="contain" class="cp-input-image" :preview-src-list="characterUrls" />
+          </div>
+          <div class="cp-plus">+</div>
+          <div v-if="pose.poseImage" class="cp-input">
+            <span class="cp-caption">{{ t('portal.poseImage') }}</span>
+            <el-image :src="pose.poseImage.url" fit="contain" class="cp-input-image" :preview-src-list="referenceUrls" />
+          </div>
         </div>
+
+        <!-- 中间：箭头 -->
+        <div class="cp-arrow" aria-hidden="true"></div>
+
+        <!-- 右侧：合成图 -->
         <div class="cp-results">
           <el-image
             v-for="image in resultImages(pose)"
@@ -56,50 +64,92 @@ const resultUrls = (pose: PromptPose) => resultImages(pose).map((image) => image
   font-weight: 600;
 }
 
-.cp-character-image,
-.cp-reference-image {
+.cp-formula {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-fill-color-blank);
+}
+
+/* 左侧输入：角色图 + 姿势图 */
+.cp-inputs {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.cp-input {
   width: 100%;
-  max-height: 420px;
+}
+
+.cp-input-image {
+  width: 100%;
+  height: 160px;
   display: block;
   background: var(--el-fill-color-light);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
-.cp-character-image {
-  height: 320px;
+.cp-plus {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--el-color-primary);
 }
 
-.cp-reference-image {
-  height: 260px;
+/* 中间运算符：渐变线条 + 实心箭头 */
+.cp-arrow {
+  position: relative;
+  flex: 0 0 56px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--el-color-primary-light-5), var(--el-color-primary));
 }
-
-.cp-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
+.cp-arrow::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--el-color-primary-light-5);
+  transform: translateY(-50%);
 }
-
-.cp-reference {
-  flex: 0 0 34%;
+.cp-arrow::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 11px solid var(--el-color-primary);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
 }
 
 .cp-results {
   flex: 1;
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
 }
 
 .cp-result-image {
   width: 100%;
-  height: 200px;
+  height: 180px;
   display: block;
   border-radius: 6px;
 }
 
 .cp-caption {
   display: block;
-  margin-top: 6px;
+  margin-bottom: 4px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
   text-align: center;
@@ -113,13 +163,29 @@ const resultUrls = (pose: PromptPose) => resultImages(pose).map((image) => image
 }
 
 @media (max-width: 900px) {
-  .cp-row {
-    flex-direction: column;
+  .cp-formula {
+    gap: 8px;
+    padding: 8px;
   }
 
-  .cp-reference {
-    flex-basis: auto;
-    width: 100%;
+  .cp-inputs {
+    flex-basis: 120px;
+  }
+
+  .cp-input-image {
+    height: 110px;
+  }
+
+  .cp-arrow {
+    flex-basis: 34px;
+  }
+
+  .cp-results {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  }
+
+  .cp-result-image {
+    height: 130px;
   }
 }
 </style>

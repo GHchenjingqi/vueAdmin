@@ -11,16 +11,7 @@
     <div v-loading="loading" class="collection-grid">
       <router-link v-for="item in rows" :key="item.id" :to="`/portal/prompts/${item.id}`" class="collection-card">
         <div class="collection-covers">
-          <template v-if="coversOf(item).length">
-            <img
-              v-for="(cover, index) in coversOf(item).slice(0, 3)"
-              :key="cover + index"
-              :src="cover"
-              :alt="item.title"
-              class="collection-cover"
-              :class="`cover-${index}`"
-            />
-          </template>
+          <img v-if="coversOf(item).length" :src="coversOf(item)[0]" :alt="item.title" class="collection-cover" />
           <div v-else class="collection-cover-empty">
             <el-icon :size="30"><Picture /></el-icon>
           </div>
@@ -149,30 +140,14 @@ onMounted(() => void load())
 }
 .collection-covers {
   position: relative;
-  height: 170px;
+  height: 180px;
   background: var(--page-bg);
 }
 .collection-cover {
-  position: absolute;
-  top: 12px;
-  width: 45%;
-  height: 140px;
+  width: 100%;
+  height: 100%;
+  display: block;
   object-fit: cover;
-  border-radius: 6px;
-  border: 2px solid var(--card-bg);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-.cover-0 {
-  left: 8%;
-  z-index: 3;
-}
-.cover-1 {
-  left: 28%;
-  z-index: 2;
-}
-.cover-2 {
-  left: 48%;
-  z-index: 1;
 }
 .collection-cover-empty {
   position: absolute;

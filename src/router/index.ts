@@ -52,7 +52,7 @@ const routes = [
         path: 'prompts',
         name: 'PortalPrompts',
         component: () => import('@/views/portal/PromptSquare.vue'),
-        meta: { title: '提示词广场' },
+        meta: { title: '发现' },
       },
       {
         path: 'poses',
