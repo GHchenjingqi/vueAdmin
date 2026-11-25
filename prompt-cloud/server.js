@@ -885,6 +885,19 @@ function matchesScope(prompt, scope, poseIds) {
   return String(scope || '') === '' ? promptGroup(prompt, poseIds) === null : promptGroup(prompt, poseIds) === String(scope)
 }
 
+/**
+ * 通用关键字匹配：标题（及可选附加字段）模糊匹配 + ID 精确匹配。
+ * 关联选择器 option 的 label 为 `#${id} ${title}`，用户输入 `#35` / `35` 时应能命中 id=35 的条目。
+ */
+function matchesKeyword(item, keyword, extraFields = []) {
+  if (!keyword) return true
+  const raw = String(keyword).trim()
+  const lower = raw.toLowerCase()
+  if ([item.title, ...extraFields].some((value) => String(value || '').toLowerCase().includes(lower))) return true
+  const idToken = raw.replace(/^#/, '').trim()
+  return /^\d+$/.test(idToken) && String(item.id) === idToken
+}
+
 /** 特殊类型归属分类 ID：分类缺失时返回 null（由 ensureSpecialCategories 兜底补种） */
 function specialCategoryId(type) {
   const name = SPECIAL_CATEGORY_NAMES[type]
@@ -1721,10 +1734,7 @@ portal.get('/platforms', (_req, res) => {
 portal.get('/skills', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   let rows = db.skills.filter((s) => s.status === 1).slice()
-  if (req.query.keyword) {
-    const k = String(req.query.keyword).trim().toLowerCase()
-    rows = rows.filter((s) => String(s.title).toLowerCase().includes(k) || String(s.description || '').toLowerCase().includes(k))
-  }
+  rows = rows.filter((s) => matchesKeyword(s, req.query.keyword, [s.description]))
   rows.sort((a, b) => b.id - a.id)
   ok(res, paged(rows.map(publicSkill), page, pageSize))
 })
@@ -1762,7 +1772,7 @@ portal.get('/parent-options', (req, res) => {
   let rows = livePrompts().filter(
     (p) => p.status === 'published' && p.type !== 'collection' && p.type !== 'character' && (!excludeId || p.id !== excludeId),
   )
-  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows = rows.filter((p) => matchesKeyword(p, keyword))
   rows.sort((a, b) => b.id - a.id)
   ok(res, rows.slice(0, 20).map((p) => ({ id: p.id, title: p.title })))
 })
@@ -1774,7 +1784,7 @@ portal.get('/related-options', (req, res) => {
   let rows = livePrompts().filter(
     (p) => p.status === 'published' && p.type !== 'collection' && p.type !== 'character' && (!excludeId || p.id !== excludeId),
   )
-  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows = rows.filter((p) => matchesKeyword(p, keyword))
   rows.sort((a, b) => b.id - a.id)
   ok(res, rows.slice(0, 20).map((p) => relatedPromptBrief(p.id)))
 })
@@ -1784,10 +1794,7 @@ portal.get('/prompts', (req, res) => {
   const q = req.query
   const poseIds = poseCategoryIds()
   let rows = livePrompts().filter((p) => p.status === 'published' && matchesScope(p, q.scope, poseIds))
-  if (q.keyword) {
-    const k = String(q.keyword).toLowerCase()
-    rows = rows.filter((p) => [p.title, p.content, p.modelName].some((v) => String(v).toLowerCase().includes(k)))
-  }
+  rows = rows.filter((p) => matchesKeyword(p, q.keyword, [p.content, p.modelName]))
   if (q.categoryId !== undefined && q.categoryId !== '') rows = rows.filter((p) => hasCategory(p, q.categoryId))
   if (q.sort === 'popular') rows.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0) || b.id - a.id)
   else rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.id - a.id)
@@ -1848,10 +1855,7 @@ portal.get('/mine', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   let rows = livePrompts().filter((p) => p.authorId === req.user.id && p.source === 'user')
   if (req.query.status) rows = rows.filter((p) => p.status === req.query.status)
-  if (req.query.keyword) {
-    const k = String(req.query.keyword).toLowerCase()
-    rows = rows.filter((p) => String(p.title).toLowerCase().includes(k))
-  }
+  rows = rows.filter((p) => matchesKeyword(p, req.query.keyword))
   rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.id - a.id)
   ok(res, paged(rows.map(decorate), page, pageSize))
 })
@@ -1977,10 +1981,7 @@ admin.post('/skills/upload-attachment', attachmentUpload.single('file'), skillAt
 admin.get('/skills', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   let rows = db.skills.slice()
-  if (req.query.keyword) {
-    const k = String(req.query.keyword).trim().toLowerCase()
-    rows = rows.filter((s) => String(s.title).toLowerCase().includes(k) || String(s.description || '').toLowerCase().includes(k))
-  }
+  rows = rows.filter((s) => matchesKeyword(s, req.query.keyword, [s.description]))
   rows.sort((a, b) => b.id - a.id)
   ok(res, paged(rows.map(publicSkill), page, pageSize))
 })
@@ -2218,10 +2219,7 @@ admin.get('/prompts', (req, res) => {
   const { page, pageSize } = normalizePage(req.query)
   const poseIds = poseCategoryIds()
   let rows = livePrompts().filter((p) => matchesScope(p, req.query.scope, poseIds))
-  if (req.query.keyword) {
-    const k = String(req.query.keyword).toLowerCase()
-    rows = rows.filter((p) => String(p.title).toLowerCase().includes(k))
-  }
+  rows = rows.filter((p) => matchesKeyword(p, req.query.keyword))
   if (req.query.categoryId !== undefined && req.query.categoryId !== '') rows = rows.filter((p) => hasCategory(p, req.query.categoryId))
   if (req.query.status) rows = rows.filter((p) => p.status === req.query.status)
   if (req.query.source) rows = rows.filter((p) => p.source === req.query.source)
@@ -2245,7 +2243,7 @@ admin.get('/prompts/parent-options', (req, res) => {
     const group = promptGroup(p, poseIds)
     return String(req.query.scope || '') === 'pose' ? group === 'pose' : group === null
   })
-  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows = rows.filter((p) => matchesKeyword(p, keyword))
   rows.sort((a, b) => b.id - a.id)
   ok(res, rows.slice(0, 20).map((p) => ({ id: p.id, title: p.title })))
 })
@@ -2257,7 +2255,7 @@ admin.get('/prompts/related-options', (req, res) => {
   let rows = livePrompts().filter(
     (p) => p.status === 'published' && p.type !== 'collection' && p.type !== 'character' && (!excludeId || p.id !== excludeId),
   )
-  if (keyword) rows = rows.filter((p) => String(p.title).toLowerCase().includes(keyword))
+  rows = rows.filter((p) => matchesKeyword(p, keyword))
   rows.sort((a, b) => b.id - a.id)
   ok(res, rows.slice(0, 20).map((p) => relatedPromptBrief(p.id)))
 })
