@@ -118,8 +118,9 @@
             <el-radio-group v-model="form.type" @change="handleTypeChange">
               <el-radio-button value="single">{{ t('portal.typeSingle') }}</el-radio-button>
               <el-radio-button value="sequence">{{ t('portal.typeSequence') }}</el-radio-button>
+              <el-radio-button value="character-pose">{{ t('portal.typeCharacterPose') }}</el-radio-button>
             </el-radio-group>
-            <div class="prompt-parent-tip">{{ form.type === 'sequence' ? t('portal.typeSequenceTip') : t('portal.typeSingleTip') }}</div>
+            <div class="prompt-parent-tip">{{ contentTypeTip }}</div>
           </div>
           <div class="prompt-images">
             <SequenceStepEditor
@@ -130,6 +131,13 @@
               :uploader="promptApi.uploadImage"
               @update:steps="form.steps = $event"
               @update:character-anchor="form.characterAnchor = $event"
+            />
+            <CharacterPoseEditor
+              v-else-if="form.type === 'character-pose'"
+              v-model="form.characterPose"
+              :platforms="platforms"
+              source="admin"
+              :uploader="promptApi.uploadImage"
             />
             <PlatformImageGroups
               v-else
@@ -178,13 +186,25 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, View } from '@element-plus/icons-vue'
 import { promptApi } from '@/api'
-import type { PromptCategory, PromptImageGroupInput, PromptItem, PromptPayload, PromptPlatform, PromptStats, PromptStepInput, PromptType } from '@/api/prompt'
+import type {
+  PromptCategory,
+  PromptCharacterPose,
+  PromptCharacterPoseInput,
+  PromptImageGroupInput,
+  PromptItem,
+  PromptPayload,
+  PromptPlatform,
+  PromptStats,
+  PromptStepInput,
+  PromptType,
+} from '@/api/prompt'
 import { getErrorMessage } from '@/utils/error'
 import { deriveModelNames, joinModelNames } from '@/utils/modelNames'
 import ProTable from '@/components/ProTable/index.vue'
 import ProForm from '@/components/ProForm/index.vue'
 import PlatformImageGroups from '@/views/portal/components/PlatformImageGroups.vue'
 import SequenceStepEditor from '@/views/portal/components/SequenceStepEditor.vue'
+import CharacterPoseEditor from '@/views/portal/components/CharacterPoseEditor.vue'
 import { useI18n } from '@/i18n'
 
 const { t, locale } = useI18n()
@@ -247,6 +267,7 @@ interface PromptForm {
   characterAnchor: string
   steps: PromptStepInput[]
   platformGroups: PromptImageGroupInput[]
+  characterPose: PromptCharacterPoseInput
 }
 
 const rows = ref<PromptItem[]>([])
@@ -277,13 +298,29 @@ const form = reactive<PromptForm>({
   characterAnchor: '',
   steps: [],
   platformGroups: [],
+  characterPose: { characterImage: null, poses: [] },
 })
 const selectedRows = ref<PromptItem[]>([])
 
 /** 左侧模型 = 右侧效果图平台组的平台名集合（套组取所有步骤的平台组），实时联动 */
+const contentTypeTip = computed(() => {
+  if (form.type === 'sequence') return t('portal.typeSequenceTip')
+  if (form.type === 'character-pose') return t('portal.typeCharacterPoseTip')
+  return t('portal.typeSingleTip')
+})
+
 const derivedModelNames = computed(() => {
-  const groups = form.type === 'sequence' ? form.steps.flatMap((step) => step.platformGroups) : form.platformGroups
-  return deriveModelNames(groups, platforms.value)
+  if (form.type === 'sequence')
+    return deriveModelNames(
+      form.steps.flatMap((step) => step.platformGroups),
+      platforms.value,
+    )
+  if (form.type === 'character-pose')
+    return deriveModelNames(
+      form.characterPose.poses.flatMap((pose) => pose.platformGroups),
+      platforms.value,
+    )
+  return deriveModelNames(form.platformGroups, platforms.value)
 })
 watch(
   derivedModelNames,
@@ -397,6 +434,7 @@ const resetForm = (): void => {
   form.characterAnchor = ''
   form.steps = []
   form.platformGroups = []
+  form.characterPose = { characterImage: null, poses: [] }
 }
 
 /** 默认平台组：取第一个可用平台，异常时退化为 1（通用） */
@@ -415,8 +453,10 @@ const defaultStep = (): PromptStepInput => ({
 const ensureTypeDefaults = (): void => {
   if (form.type === 'single') {
     if (!form.platformGroups.length) form.platformGroups = [defaultGroup()]
-  } else if (!form.steps.length) {
-    form.steps = [defaultStep()]
+  } else if (form.type === 'sequence') {
+    if (!form.steps.length) form.steps = [defaultStep()]
+  } else if (!form.characterPose.poses.length) {
+    form.characterPose = { characterImage: null, poses: [{ key: `pose-${Date.now()}`, poseImage: null, platformGroups: [defaultGroup()] }] }
   }
 }
 
@@ -463,6 +503,35 @@ const toFormSteps = (loaded: PromptItem): PromptStepInput[] =>
     })),
   }))
 
+const toFormCharacterPose = (value: PromptCharacterPose | null | undefined): PromptCharacterPoseInput => ({
+  characterImage: value?.characterImage
+    ? {
+        url: value.characterImage.url,
+        filePath: value.characterImage.filePath ?? null,
+        sort: value.characterImage.sort ?? 0,
+        isCover: false,
+      }
+    : null,
+  poses: (value?.poses || []).map((pose) => ({
+    key: pose.key,
+    poseImage: {
+      url: pose.poseImage.url,
+      filePath: pose.poseImage.filePath ?? null,
+      sort: pose.poseImage.sort ?? 0,
+      isCover: false,
+    },
+    platformGroups: pose.platformGroups.map((group) => ({
+      platformId: group.platformId,
+      images: group.images.map((image) => ({
+        url: image.url,
+        filePath: image.filePath ?? null,
+        sort: image.sort,
+        isCover: Boolean(image.isCover),
+      })),
+    })),
+  })),
+})
+
 const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
   if (!categoryOptions.value.length) await fetchOptions()
   resetForm()
@@ -481,11 +550,15 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
       form.parentId = loaded.parentId ?? null
       parentTitle = loaded.parentTitle ?? ''
       // 模型不再取存档值，统一由右侧效果图平台组派生（见 derivedModelNames watch）
-      form.type = loaded.type === 'sequence' ? 'sequence' : 'single'
+      form.type = loaded.type === 'sequence' || loaded.type === 'character-pose' ? loaded.type : 'single'
       form.characterAnchor = loaded.characterAnchor || ''
+      form.characterPose = toFormCharacterPose(loaded.characterPose)
       if (form.type === 'sequence') {
         form.steps = toFormSteps(loaded)
         form.platformGroups = []
+      } else if (form.type === 'character-pose') {
+        form.platformGroups = []
+        form.steps = []
       } else {
         form.platformGroups = toFormGroups(loaded)
         form.steps = []
@@ -511,11 +584,35 @@ const submitImagesTotal = (): number => {
   if (form.type === 'sequence') {
     return form.steps.reduce((sum, step) => sum + step.platformGroups.reduce((sub, group) => sub + group.images.length, 0), 0)
   }
+  if (form.type === 'character-pose') {
+    return form.characterPose.poses.reduce((sum, pose) => sum + pose.platformGroups.reduce((sub, group) => sub + group.images.length, 0), 0)
+  }
   return form.platformGroups.reduce((sum, group) => sum + group.images.length, 0)
 }
 
 /** 提交前校验：规则与前台投稿页 PublishPrompt 保持一致 */
 const validateForm = (action: 'publish' | 'draft'): boolean => {
+  if (form.type === 'character-pose') {
+    if (!form.characterPose.characterImage?.url) {
+      ElMessage.warning(t('portal.characterRequired'))
+      return false
+    }
+    if (!form.characterPose.poses.length) {
+      ElMessage.warning(t('portal.poseRequired'))
+      return false
+    }
+    for (const [index, pose] of form.characterPose.poses.entries()) {
+      if (!pose.poseImage?.url) {
+        ElMessage.warning(t('portal.poseImageRequired').replace('{n}', String(index + 1)))
+        return false
+      }
+      if (action === 'publish' && !pose.platformGroups.some((group) => group.images.length > 0)) {
+        ElMessage.warning(t('portal.generatedRequired').replace('{n}', String(index + 1)))
+        return false
+      }
+    }
+    return true
+  }
   if (form.type === 'sequence') {
     if (form.steps.length === 0) {
       ElMessage.warning(t('portal.stepRequired'))
@@ -551,6 +648,7 @@ const validateForm = (action: 'publish' | 'draft'): boolean => {
 const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
   const categoryIds = form.categoryIds.map(Number)
   const isSequence = form.type === 'sequence'
+  const isCharacterPose = form.type === 'character-pose'
   return {
     title: form.title,
     content: form.content,
@@ -560,6 +658,26 @@ const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
     modelName: form.modelName,
     type: form.type,
     characterAnchor: isSequence ? form.characterAnchor.trim() || null : null,
+    characterPose: isCharacterPose
+      ? {
+          characterImage: form.characterPose.characterImage,
+          poses: form.characterPose.poses.map((pose) => ({
+            key: pose.key,
+            poseImage: pose.poseImage,
+            platformGroups: pose.platformGroups
+              .filter((group) => group.images.length > 0)
+              .map((group) => ({
+                platformId: Number(group.platformId),
+                images: group.images.map((image, index) => ({
+                  url: image.url,
+                  filePath: image.filePath ?? null,
+                  sort: index,
+                  isCover: Boolean(image.isCover),
+                })),
+              })),
+          })),
+        }
+      : undefined,
     steps: isSequence
       ? form.steps.map((step, index) => ({
           ...(step.id ? { id: step.id } : {}),
@@ -583,19 +701,20 @@ const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
         }))
       : undefined,
     action,
-    platformGroups: isSequence
-      ? undefined
-      : form.platformGroups
-          .filter((group) => group.images.length > 0)
-          .map((group) => ({
-            platformId: Number(group.platformId),
-            images: group.images.map((image, index) => ({
-              url: image.url,
-              filePath: image.filePath ?? null,
-              sort: index,
-              isCover: Boolean(image.isCover),
+    platformGroups:
+      isSequence || isCharacterPose
+        ? undefined
+        : form.platformGroups
+            .filter((group) => group.images.length > 0)
+            .map((group) => ({
+              platformId: Number(group.platformId),
+              images: group.images.map((image, index) => ({
+                url: image.url,
+                filePath: image.filePath ?? null,
+                sort: index,
+                isCover: Boolean(image.isCover),
+              })),
             })),
-          })),
   }
 }
 

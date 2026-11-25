@@ -52,46 +52,43 @@
         <div v-else class="detail-layout">
           <!-- 左：作品图集 -->
           <section class="detail-gallery">
-            <div v-if="platformGroups.length > 1" class="gallery-platforms">
-              <button
-                v-for="(group, index) in platformGroups"
-                :key="group.platformId"
-                type="button"
-                class="platform-tab"
-                :class="{ active: index === activePlatformIndex }"
-                @click="selectPlatform(index)"
-              >
-                {{ group.platformName }}
-                <span class="tab-count">{{ group.images.length }}</span>
-              </button>
-            </div>
-            <div v-else-if="platformGroups.length === 1" class="gallery-single-platform">{{ platformGroups[0].platformName }}</div>
-
-            <div class="gallery-frame">
-              <el-image
-                v-if="gallery.length"
-                :src="activeImage"
-                class="detail-main-image"
-                :preview-src-list="gallery"
-                :initial-index="activeIndex"
-              />
-              <div v-else class="detail-main-placeholder">
-                <el-icon :size="40"><Picture /></el-icon>
-              </div>
-
-              <div v-if="gallery.length > 1" class="detail-thumbs">
+            <CharacterPoseGallery v-if="isCharacterPose && detail?.characterPose" :value="detail.characterPose" />
+            <template v-else>
+              <div v-if="platformGroups.length > 1" class="gallery-platforms">
                 <button
-                  v-for="(url, index) in gallery"
-                  :key="url"
+                  v-for="(group, index) in platformGroups"
+                  :key="group.platformId"
                   type="button"
-                  class="detail-thumb"
-                  :class="{ active: index === activeIndex }"
-                  @click="activeIndex = index"
+                  class="platform-tab"
+                  :class="{ active: index === activePlatformIndex }"
+                  @click="selectPlatform(index)"
                 >
-                  <img :src="url" :alt="`${detail.title} ${index + 1}`" />
+                  {{ group.platformName }}
+                  <span class="tab-count">{{ group.images.length }}</span>
                 </button>
               </div>
-            </div>
+              <div v-else-if="platformGroups.length === 1" class="gallery-single-platform">{{ platformGroups[0].platformName }}</div>
+
+              <div class="gallery-frame">
+                <el-image v-if="gallery.length" :src="activeImage" class="detail-main-image" :preview-src-list="gallery" :initial-index="activeIndex" />
+                <div v-else class="detail-main-placeholder">
+                  <el-icon :size="40"><Picture /></el-icon>
+                </div>
+
+                <div v-if="gallery.length > 1" class="detail-thumbs">
+                  <button
+                    v-for="(url, index) in gallery"
+                    :key="url"
+                    type="button"
+                    class="detail-thumb"
+                    :class="{ active: index === activeIndex }"
+                    @click="activeIndex = index"
+                  >
+                    <img :src="url" :alt="`${detail.title} ${index + 1}`" />
+                  </button>
+                </div>
+              </div>
+            </template>
           </section>
 
           <!-- 右：提示词面板（Header / Content / Footer 三段式） -->
@@ -124,10 +121,7 @@
                     <span v-if="node.id === detail.id" class="chain-node-current-tag">{{ t('portal.currentStep') }}</span>
                     <span v-else class="chain-node-upstream-tag">{{ t('portal.upstreamNode') }}</span>
                   </div>
-                  <pre
-                    class="detail-content chain-content"
-                    :class="{ 'chain-content-collapsed': node.id !== detail.id }"
-                  >{{ node.content }}</pre>
+                  <pre class="detail-content chain-content" :class="{ 'chain-content-collapsed': node.id !== detail.id }">{{ node.content }}</pre>
                   <span v-if="node.id !== detail.id" class="chain-node-goto">
                     {{ t('prompt.viewDetail') }}
                     <el-icon><ArrowRight /></el-icon>
@@ -175,6 +169,7 @@ import { getErrorMessage } from '@/utils/error'
 import { copyText } from '@/utils/clipboard'
 import PromptCard from './components/PromptCard.vue'
 import SequenceTimeline from './components/SequenceTimeline.vue'
+import CharacterPoseGallery from './components/CharacterPoseGallery.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -189,6 +184,7 @@ const activeIndex = ref(0)
 const activePlatformIndex = ref(0)
 
 const isSequence = computed(() => detail.value?.type === 'sequence')
+const isCharacterPose = computed(() => detail.value?.type === 'character-pose')
 const chain = computed(() => detail.value?.chain ?? [])
 const followUps = computed(() => (detail.value?.children ?? []).filter((child) => child.status === 'published'))
 const fullChainText = computed(() => chain.value.map((node, index) => `${index + 1}. ${node.title}\n${node.content}`).join('\n\n'))

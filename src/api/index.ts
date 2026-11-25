@@ -21,6 +21,19 @@ export { taskApi } from './task'
 export { serverApi } from './server'
 export { workflowApi } from './workflow'
 export { promptApi } from './prompt'
-export type { PromptCategory, PromptItem, PromptImageItem, PromptStats, PromptPayload, PromptListQuery, PromptStatus, IntegrationKeyInfo } from './prompt'
+export type {
+  PromptCategory,
+  PromptItem,
+  PromptImageItem,
+  PromptStats,
+  PromptPayload,
+  PromptListQuery,
+  PromptStatus,
+  IntegrationKeyInfo,
+  PromptCharacterPose,
+  PromptCharacterPoseInput,
+  PromptPose,
+  PromptPoseInput,
+} from './prompt'
 export { portalApi } from './portal'
 export type { PortalCategory, PortalPrompt, PortalListQuery, PortalPayload, PortalParentOption } from './portal'

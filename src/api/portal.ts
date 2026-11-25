@@ -6,7 +6,16 @@
  */
 import request from '@/utils/request'
 import type { PaginatedData, ListQueryParams } from '@/types/response'
-import type { PromptCategory, PromptImageGroupInput, PromptItem, PromptPlatform, PromptStatus, PromptStepInput, PromptType } from './prompt'
+import type {
+  PromptCategory,
+  PromptCharacterPoseInput,
+  PromptImageGroupInput,
+  PromptItem,
+  PromptPlatform,
+  PromptStatus,
+  PromptStepInput,
+  PromptType,
+} from './prompt'
 
 export interface PortalCategory extends PromptCategory {
   promptCount: number
@@ -51,6 +60,8 @@ export interface PortalPayload {
   submit?: boolean
   /** 按平台分组的效果图；每组最多 20 张 */
   platformGroups?: PromptImageGroupInput[]
+  /** 角色 + 姿势组合，仅 type=character-pose 使用 */
+  characterPose?: PromptCharacterPoseInput
 }
 
 export interface PortalRegisterParams {

@@ -599,6 +599,8 @@ function imagesOf(promptId, stepId) {
       filePath: img.filePath,
       sort: img.sort,
       isCover: img.isCover,
+      usage: img.usage || 'result',
+      imageKey: img.imageKey || null,
     }))
 }
 
@@ -623,7 +625,42 @@ function groupImagesByPlatform(images) {
 }
 
 function platformGroupsOf(promptId) {
-  return groupImagesByPlatform(imagesOf(promptId))
+  return groupImagesByPlatform(imagesOf(promptId).filter((img) => img.usage === 'result'))
+}
+
+// 角色+姿势组合：角色图与姿势图不参与模型名派生和作品封面
+function resultImagesOf(promptId) {
+  return imagesOf(promptId).filter((img) => img.usage === 'result')
+}
+
+function publicPoseImage(img) {
+  return img ? { url: img.url, filePath: img.filePath ?? null, sort: img.sort ?? 0, isCover: Boolean(img.isCover) } : null
+}
+
+function hasPromptResultImages(prompt) {
+  return (prompt.type === 'character-pose' ? resultImagesOf(prompt.id) : imagesOf(prompt.id)).length > 0
+}
+
+function writePromptImages(promptId, data) {
+  if (data.type === 'sequence') replaceSteps(promptId, data)
+  else if (data.type === 'character-pose') replaceCharacterPose(promptId, data)
+  else if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(promptId, data)
+}
+
+function characterPoseOf(promptId) {
+  const images = imagesOf(promptId)
+  const character = images.find((img) => img.usage === 'character')
+  const poseImages = images.filter((img) => img.usage === 'pose')
+  const poses = poseImages.map((pose, index) => {
+    const key = pose.imageKey || `pose-${index + 1}`
+    const results = images.filter((img) => img.usage === 'result' && img.imageKey === key)
+    return {
+      key,
+      poseImage: publicPoseImage(pose),
+      platformGroups: groupImagesByPlatform(results),
+    }
+  })
+  return { characterImage: publicPoseImage(character), poses }
 }
 
 function stepsOf(promptId) {
@@ -678,7 +715,8 @@ function childrenOf(promptId) {
     .filter((p) => !p.isDeleted && Number(p.parentId) === Number(promptId))
     .sort((a, b) => a.id - b.id)
     .map((p) => {
-      const first = imagesOf(p.id)[0]
+      const imgs = imagesOf(p.id)
+      const first = imgs.find((img) => img.usage === 'result') || imgs[0]
       return { id: p.id, title: p.title, status: p.status, coverImage: first ? first.url : '' }
     })
 }
@@ -740,8 +778,14 @@ function decorate(prompt) {
   const images = imagesOf(prompt.id)
   const parentMeta = resolveParentChain(prompt)
   const isSequence = prompt.type === 'sequence'
+  const isCharacterPose = prompt.type === 'character-pose'
   const steps = isSequence ? stepsOf(prompt.id) : []
-  const coverPool = isSequence && steps.length && steps[0].platformGroups.length ? steps[0].platformGroups[0].images : images
+  const characterPoseData = isCharacterPose ? characterPoseOf(prompt.id) : null
+  const coverPool = isSequence && steps.length && steps[0].platformGroups.length
+    ? steps[0].platformGroups[0].images
+    : isCharacterPose
+      ? resultImagesOf(prompt.id)
+      : images
   const cover = coverPool.find((img) => img.isCover === 1) || coverPool[0]
   return {
     id: prompt.id,
@@ -760,6 +804,7 @@ function decorate(prompt) {
     type: prompt.type || 'single',
     characterAnchor: prompt.characterAnchor ?? null,
     steps,
+    characterPose: characterPoseData,
     status: prompt.status,
     source: prompt.source,
     authorId: prompt.authorId,
@@ -793,6 +838,14 @@ function inputGroups(data) {
 }
 
 function countInputImages(data) {
+  if (data.type === 'character-pose') {
+    return (Array.isArray(data.characterPose?.poses) ? data.characterPose.poses : []).reduce(
+      (sum, pose) =>
+        sum +
+        (Array.isArray(pose.platformGroups) ? pose.platformGroups.reduce((s, g) => s + (Array.isArray(g.images) ? g.images.length : 0), 0) : 0),
+      0,
+    )
+  }
   if (data.type === 'sequence') {
     return (Array.isArray(data.steps) ? data.steps : []).reduce(
       (sum, step) => sum + (Array.isArray(step.platformGroups) ? step.platformGroups.reduce((s, g) => s + (Array.isArray(g.images) ? g.images.length : 0), 0) : 0),
@@ -862,6 +915,83 @@ function replaceSteps(promptId, data) {
   })
 }
 
+function replaceCharacterPose(promptId, data) {
+  db.images = db.images.filter((img) => img.promptId !== promptId)
+  const payload = data.characterPose && typeof data.characterPose === 'object' ? data.characterPose : {}
+  const character = payload.characterImage
+  if (character && character.url) {
+    db.images.push({
+      id: nextId('image'),
+      promptId,
+      platformId: DEFAULT_PLATFORM_ID,
+      stepId: null,
+      url: String(character.url),
+      filePath: character.filePath ?? null,
+      sort: 0,
+      isCover: 0,
+      usage: 'character',
+      imageKey: 'character',
+    })
+  }
+  let firstResult = true
+  ;(Array.isArray(payload.poses) ? payload.poses : []).forEach((pose, index) => {
+    const key = String(pose.key || `pose-${index + 1}`)
+    if (pose.poseImage && pose.poseImage.url) {
+      db.images.push({
+        id: nextId('image'),
+        promptId,
+        platformId: DEFAULT_PLATFORM_ID,
+        stepId: null,
+        url: String(pose.poseImage.url),
+        filePath: pose.poseImage.filePath ?? null,
+        sort: index,
+        isCover: 0,
+        usage: 'pose',
+        imageKey: key,
+      })
+    }
+    for (const group of Array.isArray(pose.platformGroups) ? pose.platformGroups : []) {
+      const platformId = Number(group.platformId) || DEFAULT_PLATFORM_ID
+      const images = Array.isArray(group.images) ? group.images.slice(0, IMAGES_PER_GROUP) : []
+      images.forEach((img, imageIndex) => {
+        db.images.push({
+          id: nextId('image'),
+          promptId,
+          platformId,
+          stepId: null,
+          url: String(img.url || ''),
+          filePath: img.filePath ?? null,
+          sort: imageIndex,
+          isCover: firstResult ? 1 : 0,
+          usage: 'result',
+          imageKey: key,
+        })
+        firstResult = false
+      })
+    }
+  })
+}
+
+function characterPoseError(data, requireGenerated) {
+  const payload = data.characterPose && typeof data.characterPose === 'object' ? data.characterPose : {}
+  if (!payload.characterImage || !payload.characterImage.url) return '请选择角色图'
+  const poses = Array.isArray(payload.poses) ? payload.poses : []
+  if (!poses.length) return '请至少添加一个姿势'
+  if (poses.length > IMAGES_PER_GROUP) return `最多添加 ${IMAGES_PER_GROUP} 个姿势`
+  for (const [index, pose] of poses.entries()) {
+    if (!pose || !pose.poseImage || !pose.poseImage.url) return `第 ${index + 1} 个姿势缺少姿势图`
+    const groups = Array.isArray(pose.platformGroups) ? pose.platformGroups : []
+    for (const group of groups) {
+      if (!db.platforms.some((p) => p.id === Number(group.platformId) && p.status === 1)) return '所选平台不存在或已停用'
+      if (Array.isArray(group.images) && group.images.length > IMAGES_PER_GROUP) return `每个平台最多上传 ${IMAGES_PER_GROUP} 张生成图`
+    }
+    if (requireGenerated && !groups.some((group) => Array.isArray(group.images) && group.images.length > 0)) {
+      return `第 ${index + 1} 个姿势缺少对应的生成图`
+    }
+  }
+  return null
+}
+
 function validationError(data, requireImage) {
   if (!data.title || !String(data.title).trim()) return '标题不能为空'
   if (!data.content || !String(data.content).trim()) return '提示词正文不能为空'
@@ -869,6 +999,7 @@ function validationError(data, requireImage) {
   const categoryIds = resolveCategoryIds(data)
   if (!categoryIds.length) return '请选择分类'
   if (categoryIds.length > MAX_CATEGORIES) return `最多选择 ${MAX_CATEGORIES} 个分类`
+  if (data.type === 'character-pose') return characterPoseError(data, requireImage)
   if (data.type === 'sequence') {
     const steps = Array.isArray(data.steps) ? data.steps : []
     if (steps.length === 0) return '套组至少需要 1 个步骤'
@@ -917,7 +1048,7 @@ function trimData(data) {
     categoryIds: resolveCategoryIds(data),
     parentId: data.parentId ? Number(data.parentId) : null,
     modelName: String(data.modelName || '').trim(),
-    type: data.type === 'sequence' ? 'sequence' : 'single',
+    type: data.type === 'sequence' || data.type === 'character-pose' ? data.type : 'single',
     characterAnchor: data.type === 'sequence' && data.characterAnchor ? String(data.characterAnchor).trim() : null,
   }
 }
@@ -1416,8 +1547,7 @@ portal.post('/mine', (req, res) => {
     updatedAt: nowIso(),
   }
   db.prompts.push(prompt)
-  if (data.type === 'sequence') replaceSteps(prompt.id, data)
-  else if (data.platformGroups !== undefined || Array.isArray(data.images)) replaceImages(prompt.id, data)
+  writePromptImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt), 201)
 })
@@ -1441,8 +1571,7 @@ portal.put('/mine/:id', (req, res) => {
     reviewedAt: submitting ? null : prompt.reviewedAt,
     updatedAt: nowIso(),
   })
-  if (data.type === 'sequence') replaceSteps(prompt.id, data)
-  else if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(prompt.id, data)
+  writePromptImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt))
 })
@@ -1451,7 +1580,7 @@ portal.post('/mine/:id/submit', (req, res) => {
   const prompt = findOwned(req.params.id, req.user.id)
   if (!prompt) return fail(res, '投稿不存在', 404)
   if (prompt.status !== 'draft' && prompt.status !== 'rejected') return fail(res, '只有草稿或被驳回的投稿可以提交', 400)
-  if (imagesOf(prompt.id).length === 0) return fail(res, '没有效果图，无法提交审核', 400)
+  if (!hasPromptResultImages(prompt)) return fail(res, '没有效果图，无法提交审核', 400)
   Object.assign(prompt, { status: 'pending', rejectReason: null, reviewedBy: null, reviewedAt: null, updatedAt: nowIso() })
   persist()
   ok(res, decorate(prompt))
@@ -1711,8 +1840,7 @@ admin.post('/prompts', (req, res) => {
     updatedAt: nowIso(),
   }
   db.prompts.push(prompt)
-  if (data.type === 'sequence') replaceSteps(prompt.id, data)
-  else if (data.platformGroups !== undefined || Array.isArray(data.images)) replaceImages(prompt.id, data)
+  writePromptImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt), 201)
 })
@@ -1722,8 +1850,8 @@ admin.put('/prompts/:id', (req, res) => {
   if (!prompt) return fail(res, '提示词不存在', 404)
   const data = req.body || {}
   const publishing = data.action === 'publish'
-  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined
-  const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : imagesOf(prompt.id).length > 0
+  const hasImagePayload = data.platformGroups !== undefined || data.images !== undefined || data.steps !== undefined || data.characterPose !== undefined
+  const willHaveImages = hasImagePayload ? countInputImages(data) > 0 : hasPromptResultImages(prompt)
   if (publishing && !willHaveImages) return fail(res, '正式发布的提示词必须上传至少一张效果图', 400)
   const err = validationError(data, false) || categoryError(data) || parentError(data, prompt.id)
   if (err) return fail(res, err, 400)
@@ -1732,8 +1860,7 @@ admin.put('/prompts/:id', (req, res) => {
     rejectReason: publishing ? null : prompt.rejectReason,
     updatedAt: nowIso(),
   })
-  if (data.type === 'sequence') replaceSteps(prompt.id, data)
-  else if (data.platformGroups !== undefined || data.images !== undefined) replaceImages(prompt.id, data)
+  writePromptImages(prompt.id, data)
   persist()
   ok(res, decorate(prompt))
 })
@@ -1741,7 +1868,7 @@ admin.put('/prompts/:id', (req, res) => {
 admin.post('/prompts/:id/publish', (req, res) => {
   const prompt = findPrompt(req.params.id)
   if (!prompt) return fail(res, '提示词不存在', 404)
-  if (imagesOf(prompt.id).length === 0) return fail(res, '没有效果图，无法发布', 400)
+  if (!hasPromptResultImages(prompt)) return fail(res, '没有效果图，无法发布', 400)
   Object.assign(prompt, { status: 'published', rejectReason: null, updatedAt: nowIso() })
   persist()
   ok(res, decorate(prompt))
@@ -1794,7 +1921,7 @@ admin.post('/reviews/:id/approve', (req, res) => {
   const prompt = livePrompts().find((p) => p.id === Number(req.params.id))
   if (!prompt) return fail(res, '投稿不存在', 404)
   if (prompt.status !== 'pending') return fail(res, '该投稿不是待审核状态', 400)
-  if (imagesOf(prompt.id).length === 0) return fail(res, '投稿缺少效果图，无法通过审核', 400)
+  if (!hasPromptResultImages(prompt)) return fail(res, '投稿缺少效果图，无法通过审核', 400)
   Object.assign(prompt, {
     status: 'published',
     rejectReason: null,
@@ -1933,7 +2060,7 @@ integration.get('/prompts/:id', (req, res) => {
 
 integration.post('/prompts', async (req, res) => {
   const data = req.body && typeof req.body === 'object' ? req.body : {}
-  if (data.type === 'sequence') return fail(res, 'AI 推送暂不支持套组类型', 400)
+  if (data.type === 'sequence' || data.type === 'character-pose') return fail(res, 'AI 推送暂不支持套组或角色姿势组合', 400)
 
   const idempotencyKey = String(data.idempotencyKey || '').trim().slice(0, 128)
   if (idempotencyKey) {

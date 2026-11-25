@@ -5,7 +5,30 @@ import request from '@/utils/request'
 import type { PaginatedData, ListQueryParams } from '@/types/response'
 
 export type PromptStatus = 'draft' | 'pending' | 'published' | 'rejected' | 'offline'
-export type PromptType = 'single' | 'sequence'
+export type PromptType = 'single' | 'sequence' | 'character-pose'
+
+/** 角色 + 姿势组合：一个角色图，多个姿势，每个姿势需对应生成图 */
+export interface PromptPoseInput {
+  key?: string
+  poseImage: PromptImageItem | null
+  platformGroups: PromptImageGroupInput[]
+}
+
+export interface PromptCharacterPoseInput {
+  characterImage: PromptImageItem | null
+  poses: PromptPoseInput[]
+}
+
+export interface PromptPose extends PromptPoseInput {
+  key: string
+  poseImage: PromptImageItem
+  platformGroups: PromptImageGroup[]
+}
+
+export interface PromptCharacterPose {
+  characterImage: PromptImageItem | null
+  poses: PromptPose[]
+}
 
 export interface PromptCategory {
   id: number
@@ -106,6 +129,7 @@ export interface PromptItem {
   type?: PromptType
   characterAnchor?: string | null
   steps?: PromptStep[]
+  characterPose?: PromptCharacterPose | null
   status: PromptStatus
   source: 'admin' | 'user'
   authorId: number
@@ -154,6 +178,7 @@ export interface PromptPayload {
   type?: PromptType
   characterAnchor?: string | null
   steps?: PromptStepInput[]
+  characterPose?: PromptCharacterPoseInput
   action?: 'publish' | 'draft'
   images?: PromptImageItem[]
   platformGroups?: PromptImageGroupInput[]

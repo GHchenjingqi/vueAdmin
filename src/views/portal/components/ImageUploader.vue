@@ -39,8 +39,8 @@
         </div>
         <div class="image-uploader-actions">
           <el-icon class="image-uploader-grip"><Rank /></el-icon>
-          <el-tag v-if="image.isCover" type="success" size="small" effect="dark">{{ t('portal.cover') }}</el-tag>
-          <el-button v-else link size="small" @click="setCover(index)">{{ t('portal.setCover') }}</el-button>
+          <el-tag v-if="showCover && image.isCover" type="success" size="small" effect="dark">{{ t('portal.cover') }}</el-tag>
+          <el-button v-else-if="showCover" link size="small" @click="setCover(index)">{{ t('portal.setCover') }}</el-button>
           <el-button link type="danger" size="small" @click="removeImage(index)">{{ t('common.delete') }}</el-button>
         </div>
       </div>
@@ -64,8 +64,10 @@ const props = withDefaults(
     max?: number
     /** 自定义上传通道：后台等场景可传入自己的专用上传接口，默认走投稿上传 */
     uploader?: (file: File) => Promise<{ data: { id: string; url: string } }>
+    /** 是否显示封面标记与设置封面按钮；角色图/姿势图这类单图参考图关闭 */
+    showCover?: boolean
   }>(),
-  { max: 20 },
+  { max: 20, showCover: true, uploader: undefined },
 )
 const emit = defineEmits<{ (e: 'update:modelValue', value: PromptImageItem[]): void }>()
 
@@ -104,7 +106,10 @@ const onDrop = (index: number): void => {
   const [moved] = next.splice(from, 1)
   next.splice(index, 0, moved)
   // sort 与渲染顺序一致：步骤套组提交时按 image.sort 保存，单条按数组下标保存
-  emit('update:modelValue', next.map((image, i) => ({ ...image, sort: i })))
+  emit(
+    'update:modelValue',
+    next.map((image, i) => ({ ...image, sort: i })),
+  )
 }
 
 const onDragEnd = (): void => {
@@ -216,7 +221,9 @@ const removeImage = (index: number): void => {
   overflow: hidden;
   background: var(--card-bg);
   cursor: grab;
-  transition: opacity 0.15s, box-shadow 0.15s;
+  transition:
+    opacity 0.15s,
+    box-shadow 0.15s;
 }
 
 .image-uploader-item:active {
