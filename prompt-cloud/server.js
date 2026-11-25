@@ -32,6 +32,9 @@ const DEFAULT_PLATFORM_NAMES = ['通用', '即梦', '可灵', 'GPT', 'Midjourney
 const AI_KEY_PREFIX = 'ppt_ai_'
 const AI_IMAGE_MAX_BYTES = 15 * 1024 * 1024
 const AI_FETCH_TIMEOUT_MS = 20000
+// Skills 下载中心：附件数量与单文件大小上限
+const MAX_SKILL_ATTACHMENTS = 20
+const SKILL_FILE_MAX_BYTES = 50 * 1024 * 1024
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -241,6 +244,7 @@ function seedDb() {
     steps: demo.steps,
     favorites: demo.favorites,
     uploads: [],
+    skills: [],
     demoSeeded: true,
   }
 }
@@ -373,6 +377,20 @@ function ensureIntegrationData(db) {
   return migrated
 }
 
+// Skills 下载中心数据集合，缺失时自动补种（兼容线上已有库）
+function ensureSkills(db) {
+  let migrated = false
+  if (!Array.isArray(db.skills)) {
+    db.skills = []
+    migrated = true
+  }
+  db.seq = db.seq || {}
+  if (!db.seq.skill) {
+    db.seq.skill = db.skills.reduce((max, s) => Math.max(max, Number(s.id) || 0), 0)
+  }
+  return migrated
+}
+
 // 短剧方向特殊分类：「提示词专题」与「角色库」的固定归属分类，缺失时自动补种
 const SPECIAL_CATEGORY_NAMES = { collection: '提示词', character: '角色库' }
 
@@ -423,7 +441,8 @@ function loadDb() {
   const demoMigrated = ensureDemo(db)
   const integrationMigrated = ensureIntegrationData(db)
   const specialCategoryMigrated = ensureSpecialCategories(db)
-  if (demoMigrated || platformMigrated || sequenceMigrated || integrationMigrated || specialCategoryMigrated || !loaded) {
+  const skillsMigrated = ensureSkills(db)
+  if (demoMigrated || platformMigrated || sequenceMigrated || integrationMigrated || specialCategoryMigrated || skillsMigrated || !loaded) {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8')
     if (integrationMigrated) console.log('initialized AI push API key')
     if (specialCategoryMigrated) console.log('ensured special categories for collections and character library')
@@ -1249,6 +1268,9 @@ const upload = multer({
   },
 })
 
+// Skills 附件：允许任意文件类型（md/zip/pdf/脚本等），大小上限独立于图片
+const attachmentUpload = multer({ storage, limits: { fileSize: SKILL_FILE_MAX_BYTES } })
+
 function uploadHandler(req, res) {
   if (!req.file) return fail(res, '未收到图片文件', 400)
   const url = `/uploads/${req.file.filename}`
@@ -1262,6 +1284,54 @@ function uploadHandler(req, res) {
   db.uploads.push({ ...result, filePath: req.file.filename, createdAt: nowIso() })
   persist()
   ok(res, result, 201)
+}
+
+// Skills 附件上传记录（复用 uploads 落盘，文案按附件调整）
+function skillAttachmentHandler(req, res) {
+  if (!req.file) return fail(res, '未收到附件文件', 400)
+  const result = {
+    id: req.file.filename,
+    url: `/uploads/${req.file.filename}`,
+    name: req.file.originalname,
+    size: req.file.size,
+    mimetype: req.file.mimetype,
+  }
+  db.uploads.push({ ...result, filePath: req.file.filename, createdAt: nowIso() })
+  persist()
+  ok(res, result, 201)
+}
+
+const skillAttachmentFields = ['id', 'url', 'name', 'size', 'mimetype']
+
+function normalizeSkillAttachments(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .slice(0, MAX_SKILL_ATTACHMENTS)
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const out = {}
+      for (const key of skillAttachmentFields) out[key] = item[key] ?? null
+      out.id = String(out.id || out.url || '')
+      out.url = String(out.url || '')
+      out.name = String(out.name || out.id)
+      out.size = Number(out.size) || 0
+      out.mimetype = String(out.mimetype || '')
+      return out
+    })
+    .filter((item) => item.url)
+}
+
+function publicSkill(skill) {
+  return {
+    id: skill.id,
+    title: String(skill.title || ''),
+    description: String(skill.description || ''),
+    attachments: normalizeSkillAttachments(skill.attachments),
+    status: skill.status,
+    viewCount: Number(skill.viewCount) || 0,
+    createdAt: skill.createdAt,
+    updatedAt: skill.updatedAt,
+  }
 }
 
 // ============ AI 推送：图片 URL / base64 归一化 ============
@@ -1506,6 +1576,19 @@ const MENU_TREE = [
         visible: true,
         children: [],
       },
+      {
+        id: 10,
+        parentId: 2,
+        name: 'Skills 上传',
+        path: '/skill-upload',
+        component: 'views/prompt/SkillUpload.vue',
+        icon: 'UploadFilled',
+        type: 'M',
+        sort: 7,
+        status: 1,
+        visible: true,
+        children: [],
+      },
     ],
   },
 ]
@@ -1632,6 +1715,38 @@ portal.get('/categories', (req, res) => {
 
 portal.get('/platforms', (_req, res) => {
   ok(res, db.platforms.filter((p) => p.status === 1).sort((a, b) => a.sort - b.sort || a.id - b.id))
+})
+
+// Skills 下载中心（公开）：列表只返回上架项
+portal.get('/skills', (req, res) => {
+  const { page, pageSize } = normalizePage(req.query)
+  let rows = db.skills.filter((s) => s.status === 1).slice()
+  if (req.query.keyword) {
+    const k = String(req.query.keyword).trim().toLowerCase()
+    rows = rows.filter((s) => String(s.title).toLowerCase().includes(k) || String(s.description || '').toLowerCase().includes(k))
+  }
+  rows.sort((a, b) => b.id - a.id)
+  ok(res, paged(rows.map(publicSkill), page, pageSize))
+})
+
+portal.get('/skills/:id', (req, res) => {
+  const skill = db.skills.find((s) => s.id === Number(req.params.id) && s.status === 1)
+  if (!skill) return fail(res, 'Skills 条目不存在或已下架', 404)
+  skill.viewCount = (Number(skill.viewCount) || 0) + 1
+  persist()
+  ok(res, publicSkill(skill))
+})
+
+// 附件下载：按记录查 uploads 定位真实文件，Content-Disposition 保留原始文件名
+portal.get('/skills/:id/attachments/:attachmentId/download', (req, res) => {
+  const skill = db.skills.find((s) => s.id === Number(req.params.id) && s.status === 1)
+  if (!skill) return fail(res, 'Skills 条目不存在或已下架', 404)
+  const attachment = normalizeSkillAttachments(skill.attachments).find((a) => a.id === String(req.params.attachmentId))
+  if (!attachment) return fail(res, '附件不存在', 404)
+  const file = path.basename(String(attachment.url || ''))
+  const target = path.join(UPLOAD_DIR, file)
+  if (!file || !fs.existsSync(target)) return fail(res, '附件文件不存在', 404)
+  res.download(target, attachment.name || file)
 })
 
 // 投稿表单用：库里已有的模型名（去重排序），与后台 /prompts/model-options 口径一致
@@ -1855,6 +1970,72 @@ const admin = express.Router()
 admin.use(requireAdmin)
 
 admin.post('/upload-image', upload.single('file'), uploadHandler)
+
+// ============ Skills 下载中心（后台管理） ============
+admin.post('/skills/upload-attachment', attachmentUpload.single('file'), skillAttachmentHandler)
+
+admin.get('/skills', (req, res) => {
+  const { page, pageSize } = normalizePage(req.query)
+  let rows = db.skills.slice()
+  if (req.query.keyword) {
+    const k = String(req.query.keyword).trim().toLowerCase()
+    rows = rows.filter((s) => String(s.title).toLowerCase().includes(k) || String(s.description || '').toLowerCase().includes(k))
+  }
+  rows.sort((a, b) => b.id - a.id)
+  ok(res, paged(rows.map(publicSkill), page, pageSize))
+})
+
+admin.get('/skills/:id', (req, res) => {
+  const skill = db.skills.find((s) => s.id === Number(req.params.id))
+  if (!skill) return fail(res, 'Skills 条目不存在', 404)
+  ok(res, publicSkill(skill))
+})
+
+admin.post('/skills', (req, res) => {
+  const data = req.body || {}
+  const title = String(data.title || '').trim()
+  if (!title) return fail(res, '标题不能为空', 400)
+  const attachments = normalizeSkillAttachments(data.attachments)
+  if (!attachments.length) return fail(res, '请至少上传一个附件', 400)
+  const skill = {
+    id: nextId('skill'),
+    title,
+    description: String(data.description || '').trim(),
+    attachments,
+    status: data.status === 0 ? 0 : 1,
+    viewCount: 0,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  }
+  db.skills.push(skill)
+  persist()
+  ok(res, publicSkill(skill), 201)
+})
+
+admin.put('/skills/:id', (req, res) => {
+  const skill = db.skills.find((s) => s.id === Number(req.params.id))
+  if (!skill) return fail(res, 'Skills 条目不存在', 404)
+  const data = req.body || {}
+  const title = String(data.title || '').trim()
+  if (!title) return fail(res, '标题不能为空', 400)
+  const attachments = normalizeSkillAttachments(data.attachments)
+  if (!attachments.length) return fail(res, '请至少上传一个附件', 400)
+  skill.title = title
+  skill.description = String(data.description || '').trim()
+  skill.attachments = attachments
+  if (data.status === 0 || data.status === 1) skill.status = data.status
+  skill.updatedAt = nowIso()
+  persist()
+  ok(res, publicSkill(skill))
+})
+
+admin.delete('/skills/:id', (req, res) => {
+  const index = db.skills.findIndex((s) => s.id === Number(req.params.id))
+  if (index < 0) return fail(res, 'Skills 条目不存在', 404)
+  db.skills.splice(index, 1)
+  persist()
+  ok(res, null)
+})
 
 admin.get('/categories/options', (req, res) => {
   const poseIds = poseCategoryIds()
@@ -2276,6 +2457,7 @@ admin.post('/data/import', (req, res) => {
     db = incoming
     db.seq = db.seq || {}
     ensureIntegrationData(db)
+    ensureSkills(db)
     persist()
     ok(res, { imported: true, prompts: db.prompts.length })
   } catch (err) {
@@ -2302,6 +2484,7 @@ admin.post('/data/backups/:name/restore', (req, res) => {
     db = snapshot
     db.seq = db.seq || {}
     ensureIntegrationData(db)
+    ensureSkills(db)
     persist()
     ok(res, { restored: name, prompts: db.prompts.length })
   } catch (err) {

@@ -73,6 +73,12 @@ const routes = [
         meta: { title: '角色库' },
       },
       {
+        path: 'skills',
+        name: 'PortalSkills',
+        component: () => import('@/views/portal/SkillSquare.vue'),
+        meta: { title: 'Skills 下载' },
+      },
+      {
         path: 'prompts/:id',
         name: 'PortalPromptDetail',
         component: () => import('@/views/portal/PromptDetail.vue'),

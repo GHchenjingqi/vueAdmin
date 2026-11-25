@@ -61,6 +61,10 @@
             <el-icon><Avatar /></el-icon>
             <span>{{ t('portal.navCharacters') }}</span>
           </router-link>
+          <router-link to="/portal/skills" class="side-nav-item">
+            <el-icon><Files /></el-icon>
+            <span>{{ t('portal.navSkills') }}</span>
+          </router-link>
           <router-link to="/portal/publish" class="side-nav-item">
             <el-icon><EditPen /></el-icon>
             <span>{{ t('portal.navPublish') }}</span>

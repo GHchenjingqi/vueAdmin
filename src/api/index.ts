@@ -43,3 +43,5 @@ export type {
 } from './prompt'
 export { portalApi } from './portal'
 export type { PortalCategory, PortalPrompt, PortalListQuery, PortalPayload, PortalParentOption } from './portal'
+export { skillApi } from './skill'
+export type { SkillItem, SkillAttachment, SkillPayload, SkillUploadResult } from './skill'
