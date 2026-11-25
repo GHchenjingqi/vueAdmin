@@ -415,7 +415,7 @@
     "brand": "Brand Identity",
     "watermark": "Watermark Settings",
     "aiPushTitle": "AI Push API",
-    "aiPushTip": "Share this key with AI clients to publish prompts through the dedicated endpoint. The key can only create/publish prompts, not delete data or manage users.",
+    "aiPushTip": "Share this key with AI clients to publish prompts through the dedicated endpoint (pass it as the pushKey parameter). The key can only create/publish prompts, not delete data or manage users.",
     "apiKey": "API Key",
     "copy": "Copy",
     "rotateKey": "Rotate Key",

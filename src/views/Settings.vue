@@ -561,9 +561,10 @@ const aiPushForm = reactive({ key: '', enabled: true })
 const keyRotating = ref(false)
 const keySaving = ref(false)
 
-const curlExample = computed(
-  () => `curl -X POST '${window.location.origin}/api/v1/integrations/prompts' \\
-  -H 'X-API-Key: ${aiPushForm.key || '<YOUR_KEY>'}' \\
+const curlExample = computed(() => {
+  const endpoint = `${window.location.origin}/api/v1/integrations/prompts${window.location.search || ''}`
+  const separator = endpoint.includes('?') ? '&' : '?'
+  return `curl -X POST '${endpoint}${separator}pushKey=${aiPushForm.key || '<YOUR_KEY>'}' \\
   -H 'Content-Type: application/json' \\
   -d '{
     "title": "示例标题",
@@ -573,8 +574,8 @@ const curlExample = computed(
     "imageUrls": ["https://example.com/poster.jpg"],
     "status": "published",
     "idempotencyKey": "ai-20261124-001"
-  }'`,
-)
+  }'`
+})
 
 const applyKeyInfo = (info: IntegrationKeyInfo) => {
   aiPushForm.key = info.key

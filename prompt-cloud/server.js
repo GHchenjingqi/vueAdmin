@@ -534,8 +534,12 @@ function requireAdmin(req, res, next) {
 }
 
 function requireApiKey(req, res, next) {
-  const raw = String(req.headers['x-api-key'] || '').trim()
-  if (!raw) return fail(res, '缺少 X-API-Key 请求头', 401)
+  // 网关会注入自己的 X-API-Key / Authorization，因此优先读专用查询参数 pushKey
+  const queryKey = String(req.query.pushKey || req.query.aiKey || req.query.apiKey || req.query.api_key || '').trim()
+  const authHeader = String(req.headers.authorization || '')
+  const bearer = /^Bearer\s+(.+)$/i.exec(authHeader)?.[1] || ''
+  const raw = queryKey || String(req.headers['x-api-key'] || '').trim() || bearer.trim()
+  if (!raw) return fail(res, '缺少 API 密钥（pushKey 参数、X-API-Key 或 Authorization: Bearer）', 401)
   const record = (db.apiKeys || []).find((item) => item.key === raw && item.status === 1)
   if (!record) return fail(res, 'API Key 无效或已停用', 401)
   record.lastUsedAt = nowIso()
