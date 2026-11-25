@@ -20,7 +20,7 @@
         <div class="cp-arrow" aria-hidden="true"></div>
 
         <!-- 右侧：合成图 -->
-        <div class="cp-results">
+        <div class="cp-results" :class="{ 'cp-results-single': resultImages(pose).length === 1 }">
           <el-image
             v-for="image in resultImages(pose)"
             :key="image.url"
@@ -66,7 +66,7 @@ const resultUrls = (pose: PromptPose) => resultImages(pose).map((image) => image
 
 .cp-formula {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--el-border-color-lighter);
@@ -91,8 +91,10 @@ const resultUrls = (pose: PromptPose) => resultImages(pose).map((image) => image
   width: 100%;
   height: 160px;
   display: block;
-  background: var(--el-fill-color-light);
+  background: var(--el-fill-color-blank);
   border-radius: 6px;
+  border: 1px solid var(--el-border-color-lighter);
+  box-sizing: border-box;
 }
 
 .cp-plus {
@@ -105,6 +107,7 @@ const resultUrls = (pose: PromptPose) => resultImages(pose).map((image) => image
 /* 中间运算符：渐变线条 + 实心箭头 */
 .cp-arrow {
   position: relative;
+  align-self: center;
   flex: 0 0 56px;
   height: 3px;
   border-radius: 3px;
@@ -137,12 +140,16 @@ const resultUrls = (pose: PromptPose) => resultImages(pose).map((image) => image
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-auto-rows: minmax(180px, 1fr);
   gap: 8px;
+}
+.cp-results-single {
+  grid-template-columns: 1fr;
 }
 
 .cp-result-image {
   width: 100%;
-  height: 180px;
+  height: 100%;
   display: block;
   border-radius: 6px;
 }
@@ -182,10 +189,11 @@ const resultUrls = (pose: PromptPose) => resultImages(pose).map((image) => image
 
   .cp-results {
     grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    grid-auto-rows: minmax(130px, 1fr);
   }
 
-  .cp-result-image {
-    height: 130px;
+  .cp-results-single {
+    grid-template-columns: 1fr;
   }
 }
 </style>
