@@ -1481,6 +1481,7 @@
     "selectPoseFromLibrary": "从姿势库选择",
     "characterPickerTitle": "选择角色图",
     "posePickerTitle": "选择姿势图",
+    "resultPickerTitle": "选择生成图",
     "pickerSearchPlaceholder": "搜索标题或内容",
     "pickerSearch": "搜索",
     "pickerUnit": "张",

@@ -20,6 +20,9 @@
               >
                 <el-option v-for="platform in optionsFor(index)" :key="platform.id" :label="platform.name" :value="platform.id" />
               </el-select>
+              <el-button v-if="pickerScope" link type="primary" size="small" :icon="FolderOpened" @click="openPicker(index)">
+                {{ t('portal.pickFromLibrary') }}
+              </el-button>
               <el-button link type="danger" size="small" @click="removeGroup(index)">{{ t('portal.removePlatformGroup') }}</el-button>
             </div>
             <ImageUploader :model-value="group.images" :max="max" :uploader="uploader" @update:model-value="updateImages(index, $event)" />
@@ -39,18 +42,24 @@
           >
             <el-option v-for="platform in optionsFor(index)" :key="platform.id" :label="platform.name" :value="platform.id" />
           </el-select>
+          <el-button v-if="pickerScope" link type="primary" size="small" :icon="FolderOpened" @click="openPicker(index)">
+            {{ t('portal.pickFromLibrary') }}
+          </el-button>
           <el-button link type="danger" size="small" @click="removeGroup(index)">{{ t('portal.removePlatformGroup') }}</el-button>
         </div>
         <ImageUploader :model-value="group.images" :max="max" :uploader="uploader" @update:model-value="updateImages(index, $event)" />
       </div>
     </template>
+    <ImagePickerDialog v-if="pickerScope" v-model="pickerVisible" :scope="pickerScope" @select="onPicked" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { FolderOpened } from '@element-plus/icons-vue'
 import type { PromptImageGroupInput, PromptImageItem, PromptPlatform } from '@/api/prompt'
 import ImageUploader from './ImageUploader.vue'
+import ImagePickerDialog from './ImagePickerDialog.vue'
 import { useI18n } from '@/i18n'
 
 const props = withDefaults(
@@ -64,8 +73,10 @@ const props = withDefaults(
     uploader?: (file: File) => Promise<{ data: { id: string; url: string } }>
     /** 多组时可用 tab 切换，避免竖排过长；默认竖排 */
     layout?: 'stack' | 'tabs'
+    /** 传入后允许从图库选择图片（如角色姿势生成图选 'result'），不传则不显示入口 */
+    pickerScope?: 'character' | 'pose' | 'result'
   }>(),
-  { max: 20, title: '', layout: 'stack' },
+  { max: 20, title: '', layout: 'stack', pickerScope: undefined },
 )
 const emit = defineEmits<{ (e: 'update:modelValue', value: PromptImageGroupInput[]): void }>()
 const { t } = useI18n()
@@ -118,6 +129,27 @@ const addGroup = () => {
   if (!available) return
   activeTab.value = String(props.modelValue.length)
   emit('update:modelValue', [...props.modelValue, { platformId: available.id, images: [] }])
+}
+
+const pickerVisible = ref(false)
+const pickerIndex = ref(0)
+
+const openPicker = (index: number): void => {
+  pickerIndex.value = index
+  pickerVisible.value = true
+}
+
+/** 图库选择：追加到对应平台组（按 URL 去重） */
+const onPicked = (image: PromptImageItem): void => {
+  const group = props.modelValue[pickerIndex.value]
+  if (!group) return
+  if (group.images.some((item) => item.url === image.url)) {
+    pickerVisible.value = false
+    return
+  }
+  const picked: PromptImageItem = { url: image.url, filePath: image.filePath ?? null, sort: 0, isCover: false }
+  updateImages(pickerIndex.value, [...group.images, picked])
+  pickerVisible.value = false
 }
 </script>
 

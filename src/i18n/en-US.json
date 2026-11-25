@@ -1481,6 +1481,7 @@
     "selectPoseFromLibrary": "Pick from pose library",
     "characterPickerTitle": "Pick a character image",
     "posePickerTitle": "Pick a pose image",
+    "resultPickerTitle": "Pick a generated image",
     "pickerSearchPlaceholder": "Search title or content",
     "pickerSearch": "Search",
     "pickerUnit": "images",

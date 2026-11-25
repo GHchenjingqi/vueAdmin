@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="title || (scope === 'pose' ? t('portal.posePickerTitle') : t('portal.characterPickerTitle'))"
+    :title="title || pickerTitle"
     width="860px"
     top="6vh"
     :close-on-click-modal="false"
@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { portalApi, promptApi } from '@/api'
 import type { PromptImageItem } from '@/api/prompt'
@@ -40,7 +40,8 @@ import { useI18n } from '@/i18n'
 const props = withDefaults(
   defineProps<{
     modelValue: boolean
-    scope: 'character' | 'pose'
+    /** character=角色图，pose=姿势参考图，result=已发布提示词的生成图 */
+    scope: 'character' | 'pose' | 'result'
     source?: 'portal' | 'admin'
     title?: string
   }>(),
@@ -56,6 +57,12 @@ const keyword = ref('')
 const loading = ref(false)
 const items = ref<Array<{ image: PromptImageItem; title: string }>>([])
 
+const pickerTitle = computed(() => {
+  if (props.scope === 'pose') return t('portal.posePickerTitle')
+  if (props.scope === 'result') return t('portal.resultPickerTitle')
+  return t('portal.characterPickerTitle')
+})
+
 const load = async (): Promise<void> => {
   loading.value = true
   try {
@@ -66,9 +73,15 @@ const load = async (): Promise<void> => {
       scope: props.scope === 'pose' ? ('pose' as const) : undefined,
     }
     const res = props.source === 'admin' ? await promptApi.getPrompts(params) : await portalApi.getPrompts(params)
-    items.value = res.data.rows
-      .flatMap((prompt) => (prompt.images || []).map((image) => ({ image, title: prompt.title })))
-      .filter((item) => Boolean(item.image.url))
+    const rows = res.data.rows
+    if (props.scope === 'result') {
+      // 生成图模式：取各提示词的 result 图（含角色姿势的生成图），不含参考图
+      items.value = rows
+        .flatMap((prompt) => (prompt.platformGroups || []).flatMap((group) => group.images).map((image) => ({ image, title: prompt.title })))
+        .filter((item) => Boolean(item.image.url))
+    } else {
+      items.value = rows.flatMap((prompt) => (prompt.images || []).map((image) => ({ image, title: prompt.title }))).filter((item) => Boolean(item.image.url))
+    }
   } catch {
     items.value = []
   } finally {

@@ -32,7 +32,15 @@
           {{ t('portal.selectPoseFromLibrary') }}
         </el-button>
       </div>
-      <PlatformImageGroups v-model="pose.platformGroups" :platforms="platforms" :title="t('portal.generatedImages')" layout="tabs" :uploader="uploader" />
+      <PlatformImageGroups
+        :model-value="pose.platformGroups"
+        :platforms="platforms"
+        :title="t('portal.generatedImages')"
+        layout="tabs"
+        :uploader="uploader"
+        picker-scope="result"
+        @update:model-value="setPoseGroups(index, $event)"
+      />
     </div>
 
     <el-button class="cp-add" :icon="Plus" @click="addPose">{{ t('portal.addPose') }}</el-button>
@@ -95,6 +103,13 @@ const setCharacterImage = (image: PromptImageItem | null): void => {
 const setPoseImage = (index: number, image: PromptImageItem | null): void => {
   if (!draft.value.poses[index]) return
   draft.value.poses[index].poseImage = image
+  emitChange()
+}
+
+/** 生成图分组变化（上传/图库选择/增删组）必须显式同步父组件，否则提交时校验与 payload 都是旧数据 */
+const setPoseGroups = (index: number, groups: PromptImageGroupInput[]): void => {
+  if (!draft.value.poses[index]) return
+  draft.value.poses[index].platformGroups = groups
   emitChange()
 }
 

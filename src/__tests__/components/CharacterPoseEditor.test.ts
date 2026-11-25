@@ -34,7 +34,8 @@ const mountEditor = () =>
         },
         PlatformImageGroups: {
           props: ['modelValue'],
-          template: '<div class="stub-groups"></div>',
+          template:
+            '<button class="stub-groups" @click="$emit(\'update:modelValue\', [{ platformId: 1, images: [{ url: \'/uploads/result.png\' }] }])">groups</button>',
         },
         ImagePickerDialog: {
           props: ['modelValue', 'scope'],
@@ -78,5 +79,15 @@ describe('CharacterPoseEditor 角色+姿势组合', () => {
     await wrapper.find('.cp-add').trigger('click')
     await nextTick()
     expect(wrapper.findAll('.cp-pose').length).toBe(2)
+  })
+
+  it('4. 生成图分组变化同步写回表单（回归：否则提交时报缺少生成图）', async () => {
+    const wrapper = mountEditor()
+    await nextTick()
+    await wrapper.find('.stub-groups').trigger('click')
+    await nextTick()
+    const events = wrapper.emitted('update:modelValue') || []
+    const emitted = events[events.length - 1]?.[0] as PromptCharacterPoseInput
+    expect(emitted.poses[0].platformGroups[0].images[0].url).toBe('/uploads/result.png')
   })
 })
