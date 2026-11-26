@@ -11,7 +11,7 @@
         <div v-if="heroImage" class="archive-hero">
           <el-image
             :src="heroImage.url"
-            fit="cover"
+            fit="contain"
             class="hero-image"
             :preview-src-list="heroPreview"
             :initial-index="heroPreviewIndex"
@@ -34,7 +34,7 @@
                 v-for="(image, index) in turnarounds"
                 :key="'turnaround-' + index"
                 :src="image.url"
-                fit="cover"
+                fit="contain"
                 class="turnaround-image"
                 :preview-src-list="turnaroundPreview"
                 :initial-index="index"
@@ -55,7 +55,7 @@
                 v-for="(image, index) in costumes"
                 :key="'costume-' + index"
                 :src="image.url"
-                fit="cover"
+                fit="contain"
                 class="costume-image"
                 :preview-src-list="costumePreview"
                 :initial-index="index"
@@ -82,7 +82,7 @@
               v-for="(image, index) in hairstyles"
               :key="'hairstyle-' + index"
               :src="image.url"
-              fit="cover"
+              fit="contain"
               class="detail-image"
               :preview-src-list="hairstylePreview"
               :initial-index="index"
@@ -103,7 +103,7 @@
               v-for="(image, index) in propImages"
               :key="'prop-' + index"
               :src="image.url"
-              fit="cover"
+              fit="contain"
               class="detail-image"
               :preview-src-list="propPreview"
               :initial-index="index"
@@ -259,7 +259,7 @@ const propPreview = computed(() => urlsOf(propImages.value))
 }
 .turnaround-image {
   width: 100%;
-  height: 170px;
+  height: 240px;
   display: block;
   border-radius: 8px;
   background: var(--page-bg);
@@ -267,12 +267,12 @@ const propPreview = computed(() => urlsOf(propImages.value))
 
 .costume-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
 }
 .costume-image {
   width: 100%;
-  height: 120px;
+  height: 220px;
   display: block;
   border-radius: 8px;
   background: var(--page-bg);
@@ -280,12 +280,12 @@ const propPreview = computed(() => urlsOf(propImages.value))
 
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px;
 }
 .detail-image {
   width: 100%;
-  height: 130px;
+  height: 220px;
   display: block;
   border-radius: 8px;
   background: var(--page-bg);
