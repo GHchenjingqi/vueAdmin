@@ -886,8 +886,9 @@ const handleSubmit = async (action: 'publish' | 'draft'): Promise<void> => {
   submitting.value = true
   try {
     const payload = buildPayload(action)
-    if (isEdit.value && currentId.value !== null) await promptApi.updatePrompt(currentId.value, payload)
-    else await promptApi.createPrompt(payload)
+    const res = isEdit.value && currentId.value !== null ? await promptApi.updatePrompt(currentId.value, payload) : await promptApi.createPrompt(payload)
+    const dup = (res.data as { possibleDuplicate?: { title: string } } | null)?.possibleDuplicate
+    if (dup?.title) ElMessage.warning(t('portal.possibleDuplicate', { title: dup.title }))
     ElMessage.success(t('common.success'))
     dialogVisible.value = false
     fetchRows()

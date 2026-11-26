@@ -1226,6 +1226,31 @@ function validationError(data, requireImage) {
   return null
 }
 
+/**
+ * 可能重复提醒（非阻断）：正文去空白后前 40 字相同即视为疑似重复。
+ * 只针对有正文的普通/序列/角色姿势类型；专题与角色库正文语义不同，跳过。
+ * 返回首个匹配项 { id, title }，供前端提示，不影响提交。
+ */
+function findSimilarPrompt(data, excludeId) {
+  if (data.type === 'collection' || data.type === 'character') return null
+  const key = String(data.content || '').replace(/\s+/g, '').trim().slice(0, 40)
+  if (!key) return null
+  return (
+    livePrompts().find((p) => {
+      if (excludeId != null && p.id === Number(excludeId)) return false
+      const other = String(p.content || '').replace(/\s+/g, '').trim().slice(0, 40)
+      return other === key
+    }) || null
+  )
+}
+
+/** 给 decorate 结果附加 possibleDuplicate 字段，不阻断提交 */
+function withDuplicateHint(decorated, data, id) {
+  const similar = findSimilarPrompt(data, id)
+  if (similar) decorated.possibleDuplicate = { id: similar.id, title: similar.title }
+  return decorated
+}
+
 function categoryError(data) {
   for (const id of resolveCategoryIds(data)) {
     const category = db.categories.find((c) => c.id === id)
@@ -1284,33 +1309,59 @@ const upload = multer({
 // Skills 附件：允许任意文件类型（md/zip/pdf/脚本等），大小上限独立于图片
 const attachmentUpload = multer({ storage, limits: { fileSize: SKILL_FILE_MAX_BYTES } })
 
+/**
+ * 文件内容去重：按 SHA-256 内容哈希复用已有上传，避免同内容重复落盘。
+ * 历史记录没有 hash 字段，不参与去重（其内容本就互不重复，已核验）。
+ */
+function fileSha256(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex')
+}
+
+/** 按内容哈希 + 大小查找可复用的已有上传（要求物理文件仍存在，避免复用裂图） */
+function findReusableUpload(hash, size) {
+  return (db.uploads || []).find(
+    (u) => u.hash === hash && u.size === size && u.filePath && fs.existsSync(path.join(UPLOAD_DIR, u.filePath)),
+  )
+}
+
+/** multer 上传：文件已落盘，命中复用则删除新文件并返回已有记录，不写 uploads、不 persist */
+function registerUpload(file) {
+  const buffer = fs.readFileSync(file.path)
+  const hash = fileSha256(buffer)
+  const existing = findReusableUpload(hash, file.size)
+  if (existing) {
+    try {
+      fs.unlinkSync(file.path)
+    } catch (_) {
+      /* 删除失败不影响复用结果 */
+    }
+    return {
+      result: { id: existing.id, url: existing.url, name: existing.name, size: existing.size, mimetype: existing.mimetype },
+      reused: true,
+    }
+  }
+  const result = {
+    id: file.filename,
+    url: `/uploads/${file.filename}`,
+    name: file.originalname,
+    size: file.size,
+    mimetype: file.mimetype,
+  }
+  db.uploads.push({ ...result, hash, filePath: file.filename, createdAt: nowIso() })
+  persist()
+  return { result, reused: false }
+}
+
 function uploadHandler(req, res) {
   if (!req.file) return fail(res, '未收到图片文件', 400)
-  const url = `/uploads/${req.file.filename}`
-  const result = {
-    id: req.file.filename,
-    url,
-    name: req.file.originalname,
-    size: req.file.size,
-    mimetype: req.file.mimetype,
-  }
-  db.uploads.push({ ...result, filePath: req.file.filename, createdAt: nowIso() })
-  persist()
+  const { result } = registerUpload(req.file)
   ok(res, result, 201)
 }
 
 // Skills 附件上传记录（复用 uploads 落盘，文案按附件调整）
 function skillAttachmentHandler(req, res) {
   if (!req.file) return fail(res, '未收到附件文件', 400)
-  const result = {
-    id: req.file.filename,
-    url: `/uploads/${req.file.filename}`,
-    name: req.file.originalname,
-    size: req.file.size,
-    mimetype: req.file.mimetype,
-  }
-  db.uploads.push({ ...result, filePath: req.file.filename, createdAt: nowIso() })
-  persist()
+  const { result } = registerUpload(req.file)
   ok(res, result, 201)
 }
 
@@ -1446,10 +1497,13 @@ async function ingestAiImage(input) {
 
   if (reused) return reused
   if (decoded.buffer.length > AI_IMAGE_MAX_BYTES) throw new Error('图片大小不能超过 15MB')
+  const hash = fileSha256(decoded.buffer)
+  const dedup = findReusableUpload(hash, decoded.buffer.length)
+  if (dedup) return { url: dedup.url, filePath: dedup.filePath, size: dedup.size, mimetype: dedup.mimetype }
   const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${decoded.ext}`
   fs.writeFileSync(path.join(UPLOAD_DIR, filename), decoded.buffer)
   const result = { url: `/uploads/${filename}`, filePath: filename, size: decoded.buffer.length, mimetype: decoded.mime }
-  db.uploads.push({ ...result, name: nameHint || filename, source: 'ai', createdAt: nowIso() })
+  db.uploads.push({ ...result, hash, name: nameHint || filename, source: 'ai', createdAt: nowIso() })
   return result
 }
 
@@ -1890,7 +1944,7 @@ portal.post('/mine', (req, res) => {
   db.prompts.push(prompt)
   writePromptImages(prompt.id, data)
   persist()
-  ok(res, decorate(prompt), 201)
+  ok(res, withDuplicateHint(decorate(prompt), data, prompt.id), 201)
 })
 
 portal.put('/mine/:id', (req, res) => {
@@ -1915,7 +1969,7 @@ portal.put('/mine/:id', (req, res) => {
   })
   writePromptImages(prompt.id, data)
   persist()
-  ok(res, decorate(prompt))
+  ok(res, withDuplicateHint(decorate(prompt), data, prompt.id))
 })
 
 portal.post('/mine/:id/submit', (req, res) => {
@@ -2290,7 +2344,7 @@ admin.post('/prompts', (req, res) => {
   db.prompts.push(prompt)
   writePromptImages(prompt.id, data)
   persist()
-  ok(res, decorate(prompt), 201)
+  ok(res, withDuplicateHint(decorate(prompt), data, prompt.id), 201)
 })
 
 admin.put('/prompts/:id', (req, res) => {
@@ -2311,7 +2365,7 @@ admin.put('/prompts/:id', (req, res) => {
   })
   writePromptImages(prompt.id, data)
   persist()
-  ok(res, decorate(prompt))
+  ok(res, withDuplicateHint(decorate(prompt), data, prompt.id))
 })
 
 admin.post('/prompts/:id/publish', (req, res) => {

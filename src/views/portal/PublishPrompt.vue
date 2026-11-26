@@ -618,8 +618,9 @@ const handleSubmit = async (submit: boolean): Promise<void> => {
 
   submitting.value = true
   try {
-    if (isEdit.value) await portalApi.updateMine(editId.value, payload)
-    else await portalApi.createMine(payload)
+    const res = isEdit.value ? await portalApi.updateMine(editId.value, payload) : await portalApi.createMine(payload)
+    const dup = (res.data as { possibleDuplicate?: { title: string } } | null)?.possibleDuplicate
+    if (dup?.title) ElMessage.warning(t('portal.possibleDuplicate', { title: dup.title }))
     ElMessage.success(submit ? t('portal.submitSuccess') : t('portal.createSuccess'))
     goMine()
   } catch (err: unknown) {
