@@ -1,49 +1,125 @@
 <template>
-  <div ref="viewport" class="canvas-viewport" @wheel.prevent="onWheel" @pointerdown="onBackgroundPointerDown">
-    <div class="canvas-surface" :style="surfaceStyle">
-      <div
-        v-for="(group, index) in groups"
-        :key="group.key"
-        class="canvas-node"
-        :class="{ dragging: draggingNode === group.key }"
-        :style="{ left: `${positions[group.key]?.x ?? 0}px`, top: `${positions[group.key]?.y ?? 0}px` }"
-        @pointerdown.stop="onNodePointerDown($event, group.key)"
-      >
-        <div class="canvas-node-head" :class="`node-head-${index % 4}`">
-          <span class="canvas-node-title">{{ t(group.titleKey) }}</span>
-          <span class="canvas-node-count">{{ group.images.length }}</span>
+  <div class="character-archive">
+    <div v-if="!hasImage" class="archive-empty">
+      <el-icon :size="40"><Picture /></el-icon>
+      <p>{{ t('portal.canvasEmptyGroup') }}</p>
+    </div>
+
+    <template v-else>
+      <div class="archive-body">
+        <!-- 主视觉：左侧大图，铺满右侧区块总高度 -->
+        <div v-if="heroImage" class="archive-hero">
+          <el-image
+            :src="heroImage.url"
+            fit="cover"
+            class="hero-image"
+            :preview-src-list="heroPreview"
+            :initial-index="heroPreviewIndex"
+            preview-teleported
+            hide-on-click-modal
+          />
+          <span class="hero-badge">{{ t('portal.charGroupTurnarounds') }}</span>
         </div>
-        <div class="canvas-node-body" @pointerdown.stop>
-          <template v-if="group.images.length">
+
+        <!-- 右侧：三视图 + 服装拆解 -->
+        <div class="archive-right">
+          <section v-if="turnarounds.length" class="archive-block">
+            <div class="block-title">
+              <span class="block-mark"></span>
+              <span>{{ t('portal.charGroupTurnarounds') }}</span>
+              <span class="block-count">{{ turnarounds.length }}</span>
+            </div>
+            <div class="turnaround-grid">
+              <el-image
+                v-for="(image, index) in turnarounds"
+                :key="'turnaround-' + index"
+                :src="image.url"
+                fit="cover"
+                class="turnaround-image"
+                :preview-src-list="turnaroundPreview"
+                :initial-index="index"
+                preview-teleported
+                hide-on-click-modal
+              />
+            </div>
+          </section>
+
+          <section v-if="costumes.length" class="archive-block">
+            <div class="block-title">
+              <span class="block-mark"></span>
+              <span>{{ t('portal.charGroupCostumes') }}</span>
+              <span class="block-count">{{ costumes.length }}</span>
+            </div>
+            <div class="costume-grid">
+              <el-image
+                v-for="(image, index) in costumes"
+                :key="'costume-' + index"
+                :src="image.url"
+                fit="cover"
+                class="costume-image"
+                :preview-src-list="costumePreview"
+                :initial-index="index"
+                preview-teleported
+                hide-on-click-modal
+              />
+            </div>
+          </section>
+
+          <div v-if="!turnarounds.length && !costumes.length" class="archive-block-empty">{{ t('portal.canvasEmptyGroup') }}</div>
+        </div>
+      </div>
+
+      <!-- 底部细节：发型特写 + 道具图 -->
+      <div class="archive-details">
+        <section v-if="hairstyles.length" class="archive-block">
+          <div class="block-title">
+            <span class="block-mark"></span>
+            <span>{{ t('portal.charGroupHairstyles') }}</span>
+            <span class="block-count">{{ hairstyles.length }}</span>
+          </div>
+          <div class="detail-grid">
             <el-image
-              v-for="(image, imgIndex) in group.images"
-              :key="image.url + imgIndex"
+              v-for="(image, index) in hairstyles"
+              :key="'hairstyle-' + index"
               :src="image.url"
               fit="cover"
-              class="canvas-image"
-              :preview-src-list="group.images.map((img) => img.url)"
-              :initial-index="imgIndex"
+              class="detail-image"
+              :preview-src-list="hairstylePreview"
+              :initial-index="index"
               preview-teleported
               hide-on-click-modal
             />
-          </template>
-          <div v-else class="canvas-node-empty">{{ t('portal.canvasEmptyGroup') }}</div>
-        </div>
-      </div>
-    </div>
+          </div>
+        </section>
 
-    <div class="canvas-controls">
-      <el-button size="small" circle :icon="Plus" @click.stop="zoomBy(0.2)" />
-      <el-button size="small" circle :icon="Minus" @click.stop="zoomBy(-0.2)" />
-      <el-button size="small" circle :icon="Aim" @click.stop="resetView" />
-    </div>
-    <p class="canvas-tip">{{ t('portal.canvasTip') }}</p>
+        <section v-if="propImages.length" class="archive-block">
+          <div class="block-title">
+            <span class="block-mark"></span>
+            <span>{{ t('portal.charGroupProps') }}</span>
+            <span class="block-count">{{ propImages.length }}</span>
+          </div>
+          <div class="detail-grid">
+            <el-image
+              v-for="(image, index) in propImages"
+              :key="'prop-' + index"
+              :src="image.url"
+              fit="cover"
+              class="detail-image"
+              :preview-src-list="propPreview"
+              :initial-index="index"
+              preview-teleported
+              hide-on-click-modal
+            />
+          </div>
+        </section>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { Aim, Minus, Plus } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { Picture } from '@element-plus/icons-vue'
 import type { PromptCharacterLibrary } from '@/api/prompt'
 import { useI18n } from '@/i18n'
 
@@ -51,204 +127,190 @@ const props = defineProps<{ value: PromptCharacterLibrary }>()
 
 const { t } = useI18n()
 
-const GROUPS = [
-  { key: 'turnarounds', titleKey: 'portal.charGroupTurnarounds' },
-  { key: 'costumes', titleKey: 'portal.charGroupCostumes' },
-  { key: 'hairstyles', titleKey: 'portal.charGroupHairstyles' },
-  { key: 'props', titleKey: 'portal.charGroupProps' },
-] as const
+const turnarounds = computed(() => props.value?.turnarounds ?? [])
+const costumes = computed(() => props.value?.costumes ?? [])
+const hairstyles = computed(() => props.value?.hairstyles ?? [])
+const propImages = computed(() => props.value?.props ?? [])
 
-type GroupKey = (typeof GROUPS)[number]['key']
+const urlsOf = (images: { url: string }[]): string[] => images.map((image) => image.url)
 
-const groups = computed(() =>
-  GROUPS.map((group) => ({
-    key: group.key as GroupKey,
-    titleKey: group.titleKey,
-    images: props.value[group.key] ?? [],
-  })),
-)
+const hasImage = computed(() => [turnarounds.value, costumes.value, hairstyles.value, propImages.value].some((group) => group.length > 0))
 
-const viewport = ref<HTMLElement | null>(null)
-const scale = ref(1)
-const offsetX = ref(0)
-const offsetY = ref(0)
+/** 主视觉优先取角色三视图第一张，其次取服装三视图第一张 */
+const heroImage = computed(() => turnarounds.value[0] ?? costumes.value[0] ?? null)
+const heroPreview = computed(() => [...urlsOf(turnarounds.value), ...urlsOf(costumes.value)])
+const heroPreviewIndex = computed(() => (heroImage.value ? Math.max(0, heroPreview.value.indexOf(heroImage.value.url)) : 0))
 
-/** 初始布局：四组卡片横向排开，纵向交错 */
-const positions = reactive<Record<GroupKey, { x: number; y: number }>>({
-  turnarounds: { x: 0, y: 0 },
-  costumes: { x: 340, y: 60 },
-  hairstyles: { x: 680, y: 0 },
-  props: { x: 1020, y: 60 },
-})
-
-const surfaceStyle = computed(() => ({
-  transform: `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`,
-  transformOrigin: '0 0',
-}))
-
-const clampScale = (value: number): number => Math.min(2, Math.max(0.3, value))
-
-const zoomBy = (delta: number): void => {
-  scale.value = clampScale(scale.value + delta)
-}
-
-const resetView = (): void => {
-  scale.value = 1
-  offsetX.value = 0
-  offsetY.value = 0
-}
-
-const onWheel = (event: WheelEvent): void => {
-  const delta = event.deltaY > 0 ? -0.08 : 0.08
-  scale.value = clampScale(scale.value + delta)
-}
-
-let panning = false
-let panStart = { x: 0, y: 0, offsetX: 0, offsetY: 0 }
-
-const onBackgroundPointerDown = (event: PointerEvent): void => {
-  panning = true
-  panStart = { x: event.clientX, y: event.clientY, offsetX: offsetX.value, offsetY: offsetY.value }
-  viewport.value?.setPointerCapture?.(event.pointerId)
-}
-
-let dragNode: GroupKey | null = null
-let dragStart = { x: 0, y: 0, nodeX: 0, nodeY: 0 }
-
-const onNodePointerDown = (event: PointerEvent, key: GroupKey): void => {
-  dragNode = key
-  draggingNode.value = key
-  dragStart = { x: event.clientX, y: event.clientY, nodeX: positions[key].x, nodeY: positions[key].y }
-  viewport.value?.setPointerCapture?.(event.pointerId)
-}
-
-const draggingNode = ref<GroupKey | null>(null)
-
-const onPointerMove = (event: PointerEvent): void => {
-  if (dragNode) {
-    const dx = (event.clientX - dragStart.x) / scale.value
-    const dy = (event.clientY - dragStart.y) / scale.value
-    positions[dragNode] = { x: Math.round(dragStart.nodeX + dx), y: Math.round(dragStart.nodeY + dy) }
-  } else if (panning) {
-    offsetX.value = panStart.offsetX + (event.clientX - panStart.x)
-    offsetY.value = panStart.offsetY + (event.clientY - panStart.y)
-  }
-}
-
-const onPointerUp = (): void => {
-  panning = false
-  dragNode = null
-  draggingNode.value = null
-}
-
-onMounted(() => {
-  viewport.value?.addEventListener('pointermove', onPointerMove)
-  viewport.value?.addEventListener('pointerup', onPointerUp)
-  viewport.value?.addEventListener('pointercancel', onPointerUp)
-})
+const turnaroundPreview = computed(() => urlsOf(turnarounds.value))
+const costumePreview = computed(() => urlsOf(costumes.value))
+const hairstylePreview = computed(() => urlsOf(hairstyles.value))
+const propPreview = computed(() => urlsOf(propImages.value))
 </script>
 
 <style scoped>
-.canvas-viewport {
-  position: relative;
-  height: 620px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background:
-    radial-gradient(circle, rgba(128, 128, 128, 0.18) 1px, transparent 1px) 0 0 / 22px 22px,
-    var(--page-bg);
-  overflow: hidden;
-  cursor: grab;
-  touch-action: none;
-}
-.canvas-viewport:active {
-  cursor: grabbing;
-}
-.canvas-surface {
-  position: absolute;
-  inset: 0;
-}
-.canvas-node {
-  position: absolute;
-  width: 300px;
-  border-radius: 10px;
+.character-archive {
   background: var(--card-bg);
   border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.archive-empty {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.archive-empty p {
+  margin: 0;
+}
+
+.archive-body {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+}
+
+.archive-hero {
+  position: relative;
+  flex: 0 0 32%;
+  min-width: 240px;
+  min-height: 380px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--page-bg);
+}
+.hero-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hero-badge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
   box-shadow: var(--shadow-sm);
-  cursor: move;
-  user-select: none;
 }
-.canvas-node.dragging {
-  opacity: 0.85;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+
+.archive-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
-.canvas-node-head {
+
+.archive-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 18px;
+}
+.archive-details > .archive-block {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.archive-block {
+  min-width: 0;
+}
+.block-title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 10px 10px 0 0;
-  color: #fff;
-  font-size: 13px;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
   font-weight: 600;
+  color: var(--ink);
 }
-.node-head-0 {
+.block-mark {
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
   background: var(--brand);
 }
-.node-head-1 {
-  background: #8b5cf6;
-}
-.node-head-2 {
-  background: #ec4899;
-}
-.node-head-3 {
-  background: #f59e0b;
-}
-.canvas-node-count {
+.block-count {
+  margin-left: auto;
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.25);
+  font-weight: 500;
+  color: var(--ink-3);
+  background: var(--page-bg);
   border-radius: var(--radius-pill);
   padding: 1px 8px;
 }
-.canvas-node-body {
+
+.turnaround-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  padding: 10px 12px 12px;
-  cursor: default;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
 }
-.canvas-image {
+.turnaround-image {
   width: 100%;
-  height: 110px;
-  border-radius: 6px;
+  height: 170px;
   display: block;
+  border-radius: 8px;
+  background: var(--page-bg);
 }
-.canvas-node-empty {
-  grid-column: 1 / -1;
-  padding: 26px 0;
-  text-align: center;
-  font-size: 12px;
-  color: var(--ink-3);
+
+.costume-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
 }
-.canvas-controls {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
+.costume-image {
+  width: 100%;
+  height: 120px;
+  display: block;
+  border-radius: 8px;
+  background: var(--page-bg);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+.detail-image {
+  width: 100%;
+  height: 130px;
+  display: block;
+  border-radius: 8px;
+  background: var(--page-bg);
+}
+
+.archive-block-empty {
   display: flex;
-  gap: 6px;
-  z-index: 5;
-}
-.canvas-tip {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-  margin: 0;
-  font-size: 11px;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
   color: var(--ink-3);
-  background: var(--card-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 4px 12px;
-  z-index: 5;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .archive-body {
+    flex-direction: column;
+  }
+  .archive-hero {
+    flex: none;
+    width: 100%;
+    min-height: 320px;
+  }
+  .archive-details {
+    flex-direction: column;
+  }
 }
 </style>
