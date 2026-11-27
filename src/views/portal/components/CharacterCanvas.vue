@@ -305,10 +305,10 @@ onBeforeUnmount(() => {
 }
 .group-image {
   flex: 0 0 auto;
-  width: 108px;
-  height: 144px;
+  width: 84px;
+  height: 112px;
   display: block;
-  border-radius: 8px;
+  border-radius: 0;
   background: transparent;
 }
 .group-empty {
