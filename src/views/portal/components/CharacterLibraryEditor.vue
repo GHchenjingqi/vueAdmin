@@ -52,6 +52,7 @@ const GROUPS = [
   { key: 'costumes', titleKey: 'portal.charGroupCostumes', picker: 'character' },
   { key: 'hairstyles', titleKey: 'portal.charGroupHairstyles', picker: 'character' },
   { key: 'props', titleKey: 'portal.charGroupProps', picker: 'character' },
+  { key: 'expressions', titleKey: 'portal.charGroupExpressions', picker: 'character' },
 ] as const
 
 type GroupKey = (typeof GROUPS)[number]['key']

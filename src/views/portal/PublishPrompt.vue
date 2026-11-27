@@ -201,7 +201,7 @@ const form = reactive<PublishForm>({
   steps: [],
   platformGroups: [],
   characterPose: { characterImage: null, poses: [] },
-  characterLibrary: { turnarounds: [], costumes: [], hairstyles: [], props: [] },
+  characterLibrary: { turnarounds: [], costumes: [], hairstyles: [], props: [], expressions: [] },
   relatedIds: [],
   relatedBriefs: [],
 })
@@ -359,6 +359,7 @@ const load = async (): Promise<void> => {
           costumes: (library?.costumes ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
           hairstyles: (library?.hairstyles ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
           props: (library?.props ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          expressions: (library?.expressions ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
         }
       } else if (form.type === 'sequence') {
         form.steps = (res.data.steps || []).map((step) => ({
@@ -531,6 +532,7 @@ const handleSubmit = async (submit: boolean): Promise<void> => {
               costumes: form.characterLibrary.costumes.filter((img) => img.url),
               hairstyles: form.characterLibrary.hairstyles.filter((img) => img.url),
               props: form.characterLibrary.props.filter((img) => img.url),
+              expressions: form.characterLibrary.expressions.filter((img) => img.url),
             }
           : undefined,
       submit,

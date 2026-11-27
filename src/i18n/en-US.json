@@ -1454,6 +1454,7 @@
     "charGroupCostumes": "Costume Views",
     "charGroupHairstyles": "Hairstyle",
     "charGroupProps": "Props",
+    "charGroupExpressions": "Facial Expressions",
     "characterLibraryRequired": "Please upload at least one character asset image",
     "canvasTip": "Drag cards to move · Scroll to zoom · Click image to enlarge",
     "canvasEmptyGroup": "No images yet",

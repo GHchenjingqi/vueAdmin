@@ -18,7 +18,7 @@ const stubUploader = { template: '<div class="stub-uploader" />' }
 const mountEditor = (value?: Partial<PromptCharacterLibraryInput>) =>
   mount(CharacterLibraryEditor, {
     props: {
-      modelValue: { turnarounds: [], costumes: [], hairstyles: [], props: [], ...value },
+      modelValue: { turnarounds: [], costumes: [], hairstyles: [], props: [], expressions: [], ...value },
       source: 'admin',
     },
     global: {
@@ -38,16 +38,17 @@ describe('角色库编辑器', () => {
     vi.clearAllMocks()
   })
 
-  it('1. 渲染四组资产：三视图/服装/发型/道具', () => {
+  it('1. 渲染五组资产：三视图/服装/发型/道具/面部表情', () => {
     const wrapper = mountEditor()
     const text = wrapper.text()
     expect(text).toContain('角色三视图')
     expect(text).toContain('服装三视图')
     expect(text).toContain('发型特写')
     expect(text).toContain('道具图')
+    expect(text).toContain('面部表情')
   })
 
-  it('2. 更新组图片时 emit 完整四组结构', async () => {
+  it('2. 更新组图片时 emit 完整五组结构', async () => {
     const wrapper = mountEditor()
     const vm = wrapper.vm as unknown as { updateGroup: (key: string, images: Array<{ url: string; filePath?: string | null }>) => void }
     vm.updateGroup('turnarounds', [{ url: '/uploads/a.png', filePath: null }])
@@ -56,9 +57,19 @@ describe('角色库编辑器', () => {
     expect(emitted.costumes).toEqual([])
     expect(emitted.hairstyles).toEqual([])
     expect(emitted.props).toEqual([])
+    expect(emitted.expressions).toEqual([])
   })
 
-  it('3. 图库选择去重：同一 URL 不重复追加', async () => {
+  it('3. 面部表情组：上传图片 emit 到 expressions 字段', async () => {
+    const wrapper = mountEditor()
+    const vm = wrapper.vm as unknown as { updateGroup: (key: string, images: Array<{ url: string; filePath?: string | null }>) => void }
+    vm.updateGroup('expressions', [{ url: '/uploads/face.png', filePath: null }])
+    const emitted = wrapper.emitted('update:modelValue')?.slice(-1)[0]?.[0] as PromptCharacterLibraryInput
+    expect(emitted.expressions).toEqual([{ url: '/uploads/face.png', filePath: null }])
+    expect(emitted.turnarounds).toEqual([])
+  })
+
+  it('4. 图库选择去重：同一 URL 不重复追加', async () => {
     const wrapper = mountEditor({ costumes: [{ url: '/uploads/b.png' }] })
     const vm = wrapper.vm as unknown as {
       openPicker: (key: string) => void

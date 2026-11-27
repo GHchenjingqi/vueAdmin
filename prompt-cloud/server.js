@@ -743,12 +743,13 @@ function relatedPromptsOf(prompt) {
     .filter(Boolean)
 }
 
-/** 角色库资产：三视图 / 服装三视图 / 发型特写 / 道具图 四组，usage 即组名 */
+/** 角色库资产：三视图 / 服装三视图 / 发型特写 / 道具图 / 面部表情 五组，usage 即组名 */
 const CHARACTER_LIBRARY_GROUPS = [
   { key: 'turnarounds', usage: 'char-view' },
   { key: 'costumes', usage: 'costume' },
   { key: 'hairstyles', usage: 'hairstyle' },
   { key: 'props', usage: 'prop' },
+  { key: 'expressions', usage: 'expression' },
 ]
 
 function characterLibraryOf(promptId) {
@@ -1129,7 +1130,7 @@ function replaceCharacterPose(promptId, data) {
   })
 }
 
-/** 角色库：按四组写入 usage 标记的图片，无平台分组概念 */
+/** 角色库：按五组写入 usage 标记的图片，无平台分组概念 */
 function replaceCharacterLibrary(promptId, data) {
   db.images = db.images.filter((img) => img.promptId !== promptId)
   const payload = data.characterLibrary && typeof data.characterLibrary === 'object' ? data.characterLibrary : {}

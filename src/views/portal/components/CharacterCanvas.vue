@@ -112,6 +112,27 @@
             />
           </div>
         </section>
+
+        <section v-if="expressions.length" class="archive-block">
+          <div class="block-title">
+            <span class="block-mark"></span>
+            <span>{{ t('portal.charGroupExpressions') }}</span>
+            <span class="block-count">{{ expressions.length }}</span>
+          </div>
+          <div class="detail-grid">
+            <el-image
+              v-for="(image, index) in expressions"
+              :key="'expression-' + index"
+              :src="image.url"
+              fit="contain"
+              class="detail-image"
+              :preview-src-list="expressionPreview"
+              :initial-index="index"
+              preview-teleported
+              hide-on-click-modal
+            />
+          </div>
+        </section>
       </div>
     </template>
   </div>
@@ -131,10 +152,11 @@ const turnarounds = computed(() => props.value?.turnarounds ?? [])
 const costumes = computed(() => props.value?.costumes ?? [])
 const hairstyles = computed(() => props.value?.hairstyles ?? [])
 const propImages = computed(() => props.value?.props ?? [])
+const expressions = computed(() => props.value?.expressions ?? [])
 
 const urlsOf = (images: { url: string }[]): string[] => images.map((image) => image.url)
 
-const hasImage = computed(() => [turnarounds.value, costumes.value, hairstyles.value, propImages.value].some((group) => group.length > 0))
+const hasImage = computed(() => [turnarounds.value, costumes.value, hairstyles.value, propImages.value, expressions.value].some((group) => group.length > 0))
 
 /** 主视觉优先取角色三视图第一张，其次取服装三视图第一张 */
 const heroImage = computed(() => turnarounds.value[0] ?? costumes.value[0] ?? null)
@@ -145,6 +167,7 @@ const turnaroundPreview = computed(() => urlsOf(turnarounds.value))
 const costumePreview = computed(() => urlsOf(costumes.value))
 const hairstylePreview = computed(() => urlsOf(hairstyles.value))
 const propPreview = computed(() => urlsOf(propImages.value))
+const expressionPreview = computed(() => urlsOf(expressions.value))
 </script>
 
 <style scoped>

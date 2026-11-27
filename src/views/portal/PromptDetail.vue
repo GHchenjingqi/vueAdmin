@@ -89,7 +89,7 @@
         <!-- 角色库：无限画布 -->
         <template v-else-if="isCharacter && detail">
           <section class="character-canvas-section">
-            <CharacterCanvas :value="detail.characterLibrary ?? { turnarounds: [], costumes: [], hairstyles: [], props: [] }" />
+            <CharacterCanvas :value="detail.characterLibrary ?? { turnarounds: [], costumes: [], hairstyles: [], props: [], expressions: [] }" />
           </section>
           <section v-if="detail.content" class="character-desc-section">
             <div class="prompt-panel">

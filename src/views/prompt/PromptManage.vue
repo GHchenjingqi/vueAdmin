@@ -324,7 +324,7 @@ interface PromptForm {
   relatedBriefs: PromptRelatedBrief[]
 }
 
-const emptyCharacterLibrary = (): PromptCharacterLibraryInput => ({ turnarounds: [], costumes: [], hairstyles: [], props: [] })
+const emptyCharacterLibrary = (): PromptCharacterLibraryInput => ({ turnarounds: [], costumes: [], hairstyles: [], props: [], expressions: [] })
 
 const rows = ref<PromptItem[]>([])
 const loading = ref(false)
@@ -671,6 +671,7 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
           costumes: (library?.costumes ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
           hairstyles: (library?.hairstyles ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
           props: (library?.props ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
+          expressions: (library?.expressions ?? []).map((img) => ({ url: img.url, filePath: img.filePath ?? null })),
         }
       } else if (form.type === 'sequence') {
         form.steps = toFormSteps(loaded)
@@ -805,6 +806,7 @@ const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
               costumes: form.characterLibrary.costumes.filter((img) => img.url),
               hairstyles: form.characterLibrary.hairstyles.filter((img) => img.url),
               props: form.characterLibrary.props.filter((img) => img.url),
+              expressions: form.characterLibrary.expressions.filter((img) => img.url),
             }
           : undefined,
       action,

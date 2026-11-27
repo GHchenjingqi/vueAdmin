@@ -32,12 +32,13 @@ export interface PromptCharacterPose {
   poses: PromptPose[]
 }
 
-/** 角色库资产：四组图片（角色三视图 / 服装三视图 / 发型特写 / 道具图） */
+/** 角色库资产：五组图片（角色三视图 / 服装三视图 / 发型特写 / 道具图 / 面部表情） */
 export interface PromptCharacterLibrary {
   turnarounds: PromptLibraryImage[]
   costumes: PromptLibraryImage[]
   hairstyles: PromptLibraryImage[]
   props: PromptLibraryImage[]
+  expressions: PromptLibraryImage[]
 }
 
 export interface PromptLibraryImage {
