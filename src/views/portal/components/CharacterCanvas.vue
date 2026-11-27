@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
 }
 .canvas-layout {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 36px;
   padding: 36px;
 }
