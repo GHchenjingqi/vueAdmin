@@ -38,7 +38,7 @@ describe('角色库编辑器', () => {
     vi.clearAllMocks()
   })
 
-  it('1. 渲染五组资产：三视图/服装/发型/道具/面部表情', () => {
+  it('1. 渲染五组资产：三视图/服装/发饰/面部表情/道具', () => {
     const wrapper = mountEditor()
     const text = wrapper.text()
     expect(text).toContain('角色三视图')
@@ -46,6 +46,8 @@ describe('角色库编辑器', () => {
     expect(text).toContain('发饰特写')
     expect(text).toContain('道具图')
     expect(text).toContain('面部表情')
+    const order = ['角色三视图', '服装三视图', '发饰特写', '面部表情', '道具图'].map((label) => text.indexOf(label))
+    expect(order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1]))).toBe(true)
   })
 
   it('2. 更新组图片时 emit 完整五组结构', async () => {

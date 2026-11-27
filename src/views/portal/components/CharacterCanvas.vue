@@ -1,14 +1,13 @@
 <template>
-  <div class="character-archive">
-    <div v-if="!hasImage" class="archive-empty">
+  <div ref="viewport" class="canvas-viewport" :class="{ 'is-fullscreen': isFullscreen }" @wheel.prevent="onWheel" @pointerdown="onPointerDown">
+    <div v-if="!hasImage" class="canvas-empty">
       <el-icon :size="40"><Picture /></el-icon>
       <p>{{ t('portal.canvasEmptyGroup') }}</p>
     </div>
 
-    <template v-else>
-      <div class="archive-body">
-        <!-- 主视觉：左侧大图，铺满右侧区块总高度 -->
-        <div v-if="heroImage" class="archive-hero">
+    <div v-else ref="surface" class="canvas-surface" :style="surfaceStyle">
+      <div class="canvas-layout">
+        <div v-if="heroImage" class="hero-panel" @pointerdown.stop>
           <el-image
             :src="heroImage.url"
             fit="contain"
@@ -18,129 +17,56 @@
             preview-teleported
             hide-on-click-modal
           />
-          <span class="hero-badge">{{ t('portal.charGroupTurnarounds') }}</span>
+          <div class="panel-label">{{ t('portal.charGroupTurnarounds') }}</div>
         </div>
 
-        <!-- 右侧：三视图 + 服装拆解 -->
-        <div class="archive-right">
-          <section v-if="turnarounds.length" class="archive-block">
-            <div class="block-title">
-              <span class="block-mark"></span>
-              <span>{{ t('portal.charGroupTurnarounds') }}</span>
-              <span class="block-count">{{ turnarounds.length }}</span>
+        <div class="groups-column">
+          <section v-for="group in groups" :key="group.key" class="group-row">
+            <div class="group-head">
+              <span class="group-mark"></span>
+              <span>{{ t(group.titleKey) }}</span>
+              <span class="group-count">{{ group.images.length }}</span>
             </div>
-            <div class="turnaround-grid">
+            <div class="group-images" @pointerdown.stop>
               <el-image
-                v-for="(image, index) in turnarounds"
-                :key="'turnaround-' + index"
+                v-for="(image, index) in group.images"
+                :key="image.url + '-' + index"
                 :src="image.url"
                 fit="contain"
-                class="turnaround-image"
-                :preview-src-list="turnaroundPreview"
+                class="group-image"
+                :preview-src-list="group.preview"
                 :initial-index="index"
                 preview-teleported
                 hide-on-click-modal
               />
             </div>
           </section>
-
-          <section v-if="costumes.length" class="archive-block">
-            <div class="block-title">
-              <span class="block-mark"></span>
-              <span>{{ t('portal.charGroupCostumes') }}</span>
-              <span class="block-count">{{ costumes.length }}</span>
-            </div>
-            <div class="costume-grid">
-              <el-image
-                v-for="(image, index) in costumes"
-                :key="'costume-' + index"
-                :src="image.url"
-                fit="contain"
-                class="costume-image"
-                :preview-src-list="costumePreview"
-                :initial-index="index"
-                preview-teleported
-                hide-on-click-modal
-              />
-            </div>
-          </section>
-
-          <div v-if="!turnarounds.length && !costumes.length" class="archive-block-empty">{{ t('portal.canvasEmptyGroup') }}</div>
         </div>
       </div>
+    </div>
 
-      <!-- 底部细节：发型特写 + 道具图 -->
-      <div class="archive-details">
-        <section v-if="hairstyles.length" class="archive-block">
-          <div class="block-title">
-            <span class="block-mark"></span>
-            <span>{{ t('portal.charGroupHairstyles') }}</span>
-            <span class="block-count">{{ hairstyles.length }}</span>
-          </div>
-          <div class="detail-grid">
-            <el-image
-              v-for="(image, index) in hairstyles"
-              :key="'hairstyle-' + index"
-              :src="image.url"
-              fit="contain"
-              class="detail-image"
-              :preview-src-list="hairstylePreview"
-              :initial-index="index"
-              preview-teleported
-              hide-on-click-modal
-            />
-          </div>
-        </section>
+    <div class="canvas-toolbar" @pointerdown.stop>
+      <el-button v-if="!isFullscreen" size="small" :icon="FullScreen" @click="enterFullscreen">
+        {{ t('portal.canvasFullscreen') }}
+      </el-button>
+      <el-button v-else size="small" type="primary" :icon="ArrowLeft" @click="exitFullscreen">
+        {{ t('portal.canvasExitFullscreen') }}
+      </el-button>
+    </div>
 
-        <section v-if="propImages.length" class="archive-block">
-          <div class="block-title">
-            <span class="block-mark"></span>
-            <span>{{ t('portal.charGroupProps') }}</span>
-            <span class="block-count">{{ propImages.length }}</span>
-          </div>
-          <div class="detail-grid">
-            <el-image
-              v-for="(image, index) in propImages"
-              :key="'prop-' + index"
-              :src="image.url"
-              fit="contain"
-              class="detail-image"
-              :preview-src-list="propPreview"
-              :initial-index="index"
-              preview-teleported
-              hide-on-click-modal
-            />
-          </div>
-        </section>
+    <div class="canvas-controls" @pointerdown.stop>
+      <el-button size="small" circle :icon="Plus" @click="zoomBy(1.2)" />
+      <el-button size="small" circle :icon="Minus" @click="zoomBy(1 / 1.2)" />
+      <el-button size="small" circle :icon="Aim" @click="resetView" />
+    </div>
 
-        <section v-if="expressions.length" class="archive-block">
-          <div class="block-title">
-            <span class="block-mark"></span>
-            <span>{{ t('portal.charGroupExpressions') }}</span>
-            <span class="block-count">{{ expressions.length }}</span>
-          </div>
-          <div class="detail-grid">
-            <el-image
-              v-for="(image, index) in expressions"
-              :key="'expression-' + index"
-              :src="image.url"
-              fit="contain"
-              class="detail-image"
-              :preview-src-list="expressionPreview"
-              :initial-index="index"
-              preview-teleported
-              hide-on-click-modal
-            />
-          </div>
-        </section>
-      </div>
-    </template>
+    <p class="canvas-tip">{{ t('portal.canvasTip') }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Picture } from '@element-plus/icons-vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Aim, ArrowLeft, FullScreen, Minus, Picture, Plus } from '@element-plus/icons-vue'
 import type { PromptCharacterLibrary } from '@/api/prompt'
 import { useI18n } from '@/i18n'
 
@@ -148,38 +74,154 @@ const props = defineProps<{ value: PromptCharacterLibrary }>()
 
 const { t } = useI18n()
 
-const turnarounds = computed(() => props.value?.turnarounds ?? [])
-const costumes = computed(() => props.value?.costumes ?? [])
-const hairstyles = computed(() => props.value?.hairstyles ?? [])
-const propImages = computed(() => props.value?.props ?? [])
-const expressions = computed(() => props.value?.expressions ?? [])
+/** 分组顺序：角色三视图 / 服装三视图 / 发饰特写 / 面部表情 / 道具图 */
+const GROUPS = [
+  { key: 'turnarounds', titleKey: 'portal.charGroupTurnarounds' },
+  { key: 'costumes', titleKey: 'portal.charGroupCostumes' },
+  { key: 'hairstyles', titleKey: 'portal.charGroupHairstyles' },
+  { key: 'expressions', titleKey: 'portal.charGroupExpressions' },
+  { key: 'props', titleKey: 'portal.charGroupProps' },
+] as const
 
-const urlsOf = (images: { url: string }[]): string[] => images.map((image) => image.url)
+type GroupKey = (typeof GROUPS)[number]['key']
 
-const hasImage = computed(() => [turnarounds.value, costumes.value, hairstyles.value, propImages.value, expressions.value].some((group) => group.length > 0))
+const groups = computed(() =>
+  GROUPS.map((group) => {
+    const images = props.value?.[group.key as GroupKey] ?? []
+    return { key: group.key, titleKey: group.titleKey, images, preview: images.map((image) => image.url) }
+  }).filter((group) => group.images.length > 0),
+)
 
-/** 主视觉优先取角色三视图第一张，其次取服装三视图第一张 */
-const heroImage = computed(() => turnarounds.value[0] ?? costumes.value[0] ?? null)
-const heroPreview = computed(() => [...urlsOf(turnarounds.value), ...urlsOf(costumes.value)])
+const hasImage = computed(() => groups.value.some((group) => group.images.length > 0))
+
+/** 主视觉：角色三视图第一张，其次服装三视图第一张，再退到任意分组第一张 */
+const heroImage = computed(
+  () => props.value?.turnarounds?.[0] ?? props.value?.costumes?.[0] ?? groups.value.find((group) => group.images.length)?.images[0] ?? null,
+)
+const heroPreview = computed(() => [...(props.value?.turnarounds ?? []).map((i) => i.url), ...(props.value?.costumes ?? []).map((i) => i.url)])
 const heroPreviewIndex = computed(() => (heroImage.value ? Math.max(0, heroPreview.value.indexOf(heroImage.value.url)) : 0))
 
-const turnaroundPreview = computed(() => urlsOf(turnarounds.value))
-const costumePreview = computed(() => urlsOf(costumes.value))
-const hairstylePreview = computed(() => urlsOf(hairstyles.value))
-const propPreview = computed(() => urlsOf(propImages.value))
-const expressionPreview = computed(() => urlsOf(expressions.value))
+const viewport = ref<HTMLElement | null>(null)
+const surface = ref<HTMLElement | null>(null)
+const scale = ref(1)
+const offsetX = ref(0)
+const offsetY = ref(0)
+const isFullscreen = ref(false)
+
+const surfaceStyle = computed(() => ({
+  transform: `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`,
+  transformOrigin: '0 0',
+}))
+
+const clampScale = (value: number): number => Math.min(3, Math.max(0.2, value))
+
+const zoomAt = (factor: number, px: number, py: number): void => {
+  const next = clampScale(scale.value * factor)
+  if (next === scale.value) return
+  offsetX.value = px - (px - offsetX.value) * (next / scale.value)
+  offsetY.value = py - (py - offsetY.value) * (next / scale.value)
+  scale.value = next
+}
+
+const zoomBy = (factor: number): void => {
+  const rect = viewport.value?.getBoundingClientRect()
+  zoomAt(factor, (rect?.width ?? 0) / 2, (rect?.height ?? 0) / 2)
+}
+
+const onWheel = (event: WheelEvent): void => {
+  const rect = viewport.value?.getBoundingClientRect()
+  if (!rect) return
+  zoomAt(event.deltaY > 0 ? 1 / 1.1 : 1.1, event.clientX - rect.left, event.clientY - rect.top)
+}
+
+/** 视角自适应：让整块画布内容落在可视区域内 */
+const fitView = (): void => {
+  const vp = viewport.value
+  const sf = surface.value
+  if (!vp || !sf) return
+  const vw = vp.clientWidth
+  const vh = vp.clientHeight
+  const sw = sf.scrollWidth || sf.offsetWidth
+  const sh = sf.scrollHeight || sf.offsetHeight
+  if (!sw || !sh) return
+  scale.value = clampScale(Math.min((vw - 72) / sw, (vh - 72) / sh, 1))
+  offsetX.value = Math.max(24, (vw - sw * scale.value) / 2)
+  offsetY.value = 24
+}
+
+const resetView = (): void => fitView()
+
+const enterFullscreen = (): void => {
+  isFullscreen.value = true
+  nextTick(fitView)
+}
+
+const exitFullscreen = (): void => {
+  isFullscreen.value = false
+  nextTick(fitView)
+}
+
+let panning = false
+let panStart = { x: 0, y: 0, offsetX: 0, offsetY: 0 }
+
+const onPointerDown = (event: PointerEvent): void => {
+  panning = true
+  panStart = { x: event.clientX, y: event.clientY, offsetX: offsetX.value, offsetY: offsetY.value }
+  viewport.value?.setPointerCapture?.(event.pointerId)
+}
+
+const onPointerMove = (event: PointerEvent): void => {
+  if (!panning) return
+  offsetX.value = panStart.offsetX + (event.clientX - panStart.x)
+  offsetY.value = panStart.offsetY + (event.clientY - panStart.y)
+}
+
+const onPointerUp = (): void => {
+  panning = false
+}
+
+onMounted(() => {
+  viewport.value?.addEventListener('pointermove', onPointerMove)
+  viewport.value?.addEventListener('pointerup', onPointerUp)
+  viewport.value?.addEventListener('pointercancel', onPointerUp)
+  nextTick(fitView)
+})
+
+onBeforeUnmount(() => {
+  viewport.value?.removeEventListener('pointermove', onPointerMove)
+  viewport.value?.removeEventListener('pointerup', onPointerUp)
+  viewport.value?.removeEventListener('pointercancel', onPointerUp)
+})
 </script>
 
 <style scoped>
-.character-archive {
-  background: var(--card-bg);
-  border: 1px solid var(--line);
+.canvas-viewport {
+  position: relative;
+  height: 620px;
   border-radius: var(--radius);
-  padding: 20px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle, rgba(128, 128, 128, 0.18) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--page-bg);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.canvas-viewport:active {
+  cursor: grabbing;
+}
+.canvas-viewport.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
 }
 
-.archive-empty {
-  min-height: 260px;
+.canvas-empty {
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -188,152 +230,124 @@ const expressionPreview = computed(() => urlsOf(expressions.value))
   color: var(--ink-3);
   font-size: 13px;
 }
-.archive-empty p {
+.canvas-empty p {
   margin: 0;
 }
 
-.archive-body {
+.canvas-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+}
+.canvas-layout {
   display: flex;
-  align-items: stretch;
-  gap: 18px;
+  align-items: flex-start;
+  gap: 36px;
+  padding: 36px;
 }
 
-.archive-hero {
-  position: relative;
-  flex: 0 0 32%;
-  min-width: 240px;
-  min-height: 380px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--page-bg);
+.hero-panel {
+  flex: 0 0 340px;
+  width: 340px;
 }
 .hero-image {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 340px;
+  height: 640px;
+  display: block;
+  border-radius: 10px;
+  background: transparent;
 }
-.hero-badge {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  padding: 4px 12px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.88);
-  color: var(--ink-2);
+.panel-label {
+  margin-top: 10px;
+  text-align: center;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
+  color: var(--ink-2);
 }
 
-.archive-right {
-  flex: 1;
-  min-width: 0;
+.groups-column {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 26px;
 }
-
-.archive-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  margin-top: 18px;
-}
-.archive-details > .archive-block {
-  flex: 1 1 320px;
+.group-row {
   min-width: 0;
 }
-
-.archive-block {
-  min-width: 0;
-}
-.block-title {
+.group-head {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ink);
 }
-.block-mark {
+.group-mark {
   width: 4px;
   height: 14px;
   border-radius: 2px;
   background: var(--brand);
 }
-.block-count {
-  margin-left: auto;
+.group-count {
   font-size: 11px;
   font-weight: 500;
   color: var(--ink-3);
-  background: var(--page-bg);
+  background: var(--card-bg);
+  border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   padding: 1px 8px;
 }
-
-.turnaround-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px;
-}
-.turnaround-image {
-  width: 100%;
-  height: 240px;
-  display: block;
-  border-radius: 8px;
-  background: var(--page-bg);
-}
-
-.costume-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-}
-.costume-image {
-  width: 100%;
-  height: 220px;
-  display: block;
-  border-radius: 8px;
-  background: var(--page-bg);
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-}
-.detail-image {
-  width: 100%;
-  height: 220px;
-  display: block;
-  border-radius: 8px;
-  background: var(--page-bg);
-}
-
-.archive-block-empty {
+.group-images {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 120px;
-  color: var(--ink-3);
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.group-image {
+  flex: 0 0 auto;
+  width: 108px;
+  height: 144px;
+  display: block;
+  border-radius: 8px;
+  background: transparent;
+}
+.group-empty {
+  padding: 16px 0;
   font-size: 12px;
+  color: var(--ink-3);
+}
+
+.canvas-toolbar {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 5;
+}
+.canvas-controls {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+}
+.canvas-tip {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--ink-3);
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  z-index: 5;
 }
 
 @media (max-width: 900px) {
-  .archive-body {
-    flex-direction: column;
-  }
-  .archive-hero {
-    flex: none;
-    width: 100%;
-    min-height: 320px;
-  }
-  .archive-details {
-    flex-direction: column;
+  .canvas-viewport {
+    height: 480px;
   }
 }
 </style>
