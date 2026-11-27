@@ -43,7 +43,7 @@ describe('角色库编辑器', () => {
     const text = wrapper.text()
     expect(text).toContain('角色三视图')
     expect(text).toContain('服装三视图')
-    expect(text).toContain('发型特写')
+    expect(text).toContain('发饰特写')
     expect(text).toContain('道具图')
     expect(text).toContain('面部表情')
   })
