@@ -1572,6 +1572,8 @@
     "costumeAccessories": "配饰",
     "costumeMakeup": "妆容发式",
     "costumePositive": "正向提示词",
+    "costumeAnchors": "核心锚点",
+    "costumeNegative": "负面提示词",
     "costumeAvoid": "形制红线",
     "costumeCopy": "复制当前语言",
     "costumeCopyZh": "复制中文",

@@ -95,12 +95,21 @@
           <div class="costume-label">{{ t('portal.costumePositive') }}</div>
           <div class="costume-prompt">{{ isEn ? item.promptEn : item.promptZh }}</div>
         </div>
-        <div class="costume-anchors">
-          <span v-for="anchor in item.anchors" :key="anchor" class="anchor">{{ anchor }}</span>
+        <div class="costume-block">
+          <div class="costume-label">{{ t('portal.costumeAnchors') }}</div>
+          <div class="costume-anchors">
+            <span v-for="anchor in item.anchors" :key="anchor" class="anchor">{{ anchor }}</span>
+          </div>
         </div>
-        <div class="costume-avoid">{{ t('portal.costumeAvoid') }}：{{ item.avoid.join('、') }}</div>
-        <div class="costume-negatives">
-          <div v-for="(neg, index) in isEn ? item.negativeEn : item.negativeZh" :key="index" class="negative">{{ neg }}</div>
+        <div class="costume-block costume-block-avoid">
+          <div class="costume-label">{{ t('portal.costumeAvoid') }}</div>
+          <div class="costume-avoid">{{ item.avoid.join('、') }}</div>
+        </div>
+        <div class="costume-block costume-block-negative">
+          <div class="costume-label">{{ t('portal.costumeNegative') }}</div>
+          <div class="costume-negatives">
+            <span v-for="(neg, index) in isEn ? item.negativeEn : item.negativeZh" :key="index" class="negative">{{ neg }}</span>
+          </div>
         </div>
         <div class="costume-actions">
           <el-button size="small" @click="copyPrompt(item, 'current')">{{ t('portal.costumeCopy') }}</el-button>
@@ -382,12 +391,35 @@ const copyPrompt = async (item: CostumePromptEntry, mode: 'current' | 'zh' | 'en
   margin-bottom: 12px;
 }
 .costume-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
-  color: var(--ink-3);
-  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.costume-label::before {
+  content: '';
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--brand);
 }
 .costume-block {
   margin-bottom: 10px;
+}
+.costume-block-avoid .costume-label {
+  color: #b4543b;
+}
+.costume-block-avoid .costume-label::before {
+  background: #d98a4a;
+}
+.costume-block-negative .costume-label {
+  color: #b63b3b;
+}
+.costume-block-negative .costume-label::before {
+  background: #d04848;
 }
 .costume-prompt {
   background: var(--page-bg);
@@ -402,31 +434,33 @@ const copyPrompt = async (item: CostumePromptEntry, mode: 'current' | 'zh' | 'en
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin: 8px 0;
 }
 .anchor {
   font-size: 11px;
-  background: var(--page-bg);
-  color: var(--ink-2);
-  border: 1px solid var(--line);
+  background: var(--brand-soft);
+  color: var(--brand);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
 }
 .costume-avoid {
   font-size: 11px;
+  line-height: 1.7;
   color: #b4543b;
-  margin-top: 6px;
+  background: #fff7f2;
+  border: 1px solid #f2d9c8;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
 }
 .costume-negatives {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
-  margin-top: 8px;
 }
 .negative {
   font-size: 11px;
-  color: var(--ink-3);
-  background: var(--page-bg);
+  color: #b63b3b;
+  background: #fff0f0;
+  border: 1px solid #f5d5d5;
   padding: 2px 7px;
   border-radius: var(--radius-sm);
 }

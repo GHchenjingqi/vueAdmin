@@ -1572,6 +1572,8 @@
     "costumeAccessories": "Accessories",
     "costumeMakeup": "Hair & makeup",
     "costumePositive": "Positive prompt",
+    "costumeAnchors": "Core anchors",
+    "costumeNegative": "Negative prompt",
     "costumeAvoid": "Taboo details",
     "costumeCopy": "Copy current",
     "costumeCopyZh": "Copy Chinese",
