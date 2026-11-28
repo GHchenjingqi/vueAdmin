@@ -190,6 +190,13 @@
               </template>
               <pre v-else class="detail-content">{{ detail.content }}</pre>
             </div>
+            <div v-if="detail.negativePrompt" class="negative-panel">
+              <div class="negative-panel-head">
+                <span class="negative-panel-title">{{ t('portal.negativePrompt') }}</span>
+                <el-button size="small" text :icon="DocumentCopy" @click="copyNegativePrompt">{{ t('portal.copy') }}</el-button>
+              </div>
+              <pre class="detail-content">{{ detail.negativePrompt }}</pre>
+            </div>
           </section>
         </div>
 
@@ -303,6 +310,15 @@ const copyContent = async (): Promise<void> => {
     document.body.removeChild(textarea)
     if (ok) ElMessage.success(t('portal.copySuccess'))
     else ElMessage.error(t('portal.copyFailed'))
+  }
+}
+
+const copyNegativePrompt = async (): Promise<void> => {
+  try {
+    await copyText(detail.value?.negativePrompt ?? '')
+    ElMessage.success(t('portal.copySuccess'))
+  } catch {
+    ElMessage.error(t('portal.copyFailed'))
   }
 }
 
@@ -775,6 +791,25 @@ onMounted(() => void load())
   line-clamp: 2;
   overflow: hidden;
   max-height: none;
+}
+
+.negative-panel {
+  padding: var(--gap-3) var(--gap-4);
+  border-top: 1px solid var(--line);
+  background: var(--card-bg);
+}
+
+.negative-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--gap-2);
+}
+
+.negative-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .detail-content {

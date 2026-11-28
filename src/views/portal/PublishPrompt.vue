@@ -63,6 +63,10 @@
             >
               <el-input v-model="form.content" type="textarea" :rows="8" :placeholder="publishMode === 'normal' ? t('portal.contentPlaceholder') : ''" />
             </el-form-item>
+
+            <el-form-item v-if="publishMode === 'normal'" :label="t('portal.negativePrompt')">
+              <el-input v-model="form.negativePrompt" type="textarea" :rows="4" :placeholder="t('portal.negativePromptPlaceholder')" />
+            </el-form-item>
           </div>
 
           <div class="publish-right">
@@ -162,6 +166,7 @@ type PublishMode = 'normal' | 'collection' | 'character'
 interface PublishForm {
   title: string
   content: string
+  negativePrompt: string
   categoryId: number | ''
   parentId: number | null
   modelName: string
@@ -193,6 +198,7 @@ const relatedLoading = ref(false)
 const form = reactive<PublishForm>({
   title: '',
   content: '',
+  negativePrompt: '',
   categoryId: '',
   parentId: null,
   modelName: '',
@@ -342,6 +348,7 @@ const load = async (): Promise<void> => {
       }
       form.title = res.data.title
       form.content = res.data.content
+      form.negativePrompt = res.data.negativePrompt || ''
       form.categoryId = res.data.categoryId
       form.parentId = res.data.parentId ?? null
       parentTitleToRestore = res.data.parentTitle ?? ''
@@ -554,6 +561,7 @@ const handleSubmit = async (submit: boolean): Promise<void> => {
   const payload: PortalPayload = {
     title: form.title.trim(),
     content: form.content.trim(),
+    negativePrompt: form.negativePrompt.trim() || null,
     categoryId: Number(form.categoryId),
     parentId: form.parentId,
     modelName: form.modelName.trim(),

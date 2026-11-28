@@ -942,6 +942,7 @@ function decorate(prompt) {
     id: prompt.id,
     title: prompt.title,
     content: prompt.content,
+    negativePrompt: prompt.negativePrompt ?? null,
     categoryId: prompt.categoryId,
     categoryIds,
     categoryNames,
@@ -1277,6 +1278,7 @@ function trimData(data) {
   return {
     title: String(data.title || '').trim(),
     content: String(data.content || '').trim(),
+    negativePrompt: String(data.negativePrompt || '').trim() || null,
     categoryId: categoryIds[0],
     categoryIds,
     parentId: data.parentId ? Number(data.parentId) : null,

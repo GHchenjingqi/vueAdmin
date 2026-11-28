@@ -309,6 +309,7 @@ const searchFields = computed(() => [
 interface PromptForm {
   title: string
   content: string
+  negativePrompt: string
   categoryId: number | string
   categoryIds: Array<number | string>
   parentId: number | string | null
@@ -348,6 +349,7 @@ const tableRef = ref<InstanceType<typeof ProTable> | null>(null)
 const form = reactive<PromptForm>({
   title: '',
   content: '',
+  negativePrompt: '',
   categoryId: '',
   categoryIds: [],
   parentId: null,
@@ -439,6 +441,13 @@ const formSchema = computed(() => {
       required: true,
     },
     { prop: 'content', label: t('prompt.content'), type: 'textarea', required: true, span: 24, props: { rows: 8, autosize: false } },
+    {
+      prop: 'negativePrompt',
+      label: t('prompt.negativePrompt'),
+      type: 'textarea',
+      span: 24,
+      props: { rows: 4, autosize: false },
+    },
   ]
 })
 
@@ -531,6 +540,7 @@ const onQuery = ({ pagination: next, searchParams: nextSearch }: { pagination: R
 const resetForm = (): void => {
   form.title = ''
   form.content = ''
+  form.negativePrompt = ''
   form.categoryId = ''
   form.categoryIds = []
   form.parentId = null
@@ -653,6 +663,7 @@ const openDialog = async (row?: Record<string, unknown>): Promise<void> => {
       const loaded = res.data
       form.title = loaded.title
       form.content = loaded.content
+      form.negativePrompt = loaded.negativePrompt || ''
       form.categoryIds = loaded.categoryIds?.length ? loaded.categoryIds : [loaded.categoryId]
       form.categoryId = form.categoryIds[0]
       form.parentId = loaded.parentId ?? null
@@ -815,6 +826,7 @@ const buildPayload = (action: 'publish' | 'draft'): PromptPayload => {
   return {
     title: form.title,
     content: form.content,
+    negativePrompt: form.negativePrompt.trim() || null,
     categoryId: categoryIds[0] ?? Number(form.categoryId),
     categoryIds,
     parentId: form.parentId === null || form.parentId === '' ? null : Number(form.parentId),

@@ -79,6 +79,12 @@ const routes = [
         meta: { title: 'Skills 下载' },
       },
       {
+        path: 'costumes',
+        name: 'PortalCostumes',
+        component: () => import('@/views/portal/CostumeGallery.vue'),
+        meta: { title: '朝代服饰' },
+      },
+      {
         path: 'prompts/:id',
         name: 'PortalPromptDetail',
         component: () => import('@/views/portal/PromptDetail.vue'),

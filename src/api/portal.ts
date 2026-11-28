@@ -49,6 +49,8 @@ export interface PortalParentOption {
 export interface PortalPayload {
   title: string
   content: string
+  /** 负面（反向/约束）提示词 */
+  negativePrompt?: string | null
   categoryId: number
   modelName: string
   /** 关联的原提示词 ID；派生提示词只填写本次追问正文 */

@@ -145,6 +145,8 @@ export interface PromptItem {
   id: number
   title: string
   content: string
+  /** 负面（反向/约束）提示词 */
+  negativePrompt?: string | null
   categoryId: number
   categoryIds?: number[]
   categoryName?: string
@@ -208,6 +210,8 @@ export interface PromptListQuery extends ListQueryParams {
 export interface PromptPayload {
   title: string
   content: string
+  /** 负面（反向/约束）提示词 */
+  negativePrompt?: string | null
   categoryId: number
   categoryIds?: number[]
   parentId?: number | null

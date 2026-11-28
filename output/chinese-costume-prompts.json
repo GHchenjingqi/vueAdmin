@@ -1,0 +1,2894 @@
+{
+  "meta": {
+    "title": "中国历代服饰 AI 绘画提示词库",
+    "version": "1.0",
+    "total": 70,
+    "dimensions": [
+      "朝代",
+      "性别",
+      "礼服/常服/铠甲"
+    ],
+    "note": "每条含中英双语正向词、定向负面词（分中文/英文数组）、核心锚点、形制红线与年代区间。共 14 个时期 × 礼服/常服/铠甲，铠甲条目仅男性，可直接接入提示词系统。"
+  },
+  "methodology": {
+    "principles": [
+      "锁定形制而非朝代标签：AI 对「汉服」「古装」概念模糊，对「交领右衽」「曲裾绕襟」「马面裙褶裥」等结构词敏感。先写结构，再写朝代。",
+      "用定向负面词排除串朝代：生成唐装就在负面词里写马面裙、旗头、补子、立领；生成明装就排除齐胸襦裙、披帛、幞头。这是避免混搭最有效的一招。",
+      "描述物理结构：领型朝向、袖口宽窄、裙腰高低、褶裥位置、开衩方向、衣长及地与否——这些是模型能稳定画出来的可验证特征。",
+      "配饰与妆容必须同朝代：幞头属唐宋、网巾属明、顶戴花翎属清；花钿属唐、珍珠妆属宋、一耳三钳属清。配饰错位是穿帮高发区。",
+      "加入材质与工艺词：织锦、缂丝、纱罗、云雷纹、蟠螭纹、织金、刺绣，能显著提升质感并压住现代感。",
+      "限定画面风格：工笔重彩、帛画、壁画、写实摄影、博物馆级复原——风格词能稳住整体观感，减少现代审美渗入。",
+      "注意左右衽：交领右衽是汉族服饰标志，左衽多见于辽金元清的游牧民族服饰，不可混用。",
+      "甲胄要按朝代分期：先秦皮甲青铜胄、秦汉札甲玄甲、魏晋隋唐明光铠、宋代步人甲、明代布面甲、清代八旗甲、民国钢盔军装，彼此不可混用。"
+    ],
+    "formula": "画面风格前缀 + 朝代性别场合 + 核心形制 + 结构细节 + 同朝代配饰妆容 + 材质工艺 + 博物馆级考据限定 + 定向负面词",
+    "termMap": {
+      "交领右衽": "cross-collar right-facing lapel",
+      "曲裾深衣": "quju wrapped shenyi robe",
+      "直裾袍": "straight-lapel pao robe",
+      "褒衣博带": "broad robe and wide sash",
+      "圆领袍": "round-collar robe",
+      "幞头": "futou headwear",
+      "齐胸襦裙": "chest-high ruqun skirt",
+      "披帛": "pibo silk scarf",
+      "褙子": "beizi jacket",
+      "马面裙": "mamian pleated skirt",
+      "补子": "rank badge",
+      "乌纱帽": "wushamao hat",
+      "顶戴花翎": "rank hat with peacock feather",
+      "旗装": "Manchu qizhuang robe",
+      "姑姑冠": "gugu Mongol headdress",
+      "霞帔": "xiapei ceremonial scarf",
+      "花钿": "huadian forehead ornament",
+      "直裰": "zhiduo straight robe",
+      "道袍": "daopao robe",
+      "曳撒": "yisa pleated robe",
+      "贴里": "tieli inner robe",
+      "裤褶": "ku-zhe trousers and short jacket",
+      "两当": "liangdang sleeveless jacket",
+      "步人甲": "Song infantry heavy armor",
+      "具装铠": "cataphract horse armor",
+      "质孙服": "zhisun monochrome court robe",
+      "罟罟冠": "gugu Mongol headdress",
+      "大拉翅": "dalachi flag headdress",
+      "一耳三钳": "three earrings per ear",
+      "号衣": "identification uniform",
+      "马蹄袖": "horseshoe cuff",
+      "朝珠": "court beads",
+      "马褂": "mandarin jacket",
+      "旗袍": "qipao fitted dress",
+      "步摇": "buyao dangling hairpin",
+      "抹胸": "moxiong inner bodice",
+      "舄": "xi ceremonial shoes",
+      "履": "cloth shoes",
+      "靴": "leather boots",
+      "屐": "wooden clogs",
+      "弓鞋": "lotus shoes",
+      "花盆底": "flowerpot-sole shoes",
+      "草履": "straw sandals"
+    },
+    "references": [
+      {
+        "title": "中国古代服饰研究",
+        "author": "沈从文",
+        "note": "服饰史系统考订的开山之作，历代服饰制度与实物互证"
+      },
+      {
+        "title": "中国古舆服论丛",
+        "author": "孙机",
+        "note": "舆服制度与出土文物互证的专题论文集"
+      },
+      {
+        "title": "华夏衣冠：中国古代服饰文化",
+        "author": "孙机",
+        "note": "以文物图像为核心的服饰文化通论"
+      },
+      {
+        "title": "中国历代服饰",
+        "author": "周汛、高春明",
+        "note": "历代服饰图录与形制考据工具书"
+      },
+      {
+        "title": "中国服装史",
+        "author": "华梅",
+        "note": "服装史教材，按时代梳理形制演变"
+      },
+      {
+        "title": "中国服装史",
+        "author": "黄能馥、陈娟娟",
+        "note": "结合纺织考古的服装通史"
+      }
+    ]
+  },
+  "global": {
+    "positiveZh": "中国历史服饰考据风格，博物馆级服饰复原，形制准确，细节严谨，写实渲染",
+    "positiveEn": "historically accurate Chinese costume, museum-grade reconstruction, authentic garment structure, meticulous detail, realistic rendering",
+    "negativeZh": "现代服装，混搭，穿越，廉价戏服，塑料质感，错误领型，现代妆容，日式和服，韩服，西方礼服，文字，水印，低质量",
+    "negativeEn": "modern clothing, costume mashup, anachronism, cheap costume, plastic texture, wrong collar, modern makeup, kimono, hanbok, western dress, text, watermark, low quality"
+  },
+  "entries": [
+    {
+      "id": "xzsz-m-f",
+      "slug": "zhou-xia-shang",
+      "era": "夏商周",
+      "years": "约前2070–前771",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "冕服、弁服",
+      "promptZh": "中国夏商周时期男性礼服，冕服与弁服，上衣下裳，玄衣纁裳，交领右衽，袖口较窄，蔽膝垂于膝前，冕冠垂旒，玉圭，革带大带，佩玉，舄履，云雷纹与蟠螭纹织绣，麻葛织物质感，庄重古朴，博物馆级服饰考古复原，工笔画风格，细腻写实",
+      "promptEn": "Xia Shang Zhou dynasty Chinese male ceremonial robe, mianfu and bianfu, upper garment and lower skirt, dark top with reddish-brown skirt, cross-collar right-facing lapel, narrow sleeves, bixi knee cover, mian crown with jade beads, jade gui, leather and silk belts, jade pendants, ceremonial shoes, cloud-thunder and dragon motifs, hemp texture, solemn archaic, museum-grade reconstruction",
+      "negativeZh": [
+        "旗头",
+        "立领",
+        "宽袍大袖",
+        "唐代浓妆",
+        "现代剪裁"
+      ],
+      "negativeEn": [
+        "round collar robe",
+        "futou",
+        "mandarin square",
+        "mamian skirt",
+        "Qing headdress",
+        "Tang makeup",
+        "modern tailoring"
+      ],
+      "anchors": [
+        "上衣下裳",
+        "玄衣纁裳",
+        "交领右衽",
+        "蔽膝",
+        "冕冠垂旒",
+        "云雷纹"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "补子",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "xzsz-m-c",
+      "slug": "zhou-xia-shang",
+      "era": "夏商周",
+      "years": "约前2070–前771",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "archaeological",
+      "form": "深衣、短襦、裤",
+      "promptZh": "中国先秦时期男性常服，深衣与短襦，上衣下裳连属，交领右衽，袖口较窄便于劳作，粗麻葛布，巾帻束发，革带布履，朴素无华，考古复原风格，写实",
+      "promptEn": "Pre-Qin Chinese male daily wear, shenyi and short ru jacket, one-piece upper and lower garment, cross-collar right-facing lapel, narrow working sleeves, coarse hemp and ramie, headscarf, leather belt, cloth shoes, plain, archaeological reconstruction, realistic",
+      "negativeZh": [
+        "补子",
+        "丝绸华丽",
+        "现代拉链"
+      ],
+      "negativeEn": [
+        "wide sleeves",
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "luxurious silk",
+        "modern zipper"
+      ],
+      "anchors": [
+        "深衣",
+        "短襦",
+        "窄袖",
+        "巾帻",
+        "麻葛"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "宽袍大袖"
+      ]
+    },
+    {
+      "id": "xzsz-m-a",
+      "slug": "zhou-xia-shang",
+      "era": "夏商周",
+      "years": "约前2070–前771",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "gongbi",
+      "form": "皮甲、青铜胄",
+      "promptZh": "中国夏商周时期士兵铠甲，皮甲与青铜胄，皮革缝制甲衣，甲片连缀，青铜胄护首，藤木盾，车兵军阵，古朴厚重，博物馆级甲胄考古复原，工笔画风格，写实",
+      "promptEn": "Xia Shang Zhou dynasty Chinese soldier armor, leather cuirass and bronze helmet, stitched hide armor, laced plates, bronze helmet, wicker shield, chariot formation, archaic and sturdy, museum-grade armor reconstruction, realistic gongbi style",
+      "negativeZh": [
+        "铁甲",
+        "现代防弹衣",
+        "西式骑士板甲",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "iron lamellar armor",
+        "mingguang armor",
+        "padded cotton armor",
+        "steel helmet",
+        "modern body armor",
+        "western plate armor",
+        "plastic texture"
+      ],
+      "anchors": [
+        "皮甲",
+        "青铜胄",
+        "藤盾",
+        "车兵"
+      ],
+      "avoid": [
+        "明光铠",
+        "布面甲",
+        "钢盔",
+        "西式板甲"
+      ]
+    },
+    {
+      "id": "xzsz-f-f",
+      "slug": "zhou-xia-shang",
+      "era": "夏商周",
+      "years": "约前2070–前771",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "深衣、后妃六服",
+      "promptZh": "中国先秦时期女性礼服，深衣与后妃六服，上衣下裳连属，交领右衽，宽袖，衣长曳地，笄簪固定发髻，玉簪，大带，蔽膝，玉佩，绣履，素雅庄重的周代礼制风格，云雷纹织绣，博物馆级复原，工笔画",
+      "promptEn": "Pre-Qin Chinese female ceremonial attire, shenyi robe and noblewomen's six robes, one-piece garment, cross-collar right-facing lapel, wide sleeves, floor-length, hair bun with ji and jade hairpins, broad sash, bixi, jade pendants, embroidered shoes, elegant Zhou ritual style, cloud-thunder motifs, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛",
+        "花钿",
+        "缠足",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "phoenix crown",
+        "bound feet",
+        "modern dress"
+      ],
+      "anchors": [
+        "深衣",
+        "后妃六服",
+        "右衽宽袖",
+        "笄簪",
+        "玉佩"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "马面裙",
+        "旗头",
+        "凤冠"
+      ]
+    },
+    {
+      "id": "xzsz-f-c",
+      "slug": "zhou-xia-shang",
+      "era": "夏商周",
+      "years": "约前2070–前771",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "archaeological",
+      "form": "深衣、短襦下裳",
+      "promptZh": "中国先秦时期女性常服，深衣与短襦下裳，上衣下裳，战国曲裾绕襟初现，窄袖，长裙及踝，麻葛布料，发绳挽髻，笄，布带，布履，素面无妆，古朴写实，考古复原风格",
+      "promptEn": "Pre-Qin Chinese female daily wear, shenyi and short ru jacket with lower skirt, upper and lower garment, early curved lapel, narrow sleeves, ankle-length skirt, hemp cloth, simple hair knot with cord, ji hairpin, cloth belt and shoes, no makeup, archaic realistic style",
+      "negativeZh": [
+        "宽袖大衫",
+        "花钿",
+        "旗头",
+        "高跟鞋"
+      ],
+      "negativeEn": [
+        "wide sleeves",
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "high heels"
+      ],
+      "anchors": [
+        "深衣",
+        "短襦下裳",
+        "曲裾初现",
+        "窄袖",
+        "发绳"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "cqzg-m-f",
+      "slug": "chunqiu-zhanguo",
+      "era": "春秋战国",
+      "years": "前770–前221",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "深衣、朝服、冕服",
+      "promptZh": "中国春秋战国时期男性礼服，深衣与朝服，交领右衽，宽袖渐起，褒衣博带，衣襟绕身，高冠鹖冠，大带革带，佩玉，蔽膝，绣履，蟠螭纹云雷纹龙凤纹织绣，丝织品光泽，士人风度，博物馆级复原，工笔重彩",
+      "promptEn": "Spring and Autumn Warring States Chinese male ceremonial robe, shenyi and court robe, cross-collar right-facing lapel, widening sleeves, broad robe and wide sash, wrapped lapel, tall crown and heguan, silk sash, jade pendants, embroidered shoes, coiled dragon and cloud-thunder motifs, silk sheen, scholar demeanor, museum-grade reconstruction",
+      "negativeZh": [
+        "旗头",
+        "立领",
+        "唐式花钿",
+        "现代剪裁"
+      ],
+      "negativeEn": [
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "mamian skirt",
+        "Qing headdress",
+        "stand collar",
+        "Tang makeup"
+      ],
+      "anchors": [
+        "深衣",
+        "褒衣博带",
+        "宽袖",
+        "高冠",
+        "佩玉",
+        "蟠螭纹"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "补子",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "cqzg-m-c",
+      "slug": "chunqiu-zhanguo",
+      "era": "春秋战国",
+      "years": "前770–前221",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "archaeological",
+      "form": "曲裾深衣、胡服",
+      "promptZh": "中国战国时期男性常服，深衣与胡服，交领右衽，窄袖短衣，长裤与皮靴，赵武灵王胡服骑射风格，巾帻束发，革带，佩刀，便于骑乘的劲装，粗麻织物，写实考古复原",
+      "promptEn": "Warring States Chinese male daily wear, shenyi and Hu nomadic costume, cross-collar right-facing lapel, narrow-sleeved short jacket, trousers and leather boots, King Wuling of Zhao cavalry style, headscarf, leather belt, dagger, riding attire, coarse linen, archaeological reconstruction",
+      "negativeZh": [
+        "补子",
+        "马面裙",
+        "现代牛仔裤",
+        "西装"
+      ],
+      "negativeEn": [
+        "wide sleeves",
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "mamian skirt",
+        "modern jeans",
+        "suit"
+      ],
+      "anchors": [
+        "曲裾深衣",
+        "胡服骑射",
+        "窄袖短衣",
+        "长裤",
+        "皮靴"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "宽袍大袖"
+      ]
+    },
+    {
+      "id": "cqzg-m-a",
+      "slug": "chunqiu-zhanguo",
+      "era": "春秋战国",
+      "years": "前770–前221",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "realistic-gongbi",
+      "form": "皮甲、札甲、胡服骑射轻甲",
+      "promptZh": "中国春秋战国时期士兵铠甲，皮甲与早期铁札甲，甲片叠压连缀，兜鍪护首，赵武灵王胡服骑射风格，窄袖短衣配轻甲长裤皮靴，盾剑戈弓弩，博物馆级复原，写实工笔",
+      "promptEn": "Spring and Autumn Warring States Chinese soldier armor, leather armor and early iron lamellar armor, overlapping laced plates, helmet, King Wuling of Zhao cavalry style, narrow short jacket with light armor trousers and boots, shield sword and crossbow, museum-grade reconstruction",
+      "negativeZh": [
+        "现代防弹衣",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "mingguang armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern body armor",
+        "plastic texture"
+      ],
+      "anchors": [
+        "皮甲",
+        "札甲",
+        "胡服骑射",
+        "轻甲长裤靴"
+      ],
+      "avoid": [
+        "明光铠",
+        "布面甲",
+        "钢盔",
+        "欧洲骑士甲"
+      ]
+    },
+    {
+      "id": "cqzg-f-f",
+      "slug": "chunqiu-zhanguo",
+      "era": "春秋战国",
+      "years": "前770–前221",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "曲裾深衣、绕襟袍",
+      "promptZh": "中国战国时期女性礼服，曲裾深衣，衣襟绕身数重，交领右衽，宽袖，长裙曳地，云雷纹蟠螭纹龙凤纹织绣，高髻加笄簪，玉佩，大带，绣履，楚地浪漫风格，华丽庄重，博物馆级复原，工笔画",
+      "promptEn": "Warring States Chinese female ceremonial robe, quju shenyi with wrapping lapel several times, cross-collar right-facing lapel, wide sleeves, floor-length skirt, cloud-thunder and coiled dragon motifs, tall bun with hairpins, jade pendants, broad sash, embroidered shoes, romantic Chu style, luxurious, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛",
+        "花钿",
+        "缠足",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "phoenix crown",
+        "bound feet"
+      ],
+      "anchors": [
+        "曲裾深衣",
+        "绕襟数重",
+        "宽袖",
+        "长裙曳地",
+        "笄簪玉佩"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "马面裙",
+        "旗头",
+        "凤冠"
+      ]
+    },
+    {
+      "id": "cqzg-f-c",
+      "slug": "chunqiu-zhanguo",
+      "era": "春秋战国",
+      "years": "前770–前221",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "archaeological",
+      "form": "深衣、短襦下裳、短衣长裙",
+      "promptZh": "中国春秋战国女性常服，深衣与短襦下裳，窄袖便于劳作，裙长适中，麻布朴素，发绳挽髻，布带，草履，无华丽妆饰，古朴写实，考古复原风格",
+      "promptEn": "Spring and Autumn Chinese female daily wear, shenyi and short ru jacket with lower skirt, narrow working sleeves, moderate skirt length, plain hemp, simple hair knot with cord, cloth belt, straw sandals, no elaborate makeup, archaic realistic style",
+      "negativeZh": [
+        "宽袖大衫",
+        "花钿",
+        "旗头",
+        "高跟鞋"
+      ],
+      "negativeEn": [
+        "wide sleeves",
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "high heels"
+      ],
+      "anchors": [
+        "深衣",
+        "短襦下裳",
+        "窄袖",
+        "麻布",
+        "发绳"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "qin-m-f",
+      "slug": "qin",
+      "era": "秦",
+      "years": "前221–前207",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "realistic-gongbi",
+      "form": "深衣、冠服（尚黑）",
+      "promptZh": "中国秦代男性礼服，深衣与冠服，承战国形制，以黑色为尊，交领右衽，衣襟规整，冠帽制度，革带玉佩，黑色礼履，庄重肃穆，法度严谨，博物馆级复原，写实工笔",
+      "promptEn": "Qin dynasty Chinese male ceremonial robe, shenyi and official crown robe, Warring States style, black as supreme color, cross-collar right-facing lapel, neat lapel, formal crown, leather belt and jade pendants, black ceremonial shoes, solemn and strict, museum-grade reconstruction",
+      "negativeZh": [
+        "旗头",
+        "立领",
+        "宽袍大袖",
+        "唐代浓妆",
+        "现代剪裁"
+      ],
+      "negativeEn": [
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "mamian skirt",
+        "Qing headdress",
+        "stand collar",
+        "Tang makeup"
+      ],
+      "anchors": [
+        "深衣",
+        "尚黑",
+        "冠服",
+        "交领右衽",
+        "庄重"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "补子",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "qin-m-c",
+      "slug": "qin",
+      "era": "秦",
+      "years": "前221–前207",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "archaeological",
+      "form": "深衣、短褐",
+      "promptZh": "中国秦代男性常服，深衣与短褐，窄袖短衣，便于劳作与军旅，麻葛面料，巾帻束发，革带，布履，朴素实用，写实考古复原",
+      "promptEn": "Qin dynasty Chinese male daily wear, shenyi and short coarse jacket, narrow sleeves, for labor and military, hemp and ramie, headscarf, leather belt, cloth shoes, plain practical, archaeological reconstruction",
+      "negativeZh": [
+        "补子",
+        "丝绸华丽",
+        "现代剪裁"
+      ],
+      "negativeEn": [
+        "wide sleeves",
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "luxurious silk",
+        "modern tailoring"
+      ],
+      "anchors": [
+        "深衣",
+        "短褐",
+        "窄袖",
+        "麻葛"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "宽袍大袖"
+      ]
+    },
+    {
+      "id": "qin-m-a",
+      "slug": "qin",
+      "era": "秦",
+      "years": "前221–前207",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "gongbi",
+      "form": "札甲（兵马俑甲衣）",
+      "promptZh": "中国秦代士兵铠甲，秦始皇陵兵马俑甲衣为标准，札甲甲片叠压连缀，分军吏甲与士兵甲，甲长及腰或及臀，兜鍪，盾戈矛弓弩，彩绘残留，军阵肃穆，博物馆级复原，工笔画风格",
+      "promptEn": "Qin dynasty Chinese soldier armor, Terracotta Army armor as standard, lamellar armor with overlapping plates, officer and soldier variants, waist or hip length, helmet, shield dagger-axe spear and crossbow, polychrome traces, solemn formation, museum-grade reconstruction",
+      "negativeZh": [
+        "欧洲骑士甲",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "mingguang armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern uniform",
+        "plastic texture"
+      ],
+      "anchors": [
+        "兵马俑札甲",
+        "军吏甲",
+        "甲片叠压",
+        "军阵"
+      ],
+      "avoid": [
+        "明光铠",
+        "布面甲",
+        "钢盔",
+        "现代军装"
+      ]
+    },
+    {
+      "id": "qin-f-f",
+      "slug": "qin",
+      "era": "秦",
+      "years": "前221–前207",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "曲裾深衣",
+      "promptZh": "中国秦代女性礼服，曲裾深衣，绕襟层数多，交领右衽，色尚黑，形制庄重，笄簪挽髻，大带，玉饰，绣履，素雅肃穆，博物馆级复原，工笔画",
+      "promptEn": "Qin dynasty Chinese female ceremonial robe, quju shenyi with multiple wrapped layers, cross-collar right-facing lapel, black color, solemn form, hair bun with hairpins, broad sash, jade ornaments, embroidered shoes, elegant and austere, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛",
+        "花钿",
+        "缠足",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "phoenix crown",
+        "bound feet"
+      ],
+      "anchors": [
+        "曲裾深衣",
+        "绕襟",
+        "尚黑",
+        "笄簪"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "马面裙",
+        "旗头",
+        "凤冠"
+      ]
+    },
+    {
+      "id": "qin-f-c",
+      "slug": "qin",
+      "era": "秦",
+      "years": "前221–前207",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "archaeological",
+      "form": "深衣、短襦下裳",
+      "promptZh": "中国秦代女性常服，深衣与短襦下裳，窄袖朴素，裙长适中，承战国遗风，发绳挽髻，布带布履，素面无妆，古朴写实，考古复原",
+      "promptEn": "Qin dynasty Chinese female daily wear, shenyi and short ru jacket with lower skirt, plain narrow sleeves, moderate skirt, Warring States tradition, simple hair knot, cloth belt and shoes, no makeup, archaic realistic style",
+      "negativeZh": [
+        "宽袖大衫",
+        "花钿",
+        "旗头",
+        "高跟鞋"
+      ],
+      "negativeEn": [
+        "wide sleeves",
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "high heels"
+      ],
+      "anchors": [
+        "深衣",
+        "短襦下裳",
+        "窄袖",
+        "素面"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "han-m-f",
+      "slug": "han",
+      "era": "汉",
+      "years": "前202–220（西汉曲裾／东汉直裾）",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "冕服、朝服、曲裾深衣",
+      "promptZh": "中国汉代男性礼服，冕服与朝服，西汉曲裾、东汉直裾深衣，交领右衽，宽袍大袖，玄衣纁裳，章纹刺绣，进贤冠武冠，玉佩绶带，蔽膝，赤色舄履，织锦云气纹刺绣，庄重肃穆，博物馆级汉代服饰复原，工笔画风格，细腻写实",
+      "promptEn": "Han dynasty Chinese male ceremonial robe, mianfu and court robe, quju wrapped shenyi, cross-collar right-facing lapel, wide flowing sleeves, dark top and reddish skirt, rank embroidery, jinxian official crown and wu military crown, jade pendants and silk ribbons, bixi, red ceremonial shoes, brocade cloud motif embroidery, solemn, museum-grade reconstruction",
+      "negativeZh": [
+        "乌纱帽",
+        "旗头",
+        "立领",
+        "清式辫发",
+        "唐式花钿",
+        "现代剪裁"
+      ],
+      "negativeEn": [
+        "round collar robe",
+        "futou",
+        "mamian skirt",
+        "mandarin square",
+        "Qing queue",
+        "Tang huadian",
+        "modern tailoring"
+      ],
+      "anchors": [
+        "冕服",
+        "西汉曲裾东汉直裾",
+        "宽袍大袖",
+        "进贤冠武冠",
+        "织锦云气纹"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "补子",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "han-m-c",
+      "slug": "han",
+      "era": "汉",
+      "years": "前202–220（西汉曲裾／东汉直裾）",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic",
+      "form": "直裾袍、襦裤、犊鼻裈",
+      "promptZh": "中国汉代男性常服，直裾袍与襦裤，交领右衽，宽袖或直袖，裤装普及，犊鼻裈劳作短裤，巾帻束发，革带，布履，香囊，日常实用，博物馆级复原，写实",
+      "promptEn": "Han dynasty Chinese male daily wear, straight-lapel pao and ru trousers, cross-collar right-facing lapel, wide or straight sleeves, common trousers, Dunbi short pants for labor, headscarf, leather belt, cloth shoes, sachet, practical daily style, museum-grade reconstruction",
+      "negativeZh": [
+        "马面裙",
+        "旗头",
+        "立领",
+        "现代T恤牛仔裤"
+      ],
+      "negativeEn": [
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "mamian skirt",
+        "Qing headdress",
+        "stand collar",
+        "modern t-shirt and jeans"
+      ],
+      "anchors": [
+        "直裾袍",
+        "襦裤",
+        "犊鼻裈",
+        "巾帻"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "补子"
+      ]
+    },
+    {
+      "id": "han-m-a",
+      "slug": "han",
+      "era": "汉",
+      "years": "前202–220（西汉曲裾／东汉直裾）",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "realistic-gongbi",
+      "form": "铁札甲（玄甲）、皮甲",
+      "promptZh": "中国汉代士兵铠甲，铁札甲，黑色玄甲为精锐标志，方形甲片连缀分胸甲背甲与披膊，兜鍪，盾，环首刀，弓弩箭囊，骑兵轻甲与重甲并存，博物馆级复原，写实工笔",
+      "promptEn": "Han dynasty Chinese soldier armor, iron lamellar armor, black Xuanjia elite armor, square plates with chest back and shoulder pieces, helmet, shield, ring-pommel sword, crossbow and quiver, light and heavy cavalry armor coexisting, museum-grade reconstruction",
+      "negativeZh": [
+        "现代防弹衣",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "mingguang armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern body armor",
+        "plastic texture"
+      ],
+      "anchors": [
+        "铁札甲",
+        "玄甲",
+        "披膊",
+        "环首刀"
+      ],
+      "avoid": [
+        "明光铠",
+        "布面甲",
+        "钢盔",
+        "欧洲骑士甲"
+      ]
+    },
+    {
+      "id": "han-f-f",
+      "slug": "han",
+      "era": "汉",
+      "years": "前202–220（西汉曲裾／东汉直裾）",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "曲裾深衣、大袖袍",
+      "promptZh": "中国汉代女性礼服，西汉曲裾、东汉直裾深衣与大袖袍，绕襟数重，交领右衽，袖宽，长裙曳地，织锦花纹鲜艳，高髻或垂髻，步摇簪钗耳珰，玉佩绶带，绣履，白粉敷面胭脂点颊朱唇，汉代典型妆容，博物馆级复原，工笔重彩",
+      "promptEn": "Han dynasty Chinese female ceremonial robe, quju shenyi and large-sleeve robe, multiple wrapping layers, cross-collar right-facing lapel, wide sleeves, floor-length skirt, colorful brocade, tall or hanging bun, buyao hairpins and eardang earrings, jade pendants, embroidered shoes, white face powder, rouge cheeks, red lips, typical Han makeup, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛",
+        "旗头",
+        "凤冠霞帔",
+        "缠足",
+        "唐妆斜红"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "phoenix crown",
+        "bound feet",
+        "Tang cheek marks"
+      ],
+      "anchors": [
+        "曲裾深衣",
+        "大袖袍",
+        "步摇簪钗",
+        "白粉胭脂朱唇"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "花钿",
+        "马面裙",
+        "凤冠"
+      ]
+    },
+    {
+      "id": "han-f-c",
+      "slug": "han",
+      "era": "汉",
+      "years": "前202–220（西汉曲裾／东汉直裾）",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "襦裙、直裾深衣",
+      "promptZh": "中国汉代女性常服，襦裙与直裾深衣，上衣短下裙长，窄袖或直袖，便于日常活动，发簪，臂钏，布履，薄施脂粉，博物馆级复原，写实工笔",
+      "promptEn": "Han dynasty Chinese female daily wear, ruqun and straight-lapel shenyi, short jacket and long skirt, narrow or straight sleeves, for daily activity, hairpins, armlets, cloth shoes, light makeup, museum-grade reconstruction",
+      "negativeZh": [
+        "花钿",
+        "旗头",
+        "高跟鞋",
+        "现代连衣裙"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "high heels",
+        "modern dress"
+      ],
+      "anchors": [
+        "襦裙",
+        "上短下长",
+        "直裾",
+        "发簪臂钏"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "wjnb-m-f",
+      "slug": "wei-jin",
+      "era": "魏晋南北朝",
+      "years": "220–589",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "冕服、朝服、宽衫",
+      "promptZh": "中国魏晋南北朝男性礼服，宽衫与朝服，褒衣博带，宽袍大袖，衣襟飘逸，交领右衽，冠或幅巾束首，玉佩，麈尾，履，承汉制而更宽博，名士风骨，博物馆级复原，工笔画风格",
+      "promptEn": "Wei Jin Chinese male ceremonial robe, wide shirt and court robe, broad robe and wide sash, large flowing sleeves, elegant drapery, cross-collar right-facing lapel, crown or headscarf, jade pendants, whisk, shoes, broader Han tradition, scholar demeanor, museum-grade reconstruction",
+      "negativeZh": [
+        "旗头",
+        "立领",
+        "唐式花钿",
+        "现代剪裁"
+      ],
+      "negativeEn": [
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "mamian skirt",
+        "Qing headdress",
+        "stand collar",
+        "Tang makeup"
+      ],
+      "anchors": [
+        "褒衣博带",
+        "宽衫大袖",
+        "幅巾",
+        "麈尾"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "补子",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "wjnb-m-c",
+      "slug": "wei-jin",
+      "era": "魏晋南北朝",
+      "years": "220–589",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic",
+      "form": "宽衫、裤褶、两当",
+      "promptZh": "中国魏晋南北朝男性常服，宽衫与裤褶两当，衫子宽大袖口宽阔，北方胡服便于骑乘，幅巾束首，革带，皮靴，佩剑，名士风度与游牧风格交融，博物馆级复原，写实",
+      "promptEn": "Wei Jin Chinese male daily wear, wide shirt and ku-zhe two-dang jacket, broad shirt with wide cuffs, northern nomadic riding costume, headscarf, leather belt, leather boots, sword, blend of scholar and nomadic styles, museum-grade reconstruction",
+      "negativeZh": [
+        "马面裙",
+        "旗头",
+        "现代西装",
+        "牛仔裤"
+      ],
+      "negativeEn": [
+        "round collar robe",
+        "futou",
+        "rank badge",
+        "mamian skirt",
+        "Qing headdress",
+        "modern suit",
+        "jeans"
+      ],
+      "anchors": [
+        "宽衫",
+        "裤褶",
+        "两当",
+        "皮靴",
+        "幅巾"
+      ],
+      "avoid": [
+        "圆领袍",
+        "幞头",
+        "补子"
+      ]
+    },
+    {
+      "id": "wjnb-m-a",
+      "slug": "wei-jin",
+      "era": "魏晋南北朝",
+      "years": "220–589",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "gongbi-heavy",
+      "form": "明光铠、两当铠、具装铠",
+      "promptZh": "中国魏晋南北朝士兵铠甲，明光铠胸背圆护反光如镜，两当铠前后两片，具装铠人马俱甲，兜鍪护颈，盾槊弓，重装骑兵全身披挂，博物馆级复原，工笔重彩",
+      "promptEn": "Wei Jin Southern and Northern Dynasties Chinese soldier armor, Mingguang armor with polished chest and back discs, liangdang armor front and back plates, cataphract horse armor, helmet with neck guard, shield spear and bow, fully armored heavy cavalry, museum-grade reconstruction",
+      "negativeZh": [
+        "现代防弹衣",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern body armor",
+        "plastic texture",
+        "Song infantry armor"
+      ],
+      "anchors": [
+        "明光铠",
+        "两当铠",
+        "具装铠",
+        "人马俱甲"
+      ],
+      "avoid": [
+        "布面甲",
+        "钢盔",
+        "欧洲骑士甲",
+        "步人甲"
+      ]
+    },
+    {
+      "id": "wjnb-f-f",
+      "slug": "wei-jin",
+      "era": "魏晋南北朝",
+      "years": "220–589",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "大袖衫、襦裙礼服",
+      "promptZh": "中国魏晋南北朝女性礼服，大袖衫与襦裙礼服，上衣短下裙长，大袖飘带，衣摆曳地，织金锦绣纹华丽，高髻巍峨多用假发，步摇簪钗耳坠，玉佩绣履，敷粉胭脂斜红，花钿初现，飘逸华丽，博物馆级复原，工笔重彩",
+      "promptEn": "Wei Jin Chinese female ceremonial robe, large-sleeve shirt and ruqun, short jacket and long skirt, flowing sleeves and ribbons, floor-length hem, gold-woven brocade, towering bun with false hair, buyao hairpins and earrings, jade pendants, face powder, rouge, xiehong cheek marks, early huadian, elegant, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛",
+        "凤冠霞帔",
+        "缠足",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "mamian skirt",
+        "Qing headdress",
+        "phoenix crown",
+        "bound feet",
+        "modern dress"
+      ],
+      "anchors": [
+        "大袖衫",
+        "假髻步摇",
+        "斜红",
+        "花钿初现"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "马面裙",
+        "旗头",
+        "凤冠"
+      ]
+    },
+    {
+      "id": "wjnb-f-c",
+      "slug": "wei-jin",
+      "era": "魏晋南北朝",
+      "years": "220–589",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "archaeological",
+      "form": "襦裙、胡服、裤装",
+      "promptZh": "中国魏晋南北朝女性常服，襦裙与胡服裤装，上短下长，窄袖便于活动，北方女性穿裤与靴，发钗，臂钏，布履或靴，中等发髻简约妆容，写实考古复原",
+      "promptEn": "Wei Jin Chinese female daily wear, ruqun and nomadic trousers, short top and long skirt, narrow sleeves for activity, northern women wearing trousers and boots, hairpins, armlets, cloth shoes or boots, medium bun, simple makeup, archaeological reconstruction",
+      "negativeZh": [
+        "披帛",
+        "花钿",
+        "高跟鞋",
+        "现代裙装"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "high heels",
+        "modern skirt"
+      ],
+      "anchors": [
+        "襦裙",
+        "胡服",
+        "裤装",
+        "发钗臂钏"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "tang-m-f",
+      "slug": "sui-tang",
+      "era": "隋唐",
+      "years": "581–907",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "冕服、衮冕、襕衫",
+      "promptZh": "中国唐代男性礼服，冕服衮冕与朝服，帝王衮冕章纹，圆领袍渐成礼服，襕衫为士人礼服，配套幞头，玉带鱼袋笏板，靴，庄重华贵，博物馆级唐代服饰复原，工笔画风格",
+      "promptEn": "Tang dynasty Chinese male ceremonial robe, mianfu gunmian and court robe, emperor gunmian emblems, round-collar robe as ceremonial, lan gown for scholars, futou headwear, jade belt and fish pouch, ivory tablet, boots, solemn and luxurious, museum-grade reconstruction",
+      "negativeZh": [
+        "网巾",
+        "顶戴花翎",
+        "立领",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "wushamao",
+        "wangjin",
+        "Qing headdress",
+        "rank feathers",
+        "stand collar",
+        "modern suit"
+      ],
+      "anchors": [
+        "冕服衮冕",
+        "圆领袍",
+        "襕衫",
+        "幞头玉带鱼袋"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "tang-m-c",
+      "slug": "sui-tang",
+      "era": "隋唐",
+      "years": "581–907",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "圆领袍、胡服、幞头",
+      "promptZh": "中国唐代男性常服，圆领窄袖袍，幞头，革带，胡靴，翻领胡服与胡靴盛极一时，骑马出行胡装，香囊佩刀，开放胡风，博物馆级复原，写实工笔",
+      "promptEn": "Tang dynasty Chinese male daily wear, round-collar narrow-sleeve robe, futou, leather belt, nomadic boots, lapel Hu costume, riding outfit, sachet and dagger, cosmopolitan style, museum-grade reconstruction",
+      "negativeZh": [
+        "网巾",
+        "顶戴花翎",
+        "立领袄",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "mandarin square",
+        "wushamao",
+        "wangjin",
+        "mamian skirt",
+        "Qing headdress",
+        "rank feathers",
+        "stand-collar ao",
+        "modern jacket"
+      ],
+      "anchors": [
+        "圆领袍",
+        "幞头",
+        "胡服",
+        "胡靴"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "tang-m-a",
+      "slug": "sui-tang",
+      "era": "隋唐",
+      "years": "581–907",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "gongbi-heavy",
+      "form": "明光铠、十三铠（唐六典）",
+      "promptZh": "中国唐代士兵铠甲，明光铠，唐六典十三铠之明光光要细鳞山文乌锤，身甲配披膊臂甲腿裙，兜鍪有护耳护颈，盾横刀弓槊，唐三彩武士俑风格，博物馆级复原，工笔重彩",
+      "promptEn": "Tang dynasty Chinese soldier armor, Mingguang armor, thirteen armor types from Tang Liudian, body armor with shoulder arm and leg pieces, helmet with ear and neck guards, shield dao sword bow and spear, Tang sancai warrior figurine style, museum-grade reconstruction",
+      "negativeZh": [
+        "现代军装",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "Song infantry armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern uniform",
+        "plastic texture"
+      ],
+      "anchors": [
+        "明光铠",
+        "十三铠",
+        "披膊腿裙",
+        "兜鍪护耳"
+      ],
+      "avoid": [
+        "步人甲",
+        "布面甲",
+        "钢盔",
+        "欧洲骑士甲"
+      ]
+    },
+    {
+      "id": "tang-f-f",
+      "slug": "sui-tang",
+      "era": "隋唐",
+      "years": "581–907",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "花钗礼衣、大袖衫、齐胸襦裙",
+      "promptZh": "中国唐代女性礼服，花钗礼衣，齐胸襦裙，大袖衫，肩绕长披帛，裙腰束于胸上，低胸交领，诃子式领口，高髻簪花金钿，花钿斜红点唇面靥白妆，浓艳唐妆，织金锦绣，华丽开放，博物馆级唐代服饰复原，工笔重彩",
+      "promptEn": "Tang dynasty Chinese female ceremonial attire, huachai liyi, chest-high ruqun, large-sleeve robe, long pibo scarf, skirt tied above chest, low-cut crossing collar, hezi-style neckline, tall bun with gold flowers, huadian forehead mark, xiehong cheek marks, red lips, baimian white makeup, elaborate Tang makeup, gold brocade, luxurious, museum-grade reconstruction",
+      "negativeZh": [
+        "花盆底",
+        "宋式褙子",
+        "缠足弓鞋",
+        "珍珠妆",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "stand collar",
+        "Qing headdress",
+        "lotus shoes",
+        "Ming phoenix crown",
+        "Song beizi",
+        "bound feet",
+        "pearl makeup",
+        "modern dress"
+      ],
+      "anchors": [
+        "齐胸襦裙",
+        "大袖衫披帛",
+        "花钗",
+        "花钿斜红点唇"
+      ],
+      "avoid": [
+        "马面裙",
+        "立领",
+        "旗头",
+        "凤冠霞帔"
+      ]
+    },
+    {
+      "id": "tang-f-c",
+      "slug": "sui-tang",
+      "era": "隋唐",
+      "years": "581–907",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "窄袖襦裙、胡服、男装",
+      "promptZh": "中国唐代女性常服，高腰窄袖襦裙，翻领胡服，宫廷女性男装骑马，幞头或胡帽，披帛，布履或胡靴，双髻垂髻，簪花，淡妆或浓妆，博物馆级复原，写实工笔",
+      "promptEn": "Tang dynasty Chinese female daily wear, high-waisted narrow-sleeve ruqun, lapel nomadic costume, palace women in male attire riding, futou or nomadic hat, pibo scarf, cloth shoes or boots, double buns, flower hairpins, light or heavy makeup, museum-grade reconstruction",
+      "negativeZh": [
+        "花盆底",
+        "缠足",
+        "宋式褙子",
+        "现代连衣裙"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "stand collar",
+        "Qing headdress",
+        "flowerpot shoes",
+        "phoenix crown",
+        "bound feet",
+        "Song beizi",
+        "modern dress"
+      ],
+      "anchors": [
+        "高腰襦裙",
+        "胡服",
+        "男装骑马",
+        "幞头胡帽"
+      ],
+      "avoid": [
+        "马面裙",
+        "立领",
+        "旗头",
+        "凤冠"
+      ]
+    },
+    {
+      "id": "wdsg-m-f",
+      "slug": "five-dynasties",
+      "era": "五代十国",
+      "years": "907–979",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "冕服、朝服、圆领袍",
+      "promptZh": "中国五代十国时期男性礼服，冕服与朝服，承唐制，圆领袍渐成礼服，幞头脚渐长趋硬，玉带鱼袋笏板，靴，庄重规整，博物馆级服饰复原，工笔画风格",
+      "promptEn": "Five Dynasties and Ten Kingdoms Chinese male ceremonial robe, mianfu and court robe, Tang tradition, round-collar robe as ceremonial, futou with lengthening stiff wings, jade belt fish pouch and ivory tablet, boots, solemn, museum-grade reconstruction",
+      "negativeZh": [
+        "顶戴花翎",
+        "立领",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "wushamao",
+        "Qing headdress",
+        "rank feathers",
+        "stand collar",
+        "modern suit"
+      ],
+      "anchors": [
+        "承唐启宋",
+        "圆领袍",
+        "幞头脚渐长"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "wdsg-m-c",
+      "slug": "five-dynasties",
+      "era": "五代十国",
+      "years": "907–979",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "圆领袍、窄袖衫",
+      "promptZh": "中国五代十国时期男性常服，圆领袍与窄袖衫，战乱年代武人装束常见，革带皮靴佩刀，便于活动，粗麻织物，博物馆级复原，写实工笔",
+      "promptEn": "Five Dynasties Chinese male daily wear, round-collar robe and narrow-sleeve shirt, military attire common in war years, leather belt boots and dagger, practical, coarse linen, museum-grade reconstruction",
+      "negativeZh": [
+        "顶戴花翎",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "wushamao",
+        "Qing headdress",
+        "rank feathers",
+        "modern jacket"
+      ],
+      "anchors": [
+        "圆领袍",
+        "窄袖衫",
+        "武人装束",
+        "佩刀"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "wdsg-m-a",
+      "slug": "five-dynasties",
+      "era": "五代十国",
+      "years": "907–979",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "realistic-gongbi",
+      "form": "铁甲（唐制遗风）、重甲",
+      "promptZh": "中国五代十国时期士兵铠甲，承唐明光铠遗制，披膊腿裙完备，铁甲趋厚重，节度使私兵装备精良，兜鍪，盾长枪弓弩，武人重甲，博物馆级复原，写实工笔",
+      "promptEn": "Five Dynasties Chinese soldier armor, Tang Mingguang armor tradition, complete shoulder and leg pieces, increasingly heavy iron armor, well-equipped warlord troops, helmet, shield spear and crossbow, martial heavy armor, museum-grade reconstruction",
+      "negativeZh": [
+        "现代军装",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern uniform",
+        "plastic texture",
+        "Song infantry armor"
+      ],
+      "anchors": [
+        "唐制遗风",
+        "铁甲重甲",
+        "披膊腿裙",
+        "私兵"
+      ],
+      "avoid": [
+        "布面甲",
+        "钢盔",
+        "欧洲骑士甲",
+        "步人甲"
+      ]
+    },
+    {
+      "id": "wdsg-f-f",
+      "slug": "five-dynasties",
+      "era": "五代十国",
+      "years": "907–979",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi-light",
+      "form": "大袖衫、襦裙礼服、花钗礼衣遗风",
+      "promptZh": "中国五代十国时期女性礼服，大袖衫与襦裙礼服，承唐制而趋纤瘦，裙腰由齐胸下移，披帛渐少，花钗礼衣简化，高髻簪钗，唐妆余风趋淡花钿减少，博物馆级复原，工笔淡彩",
+      "promptEn": "Five Dynasties Chinese female ceremonial robe, large-sleeve shirt and ruqun, Tang tradition turned slender, waistline lowered from chest, fewer pibo scarves, simplified flower-pin ceremonial attire, tall bun with hairpins, fading Tang makeup, museum-grade reconstruction",
+      "negativeZh": [
+        "缠足高跟鞋",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "stand collar",
+        "Qing headdress",
+        "Ming phoenix crown",
+        "high heels",
+        "modern dress"
+      ],
+      "anchors": [
+        "大袖衫",
+        "襦裙",
+        "花钗礼衣遗风",
+        "纤瘦"
+      ],
+      "avoid": [
+        "马面裙",
+        "立领",
+        "旗头",
+        "凤冠霞帔"
+      ]
+    },
+    {
+      "id": "wdsg-f-c",
+      "slug": "five-dynasties",
+      "era": "五代十国",
+      "years": "907–979",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "高腰襦裙、褙子初现",
+      "promptZh": "中国五代十国时期女性常服，高腰襦裙，窄袖纤瘦，褙子开始出现，发簪，披帛渐少，淡妆，承唐启宋的过渡风格，博物馆级复原，写实工笔",
+      "promptEn": "Five Dynasties Chinese female daily wear, high-waisted ruqun, narrow slender sleeves, early beizi jacket emerging, hairpins, fewer pibo, light makeup, Tang-to-Song transitional style, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛繁复",
+        "花钿浓妆",
+        "现代连衣裙"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "elaborate pibo",
+        "heavy huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "phoenix crown",
+        "modern dress"
+      ],
+      "anchors": [
+        "高腰襦裙",
+        "褙子初现",
+        "纤瘦衣裙",
+        "承唐启宋"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "马面裙",
+        "旗头",
+        "凤冠"
+      ]
+    },
+    {
+      "id": "liao-m-f",
+      "slug": "liao",
+      "era": "辽",
+      "years": "916–1125",
+      "gender": "男",
+      "group": "契丹（并列汉族）",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "国服（契丹礼服）、汉式朝服",
+      "promptZh": "中国辽代男性礼服，契丹国服，左衽窄袖长袍，南北面官制，国服与汉服并存，冠帽，革带皮靴佩刀，左衽为契丹标志，汉官用宋式朝服，庄重，博物馆级复原，工笔画风格；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Liao dynasty Chinese male ceremonial robe, Khitan national dress, left-facing lapel narrow-sleeve long robe, northern and southern official systems, national dress and Han dress coexisting, felt hat, leather belt boots and dagger, left lapel as Khitan hallmark, Han officials in Song-style robes, museum-grade reconstruction",
+      "negativeZh": [
+        "圆领袍",
+        "幞头",
+        "顶戴花翎",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "round collar robe",
+        "futou",
+        "mandarin square",
+        "wushamao",
+        "mamian skirt",
+        "rank feathers",
+        "modern suit"
+      ],
+      "anchors": [
+        "国服",
+        "左衽窄袖",
+        "南北面官",
+        "髡发"
+      ],
+      "avoid": [
+        "右衽交领",
+        "补子",
+        "乌纱帽",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "liao-m-c",
+      "slug": "liao",
+      "era": "辽",
+      "years": "916–1125",
+      "gender": "男",
+      "group": "契丹（并列汉族）",
+      "scene": "常服",
+      "style": "realistic",
+      "form": "契丹袍服、左衽窄袖、皮靴",
+      "promptZh": "中国辽代男性常服，契丹袍服，左衽窄袖长袍便于骑乘游牧，革带束腰，皮帽皮靴，刀子火镰，髡发剃去额发梳辫，冬季加皮毛，游牧生活，博物馆级复原，写实",
+      "promptEn": "Liao dynasty Chinese male daily wear, Khitan robe, left-facing lapel narrow-sleeve long robe for riding and nomadic life, leather belt, felt hat and boots, dagger and fire striker, shaved forehead with braid, winter fur, museum-grade reconstruction",
+      "negativeZh": [
+        "圆领袍",
+        "幞头",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "round collar robe",
+        "futou",
+        "mandarin square",
+        "wushamao",
+        "mamian skirt",
+        "modern jacket"
+      ],
+      "anchors": [
+        "契丹袍服",
+        "左衽窄袖",
+        "髡发",
+        "皮靴"
+      ],
+      "avoid": [
+        "右衽交领",
+        "补子",
+        "乌纱帽",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "liao-m-a",
+      "slug": "liao",
+      "era": "辽",
+      "years": "916–1125",
+      "gender": "男",
+      "group": "契丹（并列汉族）",
+      "scene": "铠甲",
+      "style": "realistic",
+      "form": "契丹骑兵甲（皮铁结合）",
+      "promptZh": "中国辽代士兵铠甲，契丹骑兵甲，皮甲为主铁甲为辅，轻便适合骑射，窄袖战袍外披甲左衽，皮胄或铁胄，盾弓骨朵狼牙棒，髡发骑射轻装，博物馆级复原，写实",
+      "promptEn": "Liao dynasty Chinese soldier armor, Khitan cavalry armor, mainly leather with some iron, light for mounted archery, left-facing lapel battle robe over armor, leather or iron helmet, shield bow and bone club, shaved forehead, museum-grade reconstruction",
+      "negativeZh": [
+        "欧洲骑士甲",
+        "现代防弹衣"
+      ],
+      "negativeEn": [
+        "mingguang armor",
+        "Song infantry armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern body armor"
+      ],
+      "anchors": [
+        "契丹骑兵甲",
+        "皮铁结合",
+        "左衽战袍",
+        "髡发"
+      ],
+      "avoid": [
+        "明光铠",
+        "步人甲",
+        "布面甲",
+        "钢盔"
+      ]
+    },
+    {
+      "id": "liao-f-f",
+      "slug": "liao",
+      "era": "辽",
+      "years": "916–1125",
+      "gender": "女",
+      "group": "契丹（并列汉族）",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "契丹女服礼服、汉式礼服",
+      "promptZh": "中国辽代女性礼服，契丹女服，左衽窄袖长袍色彩鲜明，冠巾，耳坠玉佩皮靴，髡发或盘髻敷粉，汉官家属用宋式礼服，宫廷庄重，博物馆级复原，工笔重彩；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Liao dynasty Chinese female ceremonial robe, Khitan women attire, left-facing lapel narrow-sleeve long robe in vivid colors, crown and headscarf, earrings jade pendants boots, shaved forehead or coiled bun with face powder, Han families in Song-style robes, court solemnity, museum-grade reconstruction",
+      "negativeZh": [
+        "齐胸襦裙",
+        "披帛",
+        "缠足",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "chest-high ruqun",
+        "pibo",
+        "phoenix crown",
+        "mamian skirt",
+        "Qing headdress",
+        "bound feet",
+        "modern dress"
+      ],
+      "anchors": [
+        "契丹女服",
+        "左衽长袍",
+        "髡发盘髻",
+        "耳坠"
+      ],
+      "avoid": [
+        "右衽交领",
+        "凤冠霞帔",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "liao-f-c",
+      "slug": "liao",
+      "era": "辽",
+      "years": "916–1125",
+      "gender": "女",
+      "group": "契丹（并列汉族）",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "契丹长袍、裤、靴；汉女沿宋制",
+      "promptZh": "中国辽代女性常服，契丹女性左衽长袍配裤靴便于骑乘，帽耳环皮靴，髡发或盘髻素妆，汉族女性保留宋代褙子襦裙，汉契分制并行，博物馆级复原，写实工笔；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Liao dynasty Chinese female daily wear, Khitan women left-facing lapel long robe with trousers and boots for riding, hat earrings and boots, shaved forehead or coiled bun plain makeup, Han women keeping Song-style beizi and ruqun, dual system, museum-grade reconstruction",
+      "negativeZh": [
+        "齐胸襦裙",
+        "披帛",
+        "高跟鞋",
+        "现代裙装"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "chest-high ruqun",
+        "pibo",
+        "phoenix crown",
+        "mamian skirt",
+        "Qing headdress",
+        "high heels",
+        "modern skirt"
+      ],
+      "anchors": [
+        "契丹长袍",
+        "裤靴",
+        "汉女沿宋制",
+        "髡发"
+      ],
+      "avoid": [
+        "右衽交领",
+        "凤冠霞帔",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "song-m-f",
+      "slug": "song",
+      "era": "宋",
+      "years": "960–1279",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "冕服、朝服、公服",
+      "promptZh": "中国宋代男性礼服，冕服朝服与公服，展脚幞头，圆领袍，公服按品级用紫绯绿青色，鱼袋玉带笏板，靴，内敛庄重，制度森严，博物馆级宋代服饰复原，工笔画风格",
+      "promptEn": "Song dynasty Chinese male ceremonial robe, mianfu and court robe, flat-winged futou, round-collar robe, rank colors purple crimson green and qing (dark cyan-black), fish pouch jade belt and tablet, boots, restrained and solemn, strict hierarchy, museum-grade reconstruction",
+      "negativeZh": [
+        "网巾",
+        "顶戴花翎",
+        "齐胸襦裙",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "wushamao",
+        "wangjin",
+        "Qing headdress",
+        "rank feathers",
+        "chest-high ruqun",
+        "modern suit"
+      ],
+      "anchors": [
+        "展脚幞头",
+        "圆领公服",
+        "品级用色",
+        "鱼袋笏板"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "song-m-c",
+      "slug": "song",
+      "era": "宋",
+      "years": "960–1279",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "直裰、道袍、巾帽",
+      "promptZh": "中国宋代男性常服，直裰道袍，线条平直，袖型收窄趋直，士人巾帽如东坡巾，布带布履，折扇，文人内敛风雅，博物馆级复原，写实工笔",
+      "promptEn": "Song dynasty Chinese male daily wear, zhiduo and daopao robes, straight lines, narrow straight sleeves, scholar hats such as Dongpo hat, cloth belt and shoes, folding fan, restrained literati elegance, museum-grade reconstruction",
+      "negativeZh": [
+        "网巾",
+        "顶戴花翎",
+        "胡服",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "wushamao",
+        "wangjin",
+        "Qing headdress",
+        "rank feathers",
+        "nomadic costume",
+        "modern jacket"
+      ],
+      "anchors": [
+        "直裰道袍",
+        "窄袖平直",
+        "东坡巾",
+        "折扇"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "song-m-a",
+      "slug": "song",
+      "era": "宋",
+      "years": "960–1279",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "realistic-gongbi",
+      "form": "步人甲（重型步兵甲）",
+      "promptZh": "中国宋代士兵铠甲，步人甲，上千甲叶连缀，披膊腿裙护肩完备，重达二三十公斤，兜鍪有护面，盾牌长枪弓弩，步兵重甲列阵，武经总要甲制，博物馆级复原，写实工笔",
+      "promptEn": "Song dynasty Chinese soldier armor, infantry heavy armor, over a thousand laced iron plates, shoulder leg and arm guards, weighing twenty to thirty kilograms, helmet with face guard, shield spear and crossbow, armored infantry formation, Wujing Zongyao armor system, museum-grade reconstruction",
+      "negativeZh": [
+        "现代防弹衣",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "mingguang armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern body armor",
+        "plastic texture"
+      ],
+      "anchors": [
+        "步人甲",
+        "甲叶连缀",
+        "护面兜鍪",
+        "步兵列阵"
+      ],
+      "avoid": [
+        "明光铠",
+        "布面甲",
+        "钢盔",
+        "欧洲骑士甲"
+      ]
+    },
+    {
+      "id": "song-f-f",
+      "slug": "song",
+      "era": "宋",
+      "years": "960–1279",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi-light",
+      "form": "大袖衫、霞帔、礼服褙子",
+      "promptZh": "中国宋代女性礼服，大袖衫与霞帔，礼服褙子直领对襟两侧开衩，命妇霞帔按等级配坠子，淡雅庄重，高髻插簪钗，淡妆花钿减少，珍珠妆为宋代特色，绣履，博物馆级复原，工笔淡彩",
+      "promptEn": "Song dynasty Chinese female ceremonial robe, large-sleeve shirt and xiapei, ceremonial beizi with straight front and side slits, rank-based xiapei with pendant, elegant, tall bun with hairpins, light makeup with fewer huadian, pearl makeup typical of Song, embroidered shoes, museum-grade reconstruction",
+      "negativeZh": [
+        "花钿浓妆",
+        "凤冠霞帔",
+        "缠足高跟鞋",
+        "唐妆"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "heavy huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "Ming phoenix crown",
+        "high heels",
+        "Tang makeup"
+      ],
+      "anchors": [
+        "大袖衫",
+        "霞帔",
+        "褙子",
+        "珍珠妆"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "song-f-c",
+      "slug": "song",
+      "era": "宋",
+      "years": "960–1279",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "褙子、抹胸、百褶裙",
+      "promptZh": "中国宋代女性常服，褙子直领对襟窄袖两侧开衩，内着抹胸与百褶裙，素雅配色，发簪，玉佩，布履，手帕，薄施脂粉，博物馆级宋代服饰复原，写实工笔",
+      "promptEn": "Song dynasty Chinese female daily wear, beizi with straight collar narrow sleeves and side slits, undergarment and pleated skirt, muted elegant colors, hairpins, jade pendants, cloth shoes, handkerchief, light makeup, museum-grade reconstruction",
+      "negativeZh": [
+        "花钿",
+        "凤冠",
+        "高跟鞋",
+        "现代连衣裙"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "huadian",
+        "mamian skirt",
+        "Qing headdress",
+        "phoenix crown",
+        "high heels",
+        "modern dress"
+      ],
+      "anchors": [
+        "褙子",
+        "抹胸",
+        "百褶裙",
+        "布履"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "jin-m-f",
+      "slug": "jurchen-jin",
+      "era": "金",
+      "years": "1115–1234",
+      "gender": "男",
+      "group": "女真（并列汉族）",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "女真礼服、汉式朝服",
+      "promptZh": "中国金代男性礼服，女真礼服，左衽窄袖袍与汉式朝服并存，熙宗后汉化加深制度渐趋宋制，冠帽革带靴佩刀，髡发梳辫，庄重，博物馆级复原，工笔画风格；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Jin dynasty Chinese male ceremonial robe, Jurchen ceremonial dress, left-facing lapel narrow-sleeve robe coexisting with Han-style court robes, increasing Sinicization after the Jurchen court adopted Han systems, hat belt boots and dagger, shaved forehead with braid, solemn, museum-grade reconstruction",
+      "negativeZh": [
+        "圆领袍",
+        "幞头",
+        "顶戴花翎",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "round collar robe",
+        "futou",
+        "mandarin square",
+        "wushamao",
+        "mamian skirt",
+        "rank feathers",
+        "modern suit"
+      ],
+      "anchors": [
+        "女真礼服",
+        "左衽窄袖",
+        "汉化",
+        "髡发"
+      ],
+      "avoid": [
+        "右衽交领",
+        "补子",
+        "乌纱帽",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "jin-m-c",
+      "slug": "jurchen-jin",
+      "era": "金",
+      "years": "1115–1234",
+      "gender": "男",
+      "group": "女真（并列汉族）",
+      "scene": "常服",
+      "style": "realistic",
+      "form": "女真长袍、窄袖左衽、皮靴",
+      "promptZh": "中国金代男性常服，女真长袍左衽窄袖便于骑射，毡帽革带皮靴耳坠，髡发梳辫，与宋辽服饰交融，游牧骑射生活，博物馆级复原，写实",
+      "promptEn": "Jin dynasty Chinese male daily wear, Jurchen long robe with left-facing lapel and narrow sleeves for riding and archery, felt hat leather belt boots and earrings, shaved forehead with braid, blending Song and Liao influences, nomadic life, museum-grade reconstruction",
+      "negativeZh": [
+        "圆领袍",
+        "幞头",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "round collar robe",
+        "futou",
+        "mandarin square",
+        "wushamao",
+        "mamian skirt",
+        "modern jacket"
+      ],
+      "anchors": [
+        "女真长袍",
+        "左衽窄袖",
+        "毡帽",
+        "髡发辫发"
+      ],
+      "avoid": [
+        "右衽交领",
+        "补子",
+        "乌纱帽",
+        "马面裙"
+      ]
+    },
+    {
+      "id": "jin-m-a",
+      "slug": "jurchen-jin",
+      "era": "金",
+      "years": "1115–1234",
+      "gender": "男",
+      "group": "女真（并列汉族）",
+      "scene": "铠甲",
+      "style": "gongbi-heavy",
+      "form": "女真重骑兵重甲、具装铠",
+      "promptZh": "中国金代士兵铠甲，女真重骑兵重甲（史称铁浮屠），人马俱甲，铁甲厚重，具装马铠，兜鍪，狼牙棒弓，髡发梳辫，重骑全身披挂，博物馆级复原，工笔重彩",
+      "promptEn": "Jin dynasty Chinese soldier armor, Jurchen heavy cavalry heavy armor (Tiefutu nickname), horse and rider both armored, heavy iron armor, cataphract horse armor, helmet, bone club and bow, shaved forehead with braid, fully armored heavy cavalry, museum-grade reconstruction",
+      "negativeZh": [
+        "现代防弹衣",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "mingguang armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern body armor",
+        "plastic texture"
+      ],
+      "anchors": [
+        "重骑兵重甲",
+        "人马俱甲",
+        "具装马铠",
+        "髡发辫发"
+      ],
+      "avoid": [
+        "明光铠",
+        "布面甲",
+        "钢盔",
+        "欧洲骑士甲"
+      ]
+    },
+    {
+      "id": "jin-f-f",
+      "slug": "jurchen-jin",
+      "era": "金",
+      "years": "1115–1234",
+      "gender": "女",
+      "group": "女真（并列汉族）",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "女真女服礼服、汉式礼服",
+      "promptZh": "中国金代女性礼服，女真女服左衽窄袖长袍，贵族用织金锦，头饰耳坠玉佩靴，盘髻或辫发素妆，汉式礼服渐普及，宫廷庄重，博物馆级复原，工笔重彩；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Jin dynasty Chinese female ceremonial robe, Jurchen women left-facing lapel narrow-sleeve long robe, gold-woven brocade for nobility, headdress earrings jade pendants and boots, coiled bun or braids with plain makeup, Han-style robes spreading, court solemnity, museum-grade reconstruction",
+      "negativeZh": [
+        "齐胸襦裙",
+        "披帛",
+        "缠足",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "chest-high ruqun",
+        "pibo",
+        "phoenix crown",
+        "mamian skirt",
+        "Qing headdress",
+        "bound feet",
+        "modern dress"
+      ],
+      "anchors": [
+        "女真女服",
+        "左衽窄袖",
+        "织金锦",
+        "辫发盘髻"
+      ],
+      "avoid": [
+        "右衽交领",
+        "凤冠霞帔",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "jin-f-c",
+      "slug": "jurchen-jin",
+      "era": "金",
+      "years": "1115–1234",
+      "gender": "女",
+      "group": "女真（并列汉族）",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "女真女性长袍、裤靴；汉女沿宋制",
+      "promptZh": "中国金代女性常服，女真女性长袍配裤靴便于骑乘，巾帽耳环皮靴，辫发盘髻简洁妆容，汉族女性保留宋代褙子襦裙，女真汉制交融，博物馆级复原，写实工笔；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Jin dynasty Chinese female daily wear, Jurchen women long robe with trousers and boots for riding, headscarf earrings and leather boots, braided or coiled hair with simple makeup, Han women keeping Song-style beizi and ruqun, cultural blending, museum-grade reconstruction",
+      "negativeZh": [
+        "齐胸襦裙",
+        "披帛",
+        "高跟鞋",
+        "现代裙装"
+      ],
+      "negativeEn": [
+        "right-facing cross lapel",
+        "chest-high ruqun",
+        "pibo",
+        "phoenix crown",
+        "mamian skirt",
+        "Qing headdress",
+        "high heels",
+        "modern skirt"
+      ],
+      "anchors": [
+        "女真长袍",
+        "裤靴",
+        "汉女沿宋制",
+        "辫发盘髻"
+      ],
+      "avoid": [
+        "右衽交领",
+        "凤冠霞帔",
+        "马面裙",
+        "旗头"
+      ]
+    },
+    {
+      "id": "yuan-m-f",
+      "slug": "yuan",
+      "era": "元",
+      "years": "1271–1368",
+      "gender": "男",
+      "group": "蒙古（并列汉族）",
+      "scene": "礼服",
+      "style": "realistic-gongbi",
+      "form": "质孙服、汉式朝服",
+      "promptZh": "中国元代男性礼服，质孙服，上下同色按等级配色，窄袖腰间褶裥，笠帽，宝石玉带，质孙腰带，皮靴，蒙古男性薙发梳辫，汉官宋式朝服，宫廷宴服，博物馆级复原，写实工笔；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Yuan dynasty Chinese male ceremonial robe, zhisun attire, monochrome outfit by rank, narrow sleeves and waist pleats, felt hat, jeweled belt, leather boots, Mongol men with shaved forehead and braid, Han officials in Song-style robes, court banquet attire, museum-grade reconstruction",
+      "negativeZh": [
+        "网巾",
+        "齐胸襦裙",
+        "披帛",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "wushamao",
+        "wangjin",
+        "rank feathers",
+        "chest-high ruqun",
+        "pibo",
+        "modern suit"
+      ],
+      "anchors": [
+        "质孙服",
+        "上下同色",
+        "窄袖褶裥",
+        "笠帽",
+        "薙发"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "顶戴花翎"
+      ]
+    },
+    {
+      "id": "yuan-m-c",
+      "slug": "yuan",
+      "era": "元",
+      "years": "1271–1368",
+      "gender": "男",
+      "group": "蒙古（并列汉族）",
+      "scene": "常服",
+      "style": "realistic",
+      "form": "蒙古袍、辫线袄",
+      "promptZh": "中国元代男性常服，蒙古袍与辫线袄，窄袖紧身腰间密褶，交领右衽，革带皮靴，刀子火镰，蒙古人薙发戴毡帽，汉人束发如旧，骑射生活，博物馆级复原，写实",
+      "promptEn": "Yuan dynasty Chinese male daily wear, Mongol robe and bianxian ao, narrow fitted sleeves with dense waist pleats, right-facing lapel, leather belt and boots, dagger and fire striker, Mongol shaved forehead and felt hat, Han men with tied hair, nomadic life, museum-grade reconstruction",
+      "negativeZh": [
+        "网巾",
+        "齐胸襦裙",
+        "披帛",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "wushamao",
+        "wangjin",
+        "rank feathers",
+        "chest-high ruqun",
+        "pibo",
+        "modern jacket"
+      ],
+      "anchors": [
+        "蒙古袍",
+        "辫线袄",
+        "腰间密褶",
+        "皮靴毡帽"
+      ],
+      "avoid": [
+        "补子",
+        "乌纱帽",
+        "马面裙",
+        "顶戴花翎"
+      ]
+    },
+    {
+      "id": "yuan-m-a",
+      "slug": "yuan",
+      "era": "元",
+      "years": "1271–1368",
+      "gender": "男",
+      "group": "蒙古（并列汉族）",
+      "scene": "铠甲",
+      "style": "realistic",
+      "form": "蒙古骑兵甲（皮甲为主）",
+      "promptZh": "中国元代士兵铠甲，蒙古骑兵甲，皮甲为主部分铁甲，轻便便于骑射机动，窄袖战袍外披甲，铁胄或皮胄，弓马刀骨朵，薙发戴笠形胄，骑射轻装，博物馆级复原，写实",
+      "promptEn": "Yuan dynasty Chinese soldier armor, Mongol cavalry armor, mainly leather with some iron, light for mobile mounted archery, narrow battle robe over armor, iron or leather helmet, bow saber and bone club, shaved hair with conical helmet, museum-grade reconstruction",
+      "negativeZh": [
+        "欧洲骑士甲",
+        "现代防弹衣"
+      ],
+      "negativeEn": [
+        "mingguang armor",
+        "Song infantry armor",
+        "padded cotton armor",
+        "steel helmet",
+        "European knight armor",
+        "modern body armor"
+      ],
+      "anchors": [
+        "蒙古骑兵甲",
+        "皮甲为主",
+        "骑射机动",
+        "笠形胄"
+      ],
+      "avoid": [
+        "明光铠",
+        "步人甲",
+        "布面甲",
+        "钢盔"
+      ]
+    },
+    {
+      "id": "yuan-f-f",
+      "slug": "yuan",
+      "era": "元",
+      "years": "1271–1368",
+      "gender": "女",
+      "group": "蒙古（并列汉族）",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "蒙古女服礼服、姑姑冠礼服",
+      "promptZh": "中国元代女性礼服，蒙古女服礼服，窄袖长袍用料华贵，罟罟冠姑姑冠高耸为贵族女性标志，珠串宝石耳坠玉佩，敷粉眉形细长，宫廷隆重，博物馆级复原，工笔重彩",
+      "promptEn": "Yuan dynasty Chinese female ceremonial robe, Mongol noblewomen's attire, narrow-sleeve long robe in luxurious fabric, towering gugu crown as noble marker, pearl strands jewels earrings jade pendants, face powder and thin eyebrows, court solemnity, museum-grade reconstruction",
+      "negativeZh": [
+        "补子",
+        "顶戴花翎",
+        "披帛",
+        "缠足",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "phoenix crown",
+        "Qing headdress",
+        "rank feathers",
+        "chest-high ruqun",
+        "pibo",
+        "bound feet",
+        "modern dress"
+      ],
+      "anchors": [
+        "姑姑冠",
+        "窄袖长袍",
+        "珠串宝石",
+        "敷粉细眉"
+      ],
+      "avoid": [
+        "马面裙",
+        "凤冠霞帔",
+        "旗头",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "yuan-f-c",
+      "slug": "yuan",
+      "era": "元",
+      "years": "1271–1368",
+      "gender": "女",
+      "group": "蒙古（并列汉族）",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "蒙古长袍、汉式褙子襦裙",
+      "promptZh": "中国元代女性常服，蒙古长袍窄袖便于骑乘，巾帽耳环皮靴，汉族女性保留宋代褙子襦裙，汉蒙分制并行，蒙古女性梳辫盘髻戴帽，博物馆级复原，写实工笔；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Yuan dynasty Chinese female daily wear, Mongol long narrow-sleeve robe for riding, headscarf earrings leather boots, Han women keeping Song-style beizi and ruqun, dual system, Mongol braided buns and hats, museum-grade reconstruction",
+      "negativeZh": [
+        "补子",
+        "顶戴花翎",
+        "披帛",
+        "高跟鞋",
+        "现代裙装"
+      ],
+      "negativeEn": [
+        "mamian skirt",
+        "mandarin square",
+        "phoenix crown",
+        "Qing headdress",
+        "rank feathers",
+        "chest-high ruqun",
+        "pibo",
+        "high heels",
+        "modern skirt"
+      ],
+      "anchors": [
+        "蒙古长袍",
+        "汉式褙子",
+        "皮靴",
+        "辫发盘髻"
+      ],
+      "avoid": [
+        "马面裙",
+        "凤冠霞帔",
+        "旗头",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "ming-m-f",
+      "slug": "ming",
+      "era": "明",
+      "years": "1368–1644",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "冕服、圆领袍、补服",
+      "promptZh": "中国明代男性礼服，冕服与圆领袍补服，乌纱帽，补子分文武品级文官禽武官兽，玉带笏板靴，网巾束发为明代标志，帝王冕服十二章纹，庄重威严，博物馆级明代服饰复原，工笔画风格",
+      "promptEn": "Ming dynasty Chinese male ceremonial robe, mianfu and round-collar bufu, wushamao hat, rank badges birds for civil beasts for military, jade belt and ivory tablet, boots, wangjin hair net as Ming hallmark, imperial mianfu twelve emblems, solemn, museum-grade reconstruction",
+      "negativeZh": [
+        "马蹄袖",
+        "披帛",
+        "胡服",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "futou",
+        "Qing headdress",
+        "rank hat feathers",
+        "horseshoe cuffs",
+        "chest-high ruqun",
+        "pibo",
+        "nomadic costume",
+        "modern suit"
+      ],
+      "anchors": [
+        "补服",
+        "乌纱帽",
+        "网巾",
+        "玉带笏板"
+      ],
+      "avoid": [
+        "幞头",
+        "旗头",
+        "顶戴花翎",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "ming-m-c",
+      "slug": "ming",
+      "era": "明",
+      "years": "1368–1644",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "直裰、道袍、曳撒、贴里",
+      "promptZh": "中国明代男性常服，直裰道袍曳撒贴里，立领开始出现，曳撒贴里保留元代褶裥，网巾束发包头巾，方巾，革带布履，折扇，文人多蓄须，博物馆级复原，写实工笔",
+      "promptEn": "Ming dynasty Chinese male daily wear, zhiduo daopao yisa and tieli robes, emerging stand collar, yisa retaining Yuan pleats, wangjin hair net and headwrap, square hat, leather belt and cloth shoes, folding fan, literati beards, museum-grade reconstruction",
+      "negativeZh": [
+        "马蹄袖",
+        "披帛",
+        "胡服",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "futou",
+        "Qing headdress",
+        "rank hat feathers",
+        "horseshoe cuffs",
+        "chest-high ruqun",
+        "pibo",
+        "nomadic costume",
+        "modern jacket"
+      ],
+      "anchors": [
+        "直裰道袍",
+        "曳撒贴里",
+        "网巾方巾",
+        "立领"
+      ],
+      "avoid": [
+        "幞头",
+        "旗头",
+        "顶戴花翎",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "ming-m-a",
+      "slug": "ming",
+      "era": "明",
+      "years": "1368–1644",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "realistic-gongbi",
+      "form": "布面甲（棉甲）、锁子甲",
+      "promptZh": "中国明代士兵铠甲，布面甲，铁甲片内衬棉布外露铆钉，兼有锁子甲与明光铠遗制，头盔有护面护颈，军士穿号衣，盾长枪鸟铳腰刀，火器与冷兵器并用，博物馆级复原，写实工笔",
+      "promptEn": "Ming dynasty Chinese soldier armor, padded cotton armor with iron plates lined inside and exposed rivets, mail armor and Mingguang remnants, helmet with face and neck guards, soldiers in identification uniforms, shield spear musket and saber, firearms alongside cold weapons, museum-grade reconstruction",
+      "negativeZh": [
+        "现代防弹衣",
+        "塑料质感",
+        "清式八旗甲"
+      ],
+      "negativeEn": [
+        "steel helmet",
+        "European knight armor",
+        "modern body armor",
+        "plastic texture",
+        "Qing banner armor",
+        "Japanese samurai armor"
+      ],
+      "anchors": [
+        "布面甲",
+        "外露铆钉",
+        "号衣",
+        "鸟铳"
+      ],
+      "avoid": [
+        "钢盔",
+        "欧洲骑士甲",
+        "八旗甲",
+        "日本武士甲"
+      ]
+    },
+    {
+      "id": "ming-f-f",
+      "slug": "ming",
+      "era": "明",
+      "years": "1368–1644",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "大衫霞帔、圆领大袖翟衣",
+      "promptZh": "中国明代女性礼服，大衫霞帔命妇礼服，圆领大袖翟衣式礼服，霞帔按品级分等，凤冠簪钗霞帔坠子玉佩绣履，高髻戴凤冠，敷粉胭脂樱桃小口，纹样有品级规定，庄重华丽，博物馆级复原，工笔重彩",
+      "promptEn": "Ming dynasty Chinese female ceremonial robe, dashan robe and xiapei, round-collar wide-sleeve diyi ceremonial gown, rank-based xiapei, phoenix crown and hairpins, jade pendants and embroidered shoes, tall bun with phoenix crown, face powder rouge and cherry lips, rank-regulated patterns, solemn, museum-grade reconstruction",
+      "negativeZh": [
+        "幞头",
+        "顶戴花翎",
+        "唐妆花钿",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "futou",
+        "Qing headdress",
+        "rank hat feathers",
+        "flowerpot shoes",
+        "Tang huadian",
+        "modern dress"
+      ],
+      "anchors": [
+        "大衫霞帔",
+        "凤冠",
+        "圆领大袖",
+        "樱桃小口"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "旗头",
+        "花盆底"
+      ]
+    },
+    {
+      "id": "ming-f-c",
+      "slug": "ming",
+      "era": "明",
+      "years": "1368–1644",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "立领袄、马面裙、披风",
+      "promptZh": "中国明代女性常服，立领对襟袄与马面裙，上衣下裳分体，马面裙前后裙门两侧打褶，披风，发簪耳挖簪手帕，布履，挽髻簪钗淡妆，民间朴素配色，博物馆级复原，写实工笔",
+      "promptEn": "Ming dynasty Chinese female daily wear, stand-collar front-opening ao and mamian pleated skirt, separate upper and lower garments, front and back skirt panels with side pleats, cloak, hairpins and earpick hairpin, handkerchief, cloth shoes, bun with light makeup, plain folk colors, museum-grade reconstruction",
+      "negativeZh": [
+        "幞头",
+        "顶戴花翎",
+        "唐妆花钿",
+        "现代连衣裙"
+      ],
+      "negativeEn": [
+        "chest-high ruqun",
+        "pibo",
+        "futou",
+        "Qing headdress",
+        "rank hat feathers",
+        "flowerpot shoes",
+        "Tang huadian",
+        "modern dress"
+      ],
+      "anchors": [
+        "立领袄",
+        "马面裙",
+        "耳挖簪",
+        "布履"
+      ],
+      "avoid": [
+        "齐胸襦裙",
+        "披帛",
+        "旗头",
+        "花盆底"
+      ]
+    },
+    {
+      "id": "qing-m-f",
+      "slug": "qing",
+      "era": "清",
+      "years": "1636–1912",
+      "gender": "男",
+      "group": "满族",
+      "scene": "礼服",
+      "style": "gongbi",
+      "form": "补服、朝袍、顶戴花翎",
+      "promptZh": "中国清代男性礼服，补服朝袍，顶戴花翎按品级，朝珠，胸前补子，马蹄箭袖，剃发蓄辫前剃后梳，官靴，庄重威严，清代宫廷服饰制度，博物馆级复原，工笔画风格",
+      "promptEn": "Qing dynasty Chinese male ceremonial robe, bufu and court robe, rank hat with peacock feather, court beads, chest badge, horseshoe cuff sleeves, shaved forehead with queue braid, official boots, solemn, Qing court costume system, museum-grade reconstruction",
+      "negativeZh": [
+        "马面裙",
+        "披帛",
+        "明式补服",
+        "现代西装"
+      ],
+      "negativeEn": [
+        "futou",
+        "wushamao",
+        "wangjin",
+        "mamian skirt",
+        "chest-high ruqun",
+        "pibo",
+        "Ming-style bufu",
+        "modern suit"
+      ],
+      "anchors": [
+        "补服",
+        "顶戴花翎",
+        "朝珠",
+        "马蹄袖",
+        "剃发辫"
+      ],
+      "avoid": [
+        "幞头",
+        "乌纱帽",
+        "网巾",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "qing-m-c",
+      "slug": "qing",
+      "era": "清",
+      "years": "1636–1912",
+      "gender": "男",
+      "group": "满族",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "长袍马褂、瓜皮帽",
+      "promptZh": "中国清代男性常服，长袍外罩马褂，窄袖马蹄袖，瓜皮帽，扳指鼻烟壶荷包，布鞋，剃发梳辫，日常便服，博物馆级复原，写实工笔",
+      "promptEn": "Qing dynasty Chinese male daily wear, long robe with mandarin jacket, narrow horseshoe cuffs, skullcap, thumb ring snuff bottle and pouch, cloth shoes, shaved forehead and braid, daily attire, museum-grade reconstruction",
+      "negativeZh": [
+        "马面裙",
+        "披帛",
+        "明式直裰",
+        "现代夹克"
+      ],
+      "negativeEn": [
+        "futou",
+        "wushamao",
+        "wangjin",
+        "mamian skirt",
+        "chest-high ruqun",
+        "pibo",
+        "Ming zhiduo",
+        "modern jacket"
+      ],
+      "anchors": [
+        "长袍马褂",
+        "瓜皮帽",
+        "扳指鼻烟壶",
+        "辫发"
+      ],
+      "avoid": [
+        "幞头",
+        "乌纱帽",
+        "网巾",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "qing-m-a",
+      "slug": "qing",
+      "era": "清",
+      "years": "1636–1912",
+      "gender": "男",
+      "group": "满族",
+      "scene": "铠甲",
+      "style": "gongbi-heavy",
+      "form": "八旗甲胄（布面甲／棉甲）",
+      "promptZh": "中国清代士兵铠甲，八旗甲胄，布面甲为主，上衣下裳式甲衣，胸前甲补，铁甲礼服化，头盔有顶戴护面护颈，剃发蓄辫戴盔，弓刀火枪，仪仗与实战并存，博物馆级复原，工笔重彩",
+      "promptEn": "Qing dynasty Chinese soldier armor, Eight Banners armor, mainly padded cotton armor, jacket and skirt style armor with chest badge, iron armor ceremonial, helmet with rank finial face and neck guards, shaved head with queue, bow saber and musket, ceremonial and combat use, museum-grade reconstruction",
+      "negativeZh": [
+        "现代军装",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "Ming padded armor",
+        "steel helmet",
+        "European knight armor",
+        "modern uniform",
+        "plastic texture",
+        "Japanese samurai armor"
+      ],
+      "anchors": [
+        "八旗甲胄",
+        "甲补",
+        "顶戴头盔",
+        "剃发辫"
+      ],
+      "avoid": [
+        "明式布面甲",
+        "钢盔",
+        "欧洲骑士甲",
+        "日本武士甲"
+      ]
+    },
+    {
+      "id": "qing-f-f",
+      "slug": "qing",
+      "era": "清",
+      "years": "1636–1912",
+      "gender": "女",
+      "group": "满汉双轨",
+      "scene": "礼服",
+      "style": "gongbi-heavy",
+      "form": "旗装礼服、朝服、汉女霞帔",
+      "promptZh": "中国清代女性礼服，满族立领旗装礼服，朝服，宽大直筒，旗头两把头大拉翅，朝珠，一耳三钳，花盆底鞋，汉族女性保留霞帔明式袄裙，面部妆容素净，满汉双轨，博物馆级复原，工笔重彩；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Qing dynasty Chinese female ceremonial robe, Manchu stand-collar qizhuang, court robe, wide straight cut, two-handle and large-wing flag headdress, court beads, three earrings per ear, flowerpot sole shoes, Han women keeping xiapei and Ming-style aoqun, plain makeup, Manchu-Han dual system, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛",
+        "凤冠霞帔",
+        "现代礼服"
+      ],
+      "negativeEn": [
+        "futou",
+        "wushamao",
+        "wangjin",
+        "chest-high ruqun",
+        "pibo",
+        "Ming phoenix crown",
+        "modern dress"
+      ],
+      "anchors": [
+        "旗装",
+        "两把头大拉翅",
+        "一耳三钳",
+        "花盆底"
+      ],
+      "avoid": [
+        "幞头",
+        "乌纱帽",
+        "网巾",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "qing-f-c",
+      "slug": "qing",
+      "era": "清",
+      "years": "1636–1912",
+      "gender": "女",
+      "group": "满汉双轨",
+      "scene": "常服",
+      "style": "realistic-gongbi",
+      "form": "旗装、汉女袄裙",
+      "promptZh": "中国清代女性常服，满族旗装直筒两侧开衩，旗头耳坠手帕花盆底鞋，汉族女性袄裙上衣下裳，满汉双轨并行，挽髻，博物馆级复原，写实工笔；本图主体为该朝代主体族群服饰，汉式服饰仅作制度并列说明，不与主体服饰混穿于同一人物",
+      "promptEn": "Qing dynasty Chinese female daily wear, Manchu qizhuang straight robe with side slits, flag headdress earrings handkerchief and flowerpot shoes, Han women in aoqun with cloth shoes, Manchu-Han dual system, hair buns, museum-grade reconstruction",
+      "negativeZh": [
+        "披帛",
+        "凤冠",
+        "现代连衣裙"
+      ],
+      "negativeEn": [
+        "futou",
+        "wushamao",
+        "wangjin",
+        "chest-high ruqun",
+        "pibo",
+        "phoenix crown",
+        "modern dress"
+      ],
+      "anchors": [
+        "旗装开衩",
+        "花盆底鞋",
+        "汉女袄裙",
+        "满汉双轨"
+      ],
+      "avoid": [
+        "幞头",
+        "乌纱帽",
+        "网巾",
+        "齐胸襦裙"
+      ]
+    },
+    {
+      "id": "mg-m-f",
+      "slug": "republic",
+      "era": "民国",
+      "years": "1912–1949",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "photo-realistic",
+      "form": "西装、长衫马褂、中山装",
+      "promptZh": "中国民国男性礼服，西装三件套，长衫马褂作为传统礼服，中山装立领四袋，礼帽领带怀表皮鞋手杖，剪辫后短发西装油头，中西合璧，博物馆级复原，写实摄影风格",
+      "promptEn": "Republic of China male ceremonial attire, three-piece western suit, long gown and mandarin jacket as traditional formal wear, Sun Yat-sen suit with stand collar and four pockets, bowler hat tie pocket watch leather shoes cane, short hair after queue cutting, East-West fusion, museum-grade reconstruction, realistic photography",
+      "negativeZh": [
+        "清代顶戴花翎",
+        "古代深衣",
+        "现代休闲T恤",
+        "运动鞋"
+      ],
+      "negativeEn": [
+        "Qing rank hat",
+        "queue braid",
+        "horseshoe cuffs",
+        "ancient shenyi",
+        "modern casual t-shirt",
+        "sneakers"
+      ],
+      "anchors": [
+        "西装三件套",
+        "中山装",
+        "礼帽怀表",
+        "短发"
+      ],
+      "avoid": [
+        "顶戴花翎",
+        "辫发",
+        "马蹄袖"
+      ]
+    },
+    {
+      "id": "mg-m-c",
+      "slug": "republic",
+      "era": "民国",
+      "years": "1912–1949",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic",
+      "form": "长衫、中山装、学生装",
+      "promptZh": "中国民国男性常服，长衫中山装学生装西装中西并存，学生装立领简洁，布鞋或皮鞋，礼帽围巾，短发为主，都市日常，博物馆级复原，写实风格",
+      "promptEn": "Republic of China male daily wear, long gown Sun Yat-sen suit student uniform and western suit coexisting, simple stand-collar student uniform, cloth or leather shoes, hat and scarf, short hair, urban daily life, museum-grade reconstruction",
+      "negativeZh": [
+        "清代顶戴花翎",
+        "古代深衣",
+        "现代卫衣",
+        "运动鞋"
+      ],
+      "negativeEn": [
+        "Qing rank hat",
+        "queue braid",
+        "horseshoe cuffs",
+        "ancient shenyi",
+        "modern hoodie",
+        "sneakers"
+      ],
+      "anchors": [
+        "长衫",
+        "中山装",
+        "学生装",
+        "礼帽围巾"
+      ],
+      "avoid": [
+        "顶戴花翎",
+        "辫发",
+        "马蹄袖"
+      ]
+    },
+    {
+      "id": "mg-m-a",
+      "slug": "republic",
+      "era": "民国",
+      "years": "1912–1949",
+      "gender": "男",
+      "group": "汉族",
+      "scene": "铠甲",
+      "style": "photo-realistic",
+      "form": "近代军装（传统铠甲退出实战）",
+      "promptZh": "中国民国时期军人装束，传统铠甲退出实战，立领军装，钢盔，军靴皮带，步枪刺刀望远镜，短发戴钢盔或军帽，近代军人形象，写实摄影风格，博物馆级复原",
+      "promptEn": "Republic of China military uniform, traditional armor withdrawn from combat, stand-collar uniform, steel helmet, military boots and belt, rifle bayonet and binoculars, short hair with steel helmet or service cap, modern soldier image, realistic photography, museum-grade reconstruction",
+      "negativeZh": [
+        "古代兜鍪",
+        "塑料质感"
+      ],
+      "negativeEn": [
+        "traditional armor",
+        "padded cotton armor",
+        "Qing banner armor",
+        "mingguang armor",
+        "ancient helmet",
+        "plastic texture"
+      ],
+      "anchors": [
+        "立领军装",
+        "钢盔",
+        "步枪刺刀",
+        "短发"
+      ],
+      "avoid": [
+        "传统铠甲",
+        "布面甲",
+        "八旗甲胄",
+        "明光铠"
+      ]
+    },
+    {
+      "id": "mg-f-f",
+      "slug": "republic",
+      "era": "民国",
+      "years": "1912–1949",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "礼服",
+      "style": "photo-realistic",
+      "form": "改良旗袍、婚纱、西式礼服",
+      "promptZh": "中国民国女性礼服，改良旗袍收腰开衩丝绒绸缎，西式婚纱，珍珠项链耳环高跟鞋手包，烫发柳叶眉红唇西式妆容，中西合璧，博物馆级复原，写实摄影风格",
+      "promptEn": "Republic of China female ceremonial attire, improved qipao with fitted waist and side slits in velvet and silk, western wedding dress, pearl necklace earrings high heels and clutch, permed hair willow brows red lips, western makeup, East-West fusion, museum-grade reconstruction, realistic photography",
+      "negativeZh": [
+        "清代旗头大拉翅",
+        "花盆底鞋",
+        "缠足弓鞋",
+        "明代凤冠霞帔",
+        "唐宋襦裙",
+        "现代晚礼服"
+      ],
+      "negativeEn": [
+        "Qing flag headdress",
+        "flowerpot shoes",
+        "bound feet",
+        "Ming phoenix crown",
+        "Tang Song ruqun",
+        "modern evening gown"
+      ],
+      "anchors": [
+        "改良旗袍",
+        "收腰开衩",
+        "烫发珍珠",
+        "高跟鞋"
+      ],
+      "avoid": [
+        "旗头",
+        "花盆底",
+        "凤冠霞帔"
+      ]
+    },
+    {
+      "id": "mg-f-c",
+      "slug": "republic",
+      "era": "民国",
+      "years": "1912–1949",
+      "gender": "女",
+      "group": "汉族",
+      "scene": "常服",
+      "style": "realistic",
+      "form": "改良旗袍、袄裙、布拉吉",
+      "promptZh": "中国民国女性常服，改良旗袍日常化，袄裙保留传统，西式连衣裙布拉吉在城市流行，围巾手套，高跟鞋或布鞋，短发烫发淡妆，博物馆级复原，写实风格",
+      "promptEn": "Republic of China female daily wear, everyday qipao, traditional aoqun, western dresses in cities, scarf and gloves, high heels or cloth shoes, short or permed hair, light makeup, museum-grade reconstruction",
+      "negativeZh": [
+        "清代旗头大拉翅",
+        "花盆底鞋",
+        "缠足弓鞋",
+        "明代凤冠霞帔",
+        "唐宋襦裙",
+        "现代牛仔裤"
+      ],
+      "negativeEn": [
+        "Qing flag headdress",
+        "flowerpot shoes",
+        "bound feet",
+        "Ming phoenix crown",
+        "Tang Song ruqun",
+        "modern jeans"
+      ],
+      "anchors": [
+        "改良旗袍",
+        "袄裙",
+        "布拉吉",
+        "烫发淡妆"
+      ],
+      "avoid": [
+        "旗头",
+        "花盆底",
+        "凤冠霞帔"
+      ]
+    }
+  ]
+}
